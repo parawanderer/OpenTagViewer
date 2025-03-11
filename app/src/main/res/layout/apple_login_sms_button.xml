@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    >
+
+    <Button
+        android:id="@+id/twofactorauth_choice_sms"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fontFamily="@font/nunito_medium"
+        android:text="@string/auth_by_sms_to_x"
+        android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
+        android:textSize="18sp"
+        app:icon="@drawable/sms_24px"
+        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+</layout>

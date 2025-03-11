@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Airtag4All Mac Export Airtag Info schema",
+    "description": "This is the schema that defines how AIRTAG4ALL.yml files should look",
+    "type": "object",
+    "properties": {
+        "version": {
+            "description": "Config version number",
+            "type": "string",
+            "pattern": "^(([1-9][0-9]*|0)\\.){2}([1-9][0-9]*|0)$",
+            "examples": [ "1.0.0" ]
+        },
+        "via": {
+            "description": "Field that documents which program was used to export this zip",
+            "type": "string",
+            "examples": [ "testscript.py" ]
+        },
+        "sourceUser": {
+            "description": "Field that documents which user produced this export",
+            "type": "string",
+            "examples": [ "shane@wander.dev" ]
+        },
+        "exportTimestamp": {
+            "description": "Timestamp of the export (Unix epoch in ms)",
+            "type": "integer",
+            "examples": [ 1740960095453 ],
+            "minimum": 0
+        }
+    },
+    "required": [ "version", "via", "sourceUser", "exportTimestamp" ]
+}

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AirTagForAll</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+    <string name="menu_home">Home</string>
+    <string name="menu_gallery">Gallery</string>
+    <string name="menu_slideshow">Slideshow</string>
+    <string name="settings">Settings</string>
+    <string name="do_import">Import</string>
+    <string name="information">Information</string>
+    <string name="last_updated_x">Last Updated: %1$s</string>
+    <string name="location_history">Location History</string>
+    <string name="refresh">Refresh</string>
+    <string name="do_ring">Ring</string>
+    <string name="more">More</string>
+    <string name="version_x">Version %1$s</string>
+    <string name="free_opensource_software_by">Free, Open-Source Software by Shane B.</string>
+    <string name="github">Github</string>
+    <string name="developer_website">Developer Website</string>
+    <string name="anisette_server_url">Anisette Server URL</string>
+    <string name="url_to_an_anisette_server">URL to an <a href="">Anisette</a> server</string>
+    <string name="this_is_not_a_valid_url">This is not a valid URL</string>
+    <string name="language">Language</string>
+    <string name="_current_locale">en</string>
+    <string name="lang_en">English</string>
+    <string name="lang_nl">Dutch (Nederlands)</string>
+    <string name="lang_de">German (Deutsch)</string>
+    <string name="lang_fr">French (Français)</string>
+    <string name="lang_ru">Russian (Русский)</string>
+    <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
+    <string name="login_failed">Login failed</string>
+    <string name="email_or_phone_number">Email or Phone Number</string>
+    <string name="password">password</string>
+    <string name="apple_account">Apple Account</string>
+    <string name="login">Login</string>
+    <string name="welcome">Welcome !</string>
+    <string name="auth_by_sms_to_x">SMS (%1$s)</string>
+    <string name="auth_by_trusted_device">Trusted Device</string>
+    <string name="choose_your_server">Choose your Server</string>
+    <string name="choose_2fa_authentication_method">Choose a 2FA Authentication Method</string>
+    <string name="logging_in">Logging In ...</string>
+    <string name="enter_the_verification_code_sent_to_your_apple_devices">Enter the verification code sent to your Apple devices.</string>
+    <string name="enter_the_verification_code_sent_to_your_number_x">Enter the verification code sent to your phone number: %1$s</string>
+    <string name="requesting_code">Requesting Code ...</string>
+    <string name="two_factor_authentication">Two-factor authentication</string>
+    <string name="logged_in_as">Logged In As</string>
+    <string name="logout">Logout</string>
+</resources>

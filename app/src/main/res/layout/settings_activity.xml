@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable name="handleClickBack" type="Runnable" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/settings_top_toolbar"
+            layout="@layout/inline_top_toolbar"
+            app:onClickBack="@{handleClickBack}"
+            app:pageTitle="@{@string/settings}" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="30dp">
+
+            <include
+                android:id="@+id/settings_list"
+                layout="@layout/main_app_settings" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingLeft="20dp"
+            android:paddingTop="20dp"
+            android:paddingRight="20dp">
+
+            <include
+                android:id="@+id/login_info_container"
+                layout="@layout/login_information_settings" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</layout>

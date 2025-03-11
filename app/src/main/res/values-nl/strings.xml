@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AirTagForAll</string>
+    <string name="navigation_drawer_open">Navigatie menu openen</string>
+    <string name="navigation_drawer_close">Navigatie menu sluiten</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_desc">Navigatie header</string>
+    <string name="action_settings">Instellingen</string>
+    <string name="menu_home">Home</string>
+    <string name="menu_gallery">Gallerij</string>
+    <string name="menu_slideshow">Diavoorstelling</string>
+    <string name="settings">Instellingen</string>
+    <string name="do_import">Importeren</string>
+    <string name="information">Informatie</string>
+    <string name="last_updated_x">Laatste Update: %1$s</string>
+    <string name="location_history">Locatiegeschiedenis</string>
+    <string name="refresh">Vernieuwen</string>
+    <string name="do_ring">Bellen</string>
+    <string name="more">Meer</string>
+    <string name="version_x">Versie %1$s</string>
+    <string name="free_opensource_software_by">Vrije, Open-Bron Software geschreven door Shane B.</string>
+    <string name="github">Github</string>
+    <string name="developer_website">Website Ontwikkelaar</string>
+    <string name="anisette_server_url">Anisette Server-URL</string>
+    <string name="url_to_an_anisette_server">URL voor een <a href="">Anisette</a> server</string>
+    <string name="this_is_not_a_valid_url">Dit is niet een geldige URL</string>
+    <string name="language">Taal</string>
+    <string name="_current_locale">nl</string>
+    <string name="lang_en">Engels (English)</string>
+    <string name="lang_nl">Nederlands</string>
+    <string name="lang_de">Duits (Deutsch)</string>
+    <string name="lang_fr">Frans (Français)</string>
+    <string name="lang_ru">Russisch (Русский)</string>
+    <string name="anisette_server_at_x_could_not_be_reached">Anisette server %1$s kon niet bereikt worden!</string>
+    <string name="login_failed">Inloggen mislukt</string>
+    <string name="email_or_phone_number">Email of Telefoonnummer</string>
+    <string name="password">wachtwoord</string>
+    <string name="apple_account">Apple Account</string>
+    <string name="login">Inloggen</string>
+    <string name="welcome">Welkom !</string>
+    <string name="auth_by_sms_to_x">SMS (%1$s)</string>
+    <string name="auth_by_trusted_device">Vertrouwd Toestel</string>
+    <string name="choose_your_server">Kies je Server</string>
+    <string name="choose_2fa_authentication_method">Kies een 2FA-Authenticatiemethode</string>
+    <string name="logging_in">Inloggen ...</string>
+    <string name="enter_the_verification_code_sent_to_your_apple_devices">Voer de verificatiecode in die naar uw Apple-apparaten is verzonden.</string>
+    <string name="enter_the_verification_code_sent_to_your_number_x">Voer de verificatiecode in die naar uw telefoonnummer is verzonden: %1$s</string>
+    <string name="requesting_code">Code Opvragen…</string>
+    <string name="two_factor_authentication">Twee-factor-authenticatie</string>
+    <string name="logged_in_as">Ingelogd als</string>
+    <string name="logout">Uitloggen</string>
+</resources>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    >
+
+<data>
+    <variable name="handleClickBack" type="Runnable" />
+</data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/main"
+        style="?android:attr/borderlessButtonStyle"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/md_theme_background"
+        tools:context=".InformationActivity">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingTop="0dp"
+            tools:layout_editor_absoluteY="70dp">
+
+            <include
+                android:id="@+id/information_top_toolbar"
+                layout="@layout/inline_top_toolbar"
+                app:onClickBack="@{handleClickBack}"
+                app:pageTitle="@{@string/information}" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="30dp"
+                android:textAlignment="center">
+
+                <TextView
+                    android:id="@+id/appTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/nunito_bold"
+                    android:paddingBottom="20dp"
+                    android:text="@string/app_name"
+                    android:textAlignment="center"
+                    android:textColor="@android:color/primary_text_light"
+                    android:textSize="34sp" />
+
+                <TextView
+                    android:id="@+id/appVersion"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/nunito_bold"
+                    android:text="@string/version_x"
+                    android:textAlignment="center"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/appAbout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/free_opensource_software_by"
+                    android:textAlignment="center"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="40dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/button"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="15dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="@color/md_theme_surfaceContainerHigh_highContrast"
+                    android:onClick="onClickDeveloperWebsite"
+                    android:text="@string/developer_website"
+                    android:textColor="@color/md_theme_outlineVariant_mediumContrast"
+                    android:textSize="18sp"
+                    app:icon="@drawable/link_horizontal_24"
+                    app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
+
+                <Button
+                    android:id="@+id/button2"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:backgroundTint="@color/md_theme_surfaceContainerHigh_highContrast"
+                    android:onClick="onClickGithub"
+                    android:text="@string/github"
+                    android:textColor="@color/md_theme_outlineVariant_mediumContrast"
+                    android:textSize="18sp"
+                    app:icon="@drawable/github_24"
+                    app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
+
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

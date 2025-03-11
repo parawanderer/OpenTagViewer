@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AirTagForAll</string>
+    <string name="nav_header_title">Android Студия</string>
+    <string name="nav_header_desc">Заголовок навигации</string>
+    <string name="action_settings">Настройки</string>
+    <string name="menu_home">Дом</string>
+    <string name="menu_gallery">Галерея</string>
+    <string name="menu_slideshow">Слайд-шоу</string>
+    <string name="settings">Настройки</string>
+    <string name="do_import">Импорт</string>
+    <string name="information">Информация</string>
+    <string name="last_updated_x">Последнее обновление: %1$s</string>
+    <string name="location_history">История Местоположений</string>
+    <string name="refresh">Обновить</string>
+    <string name="do_ring">Звенеть</string>
+    <string name="more">Более</string>
+    <string name="version_x">Версия %1$s</string>
+    <string name="free_opensource_software_by">Бесплатное программное обеспечение с открытым исходным кодом от Шейна Б.</string>
+    <string name="github">Гитхаб</string>
+    <string name="developer_website">Сайт Разработчика</string>
+    <string name="anisette_server_url">URL-Адрес Сервера Anisette</string>
+    <string name="url_to_an_anisette_server">URL-Адрес от «<a href="">Anisette</a>» Сервера</string>
+    <string name="this_is_not_a_valid_url">Это недействительный URL</string>
+    <string name="language">Язык</string>
+    <string name="_current_locale">ru</string>
+    <string name="lang_en">Английский (English)</string>
+    <string name="lang_nl">Нидерландский (Nederlands)</string>
+    <string name="lang_de">Немецкий (Deutsch)</string>
+    <string name="lang_fr">Французский (Français)</string>
+    <string name="lang_ru">Русский</string>
+    <string name="anisette_server_at_x_could_not_be_reached">Не удалось связаться с сервером Anisette по адресу %1$s!</string>
+    <string name="login_failed">Ошибка входа</string>
+    <string name="email_or_phone_number">Имейл или Номер Телефона</string>
+    <string name="password">пароль</string>
+    <string name="apple_account">Аккаунт Apple</string>
+    <string name="login">Вход</string>
+    <string name="welcome">Добро Пожаловать !</string>
+    <string name="auth_by_sms_to_x">SMS (%1$s)</string>
+    <string name="auth_by_trusted_device">Доверенное Устройство</string>
+    <string name="choose_your_server">Выберите свой Сервер</string>
+    <string name="choose_2fa_authentication_method">Выберите Метод Аутентификации 2FA</string>
+    <string name="logging_in">Вход в систему ...</string>
+    <string name="enter_the_verification_code_sent_to_your_apple_devices">Введите проверочный код, отправленный на ваши устройства Apple.</string>
+    <string name="enter_the_verification_code_sent_to_your_number_x">Введите проверочный код, отправленный на ваш номер телефона: %1$s</string>
+    <string name="requesting_code">Запрос Кода...</string>
+    <string name="two_factor_authentication">Двухфакторная аутентификация</string>
+    <string name="logged_in_as">Авторизован Как</string>
+    <string name="logout">Выйти</string>
+</resources>

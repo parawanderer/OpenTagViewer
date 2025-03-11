@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+    <data>
+    </data>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/tag_item_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="4dp"
+            android:layout_marginRight="4dp"
+            android:background="@drawable/layout_rounded"
+            android:clipToPadding="false"
+            android:elevation="8dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/tag_item_top_text"
+                android:layout_width="match_parent"
+                android:layout_height="85dp"
+                android:orientation="horizontal"
+                android:paddingLeft="15dp"
+                android:paddingTop="10dp"
+                android:paddingRight="15dp"
+                android:paddingBottom="0dp">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="102dp"
+                    android:layout_height="52dp"
+                    android:layout_gravity="center"
+                    android:layout_weight="1">
+
+                    <ImageView
+                        android:id="@+id/imageView2"
+                        android:layout_width="90dp"
+                        android:layout_height="53dp"
+                        android:layout_weight="1"
+                        android:padding="5dp"
+                        android:src="@drawable/apple"
+                        android:tint="#B4B4B4"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingLeft="15dp"
+                    android:paddingTop="8dp"
+                    android:paddingRight="15dp">
+
+                    <TextView
+                        android:id="@+id/device_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/nunito_extra_bold"
+                        android:text="SomeTag 1"
+                        android:textColor="@android:color/primary_text_light"
+                        android:textSize="18sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingTop="3dp"
+                        android:paddingBottom="3dp">
+
+                        <androidx.constraintlayout.widget.ConstraintLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content">
+
+                            <ImageView
+                                android:id="@+id/imageView3"
+                                android:layout_width="19dp"
+                                android:layout_height="15dp"
+                                android:src="@drawable/marker_24_2"
+                                android:tint="@color/material_dynamic_neutral_variant40" />
+
+                        </androidx.constraintlayout.widget.ConstraintLayout>
+
+                        <TextView
+                            android:id="@+id/device_location"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="5sp"
+                            android:fontFamily="@font/nunito_bold"
+                            android:gravity="center_vertical"
+                            android:text="Streetstreet 1, 1234 City, Country"
+                            android:textColor="@color/material_dynamic_neutral40"
+                            android:textSize="12sp" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/device_last_update"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/nunito_semi_bold"
+                        android:text="@string/last_updated_x"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/tag_bottom_menu"
+                android:layout_width="match_parent"
+                android:layout_height="85dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:id="@+id/device_history_button_container"
+                    android:layout_width="80dp"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:onClick="onClickLocationHistory"
+                    android:orientation="vertical"
+                    android:padding="5dp">
+
+                    <ImageButton
+                        android:id="@+id/locationHistoryButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/circle"
+                        android:clickable="false"
+                        android:contextClickable="false"
+                        android:padding="11dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/alarm_clock_24" />
+
+                    <TextView
+                        android:id="@+id/locationHistoryText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/nunito_medium"
+                        android:gravity="center"
+                        android:text="@string/location_history"
+                        android:textAlignment="gravity"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/device_refresh_button_container"
+                    android:layout_width="80dp"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:onClick="onClickRefresh"
+                    android:orientation="vertical"
+                    android:padding="5dp">
+
+                    <ImageButton
+                        android:id="@+id/refreshButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/circle"
+                        android:clickable="false"
+                        android:contextClickable="false"
+                        android:padding="11dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/refresh_24" />
+
+                    <TextView
+                        android:id="@+id/refreshText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/nunito_medium"
+                        android:gravity="center"
+                        android:text="@string/refresh"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/device_ring_button_container"
+                    android:layout_width="80dp"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:onClick="onClickRing"
+                    android:orientation="vertical"
+                    android:padding="5dp">
+
+                    <ImageButton
+                        android:id="@+id/ringButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/circle"
+                        android:clickable="false"
+                        android:contextClickable="false"
+                        android:padding="11dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/volume_24" />
+
+                    <TextView
+                        android:id="@+id/ringText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/nunito_medium"
+                        android:gravity="center"
+                        android:text="@string/do_ring"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/device_more_button_container"
+                    android:layout_width="80dp"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:onClick="onClickMoreForDevice"
+                    android:orientation="vertical"
+                    android:padding="5dp">
+
+                    <ImageButton
+                        android:id="@+id/moreButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/circle"
+                        android:clickable="false"
+                        android:contextClickable="false"
+                        android:padding="11dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/menu_dots_24" />
+
+                    <TextView
+                        android:id="@+id/moreText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/nunito_medium"
+                        android:gravity="center"
+                        android:text="@string/more"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</layout>

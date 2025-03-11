@@ -1,0 +1,70 @@
+[versions]
+agp = "8.8.2"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+constraintlayout = "2.2.1"
+lifecycleLivedataKtx = "2.8.7"
+lifecycleViewmodelKtx = "2.8.7"
+navigationFragment = "2.8.8"
+navigationUi = "2.8.8"
+googleAndroidLibrariesMapsplatformSecretsGradlePlugin = "2.0.1"
+playServicesMaps = "19.1.0"
+chaquopyVersion = "16.0.0"
+roomVersion = "2.6.1"
+gradleLombokVersion = "5.0.0"
+lombokVersion = "1.18.36"
+jacksonVersion = "2.18.3"
+#googleCodePlist = "1.28"
+jsonSchemaValidator = "1.5.6"
+preference = "1.2.0"
+activity = "1.8.0"
+androidDatastore = "1.1.3"
+rxJavaVer = "3.0.2"
+googleCornet = "18.1.0"
+retrofit = "2.11.0"
+googleCronetRetrofit = "0.1.0"
+annotation = "1.6.0"
+
+[libraries]
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycleLivedataKtx" }
+lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
+navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version.ref = "navigationFragment" }
+navigation-ui = { group = "androidx.navigation", name = "navigation-ui", version.ref = "navigationUi" }
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
+android-room = { group = "androidx.room", name = "room-runtime", version.ref = "roomVersion" }
+android-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomVersion" }
+android-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "roomVersion" }
+android-room-paging = { group = "androidx.room", name = "room-paging", version.ref = "roomVersion" }
+projectlombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombokVersion" }
+fasterxml-jackson-core = { group = "com.fasterxml.jackson.core", name = "jackson-core", version.ref = "jacksonVersion" }
+fasterxml-jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jacksonVersion" }
+fasterxml-jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jacksonVersion" }
+fasterxml-jackson-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jacksonVersion" }
+#googlecode-plist = { group = "com.googlecode.plist", name = "dd-plist", version.ref = "googleCodePlist" }
+networknt-json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version.ref = "jsonSchemaValidator" }
+preference = { group = "androidx.preference", name = "preference", version.ref = "preference" }
+activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+rxjava3 = { group = "io.reactivex.rxjava3", name = "rxandroid", version.ref = "rxJavaVer" }
+datastore-prefs = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidDatastore" }
+datastore-prefs-rxjava3 = { group = "androidx.datastore", name = "datastore-preferences-rxjava3", version.ref = "androidDatastore" }
+google-cronet = { group = "com.google.android.gms", name = "play-services-cronet", version.ref = "googleCornet" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-jackson = { group = "com.squareup.retrofit2", name = "converter-jackson", version.ref = "retrofit" }
+retrofit-rxjava3 = { group = "com.squareup.retrofit2", name = "adapter-rxjava3", version.ref = "retrofit" }
+google-cronet-retrofit = { group = "com.google.net.cronet", name = "cronet-okhttp", version.ref = "googleCronetRetrofit" }
+annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+google-android-libraries-mapsplatform-secrets-gradle-plugin = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "googleAndroidLibrariesMapsplatformSecretsGradlePlugin" }
+chaquopy = { id = "com.chaquo.python", version.ref = "chaquopyVersion" }
+gradle-lombok = { id = "io.franzbecker.gradle-lombok", version.ref = "gradleLombokVersion" }

@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:visibility="visible">
+
+    <data>
+
+        <variable
+            name="allowServerConfNext"
+            type="boolean" />
+
+        <variable
+            name="allowAccountLogin"
+            type="boolean" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="80dp">
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="10dp">
+
+                <ImageView
+                    android:id="@+id/appleLogo"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    app:srcCompat="@drawable/apple" />
+
+                <TextView
+                    android:id="@+id/login_current_input_indicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:fontFamily="@font/nunito_bold"
+                    android:gravity="center"
+                    android:text="@string/welcome"
+                    android:textColor="@color/md_theme_onSurface"
+                    android:textSize="24sp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/login_anisette_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="30dp"
+                android:paddingTop="30dp"
+                android:paddingRight="30dp"
+                android:visibility="gone">
+
+                <include
+                    android:id="@+id/settings_list"
+                    layout="@layout/main_app_settings" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginTop="10dp"
+                    android:gravity="right"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/go_to_maininfo"
+                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:enabled="@{allowServerConfNext}"
+                        android:onClick="onClickToLoginAccount"
+                        app:icon="@drawable/arrow_forward_24px"
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
+                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+                </LinearLayout>
+
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/login_maininfo_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="50dp"
+                android:paddingTop="20dp"
+                android:paddingRight="50dp"
+                android:paddingBottom="50dp"
+                android:visibility="gone">
+
+                <FrameLayout
+                    android:id="@+id/login_error_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/layout_rounded_less"
+                    android:backgroundTint="@color/md_theme_errorContainer"
+                    android:visibility="invisible">
+
+                    <TextView
+                        android:id="@+id/textView2"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/nunito_medium"
+                        android:padding="8dp"
+                        android:text="@string/login_failed"
+                        android:textColor="@color/md_theme_onErrorContainer"
+                        android:textSize="14sp"
+                        tools:visibility="visible" />
+                </FrameLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/email_or_phone_container"
+                    style="?attr/textInputOutlinedDenseStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/email_or_phone_number">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/email_or_phone_input_field"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:enabled="true"
+                        android:inputType="text|textEmailAddress"
+                        android:singleLine="true" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/password_container"
+                    style="?attr/textInputOutlinedDenseStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/password"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/password_input_field"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:singleLine="true" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="clip_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/iconButton2"
+                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0"
+                        android:onClick="onClickBackToAnisetteSettings"
+                        app:icon="@drawable/arrow_back_24px"
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
+                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="right"
+                        android:orientation="vertical">
+
+                        <Button
+                            android:id="@+id/login_button_main"
+                            style="@style/Widget.Material3.Button"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:enabled="@{allowAccountLogin}"
+                            android:fontFamily="@font/nunito_medium"
+                            android:onClick="onClickLogin"
+                            android:paddingLeft="40dp"
+                            android:paddingRight="40dp"
+                            android:text="@string/login"
+                            android:textSize="20sp" />
+
+                    </LinearLayout>
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/login_2fa_choice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/textView3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:paddingBottom="10dp"
+                    android:text="@string/choose_2fa_authentication_method" />
+
+                <Button
+                    android:id="@+id/twofactorauth_choice_trusted_device"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/nunito_medium"
+                    android:onClick="onClick2FAWithTrustedDevice"
+                    android:text="@string/auth_by_trusted_device"
+                    android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
+                    android:textSize="18sp"
+                    app:icon="@drawable/devices_24px"
+                    app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+                <!--                <Button-->
+                <!--                    android:id="@+id/twofactorauth_choice_sms"-->
+                <!--                    style="@style/Widget.Material3.Button.OutlinedButton"-->
+                <!--                    android:layout_width="match_parent"-->
+                <!--                    android:layout_height="wrap_content"-->
+                <!--                    android:fontFamily="@font/nunito_medium"-->
+                <!--                    android:text="@string/auth_by_sms_to_x"-->
+                <!--                    android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"-->
+                <!--                    android:textSize="18sp"-->
+                <!--                    app:icon="@drawable/sms_24px"-->
+                <!--                    app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />-->
+
+                <!--                <include-->
+                <!--                    android:id="@+id/sms_button_inclusion"-->
+                <!--                    layout="@layout/apple_login_sms_button" />-->
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/login_2fa_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:visibility="gone">
+
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_1"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_1"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_2"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_2"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_3"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_3"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_4"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_4"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_5"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_5"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/twofactorauth_textinput_container_6"
+                        style="?attr/textInputOutlinedDenseStyle"
+                        android:layout_width="44dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/twofactorauth_textinput_6"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:padding="10dp"
+                            android:singleLine="true"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/twofa_sent_info_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="8dp"
+                    android:text="@string/enter_the_verification_code_sent_to_your_number_x" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_margin="8dp"
+                    android:background="@drawable/layout_rounded_less"
+                    android:backgroundTint="@color/md_theme_errorContainer"
+                    android:visibility="invisible">
+
+                    <TextView
+                        android:id="@+id/verification_code_error_message"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/nunito_medium"
+                        android:padding="8dp"
+                        android:text="@string/login_failed"
+                        android:textColor="@color/md_theme_onErrorContainer"
+                        android:textSize="14sp" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
+                    android:gravity="left"
+                    android:orientation="vertical"
+                    android:visibility="invisible">
+
+                    <Button
+                        android:id="@+id/twofactorauthchoice_back_button"
+                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:icon="@drawable/arrow_back_24px"
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
+                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/login_spinning_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="100dp"
+                android:paddingBottom="10dp"
+                android:visibility="visible">
+
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/apple_login_progress_indicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    app:hideAnimationBehavior="inward"
+                    app:showAnimationBehavior="inward"
+                    app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                    app:trackCornerRadius="2dp" />
+
+                <TextView
+                    android:id="@+id/login_spinner_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/nunito_bold"
+                    android:text="@string/title_placeholder" />
+
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+</layout>
