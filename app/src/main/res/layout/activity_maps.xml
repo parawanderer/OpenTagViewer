@@ -23,7 +23,11 @@
         android:layout_height="240dp"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
-        android:layout_alignParentBottom="true">
+        android:layout_alignParentBottom="true"
+        android:scrollbarAlwaysDrawHorizontalTrack="false"
+        android:scrollbarAlwaysDrawVerticalTrack="false"
+        android:scrollbars="none"
+        tools:visibility="gone">
 
         <LinearLayout
             android:id="@+id/tags_scroll_container"

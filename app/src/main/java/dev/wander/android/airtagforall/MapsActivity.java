@@ -48,9 +48,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
 
 import java.text.SimpleDateFormat;
-import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -73,6 +71,7 @@ import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.python.PythonAppleService;
 import dev.wander.android.airtagforall.python.PythonAuthService;
+import dev.wander.android.airtagforall.ui.maps.TagListSwiperHelper;
 import dev.wander.android.airtagforall.util.AppCryptographyUtil;
 import dev.wander.android.airtagforall.util.AppleZipImporterUtil;
 import dev.wander.android.airtagforall.util.BeaconDataParser;
@@ -114,6 +113,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private long last24HHistoryFetchAt = 0L;
 
+    private TagListSwiperHelper tagListSwiperHelper = null;
+
     private final ActivityResultLauncher<Intent> pickZipActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             (ActivityResult result) -> {
@@ -142,6 +143,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         beaconRepo = new BeaconRepository(
                 AirTag4AllDatabase.getInstance(getApplicationContext()));
+
+        this.setupTagScrollArea();
 
         this.handleAuthAndShowDevices();
 
@@ -733,6 +736,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             ));
             this.TEMP_hasNavigatedToMarkers = true;
         }
+    }
+
+    private void setupTagScrollArea() {
+        HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
+        this.tagListSwiperHelper = new TagListSwiperHelper(
+                scrollContainer,
+                this.dynamicCardsForTag
+        );
+        this.tagListSwiperHelper.setupTagScrollArea();
     }
 
     private synchronized void updateBeaconCards() {
