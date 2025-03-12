@@ -26,6 +26,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -33,6 +34,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -46,6 +48,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -114,6 +117,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private long last24HHistoryFetchAt = 0L;
 
     private TagListSwiperHelper tagListSwiperHelper = null;
+
+    private final Handler refreshSchedulerHandler = new Handler();
+    private Runnable nextLocationRefreshTask = null;
 
     private final ActivityResultLauncher<Intent> pickZipActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -188,6 +194,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         });
 
         this.enableMyLocation();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        // cleanup location refresh task
+        refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
+        this.nextLocationRefreshTask = null;
     }
 
     // TODO: Starting with here, refactor. Taken from the Google maps examples...
@@ -360,19 +375,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onResume() {
         super.onResume();
 
-        final long now = System.currentTimeMillis();
+        this.refreshIfAllowed();
+        // (re-)schedule tag location refresher
+        this.nextLocationRefreshTask = () -> {
+            refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
+            this.refreshIfAllowed();
+        };
+        refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
+    }
 
-        if (this.isAppleServiceInitialised()) {
-            if (now < this.last24HHistoryFetchAt + WAIT_BEFORE_REFETCH) {
-                Log.d(TAG, String.format(
-                        "We will not re-fetch Beacon history as less than %d ms (actual: %d ms) have passed since the last history fetch",
-                        WAIT_BEFORE_REFETCH,
-                        (now - this.last24HHistoryFetchAt)
-                ));
-            } else {
-                this.fetchAndUpdateCurrentBeacons();
-            }
+    private void refreshIfAllowed() {
+        if (!this.isAppleServiceInitialised()) {
+            Log.d(TAG, "AppleService was not initialised yet, so we can't refresh");
+            return;
         }
+
+        final long now = System.currentTimeMillis();
+        if (now < this.last24HHistoryFetchAt + WAIT_BEFORE_REFETCH) {
+            Log.d(TAG, String.format(
+                    "We will not re-fetch Beacon history as less than %d ms (actual: %d ms) have passed since the last history fetch",
+                    WAIT_BEFORE_REFETCH,
+                    (now - this.last24HHistoryFetchAt)
+            ));
+            return;
+        }
+
+        Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
+        this.fetchAndUpdateCurrentBeacons();
+        Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
+        Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
     }
 
     public void onClickMoreSettings(View view) {
@@ -495,12 +526,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void onClickLocationHistory(View view) {
-        ImageButton btn = findViewById(R.id.locationHistoryButton);
         Log.i(TAG, "The location history button was just clicked!");
     }
 
     public void onClickRefresh(View view) {
-        ImageButton btn = findViewById(R.id.refreshButton);
         Log.i(TAG, "The refresh button was just clicked!");
 
         final String beaconId = this.dynamicCardsForTag.entrySet()
@@ -508,6 +537,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .map(Map.Entry::getKey)
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Click refresh event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
+
+        final CircularProgressIndicator loadingIndicator = view.findViewById(R.id.refresh_loading_indicator);
+        loadingIndicator.setVisibility(VISIBLE);
+        final ImageView icon = view.findViewById(R.id.refresh_icon);
+        icon.setVisibility(GONE);
 
         // we can now fetch for this Id only!
         var async = this.fetchLastReportsFor(
@@ -519,22 +553,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .subscribe((__) -> {
                     Log.i(TAG, "Refreshed location data and markers for beaconId=" + beaconId + " on refresh button click");
                     this.runOnUiThread(() -> {
+                        loadingIndicator.setVisibility(GONE);
+                        icon.setVisibility(VISIBLE);
                         this.showLastDeviceLocations();
                         Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
                     });
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current location for beaconId=" + beaconId + " on refresh button click!");
-                    this.runOnUiThread(() -> Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show());
+                    this.runOnUiThread(() -> {
+                        loadingIndicator.setVisibility(GONE);
+                        icon.setVisibility(VISIBLE);
+                        Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
+                    });
                 });
     }
 
     public void onClickRing(View view) {
-        ImageButton btn = findViewById(R.id.ringButton);
         Log.i(TAG, "The ring button was just clicked!");
     }
 
     public void onClickMoreForDevice(View view) {
-        ImageButton btn = findViewById(R.id.moreButton);
         Log.i(TAG, "The more (device-level) button was just clicked!");
     }
 
@@ -650,7 +688,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         Objects.requireNonNull(newItems.get(key))
                 );
 
-                Log.i(TAG, String.format(
+                Log.d(TAG, String.format(
                         "Merged location history for beaconId=%s, which had %d items of location history, with %d new items of locationHistory to get a total of %d items of locationHistory",
                         key,
                         Objects.requireNonNull(this.beaconLocations.get(key)).size(),
@@ -709,7 +747,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             this.currentMarkers.remove(beaconId);
         }
 
-        Log.i(TAG, "Going to add new marker for beaconId=" + beaconId);
+        Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
         // TODO: make the markers prettier...
         final String markerTitle = String.format("%s %s", beacon.getEmoji(), beacon.getName());
@@ -840,7 +878,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMap(this.beaconRepo::storeLocationCache)
                 .subscribe((__) -> {
-                    Log.i(TAG, "Refreshed location data and markers!");
+                    Log.d(TAG, "Refreshed location data and markers!");
                     this.runOnUiThread(() -> {
                         this.showLastDeviceLocations();
                         Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
@@ -859,7 +897,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 HOURS_TO_GO_BACK_24H
         );
 
-        Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
+        Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
                 .doOnNext(reports -> this.last24HHistoryFetchAt = now); // on success, update this time.
     }

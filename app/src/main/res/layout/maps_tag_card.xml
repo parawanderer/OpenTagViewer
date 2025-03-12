@@ -130,17 +130,38 @@
                     android:orientation="vertical"
                     android:padding="5dp">
 
-                    <ImageButton
-                        android:id="@+id/locationHistoryButton"
+                    <FrameLayout
+                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/circle"
-                        android:clickable="false"
-                        android:contextClickable="false"
-                        android:padding="11dp"
+                        android:padding="8dp"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/alarm_clock_24" />
+                        >
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
+                            android:id="@+id/history_loading_indicator"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:indeterminate="true"
+                            app:hideAnimationBehavior="inward"
+                            app:showAnimationBehavior="inward"
+                            app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                            app:trackCornerRadius="2dp"
+                            android:visibility="gone"
+                            />
+
+                        <ImageView
+                            android:id="@+id/history_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/alarm_clock_24" />
+
+
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/locationHistoryText"
@@ -163,17 +184,38 @@
                     android:orientation="vertical"
                     android:padding="5dp">
 
-                    <ImageButton
-                        android:id="@+id/refreshButton"
+                    <FrameLayout
+                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/circle"
-                        android:clickable="false"
-                        android:contextClickable="false"
-                        android:padding="11dp"
+                        android:padding="8dp"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/refresh_24" />
+                        >
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
+                            android:id="@+id/refresh_loading_indicator"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:indeterminate="true"
+                            app:hideAnimationBehavior="inward"
+                            app:showAnimationBehavior="inward"
+                            app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                            app:trackCornerRadius="2dp"
+                            android:visibility="gone"
+                            />
+
+                        <ImageView
+                            android:id="@+id/refresh_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/refresh_24" />
+
+
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/refreshText"
@@ -195,17 +237,38 @@
                     android:orientation="vertical"
                     android:padding="5dp">
 
-                    <ImageButton
-                        android:id="@+id/ringButton"
+                    <FrameLayout
+                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/circle"
-                        android:clickable="false"
-                        android:contextClickable="false"
-                        android:padding="11dp"
+                        android:padding="8dp"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/volume_24" />
+                        >
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
+                            android:id="@+id/ring_loading_indicator"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:indeterminate="true"
+                            app:hideAnimationBehavior="inward"
+                            app:showAnimationBehavior="inward"
+                            app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                            app:trackCornerRadius="2dp"
+                            android:visibility="gone"
+                            />
+
+                        <ImageView
+                            android:id="@+id/perform_ring_icon"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/volume_24" />
+
+
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/ringText"
@@ -227,17 +290,37 @@
                     android:orientation="vertical"
                     android:padding="5dp">
 
-                    <ImageButton
-                        android:id="@+id/moreButton"
+                    <FrameLayout
+                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/circle"
-                        android:clickable="false"
-                        android:contextClickable="false"
-                        android:padding="11dp"
+                        android:padding="8dp"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/menu_dots_24" />
+                        >
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
+                            android:id="@+id/more_loading_indicator"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:indeterminate="true"
+                            app:hideAnimationBehavior="inward"
+                            app:showAnimationBehavior="inward"
+                            app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                            app:trackCornerRadius="2dp"
+                            android:visibility="gone"
+                            />
+
+                        <ImageView
+                            android:id="@+id/tag_more_icon"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/menu_dots_24" />
+
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/moreText"
