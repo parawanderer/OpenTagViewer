@@ -72,14 +72,18 @@
     <LinearLayout
         android:id="@+id/buttons_bottom_right"
         android:layout_width="wrap_content"
-        android:layout_height="60dp"
+        android:layout_height="70dp"
         android:layout_alignParentRight="true"
         android:layout_alignParentBottom="true"
         android:layout_marginRight="10dp"
-        android:layout_marginBottom="250dp"
+        android:layout_marginBottom="240dp"
+        android:clipChildren="false"
         android:clipToPadding="false"
         android:orientation="horizontal"
-        android:padding="10dp">
+        android:paddingLeft="10dp"
+        android:paddingTop="10dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="20dp">
 
         <ImageButton
             android:id="@+id/button_my_location"
@@ -88,14 +92,14 @@
             android:layout_weight="1"
             android:background="@drawable/ripple_background"
             android:clickable="true"
-            android:focusable="true"
             android:cropToPadding="false"
             android:elevation="8dp"
+            android:focusable="true"
             android:onClick="onClickMyLocation"
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/my_location_24px"
-            android:visibility="gone" />
+            android:visibility="visible" />
 
     </LinearLayout>
 </RelativeLayout>
