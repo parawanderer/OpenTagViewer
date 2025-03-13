@@ -14,7 +14,7 @@ import java.util.Optional;
 import dev.wander.android.airtagforall.db.AppCryptographyException;
 import dev.wander.android.airtagforall.db.repo.model.AppleUserData;
 import dev.wander.android.airtagforall.db.repo.model.UserAuthData;
-import dev.wander.android.airtagforall.util.AppCryptographyUtil;
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;

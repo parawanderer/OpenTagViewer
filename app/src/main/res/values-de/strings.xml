@@ -47,4 +47,8 @@
     <string name="two_factor_authentication">Zwei-Faktor-Authentifizierung</string>
     <string name="logged_in_as">Angemeldet Als</string>
     <string name="logout">Ausloggen</string>
+    <string name="enable_location_permissions">Standortberechtigungen aktivieren?</string>
+    <string name="decline">Ablehnen</string>
+    <string name="accept">Akzeptieren</string>
+    <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Ihr Standort wird nur zur Visualisierung Ihrer aktuellen Position auf der Karte verwendet und verlässt Ihr Gerät nie.</string>
 </resources>

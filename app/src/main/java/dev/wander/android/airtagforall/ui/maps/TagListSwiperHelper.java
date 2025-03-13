@@ -12,9 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import kotlin.Triple;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NonNull;
 
 /**
  * Helps handle moving around the tag frames/cards at the bottom of the Map screen.
@@ -29,10 +32,16 @@ public class TagListSwiperHelper {
 
     private final HorizontalScrollView scrollContainer;
     private final Map<String, FrameLayout> dynamicCardsForTag;
+    private final Consumer<String> onScrollToTagCallback;
 
-    public TagListSwiperHelper(HorizontalScrollView scrollContainer, final Map<String, FrameLayout> dynamicCardsForTag) {
+    public TagListSwiperHelper(
+            @NonNull HorizontalScrollView scrollContainer,
+            @NonNull final Map<String, FrameLayout> dynamicCardsForTag,
+            @NonNull Consumer<String> onScrollToTagCallback
+            ) {
         this.scrollContainer = scrollContainer;
         this.dynamicCardsForTag = dynamicCardsForTag;
+        this.onScrollToTagCallback = onScrollToTagCallback;
     }
 
     public void setupTagScrollArea() {
@@ -98,6 +107,7 @@ public class TagListSwiperHelper {
         final int containerWidth = scrollContainer.getWidth();
         final int containerMid = containerWidth / 2;
 
+        String targetBeaconId = null;
         Integer minDiff = null;
 
         int[] locationTopLeftCorner = new int[2];
@@ -119,6 +129,7 @@ public class TagListSwiperHelper {
             final int diff = containerMid - mid;
             if (minDiff == null || Math.abs(diff) < Math.abs(minDiff)) {
                 minDiff = diff;
+                targetBeaconId = beaconId;
             }
         }
 
@@ -132,11 +143,12 @@ public class TagListSwiperHelper {
         }
 
         scrollContainer.smoothScrollBy(-minDiff, 0);
+        this.onScrollToTagCallback.accept(targetBeaconId); // raise the callback
         return true;
     }
 
     private boolean handleSwipeAction(HorizontalScrollView scrollContainer, final double velocity) {
-        List<Triple<Integer, Integer, FrameLayout>> sortedByXPos = this.findThreeClosestToMiddle();
+        List<CardInfo> sortedByXPos = this.findThreeClosestToMiddle();
         final int size = sortedByXPos.size();
 
         if (size <= 1) {
@@ -151,51 +163,54 @@ public class TagListSwiperHelper {
         if (size == 3) {
             // two types of situations might occur here.
             // Either the middle item is the current one, or the current one is a side item:
-            if (Math.abs(sortedByXPos.get(0).component1()) < Math.abs(sortedByXPos.get(1).component1())) {
+            if (Math.abs(sortedByXPos.get(0).getDiff()) < Math.abs(sortedByXPos.get(1).getDiff())) {
                 // CASE: [|][ ][ ]
                 // only allowed to go to the right: [|][*][ ]
                 if (velocity > 0) {
-                    return scrollAndReturn(scrollContainer, sortedByXPos, 1);
+                    return navigateTo(scrollContainer, sortedByXPos, 1);
                 }
                 return false; // we can't go to the left
-            } else if (Math.abs(sortedByXPos.get(2).component1()) < Math.abs(sortedByXPos.get(1).component1())) {
+            } else if (Math.abs(sortedByXPos.get(2).getDiff()) < Math.abs(sortedByXPos.get(1).getDiff())) {
                 // CASE: [ ][ ][|]
                 // only allowed to go to the left: [ ][*][|]
                 if (velocity < 0) {
-                    return scrollAndReturn(scrollContainer, sortedByXPos, 1);
+                    return navigateTo(scrollContainer, sortedByXPos, 1);
                 }
                 return false; // we can't go to the right
             }
             // "average" case: [ ][|][ ]  (note that in reality there could have been any number of items to the left or right of these)
             // we determine which direction we swiped in and navigate to this one:
             //                           go left [*][|][ ]                    go right [ ][|][*]
-            final int diff = velocity < 0 ? sortedByXPos.get(0).component1() : sortedByXPos.get(2).component1();
-            scrollContainer.smoothScrollBy(-diff, 0);
-            return true;
+            if (velocity < 0) {
+                // go left [*][|][ ]
+                return navigateTo(scrollContainer, sortedByXPos, 0);
+            }
+            // go right [ ][|][*]
+            return navigateTo(scrollContainer, sortedByXPos, 2);
         }
 
         // if there's just 2 items, then we might not be able to go to the target pos:
         // we have:                 [ ][|]          OR            [|][ ]
         // we can accommodate only GO LEFT in the first case and GO RIGHT in the second case
         assert size == 2;
-        if (Math.abs(sortedByXPos.get(0).component1()) < Math.abs(sortedByXPos.get(1).component1())) {
+        if (Math.abs(sortedByXPos.get(0).getDiff()) < Math.abs(sortedByXPos.get(1).getDiff())) {
             // CASE: [|][ ]
             if (velocity > 0) {
                 // only allowed to go right
-                return scrollAndReturn(scrollContainer, sortedByXPos, 1);
+                return navigateTo(scrollContainer, sortedByXPos, 1);
             }
         } else {
             // CASE: [ ][|]
             if (velocity < 0) {
                 // only allowed to go left
-                return scrollAndReturn(scrollContainer, sortedByXPos, 0);
+                return navigateTo(scrollContainer, sortedByXPos, 0);
             }
         }
-        Log.w(TAG, "Encountered unexpected swipe target case! Doing nothing.");
+        Log.d(TAG, "Encountered unexpected swipe target case! Doing nothing.");
         return false;
     }
 
-    private List<Triple<Integer, Integer, FrameLayout>> findThreeClosestToMiddle() {
+    private List<CardInfo> findThreeClosestToMiddle() {
         // find top 3
         final int containerWidth = scrollContainer.getWidth();
         final int containerMid = containerWidth / 2;
@@ -204,9 +219,9 @@ public class TagListSwiperHelper {
         // necessarily at the end we will have items: [][][]
         // such that one of them is the most central one, one is to the left of the most central one,
         // one is to the right of the most central one.
-        PriorityQueue<Triple<Integer, Integer, FrameLayout>> maxMinDistanceHeap = new PriorityQueue<>(
+        PriorityQueue<CardInfo> maxMinDistanceHeap = new PriorityQueue<>(
                 3,
-                Comparator.comparingInt(v -> -Math.abs(v.component1())) // make it a min heap
+                Comparator.comparingInt(v -> -Math.abs(v.getDiff())) // make it a min heap
         );
 
         int[] locationTopLeftCorner = new int[2];
@@ -221,24 +236,35 @@ public class TagListSwiperHelper {
             final int diff = containerMid - mid;
 
             if (maxMinDistanceHeap.size() < 3) {
-                maxMinDistanceHeap.add(new Triple<>(diff, leftX, tag));
-            } else if (Math.abs(maxMinDistanceHeap.peek().component1()) > Math.abs(diff)) {
+                maxMinDistanceHeap.add(new CardInfo(tag, diff, leftX, beaconId));
+            } else if (Math.abs(maxMinDistanceHeap.peek().getDiff()) > Math.abs(diff)) {
                 maxMinDistanceHeap.poll();
-                maxMinDistanceHeap.add(new Triple<>(diff, leftX, tag));
+                maxMinDistanceHeap.add(new CardInfo(tag, diff, leftX, beaconId));
             }
         }
 
         // triplets of <distance to middle>, <x position top left corner>, <actual container object>
         var sortedByXPos = maxMinDistanceHeap.stream()
-                .sorted(Comparator.comparingInt(Triple::component2))
+                .sorted(Comparator.comparingInt(CardInfo::getLeftXPosition))
                 .collect(Collectors.toList());
 
         return sortedByXPos;
     }
 
-    private static boolean scrollAndReturn(HorizontalScrollView scrollContainer, List<Triple<Integer, Integer, FrameLayout>> items, int newPos) {
-        final int diff = items.get(newPos).component1();
+    private boolean navigateTo(HorizontalScrollView scrollContainer, List<CardInfo> items, int newPos) {
+        CardInfo target = items.get(newPos);
+        final int diff = target.getDiff();
         scrollContainer.smoothScrollBy(-diff, 0);
+        this.onScrollToTagCallback.accept(target.getBeaconId()); // raise the event
         return true;
+    }
+
+    @AllArgsConstructor
+    @Getter
+    private static final class CardInfo {
+        private final FrameLayout container;
+        private final Integer diff;
+        private final Integer leftXPosition;
+        private final String beaconId;
     }
 }

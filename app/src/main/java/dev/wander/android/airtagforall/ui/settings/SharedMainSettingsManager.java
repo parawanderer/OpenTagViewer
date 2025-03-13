@@ -3,7 +3,7 @@ package dev.wander.android.airtagforall.ui.settings;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
-import static dev.wander.android.airtagforall.util.TextChangedWatcherFactory.justWatchOnChanged;
+import static dev.wander.android.airtagforall.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.util.Log;
 import android.util.Pair;
@@ -35,9 +35,8 @@ import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import dev.wander.android.airtagforall.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.airtagforall.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.airtagforall.ui.extensions.AppAutoCompleteTextView;
-import dev.wander.android.airtagforall.util.AnisetteUrlValidatorUtil;
-import dev.wander.android.airtagforall.util.LocaleConfigUtil;
-import dev.wander.android.airtagforall.util.TextChangedWatcherFactory;
+import dev.wander.android.airtagforall.util.validate.AnisetteUrlValidatorUtil;
+import dev.wander.android.airtagforall.util.android.LocaleConfigUtil;
 import lombok.NonNull;
 
 public class SharedMainSettingsManager {

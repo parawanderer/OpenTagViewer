@@ -106,6 +106,7 @@ dependencies {
     implementation(libs.retrofit.jackson)
     implementation(libs.retrofit.rxjava3)
     implementation(libs.google.cronet.retrofit)
+    implementation(libs.google.play.location)
 
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)

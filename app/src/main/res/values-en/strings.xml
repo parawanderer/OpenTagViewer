@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AirTagForAll</string>
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
@@ -49,4 +47,8 @@
     <string name="two_factor_authentication">Two-factor authentication</string>
     <string name="logged_in_as">Logged In As</string>
     <string name="logout">Logout</string>
+    <string name="enable_location_permissions">Enable Location Permissions?</string>
+    <string name="decline">Decline</string>
+    <string name="accept">Accept</string>
+    <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Your location will only be used to visualise your current position on the map, and will never leave your device.</string>
 </resources>

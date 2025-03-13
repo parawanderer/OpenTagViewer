@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.parse;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;

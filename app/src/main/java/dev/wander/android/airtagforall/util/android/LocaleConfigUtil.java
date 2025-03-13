@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.android;
 
 import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
 import static org.xmlpull.v1.XmlPullParser.START_TAG;

@@ -9,7 +9,7 @@ import static dev.wander.android.airtagforall.python.PythonAuthService.TWO_FACTO
 import static dev.wander.android.airtagforall.python.PythonAuthService.TWO_FACTOR_METHOD.TRUSTED_DEVICE;
 import static dev.wander.android.airtagforall.ui.settings.SharedMainSettingsManager.ANISETTE_TEST_STATUS.ERROR;
 import static dev.wander.android.airtagforall.ui.settings.SharedMainSettingsManager.ANISETTE_TEST_STATUS.OK;
-import static dev.wander.android.airtagforall.util.TextChangedWatcherFactory.justWatchOnChanged;
+import static dev.wander.android.airtagforall.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -32,11 +32,6 @@ import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -60,8 +55,8 @@ import dev.wander.android.airtagforall.service.web.GitHubService;
 import dev.wander.android.airtagforall.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.airtagforall.ui.login.Apple2FACodeInputManager;
 import dev.wander.android.airtagforall.ui.settings.SharedMainSettingsManager;
-import dev.wander.android.airtagforall.util.AppCryptographyUtil;
-import dev.wander.android.airtagforall.util.PropertiesUtil;
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
+import dev.wander.android.airtagforall.util.android.PropertiesUtil;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.extern.slf4j.Slf4j;
 

@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.android;
 
 import static android.security.keystore.KeyProperties.BLOCK_MODE_GCM;
 import static android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE;

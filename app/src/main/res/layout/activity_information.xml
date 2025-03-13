@@ -84,18 +84,22 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical">
 
+
                 <Button
                     android:id="@+id/button"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="15dp"
+                    android:layout_marginBottom="10dp"
                     android:layout_weight="1"
-                    android:backgroundTint="@color/md_theme_surfaceContainerHigh_highContrast"
+                    android:backgroundTint="@color/md_theme_surfaceContainerHigh"
                     android:onClick="onClickDeveloperWebsite"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
                     android:text="@string/developer_website"
                     android:textColor="@color/md_theme_outlineVariant_mediumContrast"
                     android:textSize="18sp"
+                    app:iconSize="22dp"
                     app:icon="@drawable/link_horizontal_24"
                     app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
 
@@ -105,11 +109,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:backgroundTint="@color/md_theme_surfaceContainerHigh_highContrast"
+                    android:backgroundTint="@color/md_theme_surfaceContainerHigh"
                     android:onClick="onClickGithub"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
                     android:text="@string/github"
                     android:textColor="@color/md_theme_outlineVariant_mediumContrast"
                     android:textSize="18sp"
+                    app:iconSize="22dp"
                     app:icon="@drawable/github_24"
                     app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
 

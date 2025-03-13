@@ -34,7 +34,7 @@ import dev.wander.android.airtagforall.service.web.CronetProvider;
 import dev.wander.android.airtagforall.service.web.GitHubService;
 import dev.wander.android.airtagforall.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.airtagforall.ui.settings.SharedMainSettingsManager;
-import dev.wander.android.airtagforall.util.AppCryptographyUtil;
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 
 
 public class SettingsActivity extends AppCompatActivity {

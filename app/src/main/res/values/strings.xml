@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">AirTagForAll</string>
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_subtitle" translatable="false">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
@@ -21,22 +19,12 @@
     <string name="refresh">Refresh</string>
     <string name="do_ring">Ring</string>
     <string name="more">More</string>
-    <string name="title_activity_settings">SettingsActivity</string>
 
     <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
 
     <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
 
     <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="version_x">Version %1$s</string>
     <string name="free_opensource_software_by">Free, Open-Source Software by Shane B.</string>
     <string name="app_website" translatable="false"><a href="https://wander.dev">wander.dev</a></string>
@@ -55,14 +43,7 @@
     <string name="lang_fr">Français</string>
     <string name="lang_ru">Русский</string>
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
-    <string name="title_activity_login">LoginActivity</string>
-    <string name="prompt_email">Email</string>
-    <string name="prompt_password">Password</string>
-    <string name="action_sign_in">Sign in or register</string>
-    <string name="action_sign_in_short">Sign in</string>
     <string name="welcome">Welcome !</string>
-    <string name="invalid_username">Not a valid username</string>
-    <string name="invalid_password">Password must be >5 characters</string>
     <string name="login_failed">"Login failed"</string>
     <string name="email_or_phone_number">Email or Phone Number</string>
     <string name="password">password</string>
@@ -79,4 +60,8 @@
     <string name="two_factor_authentication">Two-factor authentication</string>
     <string name="logged_in_as">Logged In As</string>
     <string name="logout">Logout</string>
+    <string name="enable_location_permissions">Enable Location Permissions?</string>
+    <string name="decline">Decline</string>
+    <string name="accept">Accept</string>
+    <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Your location will only be used to visualise your current position on the map, and will never leave your device.</string>
 </resources>

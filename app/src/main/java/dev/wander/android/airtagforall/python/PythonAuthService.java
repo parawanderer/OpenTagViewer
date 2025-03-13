@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dev.wander.android.airtagforall.db.repo.model.AppleUserData;
-import dev.wander.android.airtagforall.util.AppCryptographyUtil;
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;

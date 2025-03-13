@@ -47,4 +47,8 @@
     <string name="two_factor_authentication">Двухфакторная аутентификация</string>
     <string name="logged_in_as">Авторизован Как</string>
     <string name="logout">Выйти</string>
+    <string name="enable_location_permissions">Включить разрешения на определение местоположения?</string>
+    <string name="decline">Отклонить</string>
+    <string name="accept">Принять</string>
+    <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Ваше местоположение будет использоваться только для визуализации вашего текущего положения на карте и никогда не покинет пределы вашего устройства.</string>
 </resources>

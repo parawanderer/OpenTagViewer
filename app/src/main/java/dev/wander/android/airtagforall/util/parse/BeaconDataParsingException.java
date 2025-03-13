@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.parse;
 
 public class BeaconDataParsingException extends RuntimeException {
     public BeaconDataParsingException(String message) {

@@ -27,6 +27,7 @@ googleCornet = "18.1.0"
 retrofit = "2.11.0"
 googleCronetRetrofit = "0.1.0"
 annotation = "1.6.0"
+googlePlayServicesLocation = "21.3.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -62,6 +63,7 @@ retrofit-jackson = { group = "com.squareup.retrofit2", name = "converter-jackson
 retrofit-rxjava3 = { group = "com.squareup.retrofit2", name = "adapter-rxjava3", version.ref = "retrofit" }
 google-cronet-retrofit = { group = "com.google.net.cronet", name = "cronet-okhttp", version.ref = "googleCronetRetrofit" }
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+google-play-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "googlePlayServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.parse;
 
 import android.util.Log;
 
@@ -142,7 +142,7 @@ public final class BeaconDataParser {
 
     public static Observable<List<BeaconInformation>> parseAsync(final List<BeaconData> rawBeaconData) {
         return Observable.fromCallable(() -> parse(rawBeaconData))
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 

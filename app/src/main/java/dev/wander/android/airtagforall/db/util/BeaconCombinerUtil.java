@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import dev.wander.android.airtagforall.db.repo.model.BeaconData;
+import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
 import dev.wander.android.airtagforall.util.BeaconLocationReportHasher;
@@ -27,6 +28,10 @@ public final class BeaconCombinerUtil {
                         namingRec
                 ))
                 .collect(Collectors.toList());
+    }
+
+    public static List<BeaconData> combine(final ImportData beaconData) {
+        return combine(beaconData.getOwnedBeacons(), beaconData.getBeaconNamingRecords());
     }
 
     public static List<BeaconLocationReport> combineAndSort(final String beaconId, final List<BeaconLocationReport> current, final List<BeaconLocationReport> copyIntoCurrent) {

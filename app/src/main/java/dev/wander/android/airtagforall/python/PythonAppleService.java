@@ -6,6 +6,7 @@ import android.util.Pair;
 import com.chaquo.python.Kwarg;
 import com.chaquo.python.Python;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -31,6 +32,11 @@ public class PythonAppleService {
 
     public Observable<Map<String, List<BeaconLocationReport>>> getLastReports(final Map<String, String> beaconIdToPList, final int hoursToGoBack) {
         return Observable.fromCallable(() -> {
+            if (beaconIdToPList.isEmpty()) {
+                // if there's no items being requested, just return none immediately:
+                return Collections.<String, List<BeaconLocationReport>>emptyMap();
+            }
+
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
 

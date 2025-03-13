@@ -14,6 +14,8 @@ import java.security.cert.CertificateException;
 import java.util.Collections;
 import java.util.List;
 
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
+
 public class AppCryptographyUtilTest {
     // https://developer.android.com/privacy-and-security/cryptography#choose-algorithm
 

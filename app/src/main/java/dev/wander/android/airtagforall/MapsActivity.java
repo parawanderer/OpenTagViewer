@@ -14,13 +14,9 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
-import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
-import android.Manifest;
-import android.app.AlertDialog;
-import android.app.Dialog;
-import android.content.DialogInterface;
+
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -40,6 +36,8 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -48,6 +46,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
@@ -75,16 +74,22 @@ import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.python.PythonAppleService;
 import dev.wander.android.airtagforall.python.PythonAuthService;
 import dev.wander.android.airtagforall.ui.maps.TagListSwiperHelper;
-import dev.wander.android.airtagforall.util.AppCryptographyUtil;
-import dev.wander.android.airtagforall.util.AppleZipImporterUtil;
-import dev.wander.android.airtagforall.util.BeaconDataParser;
-import dev.wander.android.airtagforall.util.ZipImporterException;
+import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
+import dev.wander.android.airtagforall.util.android.PermissionUtil;
+import dev.wander.android.airtagforall.util.parse.AppleZipImporterUtil;
+import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
+import dev.wander.android.airtagforall.util.parse.ZipImporterException;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
+/**
+ * TODO: this whole thing is a bit of a godclass. Decouple it.
+ */
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, OnMapClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = MapsActivity.class.getSimpleName();
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
@@ -94,7 +99,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private static final long ONE_HOUR_IN_MS = 1000 * 60 * 60; // 1 HOUR
 
+    private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
+
     private GoogleMap mMap;
+
     private ActivityMapsBinding binding;
 
     private BeaconRepository beaconRepo;
@@ -104,6 +112,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private UserAuthRepository userAuthRepo;
 
     private PythonAppleService appleService = null;
+
+    private FusedLocationProviderClient fusedLocationClient = null;
 
     private final Map<String, BeaconInformation> beacons = new ConcurrentHashMap<>();
 
@@ -137,21 +147,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         this.checkApiKey();
 
-        binding = ActivityMapsBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        this.binding = ActivityMapsBinding.inflate(getLayoutInflater());
+        setContentView(this.binding.getRoot());
 
-        userSettingsRepo = new UserSettingsRepository(
+        this.userSettingsRepo = new UserSettingsRepository(
                 UserSettingsDataStore.getInstance(this.getApplicationContext()));
 
-        userAuthRepo = new UserAuthRepository(
+        this.userAuthRepo = new UserAuthRepository(
                 UserAuthDataStore.getInstance(getApplicationContext()),
                 new AppCryptographyUtil());
 
-        beaconRepo = new BeaconRepository(
+        this.beaconRepo = new BeaconRepository(
                 AirTag4AllDatabase.getInstance(getApplicationContext()));
 
-        this.setupTagScrollArea();
+        this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+        this.setupTagScrollArea();
         this.handleAuthAndShowDevices();
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -176,22 +187,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setOnMapClickListener(this);
 
         mMap.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
-
-        // Add a marker in Sydney and move the camera
-        // LatLng sydney = new LatLng(-34, 151);
-        // mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        // mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-
-        googleMap.setOnMyLocationButtonClickListener(() -> {
-            Toast.makeText(this, "MyLocation button clicked", LENGTH_SHORT).show();
-            // Return false so that we don't consume the event and the default behavior still occurs
-            // (the camera animates to the user's current position).
-            return false;
-        });
-
-        googleMap.setOnMyLocationClickListener((location) -> {
-            Toast.makeText(this, "Current location: " + location, LENGTH_SHORT).show();
-        });
+        mMap.getUiSettings().setMyLocationButtonEnabled(false);
 
         this.enableMyLocation();
     }
@@ -205,166 +201,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         this.nextLocationRefreshTask = null;
     }
 
-    // TODO: Starting with here, refactor. Taken from the Google maps examples...
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
-
-    private void enableMyLocation() {
-        // Check if permissions are granted, if so, enable the my location layer
-        if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
-            this.mMap.setMyLocationEnabled(true);
-            return;
-        }
-
-        // Otherwise, request location permissions from the user
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, ACCESS_FINE_LOCATION)
-            || ActivityCompat.shouldShowRequestPermissionRationale(this, ACCESS_COARSE_LOCATION)) {
-            // display a dialogue with rationale
-            // Display a dialog with rationale.
-            RationaleDialog.newInstance(LOCATION_PERMISSION_REQUEST_CODE, true)
-                    .show(this.getSupportFragmentManager(), "dialog");
-        } else {
-            // Location permission has not been granted yet, request it.
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{ ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION },
-                    LOCATION_PERMISSION_REQUEST_CODE
-            );
-        }
-    }
-
-    private boolean permissionDenied = false;
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode != LOCATION_PERMISSION_REQUEST_CODE) {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-            return;
-        }
-
-        if (isPermissionGranted(permissions, grantResults,
-                ACCESS_FINE_LOCATION) ||
-                isPermissionGranted(permissions, grantResults,
-                        ACCESS_COARSE_LOCATION)) {
-            // Enable the my location layer if the permission has been granted.
-            enableMyLocation();
-        } else {
-            // Permission was denied. Display an error message
-            // [START_EXCLUDE]
-            // Display the missing permission error dialog when the fragments resume.
-            permissionDenied = true;
-            // [END_EXCLUDE]
-        }
-    }
-
-    @Override
-    protected void onResumeFragments() {
-        super.onResumeFragments();
-
-        if (permissionDenied) {
-            // Permission was not granted, display error dialog.
-            showMissingPermissionError();
-            permissionDenied = false;
-        }
-    }
-
-    /**
-     * Displays a dialog with error message explaining that the location permission is missing.
-     */
-    private void showMissingPermissionError() {
-        Toast.makeText(this, "PERMISSION DENIED ERROR", LENGTH_SHORT).show();
-    }
-
-    // TODO: end section taken from google maps examples...
-
-    /**
-     * Checks if the result contains a {@link PackageManager#PERMISSION_GRANTED} result for a
-     * permission from a runtime permissions request.
-     *
-     * @see androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback
-     */
-    public static boolean isPermissionGranted(String[] grantPermissions, int[] grantResults,
-                                              String permission) {
-        for (int i = 0; i < grantPermissions.length; i++) {
-            if (permission.equals(grantPermissions[i])) {
-                return grantResults[i] == PackageManager.PERMISSION_GRANTED;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * A dialog that explains the use of the location permission and requests the necessary
-     * permission.
-     * <p>
-     * The activity should implement {@link androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback}
-     * to handle permit or denial of this permission request.
-     */
-    public static class RationaleDialog extends DialogFragment {
-
-        private static final String ARGUMENT_PERMISSION_REQUEST_CODE = "requestCode";
-
-        private static final String ARGUMENT_FINISH_ACTIVITY = "finish";
-
-        private boolean finishActivity = false;
-
-        /**
-         * Creates a new instance of a dialog displaying the rationale for the use of the location
-         * permission.
-         * <p>
-         * The permission is requested after clicking 'ok'.
-         *
-         * @param requestCode Id of the request that is used to request the permission. It is
-         * returned to the {@link androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback}.
-         * @param finishActivity Whether the calling Activity should be finished if the dialog is
-         * cancelled.
-         */
-        public static RationaleDialog newInstance(int requestCode, boolean finishActivity) {
-            Bundle arguments = new Bundle();
-            arguments.putInt(ARGUMENT_PERMISSION_REQUEST_CODE, requestCode);
-            arguments.putBoolean(ARGUMENT_FINISH_ACTIVITY, finishActivity);
-            RationaleDialog dialog = new RationaleDialog();
-            dialog.setArguments(arguments);
-            return dialog;
-        }
-
-        @Override
-        public Dialog onCreateDialog(Bundle savedInstanceState) {
-            Bundle arguments = getArguments();
-            final int requestCode = arguments.getInt(ARGUMENT_PERMISSION_REQUEST_CODE);
-            finishActivity = arguments.getBoolean(ARGUMENT_FINISH_ACTIVITY);
-
-            return new AlertDialog.Builder(getActivity())
-                    .setMessage("Access to the location service is required to demonstrate the \\'my location\\' feature, which shows your current location on the map.")
-                    .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            // After click on Ok, request the permission.
-                            ActivityCompat.requestPermissions(getActivity(),
-                                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                    requestCode);
-                            // Do not finish the Activity while requesting permission.
-                            finishActivity = false;
-                        }
-                    })
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .create();
-        }
-
-        @Override
-        public void onDismiss(DialogInterface dialog) {
-            super.onDismiss(dialog);
-            if (finishActivity) {
-                Toast.makeText(getActivity(),
-                                "Location permission is required for this demo.",
-                                Toast.LENGTH_SHORT)
-                        .show();
-                getActivity().finish();
-            }
-        }
-    }
-
     @Override
     public void onMapClick(LatLng point) {
         Log.i(TAG, "tapped, point=" + point);
@@ -376,7 +212,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onResume();
 
         this.refreshIfAllowed();
+        this.reSchedulePeriodicTagLocationRefresher();
+    }
+
+    private void reSchedulePeriodicTagLocationRefresher() {
         // (re-)schedule tag location refresher
+        if (this.nextLocationRefreshTask != null) {
+            refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
+        }
         this.nextLocationRefreshTask = () -> {
             refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
             this.refreshIfAllowed();
@@ -407,14 +250,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void onClickMoreSettings(View view) {
-        ImageButton bttn = findViewById(R.id.buttonMoreSettings);
-        Log.i(TAG, "The global more button was just clicked!");
+        Log.d(TAG, "Global more button was clicked");
+        ImageButton bttn = findViewById(R.id.button_more_settings);
 
         var popupMenu = new PopupMenu(this, bttn);
         popupMenu.getMenuInflater().inflate(R.menu.global_map_more_menu, popupMenu.getMenu());
 
         popupMenu.setOnMenuItemClickListener(menuItem -> {
-            Toast.makeText(this, "You clicked " + menuItem.getTitle(), LENGTH_SHORT).show();
+            Log.d(TAG, "Menu option " + menuItem.getTitle() + " was selected");
 
             if (menuItem.getItemId() == R.id.do_import) {
                 this.handleImport();
@@ -423,7 +266,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else if (menuItem.getItemId() == R.id.information) {
                 this.showInformationPage();
             }
-            // TODO: the other ones
 
             return true;
         });
@@ -431,8 +273,45 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         popupMenu.show();
     }
 
+    public void onClickMyLocation(View view) {
+        Log.d(TAG, "My location button was clicked");
+        if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
+
+            this.fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, location -> {
+                    // https://developer.android.com/develop/sensors-and-location/location/retrieve-current#last-known
+                    if (location == null) {
+                        Log.w(TAG, "Last location was returned as null!");
+                        return;
+                    }
+
+                    Log.d(TAG, "Navigating to current user position on the map...");
+                    this.mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                            new LatLng(location.getLatitude(), location.getLongitude()),
+                            CAMERA_ON_MAP_INITIAL_ZOOM));
+                });
+
+        } else {
+            Log.e(TAG, "Clicked on 'My Location' button while not having Location permissions. This shouldn't happen as this button should have been hidden in this case!");
+        }
+    }
+
+    public void askForLocationWithRationale() {
+        var explanationDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.enable_location_permissions)
+                .setMessage(R.string.location_permissions_will_only_be_used_to_visualise_on_map_text)
+                .setIcon(R.drawable.my_location_24px)
+                .setNegativeButton(R.string.decline, null)
+                .setPositiveButton(R.string.accept, (dialog, which) -> {
+                    Log.d(TAG, "Accept Enable Location Permissions button clicked. Now requesting permissions...");
+                    this.performNativePermissionRequest();
+                })
+                .show();
+    }
+
     private void showInformationPage() {
-        Log.i(TAG, "Show information page");
+        Log.d(TAG, "Show information page");
 
         // navigate to information page
         Intent intent = new Intent(this, InformationActivity.class);
@@ -440,7 +319,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void showSettingsPage() {
-        Log.i(TAG, "Show settings page");
+        Log.d(TAG, "Show settings page clicked");
 
         // navigate to settings page
         Intent intent = new Intent(this, SettingsActivity.class);
@@ -448,7 +327,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void onImportFilePicked(Intent data) {
-        Log.i(TAG, "File has been picked");
+        Log.d(TAG, "File has been picked");
 
         // combine them into the current list of beaconLocations & show this list
         var async = this.extractImportedData(data)
@@ -465,19 +344,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
              * of what you can do with these RXJava observables as far as multithreading goes...
              */
                 Observable.zip(
-                        storedBeacons.flatMap(beacons -> {
-                            Map<String, String> request = beacons.getOwnedBeacons().stream()
-                                    .collect(Collectors.toMap(b -> b.id, b -> b.content));
-                            return this.fetchLastReportsDay(request);
-                        })
-                        .doOnNext(this::addBeaconLocationsToCurrent)
-                        .flatMap(this.beaconRepo::storeLocationCache), // add these to the current locations list
-                        storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(
-                                    BeaconCombinerUtil.combine(
-                                            beacons.getOwnedBeacons(),
-                                            beacons.getBeaconNamingRecords()
-                                    ))
+                        storedBeacons.flatMap(beacons ->
+                            this.fetchLastReports(beacons.getOwnedBeacons().stream()
+                                    .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
                         )
+                        .doOnNext(this::addBeaconLocationsToCurrent)
+                        .flatMap(this.beaconRepo::storeToLocationCache),
+                        storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(beacons)))
                         .doOnNext(this::addBeaconToCurrent),
                         (lastReports, parsedBeaconData) -> {
 
@@ -549,7 +422,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Objects.requireNonNull(this.beacons.get(beaconId)).getOwnedBeaconPlistRaw(),
                 1)
                 .doOnNext(this::addBeaconLocationsToCurrent)
-                .flatMap(this.beaconRepo::storeLocationCache)
+                .flatMap(this.beaconRepo::storeToLocationCache)
                 .subscribe((__) -> {
                     Log.i(TAG, "Refreshed location data and markers for beaconId=" + beaconId + " on refresh button click");
                     this.runOnUiThread(() -> {
@@ -648,13 +521,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // initially show the cached locations (after we get those back from the DB)
         // afterwards try to fetch the latest location reports from the Apple servers
         // store those reports in the DB (cache) and then show the updated positions
-        var asyncCombo = Observable.zip(asyncAppleService, asyncBeaconData, (service, beacons) -> {
+        var asyncCombo = Observable.zip(asyncAppleService, asyncBeaconData, (service, beacons) ->
             // map to expected format:
-            final Map<String, String> requestInput = beacons.stream().collect(
-                    Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw));
-            return this.fetchLastReportsDay(requestInput);
-        }).flatMap(o -> o)
-        .flatMap(this.beaconRepo::storeLocationCache)
+            this.fetchLastReports(
+                    beacons.stream().collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw)))
+        ).flatMap(o -> o)
+        .flatMap(this.beaconRepo::storeToLocationCache)
         .subscribe(lastReports -> {
             this.addBeaconLocationsToCurrent(lastReports);
             this.runOnUiThread(() -> {
@@ -702,7 +574,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Log.d(TAG, "Adding new location for beaconId=" + key);
                 this.beaconLocations.put(key, newItems.get(key));
             }
-
         }
     }
 
@@ -728,8 +599,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         this.updateBeaconCards();
     }
-
-    private boolean TEMP_hasNavigatedToMarkers = false; // TODO: improve implementation
 
     private synchronized void showBeaconOnMap(final BeaconInformation beacon, final BeaconLocationReport lastLocation) {
         // TODO: make this whole thing prettier, make it reuse tags if possible, etc...
@@ -766,13 +635,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         Marker marker = mMap.addMarker(markerOptions);
+
         this.currentMarkers.put(beaconId, marker);
-        if (!this.TEMP_hasNavigatedToMarkers) {
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                    locationTag,
-                    16.0f
-            ));
-            this.TEMP_hasNavigatedToMarkers = true;
+        if (this.currentMarkers.size() == 1) {
+            // for the first marker, navigate to it smoothly on the map!
+            // (we choose the first added marker here because it is the
+            // one that will become visible in the UI tag list at the
+            // bottom of the screen)
+            this.goToBeaconOnMap(beaconId, CAMERA_ON_MAP_INITIAL_ZOOM);
         }
     }
 
@@ -780,9 +650,32 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
         this.tagListSwiperHelper = new TagListSwiperHelper(
                 scrollContainer,
-                this.dynamicCardsForTag
+                this.dynamicCardsForTag,
+                this::goToBeaconOnMap
         );
         this.tagListSwiperHelper.setupTagScrollArea();
+    }
+
+    private void goToBeaconOnMap(final String beaconId) {
+        this.goToBeaconOnMap(beaconId, null);
+    }
+
+    private void goToBeaconOnMap(final String beaconId, Float zoom) {
+        try {
+            //FrameLayout card = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
+            Marker marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
+            var pos = marker.getPosition();
+
+            Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
+
+            if (zoom != null) {
+                this.mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+            } else {
+                this.mMap.animateCamera(CameraUpdateFactory.newLatLng(pos));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
+        }
     }
 
     private synchronized void updateBeaconCards() {
@@ -874,9 +767,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         var beacons = this.beacons.values().stream()
                 .collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw));
 
-        var async = this.fetchLastReportsDay(beacons)
+        var async = this.fetchLastReports(beacons)
                 .doOnNext(this::addBeaconLocationsToCurrent)
-                .flatMap(this.beaconRepo::storeLocationCache)
+                .flatMap(this.beaconRepo::storeToLocationCache)
                 .subscribe((__) -> {
                     Log.d(TAG, "Refreshed location data and markers!");
                     this.runOnUiThread(() -> {
@@ -889,7 +782,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 });
     }
 
-    private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsDay(final Map<String, String> beaconIdToPlist) {
+    private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist) {
         final long now = System.currentTimeMillis();
 
         final int hoursToGoBack = (int) Math.min(
@@ -902,6 +795,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .doOnNext(reports -> this.last24HHistoryFetchAt = now); // on success, update this time.
     }
 
+    private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist, final int hoursToGoBack) {
+        Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
+        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack);
+    }
+
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.appleService.getLastReports(Map.of(beaconId, pList), hoursToGoBack);
@@ -909,5 +807,55 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private boolean isAppleServiceInitialised() {
         return this.appleService != null;
+    }
+
+    private void enableMyLocation() {
+        // Check if permissions are granted, if so, enable the my location layer
+        if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
+            Log.i(TAG, "Enabling 'my location' related UI features...");
+            this.mMap.setMyLocationEnabled(true);
+
+            // This UI button is only available if the user enables own location permissions.
+            ImageButton button = findViewById(R.id.button_my_location);
+            button.setVisibility(VISIBLE);
+
+            return;
+        }
+
+        // Otherwise, request location permissions from the user
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, ACCESS_FINE_LOCATION)
+                || ActivityCompat.shouldShowRequestPermissionRationale(this, ACCESS_COARSE_LOCATION)) {
+            Log.d(TAG, "We are being asked to show a rationale dialogue for why we need location permissions. Proceeding to do this...");
+            this.askForLocationWithRationale();
+        } else {
+            // Location permission has not been granted yet, request it.
+            this.performNativePermissionRequest();
+        }
+    }
+
+    private void performNativePermissionRequest() {
+        Log.d(TAG, "Performing native android permission request");
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{ ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION },
+                LOCATION_PERMISSION_REQUEST_CODE
+        );
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode != LOCATION_PERMISSION_REQUEST_CODE) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+            return;
+        }
+
+        if (PermissionUtil.isPermissionGranted(permissions, grantResults, ACCESS_FINE_LOCATION) ||
+                PermissionUtil.isPermissionGranted(permissions, grantResults, ACCESS_COARSE_LOCATION)) {
+            Log.i(TAG, "Permission request for location was granted");
+            this.enableMyLocation();
+        } else {
+            Log.i(TAG, "Location permission request was refused, so not going to be rendering current user location");
+        }
     }
 }

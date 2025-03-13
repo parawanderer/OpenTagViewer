@@ -1,4 +1,4 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.parse;
 
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;

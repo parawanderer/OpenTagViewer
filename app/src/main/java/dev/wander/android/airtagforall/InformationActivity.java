@@ -6,7 +6,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -15,20 +14,17 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.databinding.DataBindingUtil;
 
+
 import dev.wander.android.airtagforall.databinding.ActivityInformationBinding;
+import dev.wander.android.airtagforall.util.android.PropertiesUtil;
 
 public class InformationActivity extends AppCompatActivity {
-
     private static final String TAG = InformationActivity.class.getSimpleName();
-
-    private static final String DEVELOPER_WEBSITE = "https://wander.dev";
-    private static final String GITHUB = "https://github.com/parawanderer/airtag4all";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // setContentView(R.layout.activity_information);
         ActivityInformationBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_information);
         binding.setHandleClickBack(this::finish);
 
@@ -59,9 +55,13 @@ public class InformationActivity extends AppCompatActivity {
 
 
     public void onClickDeveloperWebsite(View view) {
-        Log.i(TAG, "Clicked Developer Website button!");
+        Log.d(TAG, "Clicked Developer Website button");
 
-        Uri devSite = Uri.parse(DEVELOPER_WEBSITE);
+        var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        assert properties != null;
+        final String developerWebsite = properties.getProperty("developerWebsite");
+
+        Uri devSite = Uri.parse(developerWebsite);
         Intent intent = new Intent(Intent.ACTION_VIEW, devSite);
         if (intent.resolveActivity(getPackageManager()) != null) {
             this.startActivity(intent);
@@ -69,9 +69,13 @@ public class InformationActivity extends AppCompatActivity {
     }
 
     public void onClickGithub(View view) {
-        Log.i(TAG, "Clicked Github button!");
+        Log.d(TAG, "Clicked Github button");
 
-        Uri devSite = Uri.parse(GITHUB);
+        var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        assert properties != null;
+        final String projectGithub = properties.getProperty("projectGithub");
+
+        Uri devSite = Uri.parse(projectGithub);
         Intent intent = new Intent(Intent.ACTION_VIEW, devSite);
         if (intent.resolveActivity(getPackageManager()) != null) {
             this.startActivity(intent);

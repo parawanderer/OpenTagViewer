@@ -1,10 +1,6 @@
-package dev.wander.android.airtagforall.util;
+package dev.wander.android.airtagforall.util.parse;
 
 import android.util.Log;
-
-import com.chaquo.python.Kwarg;
-import com.chaquo.python.PyObject;
-import com.chaquo.python.Python;
 
 import org.w3c.dom.Document;
 

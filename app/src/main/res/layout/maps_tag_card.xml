@@ -107,6 +107,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_semi_bold"
                         android:text="@string/last_updated_x"
+                        android:textColor="#8A8A8A"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -158,7 +159,8 @@
                             android:layout_height="20dp"
                             android:layout_gravity="center"
                             android:scaleType="fitCenter"
-                            android:src="@drawable/alarm_clock_24" />
+                            android:src="@drawable/alarm_clock_24"
+                            android:tint="@color/md_theme_outline" />
 
 
                     </FrameLayout>
@@ -212,7 +214,8 @@
                             android:layout_height="20dp"
                             android:layout_gravity="center"
                             android:scaleType="fitCenter"
-                            android:src="@drawable/refresh_24" />
+                            android:src="@drawable/refresh_24"
+                            android:tint="@color/md_theme_outline" />
 
 
                     </FrameLayout>
@@ -265,7 +268,8 @@
                             android:layout_height="18dp"
                             android:layout_gravity="center"
                             android:scaleType="fitCenter"
-                            android:src="@drawable/volume_24" />
+                            android:src="@drawable/volume_24"
+                            android:tint="@color/md_theme_outline" />
 
 
                     </FrameLayout>

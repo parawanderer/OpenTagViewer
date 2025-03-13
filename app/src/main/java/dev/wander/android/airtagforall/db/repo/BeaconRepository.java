@@ -1,12 +1,10 @@
 package dev.wander.android.airtagforall.db.repo;
 
 import android.util.Log;
-import android.util.Pair;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import dev.wander.android.airtagforall.db.repo.model.BeaconData;
@@ -18,7 +16,6 @@ import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.NonNull;
@@ -74,8 +71,13 @@ public class BeaconRepository {
         .observeOn(AndroidSchedulers.mainThread());
     }
 
-    public Observable<Map<String, List<BeaconLocationReport>>> storeLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {
+    public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {
         return Observable.fromCallable(() -> {
+            if (reportsForBeaconId.isEmpty()) {
+                // If it's empty then there's nothing to do. So just return right away.
+                return reportsForBeaconId;
+            }
+
             final long now = System.currentTimeMillis();
 
             // flat map them all:
