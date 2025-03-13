@@ -51,6 +51,7 @@ android {
     buildFeatures {
         viewBinding = true
         dataBinding = true
+        buildConfig = true
     }
 
     androidResources {
@@ -107,6 +108,7 @@ dependencies {
     implementation(libs.retrofit.rxjava3)
     implementation(libs.google.cronet.retrofit)
     implementation(libs.google.play.location)
+    implementation(libs.google.places)
 
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)

@@ -20,6 +20,8 @@ import androidx.fragment.app.FragmentActivity;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,10 +48,13 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.net.PlacesClient;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -82,6 +87,8 @@ import dev.wander.android.airtagforall.util.parse.ZipImporterException;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
@@ -115,7 +122,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private FusedLocationProviderClient fusedLocationClient = null;
 
-    private final Map<String, BeaconInformation> beacons = new ConcurrentHashMap<>();
+    private Geocoder geocoder = null;
+
+    private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
 
     private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
 
@@ -162,6 +171,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+        Places.initialize(this.getApplicationContext(), BuildConfig.MAPS_API_KEY);
+        this.geocoder = new Geocoder(this.getApplicationContext(), Locale.getDefault());
+
         this.setupTagScrollArea();
         this.handleAuthAndShowDevices();
 
@@ -187,6 +199,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setOnMapClickListener(this);
 
         mMap.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
+        // We don't want to use the default button. We have a custom button
         mMap.getUiSettings().setMyLocationButtonEnabled(false);
 
         this.enableMyLocation();
@@ -419,7 +432,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // we can now fetch for this Id only!
         var async = this.fetchLastReportsFor(
                 beaconId,
-                Objects.requireNonNull(this.beacons.get(beaconId)).getOwnedBeaconPlistRaw(),
+                Objects.requireNonNull(this.beacons.get(beaconId)).getInfo().getOwnedBeaconPlistRaw(),
                 1)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMap(this.beaconRepo::storeToLocationCache)
@@ -546,7 +559,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (this.beacons.containsKey(beaconId)) {
                 Log.d(TAG, "Replacing existing beacon info for beaconId=" + beaconId);
             }
-            this.beacons.put(beaconId, beacon);
+            this.beacons.put(beaconId, new BeaconData(beacon, Collections.emptyList()));
         });
     }
 
@@ -578,7 +591,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private synchronized void showLastDeviceLocations() {
-        for (BeaconInformation beacon : this.beacons.values()) {
+        for (BeaconData beaconData : this.beacons.values()) {
+            BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
 
             if (!this.beaconLocations.containsKey(beaconId)) {
@@ -594,9 +608,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
             BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+
+            // TODO: make this asynchronous OR do this in a background thread
+            try {
+                List<Address> geocodingForLocation = this.geocoder.getFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), 1);
+                beaconData.setGeocoding(Optional.ofNullable(geocodingForLocation).orElse(Collections.emptyList()));
+            } catch (Exception e) {
+                beaconData.setGeocoding(Collections.emptyList());
+            }
+
             this.showBeaconOnMap(beacon, lastLocation);
         }
-
         this.updateBeaconCards();
     }
 
@@ -634,7 +656,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .snippet(markerSnippet);
 
 
-        Marker marker = mMap.addMarker(markerOptions);
+        Marker marker = this.mMap.addMarker(markerOptions);
 
         this.currentMarkers.put(beaconId, marker);
         if (this.currentMarkers.size() == 1) {
@@ -694,7 +716,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         final long now = System.currentTimeMillis();
         // remove all beacons that had cards that are now gone
-        for (final BeaconInformation beacon : this.beacons.values()) {
+        for (final BeaconData beaconData : this.beacons.values()) {
+            final BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
             if (!this.beaconLocations.containsKey(beaconId)) {
                 Log.w(TAG, "Found a beacon (" + beaconId + ") without locations! We can't draw such a beacon. Skipping...");
@@ -706,6 +729,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 continue;
             }
             final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            final List<Address> locationInfo = beaconData.getGeocoding();
 
             FrameLayout v;
             if (!this.dynamicCardsForTag.containsKey(beaconId)) {
@@ -733,10 +757,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
             // the location
-            // TODO: fetch pretty location name from google maps api
             TextView deviceLocation = v.findViewById(R.id.device_location);
-            deviceLocation.setText(String.format(
-                    Locale.ROOT, "%.6f, %.6f", lastLocation.getLatitude(), lastLocation.getLongitude()));
+            if (locationInfo.isEmpty()) {
+                deviceLocation.setText(String.format(
+                        Locale.ROOT, "%.6f, %.6f", lastLocation.getLatitude(), lastLocation.getLongitude()));
+            } else {
+                var geoLocation = locationInfo.get(0);
+                deviceLocation.setText(String.format(
+                        Locale.ROOT,
+                        "%s, %s, %s",
+                        geoLocation.getAddressLine(0),
+                        geoLocation.getLocality(),
+                        geoLocation.getCountryName()));
+            }
+
 
             // the last updated time
             // TODO: format it according to local timezone
@@ -765,7 +799,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void fetchAndUpdateCurrentBeacons() {
         var beacons = this.beacons.values().stream()
-                .collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw));
+                .collect(Collectors.toMap(b -> b.getInfo().getBeaconId(), b -> b.getInfo().getOwnedBeaconPlistRaw()));
 
         var async = this.fetchLastReports(beacons)
                 .doOnNext(this::addBeaconLocationsToCurrent)
@@ -857,5 +891,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else {
             Log.i(TAG, "Location permission request was refused, so not going to be rendering current user location");
         }
+    }
+
+    @AllArgsConstructor
+    @Data
+    private static final class BeaconData {
+        @lombok.NonNull private BeaconInformation info;
+        @lombok.NonNull private List<Address> geocoding;
     }
 }
