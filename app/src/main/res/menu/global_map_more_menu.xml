@@ -2,11 +2,17 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/settings"
-        android:title="@string/settings" />
+        android:id="@+id/my_devices"
+        android:title="@string/my_devices" />
+
     <item
         android:id="@+id/do_import"
         android:title="@string/do_import" />
+
+    <item
+        android:id="@+id/settings"
+        android:title="@string/settings" />
+
     <item
         android:id="@+id/information"
         android:title="@string/information" />

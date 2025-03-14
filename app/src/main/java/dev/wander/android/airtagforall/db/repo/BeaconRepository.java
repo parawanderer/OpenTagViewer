@@ -51,8 +51,7 @@ public class BeaconRepository {
                 Log.e(TAG, "Error occurred when trying to insert all data for new import", e);
                 throw new RepoQueryException(e);
             }
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public Observable<List<BeaconData>> getAllBeacons() {
@@ -67,8 +66,7 @@ public class BeaconRepository {
                 Log.e(TAG, "Error occurred when trying to retrieve all beacons from repository", e);
                 throw new RepoQueryException(e);
             }
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {
@@ -101,8 +99,7 @@ public class BeaconRepository {
             db.locationReportDao().insertAll(allRecords);
 
             return reportsForBeaconId;
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public Observable<Map<String, BeaconLocationReport>> getLastForAll() {
@@ -128,7 +125,6 @@ public class BeaconRepository {
             }
 
             return result;
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 }

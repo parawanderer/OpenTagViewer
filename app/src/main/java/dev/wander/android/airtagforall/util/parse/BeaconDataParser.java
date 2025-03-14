@@ -142,8 +142,7 @@ public final class BeaconDataParser {
 
     public static Observable<List<BeaconInformation>> parseAsync(final List<BeaconData> rawBeaconData) {
         return Observable.fromCallable(() -> parse(rawBeaconData))
-                .subscribeOn(Schedulers.computation())
-                .observeOn(AndroidSchedulers.mainThread());
+                .subscribeOn(Schedulers.computation());
     }
 
     private static String getString(Document doc, XPathExpression expression) throws XPathExpressionException {

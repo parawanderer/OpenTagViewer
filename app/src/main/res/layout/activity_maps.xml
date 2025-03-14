@@ -64,8 +64,7 @@
             android:onClick="onClickMoreSettings"
             android:padding="11dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/menu_dots_vertical_24"
-            tools:visibility="gone" />
+            android:src="@drawable/menu_dots_vertical_24" />
 
     </LinearLayout>
 
@@ -99,7 +98,8 @@
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/my_location_24px"
-            android:visibility="visible" />
+            android:visibility="gone" />
 
     </LinearLayout>
+
 </RelativeLayout>

@@ -16,6 +16,7 @@
             android:layout_marginLeft="4dp"
             android:layout_marginRight="4dp"
             android:background="@drawable/layout_rounded"
+            android:backgroundTint="@color/white"
             android:clipToPadding="false"
             android:elevation="8dp"
             android:orientation="vertical">
@@ -132,26 +133,24 @@
                     android:padding="5dp">
 
                     <FrameLayout
-                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
+                        android:background="@drawable/circle"
                         android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        >
+                        android:scaleType="fitCenter">
 
                         <com.google.android.material.progressindicator.CircularProgressIndicator
-                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:id="@+id/history_loading_indicator"
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:indeterminate="true"
+                            android:visibility="gone"
                             app:hideAnimationBehavior="inward"
                             app:showAnimationBehavior="inward"
                             app:trackColor="@color/md_theme_surfaceVariant_highContrast"
-                            app:trackCornerRadius="2dp"
-                            android:visibility="gone"
-                            />
+                            app:trackCornerRadius="2dp" />
 
                         <ImageView
                             android:id="@+id/history_icon"
@@ -187,26 +186,24 @@
                     android:padding="5dp">
 
                     <FrameLayout
-                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
+                        android:background="@drawable/circle"
                         android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        >
+                        android:scaleType="fitCenter">
 
                         <com.google.android.material.progressindicator.CircularProgressIndicator
-                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:id="@+id/refresh_loading_indicator"
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:indeterminate="true"
+                            android:visibility="gone"
                             app:hideAnimationBehavior="inward"
                             app:showAnimationBehavior="inward"
                             app:trackColor="@color/md_theme_surfaceVariant_highContrast"
-                            app:trackCornerRadius="2dp"
-                            android:visibility="gone"
-                            />
+                            app:trackCornerRadius="2dp" />
 
                         <ImageView
                             android:id="@+id/refresh_icon"
@@ -241,26 +238,24 @@
                     android:padding="5dp">
 
                     <FrameLayout
-                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
+                        android:background="@drawable/circle"
                         android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        >
+                        android:scaleType="fitCenter">
 
                         <com.google.android.material.progressindicator.CircularProgressIndicator
-                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:id="@+id/ring_loading_indicator"
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:indeterminate="true"
+                            android:visibility="gone"
                             app:hideAnimationBehavior="inward"
                             app:showAnimationBehavior="inward"
                             app:trackColor="@color/md_theme_surfaceVariant_highContrast"
-                            app:trackCornerRadius="2dp"
-                            android:visibility="gone"
-                            />
+                            app:trackCornerRadius="2dp" />
 
                         <ImageView
                             android:id="@+id/perform_ring_icon"
@@ -295,26 +290,24 @@
                     android:padding="5dp">
 
                     <FrameLayout
-                        android:background="@drawable/circle"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
+                        android:background="@drawable/circle"
                         android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        >
+                        android:scaleType="fitCenter">
 
                         <com.google.android.material.progressindicator.CircularProgressIndicator
-                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:id="@+id/more_loading_indicator"
+                            style="@style/Widget.Material3.CircularProgressIndicator.ExtraSmall"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:indeterminate="true"
+                            android:visibility="gone"
                             app:hideAnimationBehavior="inward"
                             app:showAnimationBehavior="inward"
                             app:trackColor="@color/md_theme_surfaceVariant_highContrast"
-                            app:trackCornerRadius="2dp"
-                            android:visibility="gone"
-                            />
+                            app:trackCornerRadius="2dp" />
 
                         <ImageView
                             android:id="@+id/tag_more_icon"

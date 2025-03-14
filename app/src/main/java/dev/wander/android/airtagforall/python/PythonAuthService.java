@@ -12,7 +12,6 @@ import java.util.List;
 
 import dev.wander.android.airtagforall.db.repo.model.AppleUserData;
 import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -85,8 +84,7 @@ public final class PythonAuthService {
                     loginState,
                     authMethods
             );
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public static Completable requestCode(AuthMethod selectedAuthMethod) {
@@ -94,8 +92,7 @@ public final class PythonAuthService {
             selectedAuthMethod.getObj().callAttr("request");
             // equivalent to python call:  `method.request()`
             // we actually know this to be synchronous, and to return null...
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public static Completable submitCode(AuthMethod selectedAuthMethod, final String authCode) {
@@ -104,8 +101,7 @@ public final class PythonAuthService {
              "submit",
                    new Kwarg("code", authCode)
            );
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public static Observable<byte[]> retrieveAuthData(@NonNull PythonAuthResponse authResponse) {
@@ -119,8 +115,7 @@ public final class PythonAuthService {
             );
 
             return returned.toString().getBytes(StandardCharsets.UTF_8);
-        }).subscribeOn(Schedulers.computation())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.computation());
     }
 
     public static Observable<PythonAppleAccount> restoreAccount(final AppleUserData appleUserData, final String anisetteServerUrl) {
@@ -142,8 +137,7 @@ public final class PythonAuthService {
             }
 
             return new PythonAppleAccount(returned);
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 
     public enum LOGIN_STATE {

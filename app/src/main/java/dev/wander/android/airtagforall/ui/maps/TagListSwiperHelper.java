@@ -57,6 +57,28 @@ public class TagListSwiperHelper {
         });
     }
 
+    public void navigateToCard(final String beaconId) {
+        if (!this.dynamicCardsForTag.containsKey(beaconId)) {
+            Log.w(TAG, "Tried to navigate to card for beaconId=" + beaconId + ", which did not exist in the beaconId to Card map!");
+            return;
+        }
+
+        final int containerWidth = this.scrollContainer.getWidth();
+        final int containerMid = containerWidth / 2;
+
+        FrameLayout tag = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
+        int[] locationTopLeftCorner = new int[2];
+        tag.getLocationOnScreen(locationTopLeftCorner);
+
+        final int leftX = locationTopLeftCorner[0];
+        final int rightX = leftX + tag.getWidth();
+
+        final int mid = (leftX + rightX) / 2;
+        final int diff = containerMid - mid;
+
+        this.scrollContainer.smoothScrollBy(-diff, 0);
+    }
+
     private int getSizeHalfCurrentCard() {
         // all the cards are the same size. We want half of this standard size.
         // it may change at runtime...
@@ -95,16 +117,16 @@ public class TagListSwiperHelper {
         final int dragDistance = Math.abs(currentScrollX - this.xScrollStart);
 
         if (Math.abs(velocity) >= VELOCITY_LIMIT_ABS && dragDistance <= this.getSizeHalfCurrentCard()) {
-            return this.handleSwipeAction(scrollContainer, velocity);
+            return this.handleSwipeAction(velocity);
         } else {
-            return this.handleSlowScrollAction(scrollContainer);
+            return this.handleSlowScrollAction();
         }
     }
 
-    private boolean handleSlowScrollAction(HorizontalScrollView scrollContainer) {
+    private boolean handleSlowScrollAction() {
         // otherwise find the card for which it is true that most of it is currently shown in the screen's view area.
         // (tie break on two showing exactly the same thing)
-        final int containerWidth = scrollContainer.getWidth();
+        final int containerWidth = this.scrollContainer.getWidth();
         final int containerMid = containerWidth / 2;
 
         String targetBeaconId = null;
@@ -142,12 +164,12 @@ public class TagListSwiperHelper {
             return false;
         }
 
-        scrollContainer.smoothScrollBy(-minDiff, 0);
+        this.scrollContainer.smoothScrollBy(-minDiff, 0);
         this.onScrollToTagCallback.accept(targetBeaconId); // raise the callback
         return true;
     }
 
-    private boolean handleSwipeAction(HorizontalScrollView scrollContainer, final double velocity) {
+    private boolean handleSwipeAction(final double velocity) {
         List<CardInfo> sortedByXPos = this.findThreeClosestToMiddle();
         final int size = sortedByXPos.size();
 
@@ -167,14 +189,14 @@ public class TagListSwiperHelper {
                 // CASE: [|][ ][ ]
                 // only allowed to go to the right: [|][*][ ]
                 if (velocity > 0) {
-                    return navigateTo(scrollContainer, sortedByXPos, 1);
+                    return navigateTo(sortedByXPos, 1);
                 }
                 return false; // we can't go to the left
             } else if (Math.abs(sortedByXPos.get(2).getDiff()) < Math.abs(sortedByXPos.get(1).getDiff())) {
                 // CASE: [ ][ ][|]
                 // only allowed to go to the left: [ ][*][|]
                 if (velocity < 0) {
-                    return navigateTo(scrollContainer, sortedByXPos, 1);
+                    return navigateTo(sortedByXPos, 1);
                 }
                 return false; // we can't go to the right
             }
@@ -183,10 +205,10 @@ public class TagListSwiperHelper {
             //                           go left [*][|][ ]                    go right [ ][|][*]
             if (velocity < 0) {
                 // go left [*][|][ ]
-                return navigateTo(scrollContainer, sortedByXPos, 0);
+                return navigateTo(sortedByXPos, 0);
             }
             // go right [ ][|][*]
-            return navigateTo(scrollContainer, sortedByXPos, 2);
+            return navigateTo(sortedByXPos, 2);
         }
 
         // if there's just 2 items, then we might not be able to go to the target pos:
@@ -197,13 +219,13 @@ public class TagListSwiperHelper {
             // CASE: [|][ ]
             if (velocity > 0) {
                 // only allowed to go right
-                return navigateTo(scrollContainer, sortedByXPos, 1);
+                return navigateTo(sortedByXPos, 1);
             }
         } else {
             // CASE: [ ][|]
             if (velocity < 0) {
                 // only allowed to go left
-                return navigateTo(scrollContainer, sortedByXPos, 0);
+                return navigateTo(sortedByXPos, 0);
             }
         }
         Log.d(TAG, "Encountered unexpected swipe target case! Doing nothing.");
@@ -212,7 +234,7 @@ public class TagListSwiperHelper {
 
     private List<CardInfo> findThreeClosestToMiddle() {
         // find top 3
-        final int containerWidth = scrollContainer.getWidth();
+        final int containerWidth = this.scrollContainer.getWidth();
         final int containerMid = containerWidth / 2;
 
         // HEAP of (max) top 3 items with min distance to center.
@@ -251,10 +273,10 @@ public class TagListSwiperHelper {
         return sortedByXPos;
     }
 
-    private boolean navigateTo(HorizontalScrollView scrollContainer, List<CardInfo> items, int newPos) {
+    private boolean navigateTo(List<CardInfo> items, int newPos) {
         CardInfo target = items.get(newPos);
         final int diff = target.getDiff();
-        scrollContainer.smoothScrollBy(-diff, 0);
+        this.scrollContainer.smoothScrollBy(-diff, 0);
         this.onScrollToTagCallback.accept(target.getBeaconId()); // raise the event
         return true;
     }

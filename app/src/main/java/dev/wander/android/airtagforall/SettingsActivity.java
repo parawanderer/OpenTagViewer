@@ -21,7 +21,7 @@ import androidx.databinding.DataBindingUtil;
 
 import java.util.Optional;
 
-import dev.wander.android.airtagforall.databinding.SettingsActivityBinding;
+import dev.wander.android.airtagforall.databinding.ActivitySettingsBinding;
 import dev.wander.android.airtagforall.db.datastore.UserAuthDataStore;
 import dev.wander.android.airtagforall.db.datastore.UserCacheDataStore;
 import dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore;
@@ -80,7 +80,7 @@ public class SettingsActivity extends AppCompatActivity {
                 currentSettings
         );
 
-        SettingsActivityBinding binding = DataBindingUtil.setContentView(this, R.layout.settings_activity);
+        ActivitySettingsBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
         binding.setHandleClickBack(this::finish);
 
         if (this.getSupportActionBar() != null) {

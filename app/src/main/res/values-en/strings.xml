@@ -51,4 +51,5 @@
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
     <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Your location will only be used to visualise your current position on the map, and will never leave your device.</string>
+    <string name="my_devices">My Devices</string>
 </resources>

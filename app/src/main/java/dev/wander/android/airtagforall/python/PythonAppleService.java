@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
@@ -96,7 +95,6 @@ public class PythonAppleService {
             }
 
             return results;
-        }).subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread());
+        }).subscribeOn(Schedulers.io());
     }
 }

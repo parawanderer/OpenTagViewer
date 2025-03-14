@@ -32,7 +32,6 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -49,11 +48,10 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
 import com.google.android.libraries.places.api.Places;
-import com.google.android.libraries.places.api.net.PlacesClient;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -78,6 +76,7 @@ import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.python.PythonAppleService;
 import dev.wander.android.airtagforall.python.PythonAuthService;
+import dev.wander.android.airtagforall.ui.maps.TagCardHelper;
 import dev.wander.android.airtagforall.ui.maps.TagListSwiperHelper;
 import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 import dev.wander.android.airtagforall.util.android.PermissionUtil;
@@ -85,15 +84,15 @@ import dev.wander.android.airtagforall.util.parse.AppleZipImporterUtil;
 import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 import dev.wander.android.airtagforall.util.parse.ZipImporterException;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
  */
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, OnMapClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, OnMapClickListener, GoogleMap.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
@@ -133,6 +132,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
+    private boolean initialFetchComplete = false;
     private long last24HHistoryFetchAt = 0L;
 
     private TagListSwiperHelper tagListSwiperHelper = null;
@@ -197,6 +197,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         mMap.setOnMapClickListener(this);
+        mMap.setOnMarkerClickListener(this);
 
         mMap.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
         // We don't want to use the default button. We have a custom button
@@ -243,6 +244,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void refreshIfAllowed() {
         if (!this.isAppleServiceInitialised()) {
             Log.d(TAG, "AppleService was not initialised yet, so we can't refresh");
+            return;
+        }
+
+        if (!this.initialFetchComplete) {
+            Log.d(TAG, "Skipping refresh due to not having fully initialised yet");
             return;
         }
 
@@ -365,18 +371,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         .flatMap(this.beaconRepo::storeToLocationCache),
                         storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(beacons)))
                         .doOnNext(this::addBeaconToCurrent),
-                        (lastReports, parsedBeaconData) -> {
-
-                            this.runOnUiThread(() -> {
-                                this.showLastDeviceLocations();
-                                Toast.makeText(this, "New reports were visualised on the map!", LENGTH_SHORT).show();
-                            });
-
-                            return Pair.create(lastReports, parsedBeaconData);
-                        }
+                        Pair::create
                 )
             )
-            .subscribe((lastReportsAndBeaconData) -> {
+            .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+            .subscribe(() -> {
+                this.runOnUiThread(() -> {
+                    this.showLastDeviceLocations();
+                    Toast.makeText(this, "New reports were visualised on the map!", LENGTH_SHORT).show();
+                });
                 Log.i(TAG, "Finished visualising new location reports!");
             }, error -> {
                 Log.e(TAG, "Error occurred while inserting into DB", error);
@@ -424,10 +427,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Click refresh event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
 
-        final CircularProgressIndicator loadingIndicator = view.findViewById(R.id.refresh_loading_indicator);
-        loadingIndicator.setVisibility(VISIBLE);
-        final ImageView icon = view.findViewById(R.id.refresh_icon);
-        icon.setVisibility(GONE);
+        final FrameLayout container = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
+        TagCardHelper.toggleRefreshLoading(container, true);
 
         // we can now fetch for this Id only!
         var async = this.fetchLastReportsFor(
@@ -436,19 +437,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 1)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMap(this.beaconRepo::storeToLocationCache)
-                .subscribe((__) -> {
+                .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+                .subscribe(() -> {
                     Log.i(TAG, "Refreshed location data and markers for beaconId=" + beaconId + " on refresh button click");
                     this.runOnUiThread(() -> {
-                        loadingIndicator.setVisibility(GONE);
-                        icon.setVisibility(VISIBLE);
+                        TagCardHelper.toggleRefreshLoading(container, false);
                         this.showLastDeviceLocations();
                         Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
                     });
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current location for beaconId=" + beaconId + " on refresh button click!");
                     this.runOnUiThread(() -> {
-                        loadingIndicator.setVisibility(GONE);
-                        icon.setVisibility(VISIBLE);
+                        TagCardHelper.toggleRefreshLoading(container, false);
                         Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
                     });
                 });
@@ -497,7 +497,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return;
         }
         // else stay here & restore the account & get the user settings
-
         var userSettings = userSettingsRepo.getUserSettings();
 
         // Get Apple account
@@ -526,10 +525,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 // show the locations for all the devices that were already in the cache
                 Toast.makeText(this.getApplicationContext(), "Showing cached locations...", LENGTH_SHORT).show();
                 this.showLastDeviceLocations();
+                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
             });
 
             return allBeacons;
-        });
+        }).observeOn(Schedulers.computation());
 
         // initially show the cached locations (after we get those back from the DB)
         // afterwards try to fetch the latest location reports from the Apple servers
@@ -540,16 +540,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     beacons.stream().collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw)))
         ).flatMap(o -> o)
         .flatMap(this.beaconRepo::storeToLocationCache)
+        .doOnNext(this::addBeaconLocationsToCurrent)
+        .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
         .subscribe(lastReports -> {
-            this.addBeaconLocationsToCurrent(lastReports);
+            this.initialFetchComplete = true;
             this.runOnUiThread(() -> {
                 Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
+                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
                 this.showLastDeviceLocations();
             });
             Log.i(TAG, "Successfully retrieved latest reports!");
         }, error -> {
+            this.initialFetchComplete = true;
             Log.e(TAG, "Error while restoring account and trying to get latest beacons", error);
-            this.runOnUiThread(() -> Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show());
+            this.runOnUiThread(() -> {
+                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+                Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
+            });
         });
     }
 
@@ -590,6 +597,60 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    private Completable updateBeaconGeocodings() {
+        return Observable.fromCallable(this::updateBeaconGeocodingsSync)
+        .flatMapCompletable(o -> o)
+        .subscribeOn(Schedulers.io());
+    }
+
+    private synchronized Completable updateBeaconGeocodingsSync() {
+        var tasks = new ArrayList<Completable>();
+
+        for (BeaconData beaconData : this.beacons.values()) {
+            final String beaconId = beaconData.getInfo().getBeaconId();
+
+            if (!this.beaconLocations.containsKey(beaconId)) {
+                Log.d(TAG, "Can't update geocoding for beacon=" + beaconId + " because it contained no locations");
+                continue;
+            }
+
+            List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
+
+            if (locations.isEmpty()) {
+                Log.d(TAG, "Did not reverse geocode the last location for beaconId=" + beaconId + " because it had no known locations");
+                continue;
+            }
+
+            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            final Double lastLat = beaconData.getLastGeocodingLat();
+            final Double lastLon = beaconData.getLastGeocodingLon();
+            if (lastLat != null && lastLat == lastLocation.getLatitude() && lastLon != null && lastLon == lastLocation.getLongitude()) {
+                Log.d(TAG, "No need to update geocoding for beaconId=" + beaconId + " because previous geocoding is still valid (location has not updated since the last check)");
+                continue;
+            }
+
+            Completable asyncTask = this.reverseGeocode(lastLocation.getLatitude(), lastLocation.getLongitude())
+                    .doOnNext(geocodingForLocation -> {
+                        Log.d(TAG, "Got new reverse geocoding data for beaconId=" + beaconId);
+                        beaconData.setGeocoding(Optional.ofNullable(geocodingForLocation).orElse(Collections.emptyList()));
+                    })
+                    .doOnError(err -> {
+                        Log.e(TAG, "Error occurred while trying to reverse geocode!", err);
+                        beaconData.setGeocoding(Collections.emptyList());
+                    }).ignoreElements();
+
+            tasks.add(asyncTask);
+        }
+
+        return Completable.merge(tasks).doOnComplete(() -> Log.d(TAG, "Finished updating reverse geocoding data!"))
+                .subscribeOn(Schedulers.io());
+    }
+
+    private Observable<List<Address>> reverseGeocode(double latitude, double longitude) {
+        return Observable.fromCallable(() -> this.geocoder.getFromLocation(latitude, longitude, 1))
+            .subscribeOn(Schedulers.io());
+    }
+
     private synchronized void showLastDeviceLocations() {
         for (BeaconData beaconData : this.beacons.values()) {
             BeaconInformation beacon = beaconData.getInfo();
@@ -608,15 +669,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
             BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
-
-            // TODO: make this asynchronous OR do this in a background thread
-            try {
-                List<Address> geocodingForLocation = this.geocoder.getFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), 1);
-                beaconData.setGeocoding(Optional.ofNullable(geocodingForLocation).orElse(Collections.emptyList()));
-            } catch (Exception e) {
-                beaconData.setGeocoding(Collections.emptyList());
-            }
-
             this.showBeaconOnMap(beacon, lastLocation);
         }
         this.updateBeaconCards();
@@ -801,18 +853,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         var beacons = this.beacons.values().stream()
                 .collect(Collectors.toMap(b -> b.getInfo().getBeaconId(), b -> b.getInfo().getOwnedBeaconPlistRaw()));
 
+        TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
+
         var async = this.fetchLastReports(beacons)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMap(this.beaconRepo::storeToLocationCache)
-                .subscribe((__) -> {
+                .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+                .subscribe(() -> {
                     Log.d(TAG, "Refreshed location data and markers!");
                     this.runOnUiThread(() -> {
+                        TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
                         this.showLastDeviceLocations();
                         Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
                     });
                 }, error -> {
-                    Log.e(TAG, "Failed to refresh current locations!");
-                    this.runOnUiThread(() -> Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show());
+                    Log.e(TAG, "Failed to refresh current locations!", error);
+                    this.runOnUiThread(() -> {
+                        TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+                        Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
+                    });
                 });
     }
 
@@ -893,10 +952,32 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    @AllArgsConstructor
+    @Override
+    public boolean onMarkerClick(@NonNull Marker marker) {
+        Optional<String> beaconIdForMarker = this.currentMarkers.entrySet().stream()
+                .filter(kvp -> kvp.getValue().equals(marker))
+                .map(Map.Entry::getKey)
+                .findFirst();
+
+        if (beaconIdForMarker.isPresent()) {
+            this.tagListSwiperHelper.navigateToCard(beaconIdForMarker.get());
+        } else {
+            Log.w(TAG, "Clicked on a marker that could not be associated back to any beaconId!");
+        }
+
+        return false;
+    }
+
     @Data
     private static final class BeaconData {
         @lombok.NonNull private BeaconInformation info;
         @lombok.NonNull private List<Address> geocoding;
+        private Double lastGeocodingLat;
+        private Double lastGeocodingLon;
+
+        public BeaconData(@lombok.NonNull BeaconInformation info, @lombok.NonNull List<Address> geocoding) {
+            this.info = info;
+            this.geocoding = geocoding;
+        }
     }
 }
