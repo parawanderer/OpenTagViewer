@@ -64,8 +64,10 @@ import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconInformation;
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
+import dev.wander.android.airtagforall.data.model.UserMapCameraPosition;
 import dev.wander.android.airtagforall.databinding.ActivityMapsBinding;
 import dev.wander.android.airtagforall.db.datastore.UserAuthDataStore;
+import dev.wander.android.airtagforall.db.datastore.UserCacheDataStore;
 import dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore;
 import dev.wander.android.airtagforall.db.repo.UserAuthRepository;
 import dev.wander.android.airtagforall.db.repo.UserSettingsRepository;
@@ -76,6 +78,7 @@ import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.python.PythonAppleService;
 import dev.wander.android.airtagforall.python.PythonAuthService;
+import dev.wander.android.airtagforall.db.repo.UserDataRepository;
 import dev.wander.android.airtagforall.ui.maps.TagCardHelper;
 import dev.wander.android.airtagforall.ui.maps.TagListSwiperHelper;
 import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
@@ -117,6 +120,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private UserAuthRepository userAuthRepo;
 
+    private UserDataRepository userDataRepository;
+
     private PythonAppleService appleService = null;
 
     private FusedLocationProviderClient fusedLocationClient = null;
@@ -128,7 +133,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
 
     private final Map<String, Marker> currentMarkers = new ConcurrentHashMap<>();
-
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
@@ -162,6 +166,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         this.userSettingsRepo = new UserSettingsRepository(
                 UserSettingsDataStore.getInstance(this.getApplicationContext()));
 
+        this.userDataRepository = new UserDataRepository(
+                UserCacheDataStore.getInstance(getApplicationContext())
+        );
+
         this.userAuthRepo = new UserAuthRepository(
                 UserAuthDataStore.getInstance(getApplicationContext()),
                 new AppCryptographyUtil());
@@ -175,7 +183,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         this.geocoder = new Geocoder(this.getApplicationContext(), Locale.getDefault());
 
         this.setupTagScrollArea();
-        this.handleAuthAndShowDevices();
+
+        var async = this.userDataRepository.getLastCameraPosition()
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(pos -> {
+                Log.d(TAG, "Got previous camera position to reset us to: " + pos);
+
+                pos.ifPresent(userMapCameraPosition -> this.mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                        new LatLng(userMapCameraPosition.getLat(), userMapCameraPosition.getLon()),
+                        userMapCameraPosition.getZoom()
+                )));
+
+                this.handleAuthAndShowDevices();
+
+            }, error -> Log.e(TAG, "Failed to get last camera position!", error));
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -209,6 +230,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     protected void onPause() {
         super.onPause();
+
+        var pos = this.mMap.getCameraPosition();
+        var async = this.userDataRepository.storeLastCameraPosition(
+                UserMapCameraPosition.builder()
+                        .zoom(pos.zoom)
+                        .lat(pos.target.latitude)
+                        .lon(pos.target.longitude)
+                        .build()
+        ).subscribe(
+                success -> Log.d(TAG, "Success storing last camera position!"),
+                error -> Log.e(TAG, "Error storing last camera position!", error));
 
         // cleanup location refresh task
         refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);

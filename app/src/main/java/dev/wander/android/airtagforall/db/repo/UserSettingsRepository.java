@@ -10,6 +10,7 @@ import androidx.datastore.rxjava3.RxDataStore;
 import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class UserSettingsRepository {
     private final RxDataStore<Preferences> userSettingsStore;
@@ -29,7 +30,8 @@ public class UserSettingsRepository {
                         .language(language)
                         .build();
 
-            }).blockingFirst();
+            }).subscribeOn(Schedulers.io())
+            .blockingFirst();
     }
 
     public Completable storeUserSettings(UserSettings userSettings) {
@@ -41,6 +43,7 @@ public class UserSettingsRepository {
             mutablePreferences.set(LANGUAGE, userSettings.getLanguage());
 
             return Single.just(mutablePreferences);
-        }).ignoreElement();
+        }).subscribeOn(Schedulers.io())
+        .ignoreElement();
     }
 }

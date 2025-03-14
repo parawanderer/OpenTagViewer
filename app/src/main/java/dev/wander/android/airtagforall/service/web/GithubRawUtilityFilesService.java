@@ -17,6 +17,7 @@ import java.util.Optional;
 import dev.wander.android.airtagforall.service.web.sidestore.AnisetteServerSuggestionsGithub;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class GithubRawUtilityFilesService {
     private static final String TAG = GithubRawUtilityFilesService.class.getSimpleName();
@@ -40,26 +41,27 @@ public class GithubRawUtilityFilesService {
         final long now = System.currentTimeMillis();
 
         return this.userCache.data().toObservable()
-                .map(cache -> {
-                    long expiresAt = Optional.ofNullable(cache.get(ANISETTE_SERVER_LIST_TIMESTAMP))
-                            .map(saveTime -> saveTime + SERVER_LIST_CACHE_TIME_MS)
-                            .orElse(0L);
+            .map(cache -> {
+                long expiresAt = Optional.ofNullable(cache.get(ANISETTE_SERVER_LIST_TIMESTAMP))
+                        .map(saveTime -> saveTime + SERVER_LIST_CACHE_TIME_MS)
+                        .orElse(0L);
 
-                    if (now >= expiresAt) {
-                        // fetch new
-                        return this.fetchAndCacheServerSuggestions().blockingFirst();
-                    } else {
-                        // return existing
-                        return this.parseCachedServers(cache);
-                    }
-                });
+                if (now >= expiresAt) {
+                    // fetch new
+                    return this.fetchAndCacheServerSuggestions().blockingFirst();
+                } else {
+                    // return existing
+                    return this.parseCachedServers(cache);
+                }
+            }).subscribeOn(Schedulers.io());
     }
 
     private Observable<AnisetteServerSuggestionsGithub> fetchAndCacheServerSuggestions() {
         Log.d(TAG, "Fetching and caching suggested server list...");
         return this.github.getJsonFileContents(SERVERLIST_URL_PATH, AnisetteServerSuggestionsGithub.class)
-                .doOnEach(serverList -> Log.d(TAG, "Got server list response!"))
-                .flatMap(this::storeServerList);
+            .doOnEach(serverList -> Log.d(TAG, "Got server list response!"))
+            .flatMap(this::storeServerList)
+            .subscribeOn(Schedulers.io());
     }
 
     private Observable<AnisetteServerSuggestionsGithub> storeServerList(AnisetteServerSuggestionsGithub serverList) {
@@ -74,7 +76,9 @@ public class GithubRawUtilityFilesService {
 
             Log.d(TAG, "Server list was stored!");
             return Single.just(mutablePreferences);
-        }).toObservable().map(_ignored -> serverList);
+        }).toObservable()
+        .map(_ignored -> serverList)
+        .subscribeOn(Schedulers.io());
     }
 
     private AnisetteServerSuggestionsGithub parseCachedServers(Preferences userCache) {

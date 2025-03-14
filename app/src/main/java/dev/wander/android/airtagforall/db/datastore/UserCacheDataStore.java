@@ -18,6 +18,7 @@ public final class UserCacheDataStore {
 
     public static final Preferences.Key<String> ANISETTE_SERVER_LIST = PreferencesKeys.stringKey("anisette_server_list");
     public static final Preferences.Key<Long> ANISETTE_SERVER_LIST_TIMESTAMP = PreferencesKeys.longKey("anisette_server_list_timestamp");
+    public static final Preferences.Key<String> MAP_CAMERA_ORIENTATION = PreferencesKeys.stringKey("map_camera_orientation");
 
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (USER_CACHE_DATASTORE == null) {

@@ -18,6 +18,7 @@ import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.NonNull;
 
 public class UserAuthRepository {
@@ -44,7 +45,8 @@ public class UserAuthRepository {
                 }
                 return Optional.<AppleUserData>empty();
             })
-            .toObservable();
+            .toObservable()
+            .subscribeOn(Schedulers.io());
     }
 
     public Completable clearUser() {
@@ -52,7 +54,9 @@ public class UserAuthRepository {
             MutablePreferences mutablePreferences = settings.toMutablePreferences();
             mutablePreferences.remove(APPLE_ACCOUNT);
             return Single.just(mutablePreferences);
-        }).ignoreElement();
+        })
+        .subscribeOn(Schedulers.io())
+        .ignoreElement();
     }
 
     public Completable storeUserAuth(byte[] userAuthData) {
@@ -66,7 +70,8 @@ public class UserAuthRepository {
             mutablePreferences.set(APPLE_ACCOUNT, encrypted.flatten());
 
             return Single.just(mutablePreferences);
-        }).ignoreElement();
+        }).subscribeOn(Schedulers.io())
+        .ignoreElement();
     }
 
     public byte[] decrypt(final byte[] encryptedAuthData) {
