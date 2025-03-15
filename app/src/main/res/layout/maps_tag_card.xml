@@ -139,6 +139,8 @@
                     android:id="@+id/device_history_button_container"
                     android:layout_width="80dp"
                     android:layout_height="match_parent"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:onClick="onClickLocationHistory"
@@ -192,6 +194,8 @@
                     android:id="@+id/device_refresh_button_container"
                     android:layout_width="80dp"
                     android:layout_height="match_parent"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:onClick="onClickRefresh"
@@ -244,6 +248,8 @@
                     android:id="@+id/device_ring_button_container"
                     android:layout_width="80dp"
                     android:layout_height="match_parent"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:onClick="onClickRing"
@@ -300,7 +306,8 @@
                     android:clickable="true"
                     android:onClick="onClickMoreForDevice"
                     android:orientation="vertical"
-                    android:padding="5dp">
+                    android:padding="5dp"
+                    android:visibility="gone">
 
                     <FrameLayout
                         android:layout_width="40dp"

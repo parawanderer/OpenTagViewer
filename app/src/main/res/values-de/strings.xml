@@ -52,4 +52,5 @@
     <string name="accept">Akzeptieren</string>
     <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Ihr Standort wird nur zur Visualisierung Ihrer aktuellen Position auf der Karte verwendet und verlässt Ihr Gerät nie.</string>
     <string name="my_devices">Meine Geräte</string>
+    <string name="no_last_location_known">Kein letzter Standort bekannt</string>
 </resources>

@@ -52,4 +52,5 @@
     <string name="accept">Accepteren</string>
     <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Uw locatie zal alleen gebruikt worden om uw huidige positie op de kaart te visualiseren en verlaat uw apparaat nooit.</string>
     <string name="my_devices">Mijn Apparaten</string>
+    <string name="no_last_location_known">Geen laatste locatie bekend</string>
 </resources>

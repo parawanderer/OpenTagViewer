@@ -304,7 +304,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
         this.fetchAndUpdateCurrentBeacons();
         Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
-        Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
+        //Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
     }
 
     public void onClickMoreSettings(View view) {
@@ -323,6 +323,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 this.showSettingsPage();
             } else if (menuItem.getItemId() == R.id.information) {
                 this.showInformationPage();
+            } else if (menuItem.getItemId() == R.id.my_devices) {
+                this.showMyDevicesPage();
             }
 
             return true;
@@ -413,6 +415,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
     }
+
+    private void showMyDevicesPage() {
+        Log.d(TAG, "Show my devices page clicked");
+
+        Intent intent = new Intent(this, MyDevicesListActivity.class);
+        startActivity(intent);
+    }
+
 
     private void onImportFilePicked(Intent data) {
         Log.d(TAG, "File has been picked");
@@ -512,13 +522,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     this.runOnUiThread(() -> {
                         TagCardHelper.toggleRefreshLoading(container, false);
                         this.showLastDeviceLocations();
-                        Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
+                        //Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
                     });
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current location for beaconId=" + beaconId + " on refresh button click!");
                     this.runOnUiThread(() -> {
                         TagCardHelper.toggleRefreshLoading(container, false);
-                        Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
+                        //Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
                     });
                 });
     }
@@ -592,13 +602,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             this.runOnUiThread(() -> {
                 // show the locations for all the devices that were already in the cache
-                Toast.makeText(this.getApplicationContext(), "Showing cached locations...", LENGTH_SHORT).show();
+                //Toast.makeText(this.getApplicationContext(), "Showing cached locations...", LENGTH_SHORT).show();
                 this.showLastDeviceLocations();
                 TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
             });
 
             return allBeacons;
-        }).observeOn(Schedulers.computation());
+        }).observeOn(Schedulers.io());
 
         // initially show the cached locations (after we get those back from the DB)
         // afterwards try to fetch the latest location reports from the Apple servers
@@ -614,7 +624,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         .subscribe(lastReports -> {
             this.initialFetchComplete = true;
             this.runOnUiThread(() -> {
-                Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
+                //Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
                 TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
                 this.showLastDeviceLocations();
             });
@@ -691,8 +701,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
             BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
-            final Double lastLat = beaconData.getLastGeocodingLat();
-            final Double lastLon = beaconData.getLastGeocodingLon();
+            final Double lastLat = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.latitude).orElse(null);
+            final Double lastLon = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.longitude).orElse(null);
             if (lastLat != null && lastLat == lastLocation.getLatitude() && lastLon != null && lastLon == lastLocation.getLongitude()) {
                 Log.d(TAG, "No need to update geocoding for beaconId=" + beaconId + " because previous geocoding is still valid (location has not updated since the last check)");
                 continue;
@@ -702,10 +712,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     .doOnNext(geocodingForLocation -> {
                         Log.d(TAG, "Got new reverse geocoding data for beaconId=" + beaconId);
                         beaconData.setGeocoding(Optional.ofNullable(geocodingForLocation).orElse(Collections.emptyList()));
+                        beaconData.setLastGeocodingLocation(new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude()));
                     })
                     .doOnError(err -> {
                         Log.e(TAG, "Error occurred while trying to reverse geocode!", err);
                         beaconData.setGeocoding(Collections.emptyList());
+                        beaconData.setLastGeocodingLocation(null);
                     }).ignoreElements();
 
             tasks.add(asyncTask);
@@ -769,7 +781,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         );
 
         BitmapDescriptor icon;
-        if (beacon.getEmoji() != null) {
+        if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
             icon = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
@@ -885,7 +897,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             deviceNameView.setText(beacon.getName());
 
             // icon
-            if (beacon.getEmoji() != null) {
+            if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
                 // use emoji
                 TextView emojiContainer = v.findViewById(R.id.device_icon_emoji);
                 ImageView iconContainer = v.findViewById(R.id.device_icon_img);
@@ -954,13 +966,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     this.runOnUiThread(() -> {
                         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
                         this.showLastDeviceLocations();
-                        Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
+                        //Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
                     });
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current locations!", error);
                     this.runOnUiThread(() -> {
                         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
-                        Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
+                        //Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
                     });
                 });
     }
@@ -1062,8 +1074,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private static final class BeaconData {
         @lombok.NonNull private BeaconInformation info;
         @lombok.NonNull private List<Address> geocoding;
-        private Double lastGeocodingLat;
-        private Double lastGeocodingLon;
+        private LatLng lastGeocodingLocation;
 
         public BeaconData(@lombok.NonNull BeaconInformation info, @lombok.NonNull List<Address> geocoding) {
             this.info = info;

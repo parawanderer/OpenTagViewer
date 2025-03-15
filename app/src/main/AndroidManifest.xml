@@ -4,7 +4,6 @@
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -32,11 +31,15 @@
         android:theme="@style/Theme.AirTagForAll"
         tools:targetApi="31">
         <activity
+            android:name=".MyDevicesListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity"
+            />
+        <activity
             android:name=".AppleLoginActivity"
             android:exported="false"
             android:noHistory="true"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity"
-            />
+            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
 
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
@@ -46,10 +49,10 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
-
         <service
-                android:name=".service.AppNavigationService"
-                android:foregroundServiceType="location">
+            android:name=".service.AppNavigationService"
+            android:foregroundServiceType="location">
+
             <!-- Any inner elements would go here. -->
         </service>
 
