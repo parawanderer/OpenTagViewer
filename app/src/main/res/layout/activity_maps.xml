@@ -111,7 +111,7 @@
             android:cropToPadding="false"
             android:elevation="8dp"
             android:focusable="true"
-            android:onClick="onClickNavigateTo"
+            android:onClick="onClickMyLocation"
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/my_location_24px"
