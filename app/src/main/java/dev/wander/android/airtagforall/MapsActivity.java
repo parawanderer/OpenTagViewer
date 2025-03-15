@@ -43,6 +43,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -83,6 +84,7 @@ import dev.wander.android.airtagforall.ui.maps.TagCardHelper;
 import dev.wander.android.airtagforall.ui.maps.TagListSwiperHelper;
 import dev.wander.android.airtagforall.util.android.AppCryptographyUtil;
 import dev.wander.android.airtagforall.util.android.PermissionUtil;
+import dev.wander.android.airtagforall.ui.maps.VectorImageGeneratorUtil;
 import dev.wander.android.airtagforall.util.parse.AppleZipImporterUtil;
 import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 import dev.wander.android.airtagforall.util.parse.ZipImporterException;
@@ -734,10 +736,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 lastLocation.getStatus()
         );
 
+        BitmapDescriptor icon;
+        if (beacon.getEmoji() != null) {
+            icon = VectorImageGeneratorUtil.makeMarker(
+                    getResources(),
+                    beacon.getEmoji(),
+                    getColor(R.color.white));
+        } else {
+            icon = VectorImageGeneratorUtil.makeMarker(
+                    getResources(),
+                    R.drawable.apple,
+                    getColor(R.color.white),
+                    getColor(R.color.greyish)
+            );
+        }
+
         var markerOptions = new MarkerOptions()
                 .position(locationTag)
                 .title(markerTitle)
-                .snippet(markerSnippet);
+                .snippet(markerSnippet)
+                .icon(icon);
 
 
         Marker marker = this.mMap.addMarker(markerOptions);

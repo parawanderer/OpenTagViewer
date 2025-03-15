@@ -8,6 +8,7 @@
     <color name="black">#FF000000</color>
     <color name="off_white">#F4F5FB</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="greyish">#B4B4B4</color>
 
 
     <color name="md_theme_primary">#006971</color>
