@@ -37,14 +37,26 @@
                     android:layout_gravity="center"
                     android:layout_weight="1">
 
+                    <TextView
+                        android:id="@+id/device_icon_emoji"
+                        android:layout_width="90dp"
+                        android:layout_height="53dp"
+                        android:gravity="center"
+                        android:textSize="36sp"
+                        android:visibility="gone"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
                     <ImageView
-                        android:id="@+id/imageView2"
+                        android:id="@+id/device_icon_img"
                         android:layout_width="90dp"
                         android:layout_height="53dp"
                         android:layout_weight="1"
                         android:padding="5dp"
                         android:src="@drawable/apple"
-                        android:tint="#B4B4B4"
+                        android:tint="@color/greyish"
+                        android:visibility="visible"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"

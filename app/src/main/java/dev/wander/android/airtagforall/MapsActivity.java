@@ -32,6 +32,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -709,8 +710,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private synchronized void showBeaconOnMap(final BeaconInformation beacon, final BeaconLocationReport lastLocation) {
-        // TODO: make this whole thing prettier, make it reuse tags if possible, etc...
-        // Add a marker and move the camera
+        // TODO: make it reuse tags if possible
         var format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
 
         final String beaconId = beacon.getBeaconId();
@@ -723,10 +723,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             oldMarker.remove();
             this.currentMarkers.remove(beaconId);
         }
-
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
-        // TODO: make the markers prettier...
         final String markerTitle = String.format("%s %s", beacon.getEmoji(), beacon.getName());
         final String markerSnippet = String.format(Locale.ENGLISH, "Last seen: %s (%s, %d, %d, %d)",
                 format.format(new Date(lastLocation.getTimestamp())),
@@ -756,8 +754,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .title(markerTitle)
                 .snippet(markerSnippet)
                 .icon(icon);
-
-
         Marker marker = this.mMap.addMarker(markerOptions);
 
         this.currentMarkers.put(beaconId, marker);
@@ -852,11 +848,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             // the title
             TextView deviceNameView = v.findViewById(R.id.device_name);
-            if (beacon.getEmoji() != null && !beacon.getEmoji().isEmpty()) {
-                deviceNameView.setText(String.format("%s %s", beacon.getEmoji(), beacon.getName()));
-            } else {
-                deviceNameView.setText(beacon.getName());
+            deviceNameView.setText(beacon.getName());
+
+            // icon
+            if (beacon.getEmoji() != null) {
+                // use emoji
+                TextView emojiContainer = v.findViewById(R.id.device_icon_emoji);
+                ImageView iconContainer = v.findViewById(R.id.device_icon_img);
+                emojiContainer.setText(beacon.getEmoji());
+                emojiContainer.setVisibility(VISIBLE);
+                iconContainer.setVisibility(GONE);
             }
+            // ^ ELSE: show default apple icon
+
 
             // the location
             TextView deviceLocation = v.findViewById(R.id.device_location);
