@@ -57,6 +57,39 @@ public class TagListSwiperHelper {
         });
     }
 
+    public String getCurrentPrimaryCard() {
+        if (this.dynamicCardsForTag.isEmpty()) {
+            return null;
+        }
+
+        final int containerWidth = this.scrollContainer.getWidth();
+        final int containerMid = containerWidth / 2;
+
+        String targetBeaconId = null;
+        Integer minDiff = null;
+
+        int[] locationTopLeftCorner = new int[2];
+        for (var beaconId : this.dynamicCardsForTag.keySet()) {
+            FrameLayout tag = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
+
+            tag.getLocationOnScreen(locationTopLeftCorner);
+            final int leftX = locationTopLeftCorner[0];
+            final int rightX = leftX + tag.getWidth();
+
+            if (rightX <= 0) continue;
+            if (leftX >= containerWidth) continue;
+
+            final int mid = (leftX + rightX) / 2;
+            final int diff = containerMid - mid;
+            if (minDiff == null || Math.abs(diff) < Math.abs(minDiff)) {
+                minDiff = diff;
+                targetBeaconId = beaconId;
+            }
+        }
+
+        return targetBeaconId;
+    }
+
     public void navigateToCard(final String beaconId) {
         if (!this.dynamicCardsForTag.containsKey(beaconId)) {
             Log.w(TAG, "Tried to navigate to card for beaconId=" + beaconId + ", which did not exist in the beaconId to Card map!");

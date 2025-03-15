@@ -226,6 +226,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
         // We don't want to use the default button. We have a custom button
         mMap.getUiSettings().setMyLocationButtonEnabled(false);
+        mMap.getUiSettings().setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
+        mMap.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
+        mMap.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
+
 
         this.enableMyLocation();
     }
@@ -348,6 +352,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         } else {
             Log.e(TAG, "Clicked on 'My Location' button while not having Location permissions. This shouldn't happen as this button should have been hidden in this case!");
+        }
+    }
+
+    public void onClickNavigateTo(View view) {
+        Log.d(TAG, "Navigate to button was clicked");
+
+        if (this.dynamicCardsForTag.isEmpty()) {
+            Log.w(TAG, "Unexpected: managed to click navigateTo even though there was no tags listed! Expected this button to be disabled.");
+            return;
+        }
+
+        final String beaconId = this.tagListSwiperHelper.getCurrentPrimaryCard();
+        if (beaconId == null) {
+            Log.w(TAG, "No current card was found!");
+            return;
+        }
+
+        final List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
+        if (locations.isEmpty()) {
+            Log.w(TAG, "Can't navigate to a beacon that has no locations!");
+            return;
+        }
+        final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+        Uri uri = Uri.parse(String.format(Locale.ROOT, "geo:%.7f,%.7f?q=%.7f,%.7f", lastLocation.getLatitude(), lastLocation.getLongitude(), lastLocation.getLatitude(), lastLocation.getLongitude()));
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
+        mapIntent.setPackage("com.google.android.apps.maps");
+        if (mapIntent.resolveActivity(getPackageManager()) != null) {
+            startActivity(mapIntent);
+        } else {
+            Log.e(TAG, "Could not start maps activity for currently visible tag!");
         }
     }
 
@@ -889,12 +923,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
         }
 
+
+        ImageButton navigationButton = this.findViewById(R.id.button_navigate_to);
         if (this.dynamicCardsForTag.isEmpty()) {
-            // HIDE PARENT CONTAINER (FOR NOW)
-            scrollContainer.setVisibility(GONE);
+            scrollContainer.setVisibility(GONE); // HIDE PARENT CONTAINER (FOR NOW)
+            navigationButton.setVisibility(GONE);
         } else {
-            // UNHIDE PARENT CONTAINER
-            scrollContainer.setVisibility(VISIBLE);
+            scrollContainer.setVisibility(VISIBLE); // UNHIDE PARENT CONTAINER
+            navigationButton.setVisibility(VISIBLE);
         }
     }
 

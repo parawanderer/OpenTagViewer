@@ -85,7 +85,7 @@
         android:paddingBottom="20dp">
 
         <ImageButton
-            android:id="@+id/button_my_location"
+            android:id="@+id/button_navigate_to"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_weight="1"
@@ -94,7 +94,24 @@
             android:cropToPadding="false"
             android:elevation="8dp"
             android:focusable="true"
-            android:onClick="onClickMyLocation"
+            android:onClick="onClickNavigateTo"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/directions_24px"
+            android:visibility="visible" />
+
+        <ImageButton
+            android:id="@+id/button_my_location"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginLeft="10dp"
+            android:layout_weight="1"
+            android:background="@drawable/ripple_background"
+            android:clickable="true"
+            android:cropToPadding="false"
+            android:elevation="8dp"
+            android:focusable="true"
+            android:onClick="onClickNavigateTo"
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/my_location_24px"
