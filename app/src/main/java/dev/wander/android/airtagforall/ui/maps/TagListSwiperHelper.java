@@ -28,7 +28,7 @@ public class TagListSwiperHelper {
     private int xScrollStart = 0;
     private long xPosLastTime = 0;
 
-    private static final double VELOCITY_LIMIT_ABS = 0.9E-6;
+    private static final double VELOCITY_LIMIT_ABS = 0.7E-6;
 
     private final HorizontalScrollView scrollContainer;
     private final Map<String, FrameLayout> dynamicCardsForTag;

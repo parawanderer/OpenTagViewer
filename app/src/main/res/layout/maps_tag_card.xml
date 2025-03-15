@@ -96,7 +96,8 @@
                             android:layout_marginStart="5sp"
                             android:fontFamily="@font/nunito_bold"
                             android:gravity="center_vertical"
-                            android:text="Streetstreet 1, 1234 City, Country"
+                            android:singleLine="true"
+                            android:text="Streetstreet 1, 1234 CityThatIsLong Actually, Country"
                             android:textColor="@color/material_dynamic_neutral40"
                             android:textSize="12sp" />
 
