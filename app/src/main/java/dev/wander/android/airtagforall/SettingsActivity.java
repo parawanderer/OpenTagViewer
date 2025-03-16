@@ -15,6 +15,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +28,7 @@ import androidx.databinding.DataBindingUtil;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.progressindicator.CircularProgressIndicatorSpec;
 import com.google.android.material.progressindicator.IndeterminateDrawable;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
@@ -124,10 +126,14 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setCurrentLanguage(this.getPrettyLanguageName(this.currentSettings.getLanguage()));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
         this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
+        this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
         }
+
+        MaterialSwitch switcher = this.findViewById(R.id.settings_app_debug_data_enabled);
+        switcher.setOnCheckedChangeListener(this::onDebugDataEnabledChange);
 
         this.setupUserInfo();
 
@@ -143,6 +149,15 @@ public class SettingsActivity extends AppCompatActivity {
                         .forEach(urlOptions::add);
             });
         }, error -> Log.e(TAG, "Error occurred while fetching servers", error));
+    }
+
+    private void onDebugDataEnabledChange(CompoundButton buttonView, boolean isChecked) {
+        final Boolean oldChoice = this.currentSettings.getEnableDebugData();
+        if (oldChoice == null || oldChoice != isChecked) {
+            this.currentSettings.setEnableDebugData(isChecked);
+            this.binding.setIsDebugDataEnabled(isChecked);
+            this.saveSettings();
+        }
     }
 
     private String getCurrentThemeUiString() {

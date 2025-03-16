@@ -36,9 +36,10 @@
                 android:id="@+id/history_item_location_detail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Streetstreet 1234, 1234AB Cityname, Country"
+                android:text="Extra data"
                 android:textColor="@color/md_theme_outline"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/history_item_location_time"

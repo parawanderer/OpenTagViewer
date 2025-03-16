@@ -9,4 +9,5 @@ public class UserSettings {
     private Boolean useDarkTheme;
     private String anisetteServerUrl;
     private String language;
+    private Boolean enableDebugData;
 }

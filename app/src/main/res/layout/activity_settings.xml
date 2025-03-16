@@ -11,6 +11,7 @@
         <variable name="currentLanguage" type="String" />
         <variable name="onClickAnisetteServerUrl" type="Runnable" />
         <variable name="currentAnisetteServerUrl" type="String" />
+        <variable name="isDebugDataEnabled" type="boolean" />
     </data>
 
     <LinearLayout
@@ -71,6 +72,40 @@
                 app:title="@{@string/anisette_server_url}"
                 app:onClick="@{onClickAnisetteServerUrl}"
                 />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="22dp"
+                android:paddingTop="8dp"
+                android:paddingRight="22dp"
+                android:paddingBottom="8dp">
+
+                <ImageView
+                    android:id="@+id/imageView5"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    app:srcCompat="@drawable/developer_mode_24px" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/settings_app_debug_data_enabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22dp"
+                    android:checked="@{isDebugDataEnabled}"
+                    android:enabled="true"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/enable_debug_data"
+                    android:textSize="16sp" />
+            </LinearLayout>
 
         </LinearLayout>
 

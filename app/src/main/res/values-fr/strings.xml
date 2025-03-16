@@ -66,4 +66,5 @@
     <string name="retry">Réessayer</string>
     <string name="error_occurred_while_fetching_history">Une erreur s\'est produite lors de la récupération de l\'historique</string>
     <string name="are_you_sure_you_want_to_logout">Êtes-vous sûr de vouloir vous déconnecter ?</string>
+    <string name="enable_debug_data">Activer les données de débogage</string>
 </resources>

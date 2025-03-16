@@ -66,4 +66,5 @@
     <string name="retry">Wiederholen</string>
     <string name="error_occurred_while_fetching_history">Beim Abrufen des Verlaufs ist ein Fehler aufgetreten</string>
     <string name="are_you_sure_you_want_to_logout">Möchten Sie sich wirklich abmelden?</string>
+    <string name="enable_debug_data">Debugdaten aktivieren</string>
 </resources>

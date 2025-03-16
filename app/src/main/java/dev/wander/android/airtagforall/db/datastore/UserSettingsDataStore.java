@@ -20,6 +20,8 @@ public final class UserSettingsDataStore {
     public static final Preferences.Key<String> LANGUAGE = PreferencesKeys.stringKey("language");
     public static final Preferences.Key<Boolean> USE_DARK_THEME = PreferencesKeys.booleanKey("use_dark_theme");
 
+    public static final Preferences.Key<Boolean> ENABLE_DEBUG_DATA = PreferencesKeys.booleanKey("enable_debug_data");
+
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (PREFERENCES_DATA_STORE == null) {
             PREFERENCES_DATA_STORE = new RxPreferenceDataStoreBuilder(context, SETTINGS_FILE_NAME)

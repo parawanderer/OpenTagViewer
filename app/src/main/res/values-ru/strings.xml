@@ -66,4 +66,5 @@
     <string name="retry">Повторить</string>
     <string name="error_occurred_while_fetching_history">Произошла ошибка при извлечении истории</string>
     <string name="are_you_sure_you_want_to_logout">Вы уверены, что хотите выйти?</string>
+    <string name="enable_debug_data">Включить отладочные данные</string>
 </resources>

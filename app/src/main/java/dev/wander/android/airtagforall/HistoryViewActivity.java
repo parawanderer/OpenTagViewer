@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -149,7 +148,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         content.addView(getLayoutInflater().inflate(R.layout.view_history_bottom_sheet, content, false));
         this.setupBottomSheet();
 
-        this.historyItemsAdapter = new HistoryItemsAdapter(this.geocoder, this.locations);
+        this.historyItemsAdapter = new HistoryItemsAdapter(this.geocoder, this.locations, this.userSettings);
         RecyclerView recyclerView = findViewById(R.id.recycler_view_history_items);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(this.historyItemsAdapter);

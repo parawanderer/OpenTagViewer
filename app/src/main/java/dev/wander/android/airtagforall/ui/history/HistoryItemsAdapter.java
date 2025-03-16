@@ -1,5 +1,8 @@
 package dev.wander.android.airtagforall.ui.history;
 
+import static android.view.View.GONE;
+import static android.view.View.VISIBLE;
+
 import android.location.Address;
 import android.location.Geocoder;
 import android.text.format.DateFormat;
@@ -21,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import dev.wander.android.airtagforall.R;
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
+import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -30,16 +34,17 @@ import lombok.Setter;
 public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapter.ViewHolder> {
     private static final String TAG = HistoryItemsAdapter.class.getSimpleName();
 
-    private final List<BeaconLocationReport> locations;
-    private final Geocoder geocoder;
     private static final Map<String, List<Address>> GEOCODING_CACHE = new ConcurrentHashMap<>();
 
-    @Setter
-    private int daysBack = 0;
+    private final List<BeaconLocationReport> locations;
+    private final Geocoder geocoder;
+    private final @lombok.NonNull UserSettings userSettings;
 
-    public HistoryItemsAdapter(@lombok.NonNull Geocoder geocoder, @lombok.NonNull List<BeaconLocationReport> locations) {
+
+    public HistoryItemsAdapter(@lombok.NonNull Geocoder geocoder, @lombok.NonNull List<BeaconLocationReport> locations, @lombok.NonNull UserSettings userSettings) {
         this.locations = locations;
         this.geocoder = geocoder;
+        this.userSettings = userSettings;
     }
 
     @Getter
@@ -78,16 +83,22 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
         viewHolder.getLocationName().setText(
                 String.format(Locale.ROOT, "%.6f, %.6f", item.getLatitude(), item.getLongitude()));
 
-        viewHolder.getLocationDetail().setText(String.format(
-                Locale.ROOT,
-                "coords:%.6f,%.6f, desc:%s, status:%d, conf:%d, acc:%d",
-                item.getLatitude(),
-                item.getLongitude(),
-                item.getDescription(),
-                item.getStatus(),
-                item.getConfidence(),
-                item.getHorizontalAccuracy()
-        ));
+        if (this.userSettings.getEnableDebugData() == Boolean.TRUE) {
+            viewHolder.getLocationDetail().setVisibility(VISIBLE);
+            viewHolder.getLocationDetail().setText(String.format(
+                    Locale.ROOT,
+                    "coords:%.6f,%.6f, desc:%s, status:%d, conf:%d, acc:%d",
+                    item.getLatitude(),
+                    item.getLongitude(),
+                    item.getDescription(),
+                    item.getStatus(),
+                    item.getConfidence(),
+                    item.getHorizontalAccuracy()
+            ));
+        } else {
+            viewHolder.getLocationDetail().setVisibility(GONE);
+        }
+
 
         var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss");
         var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());
