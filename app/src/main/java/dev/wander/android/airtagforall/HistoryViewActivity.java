@@ -28,12 +28,13 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.progressindicator.CircularProgressIndicatorSpec;
-import com.google.android.material.progressindicator.IndeterminateDrawable;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -104,8 +105,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private Polyline currentHistoryLineOutline = null;
     private Polyline currentHistoryLine = null;
+    private Marker singleCoordMarker = null;
 
-    private IndeterminateDrawable<CircularProgressIndicatorSpec> progressIndicator = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -184,6 +185,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         final LinearLayout dataReportContainer = this.findViewById(R.id.history_data_overview_top);
         final LinearLayout errorMessageContainer = this.findViewById(R.id.history_error_message);
 
+        final LinearProgressIndicator historyLoadingProgress = this.findViewById(R.id.history_loading_progress_indicator);
+
         final long now = System.currentTimeMillis();
 
         final long nowWithDaysBack = now - (this.daysBack * DAY_IN_MS);
@@ -192,38 +195,54 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         this.currentBeginningOfDay = beginningOfDay;
 
+        if (!this.hasReportsForDayLocally(beginningOfDay)) {
+            // show if we will be loading for a bit.
+            // if it is available locally, then don't show because it will update very quickly!
+            historyLoadingProgress.show();
+        }
+
         // fetch & do
         var async = this.getReportsForDay(beginningOfDay)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(items -> {
+                        historyLoadingProgress.hide();
+
                         this.setRetryButtonLoading(true);
                         dataReportContainer.setVisibility(VISIBLE);
                         errorMessageContainer.setVisibility(GONE);
 
-                        moveLeftButton.setClickable(true); // allow navigation
-                        if (moveRightButton.getVisibility() != INVISIBLE)
-                            moveRightButton.setClickable(true); // allow navigation
+                        moveLeftButton.setClickable(true);
+                        if (moveRightButton.getVisibility() != INVISIBLE) moveRightButton.setClickable(true); // allow navigation
+
                         this.updateForNewLocationsList(items);
                     },
                     error -> {
                         Log.e(TAG, "Failure to fetch location reports in time range: " + beginningOfDay + " - " + (beginningOfDay + DAY_IN_MS), error);
+                        historyLoadingProgress.hide();
 
                         this.setRetryButtonLoading(true);
                         dataReportContainer.setVisibility(GONE);
                         errorMessageContainer.setVisibility(VISIBLE);
 
                         moveLeftButton.setClickable(true);
-                        if (moveRightButton.getVisibility() != INVISIBLE)
-                            moveRightButton.setClickable(true); // allow navigation
+                        if (moveRightButton.getVisibility() != INVISIBLE) moveRightButton.setClickable(true); // allow navigation
                     });
     }
 
     private static final Map<String, List<BeaconLocationReport>> REPORTS_CACHE = new ConcurrentHashMap<>();
 
+    private static String createReportsForDayCacheKey(final String beaconId, final long beginningOfDay) {
+        return String.format(Locale.ROOT, "%d-%s", beginningOfDay, beaconId);
+    }
+
+    private boolean hasReportsForDayLocally(final long beginningOfDay) {
+        final String cacheKey = createReportsForDayCacheKey(beaconId, beginningOfDay);
+        return REPORTS_CACHE.containsKey(cacheKey);
+    }
+
     private Observable<List<BeaconLocationReport>> getReportsForDay(final long beginningOfDay) {
         final boolean isForToday = this.daysBack == 0;
-        final String beaconId = this.beaconId;
-        final String cacheKey = String.format(Locale.ROOT, "%d-%s", beginningOfDay, beaconId);
+        final String cacheKey = createReportsForDayCacheKey(beaconId, beginningOfDay);
         final long endOfDay = beginningOfDay + DAY_IN_MS;
 
         if (REPORTS_CACHE.containsKey(cacheKey)) {
@@ -289,15 +308,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             this.historyItemsAdapter.notifyItemRangeRemoved(0, oldNumItems);
         }
 
-        // cleanup old line
-        if (this.currentHistoryLine != null) {
-            this.currentHistoryLine.remove();
-            this.currentHistoryLine = null;
-        }
-        if (this.currentHistoryLineOutline != null) {
-            this.currentHistoryLineOutline.remove();
-            this.currentHistoryLineOutline = null;
-        }
+        this.cleanupOldLines();
 
         TextView currentRangeText = this.findViewById(R.id.history_drawer_title);
         //MaterialButton moveLeftButton = this.findViewById(R.id.history_move_left_button);
@@ -320,10 +331,22 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.drawNewLocationList(newReports);
     }
 
-    private void setupBottomSheet() {
-        CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(this, /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
-        this.progressIndicator = IndeterminateDrawable.createCircularDrawable(this, spec);
+    private void cleanupOldLines() {
+        if (this.currentHistoryLine != null) {
+            this.currentHistoryLine.remove();
+            this.currentHistoryLine = null;
+        }
+        if (this.currentHistoryLineOutline != null) {
+            this.currentHistoryLineOutline.remove();
+            this.currentHistoryLineOutline = null;
+        }
+        if (this.singleCoordMarker != null) {
+            this.singleCoordMarker.remove();
+            this.singleCoordMarker = null;
+        }
+    }
 
+    private void setupBottomSheet() {
         View bottomSheetChildView = this.findViewById(R.id.view_history_bottom_sheet_layout);
         ViewGroup.LayoutParams params = bottomSheetChildView.getLayoutParams();
         BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
@@ -359,6 +382,9 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         final MaterialButton retryButton = this.findViewById(R.id.history_fetch_retry_button);
         retryButton.setOnClickListener(v -> this.handleRetryHistoryFetch());
+
+        final LinearProgressIndicator historyLoadingProgress = this.findViewById(R.id.history_loading_progress_indicator);
+        historyLoadingProgress.hide();
     }
 
     private void handleRetryHistoryFetch() {
@@ -371,10 +397,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         if (!isComplete) {
             retryButton.setClickable(false); // temporarily disable
-            retryButton.setIcon(this.progressIndicator);
         } else {
             retryButton.setClickable(true);
-            retryButton.setIcon(null);
         }
     }
 
@@ -422,20 +446,28 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             }
         }
 
-        var optionsOutlineLine = new PolylineOptions()
-                .color(this.getColor(R.color.maps_line_outline))
-                .width(OUTLINE_WIDTH)
-                .clickable(false)
-                .addAll(coords);
-        this.currentHistoryLineOutline = this.map.addPolyline(optionsOutlineLine);
+        final int numCoords = coords.size();
+        if (numCoords > 1) {
+            var optionsOutlineLine = new PolylineOptions()
+                    .color(this.getColor(R.color.maps_line_outline))
+                    .width(OUTLINE_WIDTH)
+                    .clickable(false)
+                    .addAll(coords);
+            this.currentHistoryLineOutline = this.map.addPolyline(optionsOutlineLine);
 
-        var optionsPrimaryLine = new PolylineOptions()
-                .color(this.getColor(R.color.maps_line_primary))
-                .width(LINE_WIDTH)
-                .clickable(true)
-                .addAll(coords);
+            var optionsPrimaryLine = new PolylineOptions()
+                    .color(this.getColor(R.color.maps_line_primary))
+                    .width(LINE_WIDTH)
+                    .clickable(true)
+                    .addAll(coords);
 
-        this.currentHistoryLine = this.map.addPolyline(optionsPrimaryLine);
+            this.currentHistoryLine = this.map.addPolyline(optionsPrimaryLine);
+        } else if (numCoords == 1) {
+            // if we just had a single item, then draw a single marker
+            var markerOptions = new MarkerOptions()
+                    .position(coords.get(0));
+            this.singleCoordMarker = this.map.addMarker(markerOptions);
+        }
 
         if (!coords.isEmpty()) {
             this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(

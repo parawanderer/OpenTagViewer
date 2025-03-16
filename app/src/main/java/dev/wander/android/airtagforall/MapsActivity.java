@@ -821,7 +821,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         var markerOptions = new MarkerOptions()
                 .position(locationTag)
                 .title(markerTitle)
-                //.snippet(markerSnippet)
                 .icon(icon);
         Marker marker = this.map.addMarker(markerOptions);
 
