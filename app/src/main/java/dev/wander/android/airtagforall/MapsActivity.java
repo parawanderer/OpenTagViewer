@@ -796,13 +796,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
         final String markerTitle = String.format("%s %s", beacon.getEmoji(), beacon.getName());
-//        final String markerSnippet = String.format(Locale.ENGLISH, "Last seen: %s (%s, %d, %d, %d)",
-//                format.format(new Date(lastLocation.getTimestamp())),
-//                lastLocation.getDescription(),
-//                lastLocation.getConfidence(),
-//                lastLocation.getHorizontalAccuracy(),
-//                lastLocation.getStatus()
-//        );
 
         BitmapDescriptor icon;
         if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {

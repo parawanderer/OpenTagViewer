@@ -2,6 +2,7 @@
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    xmlns:map="http://schemas.android.com/apk/res-auto"
     tools:context=".HistoryViewActivity">
     <data>
         <variable name="handleClickBack" type="Runnable" />
@@ -36,7 +37,9 @@
                     android:name="com.google.android.gms.maps.SupportMapFragment"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    tools:context=".HistoryViewActivity" />
+                    tools:context=".HistoryViewActivity"
+                    map:backgroundColor="@color/md_theme_background"
+                    />
             </FrameLayout>
         </androidx.coordinatorlayout.widget.CoordinatorLayout>
     </LinearLayout>
