@@ -9,7 +9,8 @@
     <color name="off_white">#F4F5FB</color>
     <color name="white">#FFFFFFFF</color>
     <color name="greyish">#B4B4B4</color>
-
+    <color name="maps_line_primary">#0055f9</color>
+    <color name="maps_line_outline">#001cd3</color>
 
     <color name="md_theme_primary">#006971</color>
     <color name="md_theme_onPrimary">#FFFFFF</color>

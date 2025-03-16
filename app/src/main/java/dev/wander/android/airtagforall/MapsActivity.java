@@ -20,7 +20,6 @@ import androidx.core.view.WindowCompat;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.location.Address;
 import android.location.Geocoder;
 import android.net.Uri;
@@ -57,7 +56,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -129,7 +127,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private UserDataRepository userDataRepository;
 
     private PythonAppleService appleService = null;
-
 
     private UserSettings userSettings;
 
@@ -608,7 +605,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         // Get Apple account
         var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get(), userSettings.getAnisetteServerUrl())
             .map(appleAccount -> {
-                this.appleService = new PythonAppleService(appleAccount);
+                this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;
             });
 
@@ -799,13 +796,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
         final String markerTitle = String.format("%s %s", beacon.getEmoji(), beacon.getName());
-        final String markerSnippet = String.format(Locale.ENGLISH, "Last seen: %s (%s, %d, %d, %d)",
-                format.format(new Date(lastLocation.getTimestamp())),
-                lastLocation.getDescription(),
-                lastLocation.getConfidence(),
-                lastLocation.getHorizontalAccuracy(),
-                lastLocation.getStatus()
-        );
+//        final String markerSnippet = String.format(Locale.ENGLISH, "Last seen: %s (%s, %d, %d, %d)",
+//                format.format(new Date(lastLocation.getTimestamp())),
+//                lastLocation.getDescription(),
+//                lastLocation.getConfidence(),
+//                lastLocation.getHorizontalAccuracy(),
+//                lastLocation.getStatus()
+//        );
 
         BitmapDescriptor icon;
         if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
@@ -825,7 +822,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         var markerOptions = new MarkerOptions()
                 .position(locationTag)
                 .title(markerTitle)
-                .snippet(markerSnippet)
+                //.snippet(markerSnippet)
                 .icon(icon);
         Marker marker = this.map.addMarker(markerOptions);
 

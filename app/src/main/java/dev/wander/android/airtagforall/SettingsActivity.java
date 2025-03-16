@@ -90,10 +90,6 @@ public class SettingsActivity extends AppCompatActivity {
 
     private String editorSelectedLocateId = null;
 
-    private static void run() {
-
-    }
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -5,6 +5,7 @@
     tools:context=".HistoryViewActivity">
     <data>
         <variable name="handleClickBack" type="Runnable" />
+        <variable name="pageTitle" type="String" />
     </data>
 
 
@@ -17,7 +18,7 @@
             android:id="@+id/settings_top_toolbar"
             layout="@layout/inline_top_toolbar"
             app:onClickBack="@{handleClickBack}"
-            app:pageTitle="@{@string/location_history}" />
+            app:pageTitle="@{pageTitle}" />
 
         <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:layout_width="match_parent"

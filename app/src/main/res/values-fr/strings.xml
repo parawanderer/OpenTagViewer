@@ -62,4 +62,7 @@
     <string name="theme">Thème</string>
     <string name="test">Tester</string>
     <string name="cancel">Annuler</string>
+    <string name="history_x">Histoire: %1$s</string>
+    <string name="retry">Réessayer</string>
+    <string name="error_occurred_while_fetching_history">Une erreur s\'est produite lors de la récupération de l\'historique</string>
 </resources>

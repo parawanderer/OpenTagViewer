@@ -33,14 +33,14 @@ public final class BeaconCombinerUtil {
         return combine(beaconData.getOwnedBeacons(), beaconData.getBeaconNamingRecords());
     }
 
-    public static List<BeaconLocationReport> combineAndSort(final String beaconId, final List<BeaconLocationReport> current, final List<BeaconLocationReport> copyIntoCurrent) {
-        Map<String, BeaconLocationReport> distinctItems = current.stream().collect(Collectors.toMap(
+    public static List<BeaconLocationReport> combineAndSort(final String beaconId, final List<BeaconLocationReport> first, final List<BeaconLocationReport> second) {
+        Map<String, BeaconLocationReport> distinctItems = first.stream().collect(Collectors.toMap(
                 report -> BeaconLocationReportHasher.getSha256HashFor(beaconId, report),
                 report -> report
         ));
 
         // this will override items that we consider "duplicates" with the item from list 2
-        copyIntoCurrent.forEach(report -> distinctItems.put(
+        second.forEach(report -> distinctItems.put(
                 BeaconLocationReportHasher.getSha256HashFor(beaconId, report),
                 report
         ));

@@ -62,4 +62,7 @@
     <string name="theme">Дизайн</string>
     <string name="test">Проверка</string>
     <string name="cancel">Отменить</string>
+    <string name="history_x">История: %1$s</string>
+    <string name="retry">Повторить</string>
+    <string name="error_occurred_while_fetching_history">Произошла ошибка при извлечении истории</string>
 </resources>

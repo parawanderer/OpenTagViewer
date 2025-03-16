@@ -121,4 +121,6 @@ dependencies {
     annotationProcessor(libs.android.room.compiler)
 
     testAnnotationProcessor(libs.projectlombok)
+
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 }

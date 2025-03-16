@@ -29,6 +29,7 @@ googleCronetRetrofit = "0.1.0"
 annotation = "1.6.0"
 googlePlayServicesLocation = "21.3.0"
 googlePlacesLib = "4.1.0"
+desugarJdkLibs = "2.1.5"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -66,6 +67,7 @@ google-cronet-retrofit = { group = "com.google.net.cronet", name = "cronet-okhtt
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
 google-play-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "googlePlayServicesLocation" }
 google-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "googlePlacesLib" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

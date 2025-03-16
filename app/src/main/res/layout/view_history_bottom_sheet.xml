@@ -59,6 +59,7 @@
                 style="?attr/materialIconButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:visibility="invisible"
                 app:icon="@drawable/arrow_forward_24px"
                 app:iconTint="@color/md_theme_outline" />
         </LinearLayout>
@@ -69,6 +70,7 @@
 
 
         <LinearLayout
+            android:id="@+id/history_data_overview_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
@@ -86,13 +88,49 @@
                 android:id="@+id/history_datapoints_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:singleLine="true"
                 android:text="@string/x_data_points"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                tools:text="456 data points" />
         </LinearLayout>
 
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <LinearLayout
+            android:id="@+id/history_error_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/imageView4"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginTop="20dp"
+                android:src="@drawable/warning_24px_fill" />
+
+            <TextView
+                android:id="@+id/textView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="10dp"
+                android:text="@string/error_occurred_while_fetching_history" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/history_fetch_retry_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:ellipsize="end"
+                android:text="@string/retry" />
+
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view_history_items"

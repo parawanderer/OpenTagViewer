@@ -62,4 +62,7 @@
     <string name="theme">Theme</string>
     <string name="test">Test</string>
     <string name="cancel">Cancel</string>
+    <string name="history_x">History: %1$s</string>
+    <string name="retry">Retry</string>
+    <string name="error_occurred_while_fetching_history">Error occurred while fetching history</string>
 </resources>

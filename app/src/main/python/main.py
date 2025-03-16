@@ -1,7 +1,7 @@
 from enum import Enum
 import json
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 import base64
 import NSKeyedUnArchiver
@@ -209,12 +209,68 @@ def getLastReports(
             beaconId = pair.first
             plistContent = pair.second
 
-            print(f"Fetching report for {beaconId}...")
+            print(f"Fetching report for {beaconId} for the last {hoursBack} hours...")
             fp = BytesIO(plistContent.encode('utf-8'))
             airtag = FindMyAccessory.from_plist(fp)
 
             reports = account.fetch_last_reports(airtag, hoursBack)
             print(f"Got {len(reports)} reports for {beaconId}")
+
+            items = []
+            for report in sorted(reports):
+                items.append({
+                    "publishedAt": _toUnixEpochMs(report.published_at),
+                    "description": report.description,
+                    "timestamp": _toUnixEpochMs(report.timestamp),
+                    "confidence": report.confidence,
+                    "latitude": report.latitude,
+                    "longitude": report.longitude,
+                    "horizontalAccuracy": report.horizontal_accuracy,
+                    "status": report.status
+                })
+
+            res[beaconId] = items
+
+        return res
+
+    except Exception:
+        err = traceback.format_exc()
+        print(f"Failed to fetch all reports due to error: {err}")
+        return None
+
+
+def getReports(
+        account: AppleAccount,
+        idToPList,
+        unixStartMs: int,
+        unixEndMs: int) -> dict:
+    # JAVA typing: see https://chaquo.com/chaquopy/doc/current/python.html
+    # especially this: https://chaquo.com/chaquopy/doc/current/python.html#classes
+    try:
+        res = {}
+
+        num_items = idToPList.size()
+        print(f"num_items is {num_items}")
+
+        for i in range(0, num_items):
+            pair = idToPList.get(i)
+            beaconId = pair.first
+            plistContent = pair.second
+
+            print(f"Fetching report for {beaconId} in time range {unixStartMs}-{unixEndMs}...")
+            fp = BytesIO(plistContent.encode('utf-8'))
+            airtag = FindMyAccessory.from_plist(fp)
+
+            start: datetime = datetime.fromtimestamp(
+                unixStartMs/1000,
+                tz=timezone.utc
+            )
+            end: datetime = datetime.fromtimestamp(
+                unixEndMs/1000,
+                tz=timezone.utc
+            )
+            reports = account.fetch_reports(airtag, start, end)
+            print(f"Got {len(reports)} reports for {beaconId} for time range {unixStartMs}-{unixEndMs}")
 
             items = []
             for report in sorted(reports):
