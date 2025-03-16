@@ -19,6 +19,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
@@ -26,11 +27,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import dev.wander.android.airtagforall.data.model.BeaconInformation;
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import dev.wander.android.airtagforall.databinding.ActivityHistoryViewBinding;
+import dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore;
 import dev.wander.android.airtagforall.db.repo.BeaconRepository;
+import dev.wander.android.airtagforall.db.repo.UserSettingsRepository;
+import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
 import dev.wander.android.airtagforall.ui.history.HistoryItemsAdapter;
+import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 
 public class HistoryViewActivity extends AppCompatActivity implements OnMapReadyCallback {
     private static final String TAG = HistoryViewActivity.class.getSimpleName();
@@ -40,8 +46,13 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private GoogleMap map;
 
     private BeaconRepository beaconRepo;
+    private UserSettingsRepository userSettingsRepo;
+
+    private UserSettings userSettings;
 
     private String beaconId;
+
+    private BeaconInformation beaconInformation;
 
     private List<BeaconLocationReport> locations = new ArrayList<>();
 
@@ -57,6 +68,16 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         this.beaconRepo = new BeaconRepository(
                 AirTag4AllDatabase.getInstance(getApplicationContext()));
+
+        this.userSettingsRepo = new UserSettingsRepository(
+                UserSettingsDataStore.getInstance(this.getApplicationContext()));
+
+        this.userSettings = this.userSettingsRepo.getUserSettings();
+
+        this.beaconInformation = this.beaconRepo.getById(this.beaconId)
+                .flatMap(data -> BeaconDataParser.parseAsync(List.of(data)))
+                .map(items -> items.get(0))
+                .blockingFirst();
 
         ActivityHistoryViewBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_history_view);
         binding.setHandleClickBack(this::finish);
@@ -83,6 +104,11 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     @Override
     public void onMapReady(GoogleMap googleMap) {
         this.map = googleMap;
+
+        if (this.userSettings.getUseDarkTheme()) {
+            // DARK THEME map
+            map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
+        }
 
         final long now = System.currentTimeMillis();
         final long yesterday = now - (1000 * 60 * 60 * 24);
@@ -119,7 +145,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         var options = new PolylineOptions()
                 .color(Color.BLUE)
-                .width(4f)
+                .width(6f)
                 .clickable(true)
                 .addAll(coords);
 

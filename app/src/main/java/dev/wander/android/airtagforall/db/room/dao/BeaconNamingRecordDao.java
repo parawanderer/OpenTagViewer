@@ -18,6 +18,9 @@ public interface BeaconNamingRecordDao {
     @Query("SELECT * FROM BeaconNamingRecord WHERE import_id = :importId")
     List<BeaconNamingRecord> getAllByImportId(int importId);
 
+    @Query("SELECT * FROM BeaconNamingRecord WHERE id = :beaconId")
+    BeaconNamingRecord getByBeaconId(String beaconId);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     List<Long> insertAll(BeaconNamingRecord... beaconNamingRecords);
 

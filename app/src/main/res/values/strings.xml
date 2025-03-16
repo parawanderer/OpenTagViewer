@@ -69,4 +69,10 @@
     <string name="today">Today</string>
     <string name="yesterday">Yesterday</string>
     <string name="x_data_points">%1$d data points</string>
+    <string name="dark_theme">Dark Theme</string>
+    <string name="light_theme">Light Theme</string>
+    <string name="use_system_default">Use System Default</string>
+    <string name="theme">Theme</string>
+    <string name="test">Test</string>
+    <string name="cancel">Cancel</string>
 </resources>

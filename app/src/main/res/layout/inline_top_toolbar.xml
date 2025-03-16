@@ -39,11 +39,12 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
                 android:layout_marginLeft="15dp"
-                android:fontFamily="@font/nunito_extra_bold"
+                android:fontFamily="@font/nunito_bold"
                 android:gravity="center_vertical"
                 android:text="@{pageTitle}"
-                android:textColor="@android:color/primary_text_light"
-                android:textSize="20sp" />
+                android:textColor="@color/md_theme_onSurface"
+                android:textSize="20sp"
+                tools:text="Page Title" />
 
         </LinearLayout>
 

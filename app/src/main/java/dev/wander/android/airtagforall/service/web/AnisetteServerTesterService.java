@@ -6,6 +6,7 @@ import com.google.net.cronet.okhttptransport.CronetCallFactory;
 import org.chromium.net.CronetEngine;
 
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory;
@@ -30,7 +31,7 @@ public class AnisetteServerTesterService {
 
         var service = retrofit.create(AnisetteServer.class);
 
-        return service.getRoot();
+        return service.getRoot().subscribeOn(Schedulers.io());
     }
 
     @Data

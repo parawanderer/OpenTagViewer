@@ -11,15 +11,16 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
-import androidx.fragment.app.FragmentActivity;
 
 
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.location.Address;
 import android.location.Geocoder;
 import android.net.Uri;
@@ -46,6 +47,7 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
@@ -74,6 +76,7 @@ import dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore;
 import dev.wander.android.airtagforall.db.repo.UserAuthRepository;
 import dev.wander.android.airtagforall.db.repo.UserSettingsRepository;
 import dev.wander.android.airtagforall.db.repo.model.AppleUserData;
+import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
 import dev.wander.android.airtagforall.db.repo.BeaconRepository;
 import dev.wander.android.airtagforall.db.repo.model.ImportData;
@@ -98,7 +101,7 @@ import lombok.Data;
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
  */
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, OnMapClickListener, GoogleMap.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, OnMapClickListener, GoogleMap.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
@@ -126,6 +129,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private UserDataRepository userDataRepository;
 
     private PythonAppleService appleService = null;
+
+
+    private UserSettings userSettings;
 
     private FusedLocationProviderClient fusedLocationClient = null;
 
@@ -160,6 +166,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AirtagForAllApplication app = (AirtagForAllApplication) this.getApplication();
+        app.setupTheme();
+
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         this.checkApiKey();
 
@@ -168,6 +177,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         this.userSettingsRepo = new UserSettingsRepository(
                 UserSettingsDataStore.getInstance(this.getApplicationContext()));
+
+        this.userSettings = userSettingsRepo.getUserSettings();
 
         this.userDataRepository = new UserDataRepository(
                 UserCacheDataStore.getInstance(getApplicationContext())
@@ -230,6 +241,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         map.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
         map.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
 
+        if (this.userSettings.getUseDarkTheme()) {
+            // DARK THEME map
+            map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
+        }
 
         this.enableMyLocation();
     }
@@ -238,20 +253,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onPause() {
         super.onPause();
 
-        var pos = this.map.getCameraPosition();
-        var async = this.userDataRepository.storeLastCameraPosition(
-                UserMapCameraPosition.builder()
-                        .zoom(pos.zoom)
-                        .lat(pos.target.latitude)
-                        .lon(pos.target.longitude)
-                        .build()
-        ).subscribe(
-                success -> Log.d(TAG, "Success storing last camera position!"),
-                error -> Log.e(TAG, "Error storing last camera position!", error));
+        if (this.map != null) {
+            var pos = this.map.getCameraPosition();
+            var async = this.userDataRepository.storeLastCameraPosition(
+                    UserMapCameraPosition.builder()
+                            .zoom(pos.zoom)
+                            .lat(pos.target.latitude)
+                            .lon(pos.target.longitude)
+                            .build()
+            ).subscribe(
+                    success -> Log.d(TAG, "Success storing last camera position!"),
+                    error -> Log.e(TAG, "Error storing last camera position!", error));
 
-        // cleanup location refresh task
-        refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
-        this.nextLocationRefreshTask = null;
+            // cleanup location refresh task
+            refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
+            this.nextLocationRefreshTask = null;
+        }
     }
 
     @Override
@@ -795,12 +812,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             icon = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
-                    getColor(R.color.white));
+                    getColor(R.color.md_theme_background));
         } else {
             icon = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     R.drawable.apple,
-                    getColor(R.color.white),
+                    getColor(R.color.md_theme_background),
                     getColor(R.color.greyish)
             );
         }

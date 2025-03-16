@@ -18,6 +18,9 @@ public interface OwnedBeaconDao {
     @Query("SELECT * FROM OwnedBeacons WHERE import_id = :importId")
     List<OwnedBeacon> getAllByImportId(int importId);
 
+    @Query("SELECT * FROM OwnedBeacons WHERE id = :beaconId")
+    OwnedBeacon getById(String beaconId);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     List<Long> insertAll(OwnedBeacon... ownedBeacons);
 

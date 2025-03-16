@@ -18,6 +18,7 @@ public final class UserSettingsDataStore {
 
     public static final Preferences.Key<String> ANISETTE_SERVER_URL = PreferencesKeys.stringKey("anisette_server_url");
     public static final Preferences.Key<String> LANGUAGE = PreferencesKeys.stringKey("language");
+    public static final Preferences.Key<Boolean> USE_DARK_THEME = PreferencesKeys.booleanKey("use_dark_theme");
 
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (PREFERENCES_DATA_STORE == null) {

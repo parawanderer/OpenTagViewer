@@ -5,6 +5,12 @@
 
     <data>
         <variable name="handleClickBack" type="Runnable" />
+        <variable name="onClickTheme" type="Runnable" />
+        <variable name="currentTheme" type="String" />
+        <variable name="onClickLanguage" type="Runnable" />
+        <variable name="currentLanguage" type="String" />
+        <variable name="onClickAnisetteServerUrl" type="Runnable" />
+        <variable name="currentAnisetteServerUrl" type="String" />
     </data>
 
     <LinearLayout
@@ -22,9 +28,9 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingLeft="20dp"
+            android:paddingLeft="8dp"
             android:paddingTop="20dp"
-            android:paddingRight="20dp">
+            android:paddingRight="8dp">
 
             <include
                 android:id="@+id/login_info_container"
@@ -32,15 +38,39 @@
 
         </LinearLayout>
 
+
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="30dp">
+            android:paddingTop="20dp">
 
             <include
-                android:id="@+id/settings_list"
-                layout="@layout/main_app_settings" />
+                android:id="@+id/setting_app_theme"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/light_mode_24px}"
+                app:sectionSubtitle="@{currentTheme}"
+                app:title="@{@string/theme}"
+                app:onClick="@{onClickTheme}"
+                />
+
+            <include
+                android:id="@+id/setting_app_language"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/language_24px}"
+                app:sectionSubtitle="@{currentLanguage}"
+                app:title="@{@string/language}"
+                app:onClick="@{onClickLanguage}"
+                />
+
+            <include
+                android:id="@+id/setting_app_anisette_server"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/host_24px}"
+                app:sectionSubtitle="@{currentAnisetteServerUrl}"
+                app:title="@{@string/anisette_server_url}"
+                app:onClick="@{onClickAnisetteServerUrl}"
+                />
 
         </LinearLayout>
 

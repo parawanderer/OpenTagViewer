@@ -56,4 +56,10 @@
     <string name="today">Aujourd\'hui</string>
     <string name="yesterday">Hier</string>
     <string name="x_data_points">%1$d points de données</string>
+    <string name="dark_theme">Thème Sombre</string>
+    <string name="light_theme">Thème Clair</string>
+    <string name="use_system_default">Utiliser les Paramètres par Défaut</string>
+    <string name="theme">Thème</string>
+    <string name="test">Tester</string>
+    <string name="cancel">Annuler</string>
 </resources>

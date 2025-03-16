@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="?attr/textInputOutlinedExposedDropdownMenuStyle"
+        android:id="@+id/anisetteServerUrlContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:helperTextEnabled="true"
+        app:helperText="@string/url_to_an_anisette_server"
+        app:errorEnabled="true"
+        app:errorTextColor="@color/md_theme_error"
+        app:errorIconDrawable="@drawable/exclamation_24"
+        app:errorIconTint="@color/md_theme_error"
+        >
+
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+            android:id="@+id/anisetteServerUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text|textUri"
+            android:singleLine="true"
+            android:completionThreshold="1"
+            android:imeOptions="actionDone"
+            />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+</FrameLayout>

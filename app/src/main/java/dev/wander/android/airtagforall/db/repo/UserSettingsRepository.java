@@ -2,6 +2,7 @@ package dev.wander.android.airtagforall.db.repo;
 
 import static dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore.ANISETTE_SERVER_URL;
 import static dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore.LANGUAGE;
+import static dev.wander.android.airtagforall.db.datastore.UserSettingsDataStore.USE_DARK_THEME;
 
 import androidx.datastore.preferences.core.MutablePreferences;
 import androidx.datastore.preferences.core.Preferences;
@@ -24,10 +25,12 @@ public class UserSettingsRepository {
             .map(settings -> {
                 String anisetteServerUrl = settings.get(ANISETTE_SERVER_URL);
                 String language = settings.get(LANGUAGE);
+                Boolean useDarkTheme = settings.get(USE_DARK_THEME);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
                         .language(language)
+                        .useDarkTheme(useDarkTheme)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -41,6 +44,7 @@ public class UserSettingsRepository {
 
             mutablePreferences.set(ANISETTE_SERVER_URL, userSettings.getAnisetteServerUrl());
             mutablePreferences.set(LANGUAGE, userSettings.getLanguage());
+            mutablePreferences.set(USE_DARK_THEME, userSettings.getUseDarkTheme());
 
             return Single.just(mutablePreferences);
         }).subscribeOn(Schedulers.io())

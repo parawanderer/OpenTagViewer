@@ -69,6 +69,19 @@ public class BeaconRepository {
         }).subscribeOn(Schedulers.io());
     }
 
+    public Observable<BeaconData> getById(final String beaconId) {
+        return Observable.fromCallable(() -> {
+            OwnedBeacon ownedBeacon = db.ownedBeaconDao().getById(beaconId);
+            BeaconNamingRecord namingRecord = db.beaconNamingRecordDao().getByBeaconId(beaconId);
+
+            return new BeaconData(
+                    ownedBeacon.id,
+                    ownedBeacon,
+                    namingRecord
+            );
+        }).subscribeOn(Schedulers.io());
+    }
+
     public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {
         return Observable.fromCallable(() -> {
             if (reportsForBeaconId.isEmpty()) {

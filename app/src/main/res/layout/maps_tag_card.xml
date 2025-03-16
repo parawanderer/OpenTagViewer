@@ -16,7 +16,7 @@
             android:layout_marginLeft="4dp"
             android:layout_marginRight="4dp"
             android:background="@drawable/layout_rounded"
-            android:backgroundTint="@color/white"
+            android:backgroundTint="@color/md_theme_background"
             android:clipToPadding="false"
             android:elevation="8dp"
             android:orientation="vertical">
@@ -55,7 +55,7 @@
                         android:layout_weight="1"
                         android:padding="5dp"
                         android:src="@drawable/apple"
-                        android:tint="@color/greyish"
+                        android:tint="@color/md_theme_outline"
                         android:visibility="visible"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
@@ -76,9 +76,9 @@
                         android:id="@+id/device_name"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/nunito_extra_bold"
+                        android:fontFamily="@font/nunito_bold"
                         android:text="SomeTag 1"
-                        android:textColor="@android:color/primary_text_light"
+                        android:textColor="@color/md_theme_onBackground"
                         android:textSize="18sp" />
 
                     <LinearLayout
@@ -97,7 +97,7 @@
                                 android:layout_width="19dp"
                                 android:layout_height="15dp"
                                 android:src="@drawable/marker_24_2"
-                                android:tint="@color/material_dynamic_neutral_variant40" />
+                                android:tint="@color/md_theme_onSurfaceVariant" />
 
                         </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -110,7 +110,7 @@
                             android:gravity="center_vertical"
                             android:singleLine="true"
                             android:text="Streetstreet 1, 1234 CityThatIsLong Actually, Country"
-                            android:textColor="@color/material_dynamic_neutral40"
+                            android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
                     </LinearLayout>
@@ -121,7 +121,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_semi_bold"
                         android:text="@string/last_updated_x"
-                        android:textColor="#8A8A8A"
+                        android:textColor="@color/md_theme_outline"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -150,6 +150,7 @@
                         android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:background="@drawable/circle"
+                        android:backgroundTint="@color/md_theme_onBackground"
                         android:padding="8dp"
                         android:scaleType="fitCenter">
 
@@ -203,6 +204,7 @@
                         android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:background="@drawable/circle"
+                        android:backgroundTint="@color/md_theme_onBackground"
                         android:padding="8dp"
                         android:scaleType="fitCenter">
 
@@ -255,6 +257,7 @@
                         android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:background="@drawable/circle"
+                        android:backgroundTint="@color/md_theme_onBackground"
                         android:padding="8dp"
                         android:scaleType="fitCenter">
 
@@ -308,6 +311,7 @@
                         android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:background="@drawable/circle"
+                        android:backgroundTint="@color/md_theme_onBackground"
                         android:padding="8dp"
                         android:scaleType="fitCenter">
 

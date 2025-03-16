@@ -1,5 +1,6 @@
 package dev.wander.android.airtagforall.ui.maps;
 
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;

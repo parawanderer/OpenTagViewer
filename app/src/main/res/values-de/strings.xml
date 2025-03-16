@@ -56,4 +56,10 @@
     <string name="today">Heute</string>
     <string name="yesterday">Gestern</string>
     <string name="x_data_points">%1$d Datenpunkte</string>
+    <string name="dark_theme">Dunkles Design</string>
+    <string name="light_theme">Helles Design</string>
+    <string name="use_system_default">Systemstandard Verwenden</string>
+    <string name="theme">Design</string>
+    <string name="test">Testen</string>
+    <string name="cancel">Abbrechen</string>
 </resources>

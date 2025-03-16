@@ -35,7 +35,7 @@
             android:layout_height="match_parent"
             android:layout_margin="0dp"
             android:background="@drawable/layout_rounded"
-            android:backgroundTint="@color/md_theme_surfaceContainerHigh"
+            android:backgroundTint="@color/md_theme_surfaceContainerLow_highContrast"
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:padding="16dp">
@@ -61,7 +61,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:backgroundTint="@color/md_theme_secondaryFixedDim"
                 android:text="@string/logout"
                 android:textSize="14sp" />
 

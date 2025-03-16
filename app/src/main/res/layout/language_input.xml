@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="?attr/textInputOutlinedExposedDropdownMenuStyle"
+        android:id="@+id/languageSelectContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        >
+
+        <dev.wander.android.airtagforall.ui.extensions.AppAutoCompleteTextView
+            android:id="@+id/languageSelectDropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none"
+            />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+</FrameLayout>

@@ -56,4 +56,10 @@
     <string name="today">Сегодня</string>
     <string name="yesterday">Вчера</string>
     <string name="x_data_points">%1$d точек данных</string>
+    <string name="dark_theme">Темный Дизайн</string>
+    <string name="light_theme">Светлый Дизайн</string>
+    <string name="use_system_default">Использовать Настройки по Умолчанию</string>
+    <string name="theme">Дизайн</string>
+    <string name="test">Проверка</string>
+    <string name="cancel">Отменить</string>
 </resources>

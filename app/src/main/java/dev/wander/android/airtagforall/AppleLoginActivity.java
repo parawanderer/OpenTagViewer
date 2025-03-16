@@ -12,6 +12,7 @@ import static dev.wander.android.airtagforall.ui.settings.SharedMainSettingsMana
 import static dev.wander.android.airtagforall.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Patterns;
@@ -105,7 +106,6 @@ public class AppleLoginActivity extends AppCompatActivity {
             }
         });
 
-
         userAuthRepo = new UserAuthRepository(
                 UserAuthDataStore.getInstance(getApplicationContext()),
                 new AppCryptographyUtil());
@@ -131,10 +131,7 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.twoFactorEntryManager = new Apple2FACodeInputManager(this, this::on2FAAuthCodeFilled);
 
-
-        //setContentView(R.layout.activity_apple_login);
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_apple_login);
-
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
