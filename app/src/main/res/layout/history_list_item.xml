@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:id="@+id/history_text_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/history_item_location_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/nunito_bold"
+                android:text="Location Name Placeholder" />
+
+            <TextView
+                android:id="@+id/history_item_location_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Streetstreet 1234, 1234AB Cityname, Country"
+                android:textColor="@color/md_theme_outline"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/history_item_location_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="At 00:00"
+                android:textColor="@color/md_theme_outline"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

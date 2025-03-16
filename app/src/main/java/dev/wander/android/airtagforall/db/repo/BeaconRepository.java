@@ -5,6 +5,7 @@ import android.util.Log;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import dev.wander.android.airtagforall.db.repo.model.BeaconData;
@@ -15,7 +16,6 @@ import dev.wander.android.airtagforall.db.room.entity.LocationReport;
 import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.util.BeaconLocationReportHasher;
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.NonNull;
@@ -102,7 +102,7 @@ public class BeaconRepository {
         }).subscribeOn(Schedulers.io());
     }
 
-    public Observable<Map<String, BeaconLocationReport>> getLastForAll() {
+    public Observable<Map<String, BeaconLocationReport>> getLastLocationsForAll() {
         return Observable.fromCallable(() -> {
 
             var locationReports = db.locationReportDao().getLastForAllBeacons();
@@ -125,6 +125,23 @@ public class BeaconRepository {
             }
 
             return result;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    public Observable<List<BeaconLocationReport>> getLocationsFor(final String beaconId, final long unixStartTimeMS, final long unixEndTimeMS) {
+        return Observable.fromCallable(() -> {
+            List<LocationReport> reports = db.locationReportDao().getInTimeRange(beaconId, unixStartTimeMS, unixEndTimeMS);
+            return reports.stream().map(locationReport -> BeaconLocationReport.builder()
+                    .publishedAt(locationReport.publishedAt)
+                    .description(locationReport.description)
+                    .timestamp(locationReport.timestamp)
+                    .confidence(locationReport.confidence)
+                    .latitude(locationReport.latitude)
+                    .longitude(locationReport.longitude)
+                    .horizontalAccuracy(locationReport.horizontalAccuracy)
+                    .status(locationReport.status)
+                    .build())
+                .collect(Collectors.toList());
         }).subscribeOn(Schedulers.io());
     }
 }

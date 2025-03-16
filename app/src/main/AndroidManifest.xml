@@ -31,10 +31,14 @@
         android:theme="@style/Theme.AirTagForAll"
         tools:targetApi="31">
         <activity
-            android:name=".MyDevicesListActivity"
+            android:name=".HistoryViewActivity"
             android:exported="false"
             android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity"
             />
+        <activity
+            android:name=".MyDevicesListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
         <activity
             android:name=".AppleLoginActivity"
             android:exported="false"

@@ -113,7 +113,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
 
-    private GoogleMap mMap;
+    private GoogleMap map;
 
     private ActivityMapsBinding binding;
 
@@ -192,7 +192,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             .subscribe(pos -> {
                 Log.d(TAG, "Got previous camera position to reset us to: " + pos);
 
-                pos.ifPresent(userMapCameraPosition -> this.mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                pos.ifPresent(userMapCameraPosition -> this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(
                         new LatLng(userMapCameraPosition.getLat(), userMapCameraPosition.getLon()),
                         userMapCameraPosition.getZoom()
                 )));
@@ -218,17 +218,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      */
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
+        map = googleMap;
 
-        mMap.setOnMapClickListener(this);
-        mMap.setOnMarkerClickListener(this);
+        map.setOnMapClickListener(this);
+        map.setOnMarkerClickListener(this);
 
-        mMap.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
+        map.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
         // We don't want to use the default button. We have a custom button
-        mMap.getUiSettings().setMyLocationButtonEnabled(false);
-        mMap.getUiSettings().setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
-        mMap.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
-        mMap.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
+        map.getUiSettings().setMyLocationButtonEnabled(false);
+        map.getUiSettings().setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
+        map.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
+        map.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
 
 
         this.enableMyLocation();
@@ -238,7 +238,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onPause() {
         super.onPause();
 
-        var pos = this.mMap.getCameraPosition();
+        var pos = this.map.getCameraPosition();
         var async = this.userDataRepository.storeLastCameraPosition(
                 UserMapCameraPosition.builder()
                         .zoom(pos.zoom)
@@ -347,7 +347,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
 
                     Log.d(TAG, "Navigating to current user position on the map...");
-                    this.mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                    this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(
                             new LatLng(location.getLatitude(), location.getLongitude()),
                             CAMERA_ON_MAP_INITIAL_ZOOM));
                 });
@@ -494,7 +494,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void onClickLocationHistory(View view) {
-        Log.i(TAG, "The location history button was just clicked!");
+        Log.d(TAG, "The location history button was just clicked!");
+
+        final String beaconId = this.dynamicCardsForTag.entrySet()
+                .stream().filter(kvp -> kvp.getValue().findViewById(R.id.device_history_button_container) == view)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Click location history event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
+
+        Intent viewHistoryIntent = new Intent(this, HistoryViewActivity.class);
+        viewHistoryIntent.putExtra("beaconId", beaconId);
+        startActivity(viewHistoryIntent);
     }
 
     public void onClickRefresh(View view) {
@@ -592,7 +602,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         // get list of cached (previously fetched) locations
         // (might be empty or might not be present for all of them)
-        var asyncAllLocations = this.beaconRepo.getLastForAll();
+        var asyncAllLocations = this.beaconRepo.getLastLocationsForAll();
 
         var asyncBeaconData = Observable.zip(asyncAllBeacons, asyncAllLocations, (allBeacons, allLatestLocations) -> {
             // temporarily show cached beacon locations until we get the new ones!
@@ -800,7 +810,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .title(markerTitle)
                 .snippet(markerSnippet)
                 .icon(icon);
-        Marker marker = this.mMap.addMarker(markerOptions);
+        Marker marker = this.map.addMarker(markerOptions);
 
         this.currentMarkers.put(beaconId, marker);
         if (this.currentMarkers.size() == 1) {
@@ -830,14 +840,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         try {
             //FrameLayout card = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
             Marker marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
+            marker.showInfoWindow();
             var pos = marker.getPosition();
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
             if (zoom != null) {
-                this.mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+                this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
             } else {
-                this.mMap.animateCamera(CameraUpdateFactory.newLatLng(pos));
+                this.map.animateCamera(CameraUpdateFactory.newLatLng(pos));
             }
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
@@ -1009,7 +1020,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
             Log.i(TAG, "Enabling 'my location' related UI features...");
-            this.mMap.setMyLocationEnabled(true);
+            this.map.setMyLocationEnabled(true);
 
             // This UI button is only available if the user enables own location permissions.
             ImageButton button = findViewById(R.id.button_my_location);

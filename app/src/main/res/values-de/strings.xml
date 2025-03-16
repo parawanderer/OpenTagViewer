@@ -53,4 +53,7 @@
     <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Ihr Standort wird nur zur Visualisierung Ihrer aktuellen Position auf der Karte verwendet und verlässt Ihr Gerät nie.</string>
     <string name="my_devices">Meine Geräte</string>
     <string name="no_last_location_known">Kein letzter Standort bekannt</string>
+    <string name="today">Heute</string>
+    <string name="yesterday">Gestern</string>
+    <string name="x_data_points">%1$d Datenpunkte</string>
 </resources>

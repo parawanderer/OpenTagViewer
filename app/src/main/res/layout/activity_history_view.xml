@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".HistoryViewActivity">
+    <data>
+        <variable name="handleClickBack" type="Runnable" />
+    </data>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/settings_top_toolbar"
+            layout="@layout/inline_top_toolbar"
+            app:onClickBack="@{handleClickBack}"
+            app:pageTitle="@{@string/location_history}" />
+
+        <androidx.coordinatorlayout.widget.CoordinatorLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/history_bottomsheet_coordinator_layout"
+            >
+
+            <FrameLayout
+                android:id="@+id/history_map_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <fragment
+                    android:id="@+id/history_map"
+                    android:name="com.google.android.gms.maps.SupportMapFragment"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    tools:context=".HistoryViewActivity" />
+            </FrameLayout>
+        </androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </LinearLayout>
+</layout>

@@ -24,9 +24,7 @@ import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import lombok.Getter;
 
 public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder> {
-
     private final List<BeaconInformation> beaconInfo;
-
     private final Map<String, BeaconLocationReport> locations;
     private final @lombok.NonNull Resources resources;
 

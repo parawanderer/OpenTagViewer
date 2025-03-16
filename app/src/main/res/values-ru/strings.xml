@@ -53,4 +53,7 @@
     <string name="location_permissions_will_only_be_used_to_visualise_on_map_text">Ваше местоположение будет использоваться только для визуализации вашего текущего положения на карте и никогда не покинет пределы вашего устройства.</string>
     <string name="my_devices">Мои Устройства</string>
     <string name="no_last_location_known">Последнее местонахождение неизвестно</string>
+    <string name="today">Сегодня</string>
+    <string name="yesterday">Вчера</string>
+    <string name="x_data_points">%1$d точек данных</string>
 </resources>

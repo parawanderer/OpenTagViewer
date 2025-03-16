@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/view_history_bottom_sheet_layout"
+    style="@style/Widget.Material3.BottomSheet"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:backgroundTint="#F3F8F9"
+    app:behavior_hideable="false"
+    app:behavior_peekHeight="74dp"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    app:shapeAppearance="?attr/shapeAppearanceCornerMedium">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:id="@+id/drag_handle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:tint="@color/md_theme_outlineVariant" />
+
+
+    <!-- Bottom sheet contents. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="24dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/history_day_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="4dp">
+
+            <Button
+                android:id="@+id/history_move_left_button"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:icon="@drawable/arrow_back_24px"
+                app:iconTint="@color/md_theme_outline" />
+
+            <TextView
+                android:id="@+id/history_drawer_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/nunito_bold"
+                android:gravity="center"
+                android:text="@string/today"
+                android:textSize="20sp" />
+
+            <Button
+                android:id="@+id/history_move_right_button"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:icon="@drawable/arrow_forward_24px"
+                app:iconTint="@color/md_theme_outline" />
+        </LinearLayout>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <ImageView
+                android:id="@+id/imageView"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginRight="8dp"
+                android:src="@drawable/timeline_24px" />
+
+            <TextView
+                android:id="@+id/history_datapoints_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/x_data_points"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view_history_items"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </LinearLayout>
+
+</RelativeLayout>

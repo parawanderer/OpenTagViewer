@@ -54,7 +54,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
         recyclerView.setAdapter(customAdapter);
 
 
-        var asyncLocations = this.beaconRepo.getLastForAll();
+        var asyncLocations = this.beaconRepo.getLastLocationsForAll();
 
         var asyncBeacons = this.beaconRepo.getAllBeacons()
                 .flatMap(BeaconDataParser::parseAsync);
@@ -63,10 +63,9 @@ public class MyDevicesListActivity extends AppCompatActivity {
             .subscribeOn(Schedulers.io())
             .subscribe((beaconsAndLocations) -> {
 
-                this.beaconInfo.addAll(beaconsAndLocations.first);
-                this.locations.putAll(beaconsAndLocations.second);
-
                 this.runOnUiThread(() -> {
+                    this.beaconInfo.addAll(beaconsAndLocations.first);
+                    this.locations.putAll(beaconsAndLocations.second);
                     customAdapter.notifyItemRangeInserted(0, this.beaconInfo.size());
                 });
 
