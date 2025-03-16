@@ -6,6 +6,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.location.Geocoder;
 import android.os.Bundle;
 import android.text.format.DateFormat;
@@ -89,6 +90,10 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private String beaconId;
 
+    private double defaultLatitude;
+    private double defaultLongitude;
+    private float defaultZoom;
+
     private BeaconInformation beaconInformation;
 
     private List<BeaconLocationReport> locations = new ArrayList<>();
@@ -96,7 +101,6 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private HistoryItemsAdapter historyItemsAdapter;
 
     private int daysBack = 0;
-
     private long currentBeginningOfDay = -1;
 
     private Polyline currentHistoryLineOutline = null;
@@ -108,8 +112,13 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        final Intent intent = getIntent();
         this.beaconId = getIntent().getStringExtra("beaconId");
         Log.d(TAG, "Showing history view for beaconId=" + this.beaconId);
+
+        this.defaultLatitude = intent.getDoubleExtra("lat", 0.0f);
+        this.defaultLongitude = intent.getDoubleExtra("lon", 0.0f);
+        this.defaultZoom = intent.getFloatExtra("zoom", 16.0f);
 
         this.beaconRepo = new BeaconRepository(
                 AirTag4AllDatabase.getInstance(getApplicationContext()));
@@ -160,7 +169,10 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
         }
 
-        this.daysBack = 0;
+        // move to same position that we left when we went to the history page from the main page
+        this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                new LatLng(this.defaultLatitude, this.defaultLongitude), this.defaultZoom));
+
         this.fetchAndUpdateDataForCurrentDay();
     }
 
@@ -427,7 +439,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.currentHistoryLine = this.map.addPolyline(optionsPrimaryLine);
 
         if (!coords.isEmpty()) {
-            this.map.moveCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(
+            this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(
                     new LatLng(latMin, lonMin),
                     new LatLng(latMax, lonMax)
             ), FOCUS_PADDING));

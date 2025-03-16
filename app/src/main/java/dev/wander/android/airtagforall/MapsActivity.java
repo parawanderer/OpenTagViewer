@@ -437,7 +437,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         startActivity(intent);
     }
 
-
     private void onImportFilePicked(Intent data) {
         Log.d(TAG, "File has been picked");
 
@@ -516,8 +515,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Click location history event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
 
+        var pos = this.map.getCameraPosition();
+
+        Log.d(TAG, "Going to the history page for beaconId=" + beaconId);
         Intent viewHistoryIntent = new Intent(this, HistoryViewActivity.class);
         viewHistoryIntent.putExtra("beaconId", beaconId);
+        viewHistoryIntent.putExtra("lon", pos.target.longitude);
+        viewHistoryIntent.putExtra("lat", pos.target.latitude);
+        viewHistoryIntent.putExtra("zoom", pos.zoom);
+
         startActivity(viewHistoryIntent);
     }
 
