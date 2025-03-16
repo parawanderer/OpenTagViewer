@@ -5,6 +5,10 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
+import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED;
+import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_DRAGGING;
+import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HALF_EXPANDED;
+
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.location.Geocoder;
@@ -16,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -45,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -357,6 +363,21 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             bottomSheetBehavior.setHalfExpandedRatio(HISTORY_SHEET_HALF_EXPANDED_RATIO);
         }
 
+        bottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {}
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                if (map == null) return;
+
+                int height = bottomSheet.getHeight();
+                int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * slideOffset) + bottomSheetBehavior.getPeekHeight();
+
+                map.setPadding(0, 0, 0, offset);
+            }
+        });
+
         // setup menu buttons
         final MaterialButton moveLeftButton = this.findViewById(R.id.history_move_left_button);
         final MaterialButton moveRightButton = this.findViewById(R.id.history_move_right_button);
@@ -432,20 +453,20 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                 .collect(Collectors.toList());
 
         for (var coord : coords) {
-            if (latMax == null || latMax < coord.latitude) {
-                latMax = coord.latitude;
-            }
-            if (latMin == null || latMin > coord.latitude) {
-                latMin = coord.latitude;
-            }
-            if (lonMax == null || lonMax < coord.longitude) {
-                lonMax = coord.longitude;
-            }
-            if (lonMin == null || lonMin > coord.longitude) {
-                lonMin = coord.longitude;
-            }
+            if (latMax == null || latMax < coord.latitude) latMax = coord.latitude;
+            if (latMin == null || latMin > coord.latitude) latMin = coord.latitude;
+            if (lonMax == null || lonMax < coord.longitude) lonMax = coord.longitude;
+            if (lonMin == null || lonMin > coord.longitude) lonMin = coord.longitude;
         }
 
+        this.drawNewLines(coords);
+
+        if (!coords.isEmpty()) {
+            this.animateCameraToLines(latMin, latMax, lonMin, lonMax);
+        }
+    }
+
+    private void drawNewLines(final List<LatLng> coords) {
         final int numCoords = coords.size();
         if (numCoords > 1) {
             var optionsOutlineLine = new PolylineOptions()
@@ -468,12 +489,12 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                     .position(coords.get(0));
             this.singleCoordMarker = this.map.addMarker(markerOptions);
         }
+    }
 
-        if (!coords.isEmpty()) {
-            this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(
-                    new LatLng(latMin, lonMin),
-                    new LatLng(latMax, lonMax)
-            ), FOCUS_PADDING));
-        }
+    private void animateCameraToLines(final Double latMin, final Double latMax, final Double lonMin, final Double lonMax) {
+        this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(
+                new LatLng(latMin, lonMin),
+                new LatLng(latMax, lonMax)
+        ), FOCUS_PADDING));
     }
 }
