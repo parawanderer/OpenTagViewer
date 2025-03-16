@@ -175,8 +175,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         final long now = System.currentTimeMillis();
 
+        final long nowWithDaysBack = now - (this.daysBack * DAY_IN_MS);
         // We are using this thing to solve the missing API version support: https://developer.android.com/studio/write/java8-support#library-desugaring
-        @SuppressLint("NewApi") final long nowWithDaysBack = now - (this.daysBack * DAY_IN_MS);
         @SuppressLint("NewApi") final long beginningOfDay = Instant.ofEpochMilli(nowWithDaysBack).atZone(ZoneId.systemDefault()).toLocalDate().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
         this.currentBeginningOfDay = beginningOfDay;
@@ -210,6 +210,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private static final Map<String, List<BeaconLocationReport>> REPORTS_CACHE = new ConcurrentHashMap<>();
 
     private Observable<List<BeaconLocationReport>> getReportsForDay(final long beginningOfDay) {
+        final boolean isForToday = this.daysBack == 0;
         final String beaconId = this.beaconId;
         final String cacheKey = String.format(Locale.ROOT, "%d-%s", beginningOfDay, beaconId);
         final long endOfDay = beginningOfDay + DAY_IN_MS;
@@ -219,8 +220,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             Log.d(TAG, "Returned location data for beaconId=" + beaconId + " from cache for time range: " + beginningOfDay + "-" + endOfDay);
             return Observable.just(Objects.requireNonNull(REPORTS_CACHE.get(cacheKey)));
         }
-        // otherwise actually attempt to fetch
 
+        // otherwise actually attempt to fetch
         var reqData = Map.of(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
         var asyncReq = this.appleService.getReportsBetween(reqData, beginningOfDay, endOfDay);
 
@@ -246,13 +247,23 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                         Log.d(TAG, "Final merged location history list has " + mergedList.size() + " items!");
 
                         return mergedList;
-                    }).doOnNext(locations -> REPORTS_CACHE.put(cacheKey, locations))
+                    }).doOnNext(locations -> {
+                        // Don't cache the current day (it could still update)!
+                        if (!isForToday) {
+                            REPORTS_CACHE.put(cacheKey, locations);
+                        }
+                    })
                     .subscribeOn(Schedulers.computation()); // cache this combination, there will be no more updates at this point
         }
 
         Log.d(TAG, "Going to perform a fresh fetch for beaconId=" + beaconId + " location data in range: " + beginningOfDay + "-" + endOfDay);
         return asyncReq
-                .doOnNext(locations -> REPORTS_CACHE.put(cacheKey, locations.get(beaconId)))
+                .doOnNext(locations -> {
+                    // Don't cache the current day (it could still update)!
+                    if (!isForToday) {
+                        REPORTS_CACHE.put(cacheKey, locations.get(beaconId));
+                    }
+                })
                 .flatMap(this.beaconRepo::storeToLocationCache)
                 .map(locations -> locations.get(beaconId))
                 .subscribeOn(Schedulers.computation());

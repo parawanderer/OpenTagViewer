@@ -168,11 +168,11 @@
 
                         <ImageView
                             android:id="@+id/history_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:scaleType="fitCenter"
-                            android:src="@drawable/alarm_clock_24"
+                            android:src="@drawable/history_24px"
                             android:tint="@color/md_theme_outline" />
 
 
