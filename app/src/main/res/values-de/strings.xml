@@ -65,4 +65,5 @@
     <string name="history_x">Geschichte: %1$s</string>
     <string name="retry">Wiederholen</string>
     <string name="error_occurred_while_fetching_history">Beim Abrufen des Verlaufs ist ein Fehler aufgetreten</string>
+    <string name="are_you_sure_you_want_to_logout">Möchten Sie sich wirklich abmelden?</string>
 </resources>

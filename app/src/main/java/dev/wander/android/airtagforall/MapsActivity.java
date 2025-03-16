@@ -933,17 +933,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Locale.ROOT, "%.6f, %.6f", lastLocation.getLatitude(), lastLocation.getLongitude()));
             } else {
                 var geoLocation = locationInfo.get(0);
-                deviceLocation.setText(String.format(
-                        Locale.ROOT,
-                        "%s, %s, %s",
-                        geoLocation.getAddressLine(0),
-                        geoLocation.getLocality(),
-                        geoLocation.getCountryName()));
+                deviceLocation.setText(geoLocation.getAddressLine(0));
             }
 
-
             // the last updated time
-            // TODO: format it according to local timezone
             TextView deviceLastUpdate = v.findViewById(R.id.device_last_update);
             final var timeAgo = DateUtils.getRelativeTimeSpanString(
                     lastLocation.getTimestamp(),

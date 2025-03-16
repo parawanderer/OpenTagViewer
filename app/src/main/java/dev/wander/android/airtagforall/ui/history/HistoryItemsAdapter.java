@@ -101,12 +101,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
                         if (geocodingResults.isEmpty()) return;
 
                         var geocodingLocation = geocodingResults.get(0);
-                        var locationAddr = String.format(
-                                Locale.ROOT,
-                                "%s, %s, %s",
-                                geocodingLocation.getAddressLine(0),
-                                geocodingLocation.getLocality(),
-                                geocodingLocation.getCountryName());
+                        var locationAddr = geocodingLocation.getAddressLine(0);
 
                         viewHolder.getLocationName().setText(locationAddr);
 

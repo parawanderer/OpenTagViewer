@@ -65,4 +65,5 @@
     <string name="history_x">История: %1$s</string>
     <string name="retry">Повторить</string>
     <string name="error_occurred_while_fetching_history">Произошла ошибка при извлечении истории</string>
+    <string name="are_you_sure_you_want_to_logout">Вы уверены, что хотите выйти?</string>
 </resources>

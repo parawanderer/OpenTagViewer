@@ -6,7 +6,6 @@ import static android.view.View.inflate;
 import static dev.wander.android.airtagforall.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
@@ -119,11 +118,11 @@ public class SettingsActivity extends AppCompatActivity {
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
         this.binding.setHandleClickBack(this::finish);
-        this.binding.setOnClickTheme(this::onClickTheme);
+        this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());
-        this.binding.setOnClickLanguage(this::onClickLanguage);
+        this.binding.setOnClickLanguage(this::onClickEditLanguage);
         this.binding.setCurrentLanguage(this.getPrettyLanguageName(this.currentSettings.getLanguage()));
-        this.binding.setOnClickAnisetteServerUrl(this::onClickAnisetteServerUrl);
+        this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
         this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
 
         if (this.getSupportActionBar() != null) {
@@ -155,7 +154,7 @@ public class SettingsActivity extends AppCompatActivity {
                 : this.getString(R.string.light_theme);
     }
 
-    private void onClickTheme() {
+    private void onClickEditTheme() {
         final int currentOption = Optional.ofNullable(this.currentSettings.getUseDarkTheme())
                 .map(useDarkTheme -> useDarkTheme ? THEME_CHOICE_DARK : THEME_CHOICE_LIGHT)
                 .orElse(THEME_CHOICE_SYSTEM);
@@ -179,7 +178,7 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
-    private void onClickLanguage() {
+    private void onClickEditLanguage() {
         View view = inflate(this, R.layout.language_input_dialog, null);
 
         final String currentLocale = Locale.getDefault().getLanguage();
@@ -224,7 +223,7 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
-    private void onClickAnisetteServerUrl() {
+    private void onClickEditAnisetteServerUrl() {
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
 
 
@@ -259,7 +258,7 @@ public class SettingsActivity extends AppCompatActivity {
                 manager.setUrlTestOk(false); // reset to false
                 performTestButton.setEnabled(validateAnisetteUrl(view, currentInput));
             }
-            return true;
+            return false;
         });
 
         urlTextInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
@@ -320,40 +319,6 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
 
         manager.setDialog(dialog);
-    }
-
-    @RequiredArgsConstructor
-    @Data
-    private static class AnisetteServerUrlDialogManager {
-        @NonNull private final MaterialButton performTestButton;
-        @NonNull private final IndeterminateDrawable<CircularProgressIndicatorSpec> spinnerIcon;
-
-        private AlertDialog dialog;
-
-        private boolean isUrlTestOk = false;
-
-        public void setUrlTestOk(boolean isUrlTestOk) {
-            this.isUrlTestOk = isUrlTestOk;
-            this.setButtonStage(isUrlTestOk);
-        }
-
-        public void setTestLoading(boolean isLoading) {
-            if (isLoading) {
-                this.performTestButton.setIcon(this.spinnerIcon);
-                this.performTestButton.setClickable(false); // temporarily disable until has result
-            } else {
-                this.performTestButton.setIcon(null);
-                this.performTestButton.setClickable(true);
-            }
-        }
-
-        public void setButtonStage(boolean successStage) {
-            if (successStage) {
-                this.performTestButton.setText(R.string.accept);
-            } else {
-                this.performTestButton.setText(R.string.test);
-            }
-        }
     }
 
     private static boolean validateAnisetteUrl(View view, final String urlInput) {
@@ -434,13 +399,22 @@ public class SettingsActivity extends AppCompatActivity {
     private void onClickLogout(View view) {
         if (this.userAuthData == null) return;
 
+        var dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.logout)
+                .setMessage(R.string.are_you_sure_you_want_to_logout)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.logout, (dialog1, which) -> this.performLogout())
+                .show();
+    }
+
+    private void performLogout() {
         var async = this.authRepository.clearUser()
-            .subscribe(() -> {
-                // logout by sending back to login page
-                this.finish();
-                Intent intent = new Intent(this, AppleLoginActivity.class);
-                startActivity(intent);
-            }, error -> Log.e(TAG, "Failed to clear current user!", error));
+                .subscribe(() -> {
+                    // logout by sending back to login page
+                    this.finish();
+                    Intent intent = new Intent(this, AppleLoginActivity.class);
+                    startActivity(intent);
+                }, error -> Log.e(TAG, "Failed to clear current user!", error));
     }
 
     private void saveSettings()  {
@@ -456,5 +430,40 @@ public class SettingsActivity extends AppCompatActivity {
                 "lang_" + languageId,
                 "string",
                 this.getPackageName()));
+    }
+
+
+    @RequiredArgsConstructor
+    @Data
+    private static class AnisetteServerUrlDialogManager {
+        @NonNull private final MaterialButton performTestButton;
+        @NonNull private final IndeterminateDrawable<CircularProgressIndicatorSpec> spinnerIcon;
+
+        private AlertDialog dialog;
+
+        private boolean isUrlTestOk = false;
+
+        public void setUrlTestOk(boolean isUrlTestOk) {
+            this.isUrlTestOk = isUrlTestOk;
+            this.setButtonStage(isUrlTestOk);
+        }
+
+        public void setTestLoading(boolean isLoading) {
+            if (isLoading) {
+                this.performTestButton.setIcon(this.spinnerIcon);
+                this.performTestButton.setClickable(false); // temporarily disable until has result
+            } else {
+                this.performTestButton.setIcon(null);
+                this.performTestButton.setClickable(true);
+            }
+        }
+
+        public void setButtonStage(boolean successStage) {
+            if (successStage) {
+                this.performTestButton.setText(R.string.accept);
+            } else {
+                this.performTestButton.setText(R.string.test);
+            }
+        }
     }
 }

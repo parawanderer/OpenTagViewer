@@ -78,4 +78,5 @@
     <string name="history_x">History: %1$s</string>
     <string name="retry">Retry</string>
     <string name="error_occurred_while_fetching_history">Error occurred while fetching history</string>
+    <string name="are_you_sure_you_want_to_logout">Are you sure you want to logout?</string>
 </resources>
