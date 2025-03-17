@@ -327,7 +327,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         //Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
     }
 
-    public void onClickMoreSettings(View view) {
+    public void onClickMoreSettings(View view)
+    {
         Log.d(TAG, "Global more button was clicked");
         ImageButton bttn = findViewById(R.id.button_more_settings);
 
@@ -534,7 +535,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     public void onClickRefresh(View view) {
-        Log.i(TAG, "The refresh button was just clicked!");
+        Log.d(TAG, "The refresh button was clicked");
 
         final String beaconId = this.dynamicCardsForTag.entrySet()
                 .stream().filter(kvp -> kvp.getValue().findViewById(R.id.device_refresh_button_container) == view)
@@ -570,11 +571,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     public void onClickRing(View view) {
-        Log.i(TAG, "The ring button was just clicked!");
+        Log.i(TAG, "The ring button was clicked");
     }
 
     public void onClickMoreForDevice(View view) {
-        Log.i(TAG, "The more (device-level) button was just clicked!");
+        Log.d(TAG, "The more (device-level) button was clicked");
+
+        final String beaconId = this.dynamicCardsForTag.entrySet()
+                .stream().filter(kvp -> kvp.getValue().findViewById(R.id.device_more_button_container) == view)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Click more event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
+
+        Intent deviceInfoIntent = new Intent(this, DeviceInfoActivity.class);
+        deviceInfoIntent.putExtra("beaconId", beaconId);
+        startActivity(deviceInfoIntent);
     }
 
     private void checkApiKey() {

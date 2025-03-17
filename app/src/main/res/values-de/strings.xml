@@ -67,4 +67,10 @@
     <string name="error_occurred_while_fetching_history">Beim Abrufen des Verlaufs ist ein Fehler aufgetreten</string>
     <string name="are_you_sure_you_want_to_logout">Möchten Sie sich wirklich abmelden?</string>
     <string name="enable_debug_data">Debugdaten aktivieren</string>
+    <string name="device_name">Gerätename</string>
+    <string name="exported_by">Exportiert von</string>
+    <string name="exported_at">Exportiert am</string>
+    <string name="type">Typ</string>
+    <string name="unknown">Unbekannt</string>
+    <string name="imported_at">Importiert am</string>
 </resources>

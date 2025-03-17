@@ -67,4 +67,10 @@
     <string name="error_occurred_while_fetching_history">Error occurred while fetching history</string>
     <string name="are_you_sure_you_want_to_logout">Are you sure you want to logout?</string>
     <string name="enable_debug_data">Enable debug data</string>
+    <string name="device_name">Device name</string>
+    <string name="exported_by">Exported by</string>
+    <string name="exported_at">Exported at</string>
+    <string name="type">Type</string>
+    <string name="unknown">Unknown</string>
+    <string name="imported_at">Imported At</string>
 </resources>

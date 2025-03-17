@@ -1,5 +1,6 @@
 package dev.wander.android.airtagforall;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
@@ -19,7 +20,7 @@ import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import dev.wander.android.airtagforall.databinding.ActivityMyDevicesListBinding;
 import dev.wander.android.airtagforall.db.repo.BeaconRepository;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
-import dev.wander.android.airtagforall.ui.mydevices.CustomAdapter;
+import dev.wander.android.airtagforall.ui.mydevices.DeviceListAdaptor;
 import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -47,12 +48,11 @@ public class MyDevicesListActivity extends AppCompatActivity {
             this.getSupportActionBar().hide();
         }
 
-        var customAdapter = new CustomAdapter(this.getResources(), this.beaconInfo, this.locations);
+        var customAdapter = new DeviceListAdaptor(this.getResources(), this.beaconInfo, this.locations, this::onDeviceClicked);
 
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(customAdapter);
-
 
         var asyncLocations = this.beaconRepo.getLastLocationsForAll();
 
@@ -70,5 +70,11 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 });
 
             }, error -> Log.e(TAG, "Failure retrieving beacons and latest stored locations for beacon"));
+    }
+
+    private void onDeviceClicked(final BeaconInformation clickedDevice) {
+        Intent deviceInfoIntent = new Intent(this, DeviceInfoActivity.class);
+        deviceInfoIntent.putExtra("beaconId", clickedDevice.getBeaconId());
+        startActivity(deviceInfoIntent);
     }
 }

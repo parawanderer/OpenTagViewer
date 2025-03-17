@@ -5,6 +5,7 @@ import android.util.Log;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
@@ -12,6 +13,7 @@ import dev.wander.android.airtagforall.db.repo.model.BeaconData;
 import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
 import dev.wander.android.airtagforall.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.airtagforall.db.room.entity.Import;
 import dev.wander.android.airtagforall.db.room.entity.LocationReport;
 import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
@@ -49,6 +51,18 @@ public class BeaconRepository {
                 return importData;
             } catch (Exception e) {
                 Log.e(TAG, "Error occurred when trying to insert all data for new import", e);
+                throw new RepoQueryException(e);
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
+    public Observable<Optional<Import>> getImportById(final long importId) {
+        return Observable.fromCallable(() -> {
+            try {
+                var res = db.importDao().getById(importId);
+                return Optional.ofNullable(res);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to get import by id", e);
                 throw new RepoQueryException(e);
             }
         }).subscribeOn(Schedulers.io());

@@ -107,7 +107,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
             viewHolder.getLocationDetail().setVisibility(GONE);
         }
 
-        var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss");
+        var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss, dd MMM yyyy");
         var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());
 
         viewHolder.getLocationTime().setText(timestampFormat.format(new Date(item.getTimestamp())));

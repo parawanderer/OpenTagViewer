@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+    <data>
+        <variable name="handleClickBack" type="Runnable" />
+        <variable name="pageTitle" type="String" />
+        <variable name="onClickDeviceName" type="Runnable" />
+        <variable name="deviceName" type="String" />
+        <variable name="exportedBy" type="String" />
+        <variable name="exportedAt" type="String" />
+        <variable name="importedAt" type="String" />
+        <variable name="deviceType" type="String" />
+
+        <!-- Debug info -->
+        <variable name="beaconId" type="String" />
+        <variable name="namingRecordId" type="String" />
+        <variable name="namingRecordCreationTime" type="String" />
+        <variable name="namingRecordModificationTime" type="String" />
+        <variable name="namingRecordModifiedBy" type="String" />
+        <variable name="batteryLevel" type="String" />
+        <variable name="deviceModel" type="String" />
+        <variable name="pairingDate" type="String" />
+        <variable name="productId" type="String" />
+        <variable name="systemVersion" type="String" />
+        <variable name="vendorId" type="String" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/settings_top_toolbar"
+            layout="@layout/inline_top_toolbar"
+            app:onClickBack="@{handleClickBack}"
+            app:pageTitle="@{pageTitle}" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" >
+
+                <include
+                    android:id="@+id/device_settings_name"
+                    layout="@layout/settings_item_noicon_clickable"
+                    app:clickable="@{true}"
+                    app:onClick="@{onClickDeviceName}"
+                    app:sectionSubtitle="@{deviceName}"
+                    app:title="@{@string/device_name}" />
+
+                <include
+                    android:id="@+id/device_settings_exported_by"
+                    layout="@layout/settings_item_noicon_clickable"
+                    app:clickable="@{false}"
+                    app:onClick="@{null}"
+                    app:sectionSubtitle="@{exportedBy}"
+                    app:title="@{@string/exported_by}" />
+
+                <include
+                    android:id="@+id/device_settings_exported_at"
+                    layout="@layout/settings_item_noicon_clickable"
+                    app:clickable="@{false}"
+                    app:onClick="@{null}"
+                    app:sectionSubtitle="@{exportedAt}"
+                    app:title="@{@string/exported_at}" />
+
+                <include
+                    android:id="@+id/device_settings_imported_at"
+                    layout="@layout/settings_item_noicon_clickable"
+                    app:clickable="@{false}"
+                    app:onClick="@{null}"
+                    app:sectionSubtitle="@{importedAt}"
+                    app:title="@{@string/imported_at}" />
+
+                <include
+                    layout="@layout/settings_item_noicon_clickable"
+                    app:clickable="@{false}"
+                    app:onClick="@{null}"
+                    app:sectionSubtitle="@{deviceType}"
+                    app:title="@{@string/type}" />
+
+                <LinearLayout
+                    android:id="@+id/device_debug_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="10dp" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{beaconId}"
+                        app:title="@{@string/debug_beacon_id}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{namingRecordId}"
+                        app:title="@{@string/debug_naming_record_id}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{namingRecordCreationTime}"
+                        app:title="@{@string/debug_naming_record_creation_time}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{namingRecordModificationTime}"
+                        app:title="@{@string/debug_naming_record_modification_time}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{namingRecordModifiedBy}"
+                        app:title="@{@string/debug_naming_record_modifed_by_device}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{batteryLevel}"
+                        app:title="@{@string/debug_battery_level}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{deviceModel}"
+                        app:title="@{@string/debug_device_model}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{pairingDate}"
+                        app:title="@{@string/debug_pairing_date}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{productId}"
+                        app:title="@{@string/debug_product_id}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{systemVersion}"
+                        app:title="@{@string/debug_system_version}" />
+
+                    <include
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{false}"
+                        app:onClick="@{null}"
+                        app:sectionSubtitle="@{vendorId}"
+                        app:title="@{@string/debug_vendor_id}" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+
+    </LinearLayout>
+</layout>

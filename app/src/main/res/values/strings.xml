@@ -80,4 +80,23 @@
     <string name="error_occurred_while_fetching_history">Error occurred while fetching history</string>
     <string name="are_you_sure_you_want_to_logout">Are you sure you want to logout?</string>
     <string name="enable_debug_data">Enable debug data</string>
+    <string name="device_name">Device name</string>
+    <string name="exported_by">Exported by</string>
+    <string name="exported_at">Exported at</string>
+    <string name="debug_beacon_id" translatable="false">Beacon Id</string>
+    <string name="debug_naming_record_id" translatable="false">Naming Record Id</string>
+    <string name="debug_naming_record_creation_time" translatable="false">Naming Record Creation Time</string>
+    <string name="debug_naming_record_modification_time" translatable="false">Naming Record Modification Time</string>
+    <string name="debug_naming_record_modifed_by_device" translatable="false">Naming Record Modified By</string>
+    <string name="ipad" translatable="false">iPad</string>
+    <string name="airtag" translatable="false">AirTag</string>
+    <string name="type">Type</string>
+    <string name="unknown">Unknown</string>
+    <string name="debug_battery_level" translatable="false">Battery level</string>
+    <string name="debug_device_model" translatable="false">Device Model</string>
+    <string name="debug_pairing_date" translatable="false">Pairing Date</string>
+    <string name="debug_product_id" translatable="false">Product Id</string>
+    <string name="debug_system_version" translatable="false">System Version</string>
+    <string name="debug_vendor_id" translatable="false">Vendor Id</string>
+    <string name="imported_at">Imported At</string>
 </resources>

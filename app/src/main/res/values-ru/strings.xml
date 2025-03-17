@@ -67,4 +67,10 @@
     <string name="error_occurred_while_fetching_history">Произошла ошибка при извлечении истории</string>
     <string name="are_you_sure_you_want_to_logout">Вы уверены, что хотите выйти?</string>
     <string name="enable_debug_data">Включить отладочные данные</string>
+    <string name="device_name">Имя устройства</string>
+    <string name="exported_by">Экспортировано</string>
+    <string name="exported_at">Время экспорта</string>
+    <string name="type">Тип</string>
+    <string name="unknown">Неизвестный</string>
+    <string name="imported_at">Импортировано</string>
 </resources>

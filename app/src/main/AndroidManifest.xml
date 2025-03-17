@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:name="dev.wander.android.airtagforall.AirtagForAllApplication"
+        android:name=".AirtagForAllApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -42,14 +42,19 @@
         <service
             android:name=".service.AppNavigationService"
             android:foregroundServiceType="location">
+
             <!-- Any inner elements would go here. -->
         </service>
 
         <activity
+            android:name=".DeviceInfoActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+
+        <activity
             android:name=".HistoryViewActivity"
             android:exported="false"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity"
-            />
+            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
         <activity
             android:name=".MyDevicesListActivity"
             android:exported="false"
@@ -59,7 +64,6 @@
             android:exported="false"
             android:noHistory="true"
             android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
-
         <activity
             android:name=".InformationActivity"
             android:exported="false"
@@ -87,6 +91,7 @@
             android:theme="@style/Theme.AirTagForAll.MapActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

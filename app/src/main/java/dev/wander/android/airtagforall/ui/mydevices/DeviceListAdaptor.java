@@ -8,6 +8,7 @@ import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -17,19 +18,23 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 
 import dev.wander.android.airtagforall.R;
 import dev.wander.android.airtagforall.data.model.BeaconInformation;
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
 import lombok.Getter;
 
-public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder> {
+public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.ViewHolder> {
     private final List<BeaconInformation> beaconInfo;
     private final Map<String, BeaconLocationReport> locations;
-    private final @lombok.NonNull Resources resources;
+    private final Resources resources;
+    private final Consumer<BeaconInformation> onDeviceClickCallback;
 
     @Getter
     public static class ViewHolder extends RecyclerView.ViewHolder {
+        private final FrameLayout container;
         private final TextView deviceName;
         private final TextView lastUpdated;
         private final TextView itemEmoji;
@@ -38,6 +43,7 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
+            this.container = itemView.findViewById(R.id.device_item_container);
             this.deviceName = itemView.findViewById(R.id.list_item_device_name);
             this.lastUpdated = itemView.findViewById(R.id.list_item_last_update);
             this.itemEmoji = itemView.findViewById(R.id.list_item_emoji);
@@ -46,13 +52,15 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
         }
     }
 
-    public CustomAdapter(
+    public DeviceListAdaptor(
             @lombok.NonNull Resources resources,
             @lombok.NonNull List<BeaconInformation> beaconInfo,
-            @lombok.NonNull Map<String, BeaconLocationReport> locations) {
+            @lombok.NonNull Map<String, BeaconLocationReport> locations,
+            @lombok.NonNull Consumer<BeaconInformation> onDeviceClickCallback) {
         this.resources = resources;
         this.beaconInfo = beaconInfo;
         this.locations = locations;
+        this.onDeviceClickCallback = onDeviceClickCallback;
     }
 
     // Create new views (invoked by the layout manager)
@@ -100,6 +108,10 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
             viewHolder.getLastUpdated().setText(R.string.no_last_location_known);
             viewHolder.getWarningIcon().setVisibility(VISIBLE);
         }
+
+        viewHolder.getContainer().setOnClickListener(v -> {
+            this.onDeviceClickCallback.accept(beacon);
+        });
     }
 
     // Return the size of your dataset (invoked by the layout manager)
