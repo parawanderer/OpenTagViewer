@@ -2,6 +2,7 @@ package dev.wander.android.airtagforall.db.repo;
 
 import android.util.Log;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import dev.wander.android.airtagforall.db.repo.model.BeaconData;
 import dev.wander.android.airtagforall.db.repo.model.ImportData;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
 import dev.wander.android.airtagforall.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.airtagforall.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.airtagforall.db.room.entity.Import;
 import dev.wander.android.airtagforall.db.room.entity.LocationReport;
 import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
@@ -169,6 +171,27 @@ public class BeaconRepository {
                     .status(locationReport.status)
                     .build())
                 .collect(Collectors.toList());
+        }).subscribeOn(Schedulers.io());
+    }
+
+    public Observable<List<DailyHistoryFetchRecord>> storeHistoryRecords(DailyHistoryFetchRecord... records) {
+        return Observable.fromCallable(() -> {
+            final var now = System.currentTimeMillis();
+
+            for (var record: records) {
+                record.lastUpdate = now;
+            }
+
+            db.dailyHistoryFetchRecordDao().insertAll(records);
+
+            return Arrays.stream(records).collect(Collectors.toList());
+        }).subscribeOn(Schedulers.io());
+    }
+
+    public Observable<Optional<DailyHistoryFetchRecord>> getInsertionHistoryItem(final String beaconId, final long startOfDayTimestampMS) {
+        return Observable.fromCallable(() -> {
+            DailyHistoryFetchRecord record = db.dailyHistoryFetchRecordDao().getIfExists(beaconId, startOfDayTimestampMS);
+            return Optional.ofNullable(record);
         }).subscribeOn(Schedulers.io());
     }
 }

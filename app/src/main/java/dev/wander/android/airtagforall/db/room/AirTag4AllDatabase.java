@@ -8,10 +8,12 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
 import dev.wander.android.airtagforall.db.room.dao.BeaconNamingRecordDao;
+import dev.wander.android.airtagforall.db.room.dao.DailyHistoryFetchRecordDao;
 import dev.wander.android.airtagforall.db.room.dao.ImportDao;
 import dev.wander.android.airtagforall.db.room.dao.LocationReportDao;
 import dev.wander.android.airtagforall.db.room.dao.OwnedBeaconDao;
 import dev.wander.android.airtagforall.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.airtagforall.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.airtagforall.db.room.entity.Import;
 import dev.wander.android.airtagforall.db.room.entity.LocationReport;
 import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
@@ -21,7 +23,8 @@ import dev.wander.android.airtagforall.db.room.entity.OwnedBeacon;
         Import.class,
         BeaconNamingRecord.class,
         OwnedBeacon.class,
-        LocationReport.class
+        LocationReport.class,
+        DailyHistoryFetchRecord.class
     },
     version = 1
 )
@@ -46,4 +49,6 @@ public abstract class AirTag4AllDatabase extends RoomDatabase {
     public abstract BeaconNamingRecordDao beaconNamingRecordDao();
     public abstract OwnedBeaconDao ownedBeaconDao();
     public abstract LocationReportDao locationReportDao();
+
+    public abstract DailyHistoryFetchRecordDao dailyHistoryFetchRecordDao();
 }

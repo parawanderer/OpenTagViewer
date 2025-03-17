@@ -61,11 +61,13 @@ import dev.wander.android.airtagforall.db.repo.BeaconRepository;
 import dev.wander.android.airtagforall.db.repo.UserSettingsRepository;
 import dev.wander.android.airtagforall.db.repo.model.UserSettings;
 import dev.wander.android.airtagforall.db.room.AirTag4AllDatabase;
+import dev.wander.android.airtagforall.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.airtagforall.db.util.BeaconCombinerUtil;
 import dev.wander.android.airtagforall.python.PythonAppleService;
 import dev.wander.android.airtagforall.ui.history.HistoryItemsAdapter;
 import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Synchronized;
@@ -235,7 +237,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                     });
     }
 
-    private static final Map<String, List<BeaconLocationReport>> REPORTS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, List<BeaconLocationReport>> MEMORY_REPORTS_CACHE = new ConcurrentHashMap<>();
 
     private static String createReportsForDayCacheKey(final String beaconId, final long beginningOfDay) {
         return String.format(Locale.ROOT, "%d-%s", beginningOfDay, beaconId);
@@ -243,21 +245,49 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private boolean hasReportsForDayLocally(final long beginningOfDay) {
         final String cacheKey = createReportsForDayCacheKey(beaconId, beginningOfDay);
-        return REPORTS_CACHE.containsKey(cacheKey);
+        return MEMORY_REPORTS_CACHE.containsKey(cacheKey);
     }
 
     private Observable<List<BeaconLocationReport>> getReportsForDay(final long beginningOfDay) {
-        final boolean isForToday = this.daysBack == 0;
         final String cacheKey = createReportsForDayCacheKey(beaconId, beginningOfDay);
         final long endOfDay = beginningOfDay + DAY_IN_MS;
 
-        if (REPORTS_CACHE.containsKey(cacheKey)) {
+        if (MEMORY_REPORTS_CACHE.containsKey(cacheKey)) {
             // retrieve from cache if fetched in the past already
             Log.d(TAG, "Returned location data for beaconId=" + beaconId + " from cache for time range: " + beginningOfDay + "-" + endOfDay);
-            return Observable.just(Objects.requireNonNull(REPORTS_CACHE.get(cacheKey)));
+            return Observable.just(Objects.requireNonNull(MEMORY_REPORTS_CACHE.get(cacheKey)));
         }
 
-        // otherwise actually attempt to fetch
+        // retrieve strictly from localDB if available there?
+        return this.beaconRepo.getInsertionHistoryItem(beaconId, beginningOfDay)
+                .flatMap(cacheEntry -> {
+                    if (cacheEntry.isPresent()) {
+                        // fetch entirely from local cache
+                        Log.d(TAG, "Attempting to fetch 24 day history entirely from localDB as DB reported offset is present for beaconId=" + beaconId);
+                        return this.fetchReportsLocally(beginningOfDay, endOfDay, cacheKey);
+                    } else {
+                        // otherwise actually attempt to fetch remotely
+                        Log.d(TAG, "Going to fetch 24 hour location history remotely for beaconId=" + beaconId);
+                        return this.fetchReports(beginningOfDay, endOfDay, cacheKey);
+                    }
+                });
+    }
+
+    private Observable<List<BeaconLocationReport>> fetchReportsLocally(final long beginningOfDay, final long endOfDay, final String cacheKey) {
+        final boolean isForToday = this.daysBack == 0;
+
+        return this.beaconRepo.getLocationsFor(beaconId, beginningOfDay, endOfDay)
+                .doOnNext(locations -> {
+                    // Don't cache the current day (it could still update)!
+                    if (!isForToday) {
+                        MEMORY_REPORTS_CACHE.put(cacheKey, locations);
+                    }
+                });
+    }
+
+    private Observable<List<BeaconLocationReport>> fetchReports(final long beginningOfDay, final long endOfDay, final String cacheKey) {
+        final boolean isForToday = this.daysBack == 0;
+
         var reqData = Map.of(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
         var asyncReq = this.appleService.getReportsBetween(reqData, beginningOfDay, endOfDay);
 
@@ -271,24 +301,25 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
             Log.d(TAG, "Going to perform a merged localdb + remote fetch for beaconId=" + beaconId + " location data in range: " + beginningOfDay + "-" + endOfDay);
             return Observable.zip(
-                    // try to fetch remotely anyways and combine uniquely later
-                    asyncReq.flatMap(this.beaconRepo::storeToLocationCache).map(locations -> locations.get(beaconId)),
-                    // also try to fetch from DB for same time range
-                    asyncDB,
-                    (locationsRemote, locationsLocal) -> {
-                        Log.d(TAG, "Got " + locationsRemote.size() + " locations from Apple server and got " + locationsLocal.size() + " locations from local DB for beaconId" + beaconId);
+                            // try to fetch remotely anyways and combine uniquely later
+                            asyncReq.flatMap(this.beaconRepo::storeToLocationCache).map(locations -> locations.get(beaconId)),
+                            // also try to fetch from DB for same time range
+                            asyncDB,
+                            (locationsRemote, locationsLocal) -> {
+                                Log.d(TAG, "Got " + locationsRemote.size() + " locations from Apple server and got " + locationsLocal.size() + " locations from local DB for beaconId" + beaconId);
 
-                        // merge both lists for unique events
-                        var mergedList = BeaconCombinerUtil.combineAndSort(beaconId, locationsRemote, locationsLocal);
-                        Log.d(TAG, "Final merged location history list has " + mergedList.size() + " items!");
+                                // merge both lists for unique events
+                                var mergedList = BeaconCombinerUtil.combineAndSort(beaconId, locationsRemote, locationsLocal);
+                                Log.d(TAG, "Final merged location history list has " + mergedList.size() + " items!");
 
-                        return mergedList;
-                    }).doOnNext(locations -> {
+                                return mergedList;
+                            }).doOnNext(locations -> {
                         // Don't cache the current day (it could still update)!
                         if (!isForToday) {
-                            REPORTS_CACHE.put(cacheKey, locations);
+                            MEMORY_REPORTS_CACHE.put(cacheKey, locations);
                         }
                     })
+                    .flatMap(locations -> this.storeLocationFetchToLocalDb(isForToday, beaconId, beginningOfDay).andThen(Observable.just(locations)))
                     .subscribeOn(Schedulers.computation()); // cache this combination, there will be no more updates at this point
         }
 
@@ -297,14 +328,25 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                 .doOnNext(locations -> {
                     // Don't cache the current day (it could still update)!
                     if (!isForToday) {
-                        REPORTS_CACHE.put(cacheKey, locations.get(beaconId));
+                        MEMORY_REPORTS_CACHE.put(cacheKey, locations.get(beaconId));
                     }
                 })
+                .flatMap(locations -> this.storeLocationFetchToLocalDb(isForToday, beaconId, beginningOfDay).andThen(Observable.just(locations)))
                 .flatMap(this.beaconRepo::storeToLocationCache)
                 .map(locations -> locations.get(beaconId))
                 .subscribeOn(Schedulers.computation());
     }
 
+    private Completable storeLocationFetchToLocalDb(final boolean isForToday, final String beaconId, final long startTime) {
+        if (!isForToday) {
+            // store in cache local DB too for easier access on restarts
+            return this.beaconRepo.storeHistoryRecords(DailyHistoryFetchRecord.builder()
+                    .dayStartTime(startTime)
+                    .beaconId(beaconId)
+                    .build()).ignoreElements();
+        }
+        return Completable.complete();
+    }
 
     private synchronized void updateForNewLocationsList(final List<BeaconLocationReport> newReports) {
         final int oldNumItems = this.locations.size();
