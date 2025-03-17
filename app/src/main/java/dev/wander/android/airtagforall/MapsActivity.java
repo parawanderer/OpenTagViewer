@@ -284,6 +284,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onResume() {
         super.onResume();
 
+         // TODO: when a user changes their anisette URL in settings and returns here, this should be able to deal with querying the new URL
+
         this.refreshIfAllowed();
         this.reSchedulePeriodicTagLocationRefresher();
     }

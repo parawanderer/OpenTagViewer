@@ -115,6 +115,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
         }
+
+        // TODO: users should be able to rename and change the emojis of their icons.
     }
 
     private String getDeviceNameForTitle() {
