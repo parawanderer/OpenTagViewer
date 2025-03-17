@@ -114,6 +114,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
 
+    private static final float MARKER_ZINDEX_DEFAULT = 0.0f;
+
+    private static final float MARKER_ZINDEX_TOP = 10.0f;
+
     private GoogleMap map;
 
     private ActivityMapsBinding binding;
@@ -139,6 +143,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
 
     private final Map<String, Marker> currentMarkers = new ConcurrentHashMap<>();
+
+    private Marker lastFocusedMarker = null;
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
@@ -787,8 +793,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private synchronized void showBeaconOnMap(final BeaconInformation beacon, final BeaconLocationReport lastLocation) {
         // TODO: make it reuse tags if possible
-        var format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
-
         final String beaconId = beacon.getBeaconId();
         final LatLng locationTag = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
 
@@ -820,7 +824,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         var markerOptions = new MarkerOptions()
                 .position(locationTag)
-                .title(markerTitle)
+                //.title(markerTitle)
                 .icon(icon);
         Marker marker = this.map.addMarker(markerOptions);
 
@@ -850,10 +854,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void goToBeaconOnMap(final String beaconId, Float zoom) {
         try {
-            //FrameLayout card = Objects.requireNonNull(this.dynamicCardsForTag.get(beaconId));
             Marker marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
-            marker.showInfoWindow();
+            this.bringMarkerToTop(marker);
+
             var pos = marker.getPosition();
+
+            this.lastFocusedMarker = marker;
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
@@ -865,6 +871,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
         }
+    }
+
+    private void bringMarkerToTop(Marker marker) {
+        if (this.lastFocusedMarker != null) {
+            this.lastFocusedMarker.setZIndex(MARKER_ZINDEX_DEFAULT);
+        }
+        marker.setZIndex(MARKER_ZINDEX_TOP);
+        marker.setZIndex(10.0f);
     }
 
     private synchronized void updateBeaconCards() {
@@ -1072,6 +1086,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public boolean onMarkerClick(@NonNull Marker marker) {
+        this.bringMarkerToTop(marker);
+
         Optional<String> beaconIdForMarker = this.currentMarkers.entrySet().stream()
                 .filter(kvp -> kvp.getValue().equals(marker))
                 .map(Map.Entry::getKey)

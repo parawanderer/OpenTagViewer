@@ -7,9 +7,11 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -20,7 +22,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import dev.wander.android.airtagforall.R;
 import dev.wander.android.airtagforall.data.model.BeaconLocationReport;
@@ -39,22 +43,26 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
     private final List<BeaconLocationReport> locations;
     private final Geocoder geocoder;
     private final @lombok.NonNull UserSettings userSettings;
+    private final Consumer<Pair<BeaconLocationReport, String>> onClickCallback;
 
 
-    public HistoryItemsAdapter(@lombok.NonNull Geocoder geocoder, @lombok.NonNull List<BeaconLocationReport> locations, @lombok.NonNull UserSettings userSettings) {
+    public HistoryItemsAdapter(@lombok.NonNull Geocoder geocoder, @lombok.NonNull List<BeaconLocationReport> locations, @lombok.NonNull UserSettings userSettings, @lombok.NonNull Consumer<Pair<BeaconLocationReport, String>> onClickCallback) {
         this.locations = locations;
         this.geocoder = geocoder;
         this.userSettings = userSettings;
+        this.onClickCallback = onClickCallback;
     }
 
     @Getter
     public static class ViewHolder extends RecyclerView.ViewHolder {
+        private final LinearLayout container;
         private final TextView locationName;
         private final TextView locationDetail;
         private final TextView locationTime;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
+            this.container = itemView.findViewById(R.id.history_item_clickable_container);
             this.locationName = itemView.findViewById(R.id.history_item_location_name);
             this.locationDetail = itemView.findViewById(R.id.history_item_location_detail);
             this.locationTime = itemView.findViewById(R.id.history_item_location_time);
@@ -99,11 +107,15 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
             viewHolder.getLocationDetail().setVisibility(GONE);
         }
 
-
         var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss");
         var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());
 
         viewHolder.getLocationTime().setText(timestampFormat.format(new Date(item.getTimestamp())));
+
+        // setup onclick handling for this item
+        viewHolder.getContainer().setOnClickListener(v -> {
+            this.onClickCallback.accept(Pair.create(item, viewHolder.getLocationName().getText().toString()));
+        });
 
         var async = this.reverseGeocode(item.getLatitude(), item.getLongitude())
                 .observeOn(AndroidSchedulers.mainThread())

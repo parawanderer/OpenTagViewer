@@ -5,8 +5,7 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED;
-import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_DRAGGING;
+import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED;
 import static com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HALF_EXPANDED;
 
 import android.annotation.SuppressLint;
@@ -15,6 +14,7 @@ import android.location.Geocoder;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -50,7 +50,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -69,16 +68,17 @@ import dev.wander.android.airtagforall.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import lombok.Synchronized;
 
 public class HistoryViewActivity extends AppCompatActivity implements OnMapReadyCallback {
     private static final String TAG = HistoryViewActivity.class.getSimpleName();
 
     private static final float HISTORY_SHEET_HALF_EXPANDED_RATIO = 0.4f;
-
     private static final float LINE_WIDTH = 16f;
     private static final float OUTLINE_WIDTH = 22f;
-
     private static final int FOCUS_PADDING = 120;
+
+    private static final float SINGLE_MARKER_ZOOM = 18.0f;
 
     private static final long DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -155,7 +155,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         content.addView(getLayoutInflater().inflate(R.layout.view_history_bottom_sheet, content, false));
         this.setupBottomSheet();
 
-        this.historyItemsAdapter = new HistoryItemsAdapter(this.geocoder, this.locations, this.userSettings);
+        this.historyItemsAdapter = new HistoryItemsAdapter(this.geocoder, this.locations, this.userSettings, this::handleOnClickHistoryListItem);
         RecyclerView recyclerView = findViewById(R.id.recycler_view_history_items);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(this.historyItemsAdapter);
@@ -365,7 +365,17 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         bottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
-            public void onStateChanged(@NonNull View bottomSheet, int newState) {}
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                if (map == null) return;
+
+                if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
+                    // when fully expanded then pretend it's not expanded for now
+                    // so that when the user unexpands they will see things in a more centred way
+                    int height = bottomSheet.getHeight();
+                    int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * bottomSheetBehavior.getHalfExpandedRatio()) + bottomSheetBehavior.getPeekHeight();
+                    map.setPadding(0, 0, 0, offset);
+                }
+            }
 
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
@@ -433,7 +443,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         return this.beaconInformation.getBeaconId();
     }
 
-    private synchronized void drawNewLocationList(List<BeaconLocationReport> reports) {
+    @Synchronized
+    private void drawNewLocationList(List<BeaconLocationReport> reports) {
         this.locations.addAll(reports);
 
         // Update # of datapoints text
@@ -443,27 +454,43 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         // notify that list of items has been inserted
         this.historyItemsAdapter.notifyItemRangeInserted(0, this.locations.size());
 
+        // draw datapoints on map
+        var coords = this.locations.stream().map(rep -> new LatLng(rep.getLatitude(), rep.getLongitude()))
+                .collect(Collectors.toList());
+
+        this.drawNewLines(coords);
+
+        if (!coords.isEmpty()) {
+            if (coords.size() == 1) {
+                this.animateCameraToPos(coords.get(0), SINGLE_MARKER_ZOOM);
+            } else {
+                var bounds = this.determineBoundsForCurrent();
+                this.animateCameraToBoundingBox(bounds, FOCUS_PADDING);
+            }
+        }
+    }
+
+    private LatLngBounds determineBoundsForCurrent() {
         Double latMax = null;
         Double latMin = null;
         Double lonMax = null;
         Double lonMin = null;
 
-        // draw datapoints on map
-        var coords = this.locations.stream().map(rep -> new LatLng(rep.getLatitude(), rep.getLongitude()))
-                .collect(Collectors.toList());
-
-        for (var coord : coords) {
-            if (latMax == null || latMax < coord.latitude) latMax = coord.latitude;
-            if (latMin == null || latMin > coord.latitude) latMin = coord.latitude;
-            if (lonMax == null || lonMax < coord.longitude) lonMax = coord.longitude;
-            if (lonMin == null || lonMin > coord.longitude) lonMin = coord.longitude;
+        for (var coord : this.locations) {
+            if (latMax == null || latMax < coord.getLatitude()) latMax = coord.getLatitude();
+            if (latMin == null || latMin > coord.getLatitude()) latMin = coord.getLatitude();
+            if (lonMax == null || lonMax < coord.getLongitude()) lonMax = coord.getLongitude();
+            if (lonMin == null || lonMin > coord.getLongitude()) lonMin = coord.getLongitude();
         }
 
-        this.drawNewLines(coords);
-
-        if (!coords.isEmpty()) {
-            this.animateCameraToLines(latMin, latMax, lonMin, lonMax);
+        if (latMax == null) {
+            return null;
         }
+
+        return new LatLngBounds(
+                new LatLng(latMin, lonMin),
+                new LatLng(latMax, lonMax)
+        );
     }
 
     private void drawNewLines(final List<LatLng> coords) {
@@ -491,10 +518,45 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         }
     }
 
-    private void animateCameraToLines(final Double latMin, final Double latMax, final Double lonMin, final Double lonMax) {
-        this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds(
-                new LatLng(latMin, lonMin),
-                new LatLng(latMax, lonMax)
-        ), FOCUS_PADDING));
+    private void handleOnClickHistoryListItem(final Pair<BeaconLocationReport, String> clickedReportAndLocationName) {
+        final BeaconLocationReport clickedReport = clickedReportAndLocationName.first;
+        final String locationName = clickedReportAndLocationName.second;
+
+        if (this.locations.size() <= 1) {
+            Log.d(TAG, "Can't draw single coord marker when <= 1 items! Skipping...");
+            return;
+        }
+
+        // remove current
+        if (this.singleCoordMarker != null) {
+            this.singleCoordMarker.remove();
+        }
+
+        // replace with new
+        var pos = new LatLng(clickedReport.getLatitude(), clickedReport.getLongitude());
+        var markerOptions = new MarkerOptions().position(pos).title(locationName);
+
+        this.singleCoordMarker = this.map.addMarker(markerOptions);
+
+        View bottomSheetChildView = this.findViewById(R.id.view_history_bottom_sheet_layout);
+        BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
+
+        // open the sheet
+        this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM);
+        if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
+            bottomSheetBehavior.setState(STATE_HALF_EXPANDED);
+        }
+    }
+
+    private void animateCameraToBoundingBox(final LatLngBounds bounds, int padding) {
+        this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, padding));
+    }
+
+    private void moveCameraToPos(final LatLng pos, float zoom) {
+        this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+    }
+
+    private void animateCameraToPos(final LatLng pos, float zoom) {
+        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
     }
 }
