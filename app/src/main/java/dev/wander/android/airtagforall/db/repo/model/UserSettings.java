@@ -10,4 +10,8 @@ public class UserSettings {
     private String anisetteServerUrl;
     private String language;
     private Boolean enableDebugData;
+
+    public boolean hasDarkThemeEnabled() {
+        return this.useDarkTheme == Boolean.TRUE;
+    }
 }

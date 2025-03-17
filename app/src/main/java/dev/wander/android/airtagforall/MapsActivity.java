@@ -244,7 +244,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
         map.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
 
-        if (this.userSettings.getUseDarkTheme() == Boolean.TRUE) {
+        if (this.userSettings.hasDarkThemeEnabled()) {
             // DARK THEME map
             map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
         }

@@ -170,7 +170,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     public void onMapReady(GoogleMap googleMap) {
         this.map = googleMap;
 
-        if (this.userSettings.getUseDarkTheme()) {
+        if (this.userSettings.hasDarkThemeEnabled()) {
             // DARK THEME map
             map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
         }
