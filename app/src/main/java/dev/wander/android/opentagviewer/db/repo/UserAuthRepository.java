@@ -46,6 +46,7 @@ public class UserAuthRepository {
                 return Optional.<AppleUserData>empty();
             })
             .toObservable()
+            .take(1)
             .subscribeOn(Schedulers.io());
     }
 

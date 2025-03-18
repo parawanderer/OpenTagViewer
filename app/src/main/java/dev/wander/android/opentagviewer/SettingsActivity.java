@@ -213,11 +213,9 @@ public class SettingsActivity extends AppCompatActivity {
         var mappedLocales = Arrays.stream(availableLocales)
                 .map(lang -> Pair.create(lang, this.getPrettyLanguageName(lang)))
                 .collect(Collectors.toMap(p -> p.second, p -> p.first));
-        List<String> sortedLanguageOptions = mappedLocales.keySet().stream()
-                .sorted().collect(Collectors.toList());
 
-        var shownLocalesAdapter = new ArrayAdapter<>(getApplicationContext(), android.R.layout.simple_dropdown_item_1line, sortedLanguageOptions);
-        languageDropdown.setAdapter(shownLocalesAdapter);
+        languageDropdown.setSimpleItems(mappedLocales.keySet().stream()
+                .sorted().toArray(String[]::new));
 
         mappedLocales.entrySet().stream()
                 .filter(kvp -> kvp.getValue().equals(currentLocale))
@@ -459,10 +457,6 @@ public class SettingsActivity extends AppCompatActivity {
                 .subscribe(
                         () -> {
                             Log.d(TAG, "Settings were updated");
-//                            Snackbar.make(
-//                                    this.findViewById(R.id.settings_main_container),
-//                                    R.string.settings_were_updated,
-//                                    Snackbar.LENGTH_SHORT).show();
                         },
                         error -> {
                             Log.e(TAG, "Error occurred when updating settings", error);

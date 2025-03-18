@@ -190,11 +190,12 @@ public class DeviceInfoActivity extends AppCompatActivity {
     private void onClickDeviceDelete() {
         var dialog = new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
                 .setTitle(R.string.remove_device)
+                .setIcon(R.drawable.delete_24px)
                 .setMessage(R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back)
-                .setNegativeButton(R.string.confirm, (dialog1, which) -> {
+                .setPositiveButton(R.string.confirm, (dialog1, which) -> {
                     Log.d(TAG, "Clicked to confirm device deletion. Now proceeding to delete (actually hide) device...");
                     this.handleDeviceRemoval();
-                }).setNeutralButton(R.string.cancel, null)
+                }).setNegativeButton(R.string.cancel, null)
                 .show();
     }
 

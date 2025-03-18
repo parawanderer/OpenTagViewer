@@ -36,7 +36,8 @@ public class UserDataRepository {
                     }
                     UserMapCameraPosition lastPos = this.mapper.readValue(res.get(), UserMapCameraPosition.class);
                     return Optional.of(lastPos);
-                }).subscribeOn(Schedulers.io());
+                }).take(1)
+                .subscribeOn(Schedulers.io());
     }
 
     public Observable<UserMapCameraPosition> storeLastCameraPosition(final UserMapCameraPosition currentPosition) {
@@ -49,6 +50,7 @@ public class UserDataRepository {
             Log.d(TAG, "Stored new LastCameraPosition for current user!");
             return Single.just(mutablePreferences);
         }).toObservable()
+        .take(1)
         .map(_ignored -> currentPosition)
         .subscribeOn(Schedulers.io());
     }
