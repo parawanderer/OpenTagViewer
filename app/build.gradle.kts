@@ -18,11 +18,11 @@ secrets {
 }
 
 android {
-    namespace = "dev.wander.android.airtagforall"
+    namespace = "dev.wander.android.opentagviewer"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.wander.android.airtagforall"
+        applicationId = "dev.wander.android.opentagviewer"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -68,7 +68,6 @@ chaquopy {
         version = "3.12"
         pip {
             // SEE: https://chaquo.com/chaquopy/doc/current/android.html#android-requirements
-            install("lxml==5.3.0")
             install("FindMy==0.7.6")
             install("NSKeyedUnArchiver==1.5")
         }

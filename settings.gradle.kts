@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AirTagForAll"
+rootProject.name = "OpenTagViewer"
 include(":app")

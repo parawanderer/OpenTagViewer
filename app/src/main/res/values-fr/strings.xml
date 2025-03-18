@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirTagForAll</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_desc">En-tête de havigation</string>
     <string name="action_settings">Paramètres</string>
@@ -73,4 +72,13 @@
     <string name="type">Taper</string>
     <string name="unknown">Inconnu</string>
     <string name="imported_at">Importé le</string>
+    <string name="loading_location_data_for_x_new_imported_devices">Chargement des données de localisation pour %1$d nouveaux appareils ...</string>
+    <string name="error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry">Une erreur s\'est produite lors de l\'importation de nouveaux appareils. Veuillez redémarrer l\'application et réessayer.</string>
+    <string name="error_occurred_for_2fa_attempt">Une erreur s\'est produite lors de la tentative 2FA</string>
+    <string name="settings_were_updated">Les paramètres ont été mis à jour</string>
+    <string name="error_updating_settings">Erreur lors de la mise à jour des paramètres</string>
+    <string name="remove_device">Supprimer l\'Appareil</string>
+    <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Êtes-vous sûr de vouloir supprimer cet appareil ? Une fois supprimé, il devra être réimporté pour le récupérer.</string>
+    <string name="confirm">Confirmer</string>
+    <string name="anisette_url_change_warning">Lorsque vous modifiez votre URL Anisette, vous devrez vous reconnecter au serveur Anisette. Confirmer cette modification vous redirigera vers la page de connexion.</string>
 </resources>

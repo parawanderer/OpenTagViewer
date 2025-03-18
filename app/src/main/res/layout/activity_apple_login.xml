@@ -16,6 +16,7 @@
     </data>
 
     <LinearLayout
+        android:id="@+id/app_login_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -35,10 +36,10 @@
                 android:paddingTop="10dp">
 
                 <ImageView
-                    android:id="@+id/appleLogo"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    app:srcCompat="@drawable/apple" />
+                    android:id="@+id/appLogo"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    app:srcCompat="@drawable/opentagviewer_icon" />
 
                 <TextView
                     android:id="@+id/login_current_input_indicator"
@@ -61,7 +62,8 @@
                 android:paddingLeft="30dp"
                 android:paddingTop="30dp"
                 android:paddingRight="30dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="visible">
 
                 <include
                     android:id="@+id/settings_list"
@@ -76,14 +78,13 @@
 
                     <Button
                         android:id="@+id/go_to_maininfo"
-                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        style="?attr/materialIconButtonOutlinedStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:enabled="@{allowServerConfNext}"
                         android:onClick="onClickToLoginAccount"
                         app:icon="@drawable/arrow_forward_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
-                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
 
                 </LinearLayout>
 
@@ -99,7 +100,8 @@
                 android:paddingTop="20dp"
                 android:paddingRight="50dp"
                 android:paddingBottom="50dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="gone">
 
                 <FrameLayout
                     android:id="@+id/login_error_container"
@@ -167,14 +169,13 @@
 
                     <Button
                         android:id="@+id/iconButton2"
-                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        style="?attr/materialIconButtonOutlinedStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_weight="0"
                         android:onClick="onClickBackToAnisetteSettings"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
-                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -208,7 +209,8 @@
                 android:layout_marginTop="40dp"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="gone">
 
                 <TextView
                     android:id="@+id/textView3"
@@ -256,7 +258,8 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="gone">
 
 
                 <LinearLayout

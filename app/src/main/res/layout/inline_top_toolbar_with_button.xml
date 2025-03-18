@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    >
+    <data>
+        <variable name="pageTitle" type="String" />
+        <variable name="onClickBack" type="Runnable" />
+        <variable name="onClickMenu" type="Runnable" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/md_theme_background"
+        android:backgroundTint="@color/md_theme_background"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:padding="20dp">
+
+            <ImageButton
+                android:id="@+id/back_button"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/ripple_background"
+                android:backgroundTint="@color/md_theme_background"
+                android:onClick="@{() -> onClickBack.run()}"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/angle_left_24"
+                android:tint="@color/md_theme_outline" />
+
+            <TextView
+                android:id="@+id/inline_nav_header"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:layout_marginLeft="15dp"
+                android:fontFamily="@font/nunito_bold"
+                android:gravity="center_vertical"
+                android:text="@{pageTitle}"
+                android:textColor="@color/md_theme_onSurface"
+                android:textSize="20sp"
+                tools:text="Page Title" />
+
+
+            <ImageButton
+                android:id="@+id/page_menu_button"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/ripple_background"
+                android:backgroundTint="@color/md_theme_background"
+                android:onClick="@{() -> onClickMenu.run()}"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/menu_dots_vertical_24"
+                android:tint="@color/md_theme_outline" />
+
+        </LinearLayout>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+</layout>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirTagForAll</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
@@ -73,4 +72,13 @@
     <string name="type">Type</string>
     <string name="unknown">Unknown</string>
     <string name="imported_at">Imported At</string>
+    <string name="loading_location_data_for_x_new_imported_devices">Loading location data for %1$d new imported devices ...</string>
+    <string name="error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry">Error occurred while importing new devices. Try to restart the app and retry.</string>
+    <string name="error_occurred_for_2fa_attempt">Error occurred for 2FA attempt</string>
+    <string name="settings_were_updated">Settings were updated</string>
+    <string name="error_updating_settings">Error updating settings</string>
+    <string name="remove_device">Remove Device</string>
+    <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Are you sure you want to remove this device? Once removed, it will need to be re-imported to get it back.</string>
+    <string name="confirm">Confirm</string>
+    <string name="anisette_url_change_warning">When you change your Anisette URL, you will have to re-login to the Anisette server. Confirming this change will bring you to the login page.</string>
 </resources>

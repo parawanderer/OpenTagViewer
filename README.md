@@ -1,4 +1,4 @@
-# AirTagForAll
+# OpenTagViewer
 
 My **Heavily WIP** attempt at making AirTag tracking available via a Map-based UI (like that of iOS FindMy or Samsung SmartThings) on Android via this great project: **[FindMy.py](https://github.com/malmeloo/FindMy.py)**
 

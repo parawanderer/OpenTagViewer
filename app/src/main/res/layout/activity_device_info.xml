@@ -4,6 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <data>
         <variable name="handleClickBack" type="Runnable" />
+        <variable name="handleClickMenu" type="Runnable" />
+
         <variable name="pageTitle" type="String" />
         <variable name="onClickDeviceName" type="Runnable" />
         <variable name="deviceName" type="String" />
@@ -33,8 +35,9 @@
 
         <include
             android:id="@+id/settings_top_toolbar"
-            layout="@layout/inline_top_toolbar"
+            layout="@layout/inline_top_toolbar_with_button"
             app:onClickBack="@{handleClickBack}"
+            app:onClickMenu="@{handleClickMenu}"
             app:pageTitle="@{pageTitle}" />
 
         <ScrollView

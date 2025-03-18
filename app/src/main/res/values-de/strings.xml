@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirTagForAll</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Einstellungen</string>
@@ -73,4 +72,13 @@
     <string name="type">Typ</string>
     <string name="unknown">Unbekannt</string>
     <string name="imported_at">Importiert am</string>
+    <string name="loading_location_data_for_x_new_imported_devices">Standortdaten für %1$d neue importierte Geräte werden geladen …</string>
+    <string name="error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry">Beim Importieren neuer Geräte ist ein Fehler aufgetreten. Starten Sie die App neu und versuchen Sie es erneut.</string>
+    <string name="error_occurred_for_2fa_attempt">Beim 2FA-Versuch ist ein Fehler aufgetreten</string>
+    <string name="settings_were_updated">Einstellungen wurden aktualisiert</string>
+    <string name="error_updating_settings">Fehler beim Aktualisieren der Einstellungen</string>
+    <string name="remove_device">Gerät Entfernen</string>
+    <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Möchten Sie dieses Gerät wirklich entfernen? Nach der Entfernung muss es erneut importiert werden, um es wiederherzustellen.</string>
+    <string name="confirm">Bestätigen</string>
+    <string name="anisette_url_change_warning">Wenn Sie Ihre Anisette-URL ändern, müssen Sie sich erneut beim Anisette-Server anmelden. Nach Bestätigung dieser Änderung gelangen Sie zur Anmeldeseite.</string>
 </resources>

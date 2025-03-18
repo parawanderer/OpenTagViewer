@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.AirTagForAll.MapActivity" parent="Theme.AirTagForAll">
+    <style name="Theme.OpenTagViewer.MapActivity" parent="Theme.OpenTagViewer">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
 
@@ -14,7 +14,7 @@
         <item name="android:windowLightNavigationBar">false</item>
     </style>
 
-    <style name="Theme.AirTagForAll.GenericGreyishActivity">
+    <style name="Theme.OpenTagViewer.GenericGreyishActivity">
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:statusBarColor">@color/md_theme_background</item>
         <item name="android:windowLightStatusBar">false</item>

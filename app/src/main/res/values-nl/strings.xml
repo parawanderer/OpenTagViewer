@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirTagForAll</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_desc">Navigatie header</string>
     <string name="action_settings">Instellingen</string>
@@ -73,4 +72,13 @@
     <string name="type">Type</string>
     <string name="unknown">Onbekend</string>
     <string name="imported_at">Geïmporteerd op</string>
+    <string name="loading_location_data_for_x_new_imported_devices">Locatiegegevens laden voor %1$d nieuwe geïmporteerde apparaten...</string>
+    <string name="error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry">Er is een fout opgetreden bij het importeren van nieuwe apparaten. Probeer de app opnieuw te starten en probeer het opnieuw.</string>
+    <string name="error_occurred_for_2fa_attempt">Er is een fout opgetreden bij de 2FA-poging</string>
+    <string name="settings_were_updated">Instellingen zijn bijgewerkt</string>
+    <string name="error_updating_settings">Fout bij het bijwerken van de instellingen</string>
+    <string name="remove_device">Apparaat Verwijderen</string>
+    <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Weet u zeker dat u dit apparaat wilt verwijderen? Nadat het is verwijderd, moet het opnieuw worden geïmporteerd om het terug te krijgen.</string>
+    <string name="confirm">Bevestigen</string>
+    <string name="anisette_url_change_warning">Wanneer u uw Anisette URL wijzigt, moet u opnieuw inloggen op de Anisette server. Door deze wijziging te bevestigen, komt u op de login pagina.</string>
 </resources>

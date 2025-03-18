@@ -11,15 +11,13 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
-
             <category android:name="android.intent.category.BROWSABLE" />
-
             <data android:scheme="https" />
         </intent>
     </queries>
 
     <application
-        android:name=".AirtagForAllApplication"
+        android:name=".OpenAirTagApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -28,7 +26,7 @@
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AirTagForAll"
+        android:theme="@style/Theme.OpenTagViewer"
         tools:targetApi="31">
 
         <service
@@ -42,38 +40,41 @@
         <service
             android:name=".service.AppNavigationService"
             android:foregroundServiceType="location">
-
-            <!-- Any inner elements would go here. -->
         </service>
 
         <activity
             android:name=".DeviceInfoActivity"
             android:exported="false"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
 
         <activity
             android:name=".HistoryViewActivity"
             android:exported="false"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
             android:name=".MyDevicesListActivity"
             android:exported="false"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
             android:name=".AppleLoginActivity"
-            android:exported="false"
+            android:exported="true"
             android:noHistory="true"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".InformationActivity"
             android:exported="false"
             android:label="@string/information"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings"
-            android:theme="@style/Theme.AirTagForAll.GenericGreyishActivity" />
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <!--
             To add your Maps API key to this project:
             1. Open the root project's secrets.properties file
@@ -86,14 +87,11 @@
 
         <activity
             android:name=".MapsActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/title_activity_maps"
-            android:theme="@style/Theme.AirTagForAll.MapActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            android:theme="@style/Theme.OpenTagViewer.MapActivity"
+            android:screenOrientation="portrait"
+            >
         </activity>
     </application>
 

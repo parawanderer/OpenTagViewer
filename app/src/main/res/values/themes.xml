@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.AirTagForAll" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+    <style name="Theme.OpenTagViewer" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
         <!-- Primary brand color. -->
 <!--        <item name="colorPrimary">@color/blue_200</item>-->
         <item name="colorPrimaryVariant">@color/blue_500</item>
@@ -17,7 +17,7 @@
 
         <item name="android:fontFamily">@font/nunito_regular</item>
 
-        <item name="android:buttonStyle">@style/Theme.AirTagForAll.Button</item>
+        <item name="android:buttonStyle">@style/Theme.OpenTagViewer.Button</item>
 
 
 
@@ -77,12 +77,12 @@
         <item name="android:popupElevation">16dp</item>
     </style>
 
-    <style name="Theme.AirTagForAll.NoActionBar">
+    <style name="Theme.OpenTagViewer.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
 
-    <style name="Theme.AirTagForAll.MapActivity" parent="Theme.AirTagForAll">
+    <style name="Theme.OpenTagViewer.MapActivity" parent="Theme.OpenTagViewer">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
 
@@ -94,23 +94,23 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
-    <style name="Theme.AirTagForAll.GenericGreyishActivity">
+    <style name="Theme.OpenTagViewer.GenericGreyishActivity">
         <item name="android:windowTranslucentStatus">true</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:navigationBarColor">@color/md_theme_background</item>
     </style>
 
-    <style name="Theme.AirTagForAll.Button">
+    <style name="Theme.OpenTagViewer.Button">
         <item name="android:background">@color/blue_500</item>
         <item name="android:elevation">0dp</item>
     </style>
 
-    <style name="Theme.AirTagForAll.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <style name="Theme.OpenTagViewer.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
-    <style name="Theme.AirTagForAll.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+    <style name="Theme.OpenTagViewer.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <style name="Theme.AirTagForAll.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+    <style name="Theme.OpenTagViewer.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:textSize">14sp</item>
     </style>
 </resources>

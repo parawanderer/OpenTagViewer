@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.AirTagForAll" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+    <style name="Theme.OpenTagViewer" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
         <!-- Primary brand color. -->
 <!--        <item name="colorPrimary">@color/blue_200</item>-->
         <item name="colorPrimaryVariant">@color/blue_700</item>
@@ -13,7 +13,7 @@
         <item name="android:statusBarColor">?attr/colorPrimary</item>
         <!-- Customize your theme here. -->
 
-        <item name="android:buttonStyle">@style/Theme.AirTagForAll.Button</item>
+        <item name="android:buttonStyle">@style/Theme.OpenTagViewer.Button</item>
 
 
 
@@ -65,7 +65,7 @@
         <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>
     </style>
 
-    <style name="Theme.AirTagForAll.GenericGreyishActivity">
+    <style name="Theme.OpenTagViewer.GenericGreyishActivity">
         <item name="android:windowTranslucentStatus">true</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>

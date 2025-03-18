@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         >
 
-        <dev.wander.android.airtagforall.ui.extensions.AppAutoCompleteTextView
+        <dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView
             android:id="@+id/languageSelectDropdown"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

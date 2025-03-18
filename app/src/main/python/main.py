@@ -185,6 +185,8 @@ def getAccount(
         acc = AppleAccount(anisette)
         acc.restore(data)
 
+        print(f"Login State: {acc.login_state}")
+
         return acc
     except Exception:
         err = traceback.format_exc()

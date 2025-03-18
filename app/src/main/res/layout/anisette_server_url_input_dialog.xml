@@ -20,6 +20,23 @@
 
         <include layout="@layout/anisette_server_url_input" />
 
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/layout_rounded_less"
+            android:backgroundTint="@color/md_theme_errorContainer"
+            android:padding="10dp">
+
+            <TextView
+                android:id="@+id/anisette_url_change_warning"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/anisette_url_change_warning"
+                android:textColor="@color/md_theme_error_highContrast"
+                android:textSize="12sp" />
+        </FrameLayout>
+
     </LinearLayout>
 
     <LinearLayout
