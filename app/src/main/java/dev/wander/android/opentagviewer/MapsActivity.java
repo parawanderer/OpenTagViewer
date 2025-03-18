@@ -86,6 +86,7 @@ import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
+import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PermissionUtil;
 import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
@@ -207,6 +208,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
     );
+
+    private static void run() {
+
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -527,19 +532,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 )
             )
             .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+            .observeOn(AndroidSchedulers.mainThread())
             .subscribe(() -> {
-                this.runOnUiThread(() -> {
-                    this.showLastDeviceLocations();
-                    Log.i(TAG, "Finished visualising new location reports!");
-                });
+                this.showLastDeviceLocations();
+                Log.i(TAG, "Finished visualising new location reports!");
             }, error -> {
                 Log.e(TAG, "Error occurred while inserting into DB", error);
-                this.runOnUiThread(() -> {
-                    Toast.makeText(
-                            this,
-                            R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry,
-                            LENGTH_LONG).show();
-                });
+                Toast.makeText(
+                        this,
+                        R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry,
+                        LENGTH_LONG).show();
             });
     }
 
@@ -610,19 +612,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 1)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
                     Log.i(TAG, "Refreshed location data and markers for beaconId=" + beaconId + " on refresh button click");
-                    this.runOnUiThread(() -> {
-                        TagCardHelper.toggleRefreshLoading(container, false);
-                        this.showLastDeviceLocations();
-                        //Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
-                    });
+                    TagCardHelper.toggleRefreshLoading(container, false);
+                    this.showLastDeviceLocations();
+                    //Toast.makeText(this, "Refreshed location data & markers for beaconId="+beaconId, LENGTH_SHORT).show();
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current location for beaconId=" + beaconId + " on refresh button click!");
-                    this.runOnUiThread(() -> {
-                        TagCardHelper.toggleRefreshLoading(container, false);
-                        //Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
-                    });
+                    TagCardHelper.toggleRefreshLoading(container, false);
+                    //Toast.makeText(this, "Failed to refresh location for beaconId=" + beaconId, LENGTH_SHORT).show();
                 });
     }
 
@@ -699,19 +698,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         var asyncBeaconData = Observable.zip(asyncAllBeacons, asyncAllLocations, (allBeacons, allLatestLocations) -> {
             // temporarily show cached beacon locations until we get the new ones!
-            var cachedLocations = allLatestLocations.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, kvp -> List.of(kvp.getValue())));
-            this.addBeaconLocationsToCurrent(cachedLocations);
-
-            this.runOnUiThread(() -> {
-                // show the locations for all the devices that were already in the cache
-                //Toast.makeText(this.getApplicationContext(), "Showing cached locations...", LENGTH_SHORT).show();
-                this.showLastDeviceLocations();
-                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
-            });
-
+            this.addBeaconLocationsToCurrent(MapUtils.toListOfOne(allLatestLocations));
             return allBeacons;
-        }).observeOn(Schedulers.io());
+        }).subscribeOn(Schedulers.computation())
+        .observeOn(AndroidSchedulers.mainThread())
+        .flatMap(allBeacons -> {
+            // show the locations for all the devices that were already in the cache
+            this.showLastDeviceLocations();
+            TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
+            return this.updateBeaconGeocodings().andThen(Observable.just(allBeacons));
+        });
 
         // initially show the cached locations (after we get those back from the DB)
         // afterwards try to fetch the latest location reports from the Apple servers
@@ -723,22 +719,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         ).flatMap(o -> o)
         .doOnNext(this::addBeaconLocationsToCurrent)
         .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
+        .subscribeOn(Schedulers.computation())
+        .observeOn(AndroidSchedulers.mainThread())
         .subscribe(lastReports -> {
             this.initialFetchComplete = true;
-            this.runOnUiThread(() -> {
-                //Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
-                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
-                this.showLastDeviceLocations();
-            });
+            //Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
+            TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+            this.showLastDeviceLocations();
             Log.i(TAG, "Successfully retrieved latest reports!");
         }, error -> {
             this.initialFetchComplete = true;
             Log.e(TAG, "Error while restoring account and trying to get latest beacons", error);
-            this.runOnUiThread(() -> {
-                TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
-                //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
-                // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
-            });
+            TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+            //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
+            // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
     }
 
@@ -1058,19 +1052,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         var async = this.fetchLastReports(beacons)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
                     Log.d(TAG, "Refreshed location data and markers!");
-                    this.runOnUiThread(() -> {
-                        TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
-                        this.showLastDeviceLocations();
-                        //Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
-                    });
+                    TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+                    this.showLastDeviceLocations();
+                    //Toast.makeText(this, "Refreshed location data & markers", LENGTH_SHORT).show();
                 }, error -> {
                     Log.e(TAG, "Failed to refresh current locations!", error);
-                    this.runOnUiThread(() -> {
-                        TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
-                        //Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
-                    });
+                    TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+                    //Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
                 });
     }
 
