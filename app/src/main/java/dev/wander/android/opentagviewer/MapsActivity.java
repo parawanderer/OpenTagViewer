@@ -923,8 +923,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             var pos = marker.getPosition();
 
-            this.lastFocusedMarker = marker;
-
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
             if (zoom != null) {
@@ -947,7 +945,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             this.lastFocusedMarker.setZIndex(MARKER_ZINDEX_DEFAULT);
         }
         marker.setZIndex(MARKER_ZINDEX_TOP);
-        marker.setZIndex(10.0f);
+        this.lastFocusedMarker = marker;
     }
 
     private synchronized void updateBeaconCards() {
