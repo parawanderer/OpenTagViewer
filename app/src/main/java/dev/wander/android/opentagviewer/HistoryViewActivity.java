@@ -17,8 +17,10 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -39,18 +41,27 @@ import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.CompositeDateValidator;
+import com.google.android.material.datepicker.DateValidatorPointBackward;
+import com.google.android.material.datepicker.DateValidatorPointForward;
+import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -115,6 +126,10 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private Polyline currentHistoryLine = null;
     private Marker singleCoordMarker = null;
 
+    Button moveLeftButton;
+    Button moveRightButton;
+    Button datePickerButton;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -147,7 +162,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         ActivityHistoryViewBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_history_view);
         binding.setHandleClickBack(this::finish);
-        binding.setPageTitle(this.getString(R.string.history_x, this.getCurrentBeaconName()));
+        binding.setPageTitle(this.getCurrentBeaconName());
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
@@ -185,10 +200,9 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void fetchAndUpdateDataForCurrentDay() {
-        final MaterialButton moveLeftButton = this.findViewById(R.id.history_move_left_button);
-        final MaterialButton moveRightButton = this.findViewById(R.id.history_move_right_button);
         moveLeftButton.setClickable(false); // temp disable
         moveRightButton.setClickable(false); // temp disable
+        datePickerButton.setClickable(false); // temp disable
 
         final LinearLayout dataReportContainer = this.findViewById(R.id.history_data_overview_top);
         final LinearLayout errorMessageContainer = this.findViewById(R.id.history_error_message);
@@ -220,7 +234,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                         errorMessageContainer.setVisibility(GONE);
 
                         moveLeftButton.setClickable(true);
-                        if (moveRightButton.getVisibility() != INVISIBLE) moveRightButton.setClickable(true); // allow navigation
+                        datePickerButton.setClickable(true);
+                        if (moveRightButton.isEnabled()) moveRightButton.setClickable(true); // allow navigation
 
                         this.updateForNewLocationsList(items);
                     },
@@ -233,7 +248,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                         errorMessageContainer.setVisibility(VISIBLE);
 
                         moveLeftButton.setClickable(true);
-                        if (moveRightButton.getVisibility() != INVISIBLE) moveRightButton.setClickable(true); // allow navigation
+                        datePickerButton.setClickable(true);
+                        if (moveRightButton.isEnabled()) moveRightButton.setClickable(true); // allow navigation
                     });
     }
 
@@ -359,21 +375,18 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.cleanupOldLines();
 
         TextView currentRangeText = this.findViewById(R.id.history_drawer_title);
-        //MaterialButton moveLeftButton = this.findViewById(R.id.history_move_left_button);
-        MaterialButton moveRightButton = this.findViewById(R.id.history_move_right_button);
 
         if (this.daysBack == 0) {
             currentRangeText.setText(R.string.today);
-            moveRightButton.setVisibility(INVISIBLE);
+            moveRightButton.setEnabled(false);
         } else if (this.daysBack == 1) {
             currentRangeText.setText(R.string.yesterday);
-            moveRightButton.setVisibility(VISIBLE);
+            moveRightButton.setEnabled(true);
         } else {
             var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEE, dd MMM yyyy");
             var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());
             currentRangeText.setText(timestampFormat.format(new Date(this.currentBeginningOfDay)));
-
-            moveRightButton.setVisibility(VISIBLE);
+            moveRightButton.setEnabled(true);
         }
 
         this.drawNewLocationList(newReports);
@@ -395,6 +408,10 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void setupBottomSheet() {
+        this.moveLeftButton = this.findViewById(R.id.history_move_left_button);
+        this.moveRightButton = this.findViewById(R.id.history_move_right_button);
+        this.datePickerButton = this.findViewById(R.id.history_day_picker_button);
+
         View bottomSheetChildView = this.findViewById(R.id.view_history_bottom_sheet_layout);
         ViewGroup.LayoutParams params = bottomSheetChildView.getLayoutParams();
         BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
@@ -431,33 +448,81 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         });
 
         // setup menu buttons
-        final MaterialButton moveLeftButton = this.findViewById(R.id.history_move_left_button);
-        final MaterialButton moveRightButton = this.findViewById(R.id.history_move_right_button);
+
         moveLeftButton.setOnClickListener(v -> {
             this.daysBack++;
-            if (this.daysBack > 0) {
-                moveRightButton.setVisibility(VISIBLE);
-                moveRightButton.setClickable(true);
-            } else {
-                moveRightButton.setVisibility(INVISIBLE);
-                moveRightButton.setClickable(false);
-            }
+            moveRightButton.setEnabled(this.daysBack > 0);
             this.fetchAndUpdateDataForCurrentDay();
         });
         moveRightButton.setOnClickListener(v -> {
-            if (this.daysBack <= 1) {
-                moveRightButton.setVisibility(INVISIBLE);
-                moveRightButton.setClickable(false);
-            }
+            moveRightButton.setEnabled(this.daysBack > 0);
             this.daysBack--;
             this.fetchAndUpdateDataForCurrentDay();
         });
+        datePickerButton.setOnClickListener(v -> this.showDatePicker());
 
         final MaterialButton retryButton = this.findViewById(R.id.history_fetch_retry_button);
         retryButton.setOnClickListener(v -> this.handleRetryHistoryFetch());
 
         final LinearProgressIndicator historyLoadingProgress = this.findViewById(R.id.history_loading_progress_indicator);
         historyLoadingProgress.hide();
+    }
+
+    private void showDatePicker() {
+        Calendar calendar = getClearedUtc();
+        final long today = MaterialDatePicker.todayInUtcMilliseconds();
+
+        calendar.setTimeInMillis(today);
+        calendar.add(Calendar.DAY_OF_MONTH, -this.daysBack);
+        final long currentSelectedDay = calendar.getTimeInMillis();
+
+        calendar.setTimeInMillis(today);
+        calendar.add(Calendar.YEAR, -2);
+        final long twoYearsAgo = calendar.getTimeInMillis();
+
+        MaterialDatePicker.Builder<Long> builder = MaterialDatePicker.Builder.datePicker()
+                .setSelection(currentSelectedDay)
+                .setInputMode(MaterialDatePicker.INPUT_MODE_CALENDAR);
+
+        Calendar lowerBoundCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        lowerBoundCalendar.add(Calendar.YEAR, -2);
+        long lowerBound = lowerBoundCalendar.getTimeInMillis();
+
+        var constraintBuilder = new CalendarConstraints.Builder()
+                .setStart(twoYearsAgo)
+                .setEnd(today)
+                .setValidator(CompositeDateValidator.allOf(List.of(
+                        DateValidatorPointForward.from(lowerBound),
+                        DateValidatorPointBackward.now()
+                )))
+                .setOpenAt(currentSelectedDay);
+
+        try {
+            builder.setCalendarConstraints(constraintBuilder.build());
+            MaterialDatePicker<Long> picker = builder.build();
+            picker.addOnPositiveButtonClickListener(selection -> {
+                Log.d(TAG, "User selected new date: " + selection);
+
+                final int daysDifference = (int) TimeUnit.DAYS.convert(today - selection, TimeUnit.MILLISECONDS);
+                this.handleUserPickedNewStartOfDay(daysDifference);
+            });
+
+            picker.show(this.getSupportFragmentManager(), picker.toString());
+        } catch (IllegalArgumentException e) {
+            Toast.makeText(this, "Error while showing date picker!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleUserPickedNewStartOfDay(final int daysDifference) {
+        this.daysBack = daysDifference;
+        this.moveRightButton.setEnabled(this.daysBack > 0);
+        this.fetchAndUpdateDataForCurrentDay();
+    }
+
+    private static Calendar getClearedUtc() {
+        Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        utc.clear();
+        return utc;
     }
 
     private void handleRetryHistoryFetch() {
@@ -467,12 +532,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private void setRetryButtonLoading(boolean isComplete) {
         final MaterialButton retryButton = this.findViewById(R.id.history_fetch_retry_button);
-
-        if (!isComplete) {
-            retryButton.setClickable(false); // temporarily disable
-        } else {
-            retryButton.setClickable(true);
-        }
+        retryButton.setClickable(isComplete); // temporarily disable
     }
 
     private String getCurrentBeaconName() {
