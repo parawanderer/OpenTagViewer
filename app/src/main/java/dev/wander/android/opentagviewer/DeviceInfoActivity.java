@@ -175,6 +175,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
         viewHistoryIntent.putExtra("zoom", DEFAULT_ZOOM);
 
         var async = this.userDataRepository.getLastCameraPosition()
+            .take(1)
             .subscribe(pos -> {
                 viewHistoryIntent.putExtra("lon", pos.map(UserMapCameraPosition::getLon).orElse(DEFAULT_LONGITUDE));
                 viewHistoryIntent.putExtra("lat", pos.map(UserMapCameraPosition::getLat).orElse(DEFAULT_LATITUDE));

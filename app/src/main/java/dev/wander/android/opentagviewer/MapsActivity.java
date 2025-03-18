@@ -196,6 +196,18 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
     );
 
+    private final ActivityResultLauncher<Intent> deviceInfoActivityLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    Intent data = result.getData();
+                    if (data != null && data.getStringExtra("deviceWasRemoved") != null) {
+                        this.handleDeviceListChanged();
+                    }
+                }
+            }
+    );
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -629,7 +641,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Intent deviceInfoIntent = new Intent(this, DeviceInfoActivity.class);
         deviceInfoIntent.putExtra("beaconId", beaconId);
-        startActivity(deviceInfoIntent);
+        deviceInfoActivityLauncher.launch(deviceInfoIntent);
     }
 
     private void checkApiKey() {
@@ -926,6 +938,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void bringMarkerToTop(Marker marker) {
+        if (this.lastFocusedMarker == marker) {
+            // do nothing
+            return;
+        }
+
         if (this.lastFocusedMarker != null) {
             this.lastFocusedMarker.setZIndex(MARKER_ZINDEX_DEFAULT);
         }
