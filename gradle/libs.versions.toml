@@ -30,6 +30,7 @@ annotation = "1.6.0"
 googlePlayServicesLocation = "21.3.0"
 googlePlacesLib = "4.1.0"
 desugarJdkLibs = "2.1.5"
+emojiPicker = "1.5.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -68,6 +69,10 @@ annotation = { group = "androidx.annotation", name = "annotation", version.ref =
 google-play-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "googlePlayServicesLocation" }
 google-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "googlePlacesLib" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+androidx-emoji = { group = "androidx.emoji2", name = "emoji2", version.ref = "emojiPicker" }
+androidx-emoji-views = { group = "androidx.emoji2", name = "emoji2-views", version.ref = "emojiPicker" }
+androidx-emoji-views-helper = { group = "androidx.emoji2", name = "emoji2-views-helper", version.ref = "emojiPicker" }
+androidx-emoji-picker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emojiPicker" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

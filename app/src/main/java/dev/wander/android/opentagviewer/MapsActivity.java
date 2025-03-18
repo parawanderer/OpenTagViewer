@@ -27,7 +27,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.format.DateUtils;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
@@ -54,7 +53,6 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -202,7 +200,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             (ActivityResult result) -> {
                 if (result.getResultCode() == RESULT_OK) {
                     Intent data = result.getData();
-                    if (data != null && data.getStringExtra("deviceWasRemoved") != null) {
+                    if (data != null && (
+                            data.getStringExtra("deviceWasRemoved") != null)
+                            || data.getStringExtra("deviceWasChanged") != null) {
                         this.handleDeviceListChanged();
                     }
                 }
@@ -866,7 +866,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
         BitmapDescriptor icon;
-        if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
+        if (beacon.isEmojiFilled()) {
             icon = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
@@ -996,7 +996,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             deviceNameView.setText(beacon.getName());
 
             // icon
-            if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
+            if (beacon.isEmojiFilled()) {
                 // use emoji
                 TextView emojiContainer = v.findViewById(R.id.device_icon_emoji);
                 ImageView iconContainer = v.findViewById(R.id.device_icon_img);

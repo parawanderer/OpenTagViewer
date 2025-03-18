@@ -2,99 +2,223 @@
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
-    <data>
-        <variable name="handleClickBack" type="Runnable" />
-        <variable name="handleClickMenu" type="Runnable" />
 
-        <variable name="pageTitle" type="String" />
-        <variable name="onClickDeviceName" type="Runnable" />
-        <variable name="deviceName" type="String" />
-        <variable name="exportedBy" type="String" />
-        <variable name="exportedAt" type="String" />
-        <variable name="importedAt" type="String" />
-        <variable name="deviceType" type="String" />
+    <data>
+
+        <variable
+            name="handleClickBack"
+            type="Runnable" />
+
+        <variable
+            name="handleClickMenu"
+            type="Runnable" />
+
+        <variable
+            name="pageTitle"
+            type="String" />
+
+        <variable
+            name="clickItemHandler"
+            type="Runnable" />
+
+        <variable
+            name="onClickDeviceName"
+            type="Runnable" />
+
+        <variable
+            name="deviceName"
+            type="String" />
+
+        <variable
+            name="onClickDeviceEmoji"
+            type="Runnable" />
+
+        <variable
+            name="exportedBy"
+            type="String" />
+
+        <variable
+            name="exportedAt"
+            type="String" />
+
+        <variable
+            name="importedAt"
+            type="String" />
+
+        <variable
+            name="deviceType"
+            type="String" />
 
         <!-- Debug info -->
-        <variable name="beaconId" type="String" />
-        <variable name="namingRecordId" type="String" />
-        <variable name="namingRecordCreationTime" type="String" />
-        <variable name="namingRecordModificationTime" type="String" />
-        <variable name="namingRecordModifiedBy" type="String" />
-        <variable name="batteryLevel" type="String" />
-        <variable name="deviceModel" type="String" />
-        <variable name="pairingDate" type="String" />
-        <variable name="productId" type="String" />
-        <variable name="systemVersion" type="String" />
-        <variable name="vendorId" type="String" />
+        <variable
+            name="deviceNameOriginal"
+            type="String" />
+
+        <variable
+            name="deviceEmojiOriginal"
+            type="String" />
+
+        <variable
+            name="beaconId"
+            type="String" />
+
+        <variable
+            name="namingRecordId"
+            type="String" />
+
+        <variable
+            name="namingRecordCreationTime"
+            type="String" />
+
+        <variable
+            name="namingRecordModificationTime"
+            type="String" />
+
+        <variable
+            name="namingRecordModifiedBy"
+            type="String" />
+
+        <variable
+            name="batteryLevel"
+            type="String" />
+
+        <variable
+            name="deviceModel"
+            type="String" />
+
+        <variable
+            name="pairingDate"
+            type="String" />
+
+        <variable
+            name="productId"
+            type="String" />
+
+        <variable
+            name="systemVersion"
+            type="String" />
+
+        <variable
+            name="vendorId"
+            type="String" />
     </data>
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
-        <include
-            android:id="@+id/settings_top_toolbar"
-            layout="@layout/inline_top_toolbar_with_button"
-            app:onClickBack="@{handleClickBack}"
-            app:onClickMenu="@{handleClickMenu}"
-            app:pageTitle="@{pageTitle}" />
-
-        <ScrollView
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="492dp"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-            <LinearLayout
+
+            <include
+                android:id="@+id/settings_top_toolbar"
+                layout="@layout/inline_top_toolbar_with_button"
+                app:onClickBack="@{handleClickBack}"
+                app:onClickMenu="@{handleClickMenu}"
+                app:pageTitle="@{pageTitle}" />
+
+            <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" >
-
-                <include
-                    android:id="@+id/device_settings_name"
-                    layout="@layout/settings_item_noicon_clickable"
-                    app:clickable="@{true}"
-                    app:onClick="@{onClickDeviceName}"
-                    app:sectionSubtitle="@{deviceName}"
-                    app:title="@{@string/device_name}" />
-
-                <include
-                    android:id="@+id/device_settings_exported_by"
-                    layout="@layout/settings_item_noicon_clickable"
-                    app:clickable="@{false}"
-                    app:onClick="@{null}"
-                    app:sectionSubtitle="@{exportedBy}"
-                    app:title="@{@string/exported_by}" />
-
-                <include
-                    android:id="@+id/device_settings_exported_at"
-                    layout="@layout/settings_item_noicon_clickable"
-                    app:clickable="@{false}"
-                    app:onClick="@{null}"
-                    app:sectionSubtitle="@{exportedAt}"
-                    app:title="@{@string/exported_at}" />
-
-                <include
-                    android:id="@+id/device_settings_imported_at"
-                    layout="@layout/settings_item_noicon_clickable"
-                    app:clickable="@{false}"
-                    app:onClick="@{null}"
-                    app:sectionSubtitle="@{importedAt}"
-                    app:title="@{@string/imported_at}" />
-
-                <include
-                    layout="@layout/settings_item_noicon_clickable"
-                    app:clickable="@{false}"
-                    app:onClick="@{null}"
-                    app:sectionSubtitle="@{deviceType}"
-                    app:title="@{@string/type}" />
+                android:layout_height="match_parent">
 
                 <LinearLayout
-                    android:id="@+id/device_debug_info"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:visibility="gone"
-                    tools:visibility="visible">
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginBottom="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_bold"
+                            android:paddingLeft="22dp"
+                            android:paddingTop="8dp"
+                            android:text="@string/device_settings"
+                            android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/device_settings_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:gravity="center_vertical"
+                        android:onClick="@{() -> onClickDeviceName.run()}"
+                        android:orientation="horizontal"
+                        android:paddingLeft="22dp"
+                        android:paddingTop="10dp"
+                        android:paddingRight="22dp"
+                        android:paddingBottom="10dp">
+
+
+                        <!--                        <ImageView-->
+                        <!--                            android:id="@+id/imageView6"-->
+                        <!--                            android:layout_width="wrap_content"-->
+                        <!--                            android:layout_height="wrap_content"-->
+                        <!--                            app:srcCompat="@drawable/apple" />-->
+
+                        <Button
+                            android:id="@+id/pick_icon_button"
+                            style="?attr/materialIconButtonStyle"
+                            android:layout_width="50dp"
+                            android:layout_height="50dp"
+                            android:gravity="center"
+                            android:insetLeft="0dp"
+                            android:insetTop="0dp"
+                            android:insetRight="0dp"
+                            android:insetBottom="0dp"
+                            android:onClick="@{() -> onClickDeviceEmoji.run()}"
+                            android:paddingLeft="0dp"
+                            android:paddingTop="0dp"
+                            android:paddingRight="0dp"
+                            android:paddingBottom="0dp"
+                            android:textSize="34sp"
+                            app:icon="@drawable/apple"
+                            app:iconSize="38dp"
+                            app:iconGravity="textTop"
+                            app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="16dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/textView4"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/nunito_semi_bold"
+                                android:text="@string/device_name"
+                                android:textColor="@color/md_theme_onSurface"
+                                android:textSize="16sp"
+                                tools:text="Settings Title" />
+
+                            <TextView
+                                android:id="@+id/textView5"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@{deviceName}"
+                                android:textColor="@color/md_theme_outlineVariant_highContrast"
+                                tools:text="Setting Subtitle With More Details" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
 
                     <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
@@ -102,87 +226,247 @@
                         android:layout_marginTop="10dp"
                         android:layout_marginBottom="10dp" />
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{beaconId}"
-                        app:title="@{@string/debug_beacon_id}" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginBottom="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_bold"
+                            android:paddingLeft="22dp"
+                            android:paddingTop="8dp"
+                            android:text="@string/device_information"
+                            android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+
+                    </LinearLayout>
 
                     <include
+                        android:id="@+id/device_settings_exported_by"
                         layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{namingRecordId}"
-                        app:title="@{@string/debug_naming_record_id}" />
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{exportedBy}"
+                        app:title="@{@string/exported_by}" />
 
                     <include
+                        android:id="@+id/device_settings_exported_at"
                         layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{namingRecordCreationTime}"
-                        app:title="@{@string/debug_naming_record_creation_time}" />
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{exportedAt}"
+                        app:title="@{@string/exported_at}" />
 
                     <include
+                        android:id="@+id/device_settings_imported_at"
                         layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{namingRecordModificationTime}"
-                        app:title="@{@string/debug_naming_record_modification_time}" />
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{importedAt}"
+                        app:title="@{@string/imported_at}" />
 
                     <include
+                        android:id="@+id/device_settings_device_type"
                         layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{namingRecordModifiedBy}"
-                        app:title="@{@string/debug_naming_record_modifed_by_device}" />
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{deviceType}"
+                        app:title="@{@string/type}" />
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{batteryLevel}"
-                        app:title="@{@string/debug_battery_level}" />
+                    <LinearLayout
+                        android:id="@+id/device_debug_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        tools:visibility="gone">
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{deviceModel}"
-                        app:title="@{@string/debug_device_model}" />
+                        <com.google.android.material.divider.MaterialDivider
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginBottom="10dp" />
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{pairingDate}"
-                        app:title="@{@string/debug_pairing_date}" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_marginBottom="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{productId}"
-                        app:title="@{@string/debug_product_id}" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/nunito_bold"
+                                android:paddingLeft="22dp"
+                                android:paddingTop="8dp"
+                                android:text="@string/debug_information"
+                                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{systemVersion}"
-                        app:title="@{@string/debug_system_version}" />
+                        </LinearLayout>
 
-                    <include
-                        layout="@layout/settings_item_noicon_clickable"
-                        app:clickable="@{false}"
-                        app:onClick="@{null}"
-                        app:sectionSubtitle="@{vendorId}"
-                        app:title="@{@string/debug_vendor_id}" />
+                        <include
+                            android:id="@+id/settings_debug_device_name_original"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{deviceNameOriginal}"
+                            app:title="@{@string/debug_device_name}" />
 
+                        <include
+                            android:id="@+id/settings_debug_device_emoji_original"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{deviceEmojiOriginal}"
+                            app:title="@{@string/debug_device_emoji}" />
+
+                        <include
+                            android:id="@+id/settings_debug_beacon_id"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{beaconId}"
+                            app:title="@{@string/debug_beacon_id}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_id"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{namingRecordId}"
+                            app:title="@{@string/debug_naming_record_id}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_create_time"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{namingRecordCreationTime}"
+                            app:title="@{@string/debug_naming_record_creation_time}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_modify_time"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{namingRecordModificationTime}"
+                            app:title="@{@string/debug_naming_record_modification_time}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_modified_by"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{namingRecordModifiedBy}"
+                            app:title="@{@string/debug_naming_record_modifed_by_device}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_battery_level"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{batteryLevel}"
+                            app:title="@{@string/debug_battery_level}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_device_model"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{deviceModel}"
+                            app:title="@{@string/debug_device_model}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_pairing_date"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{pairingDate}"
+                            app:title="@{@string/debug_pairing_date}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_product_id"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{productId}"
+                            app:title="@{@string/debug_product_id}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_system_version"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{systemVersion}"
+                            app:title="@{@string/debug_system_version}" />
+
+                        <include
+                            android:id="@+id/settings_debug_naming_record_vendor_id"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{vendorId}"
+                            app:title="@{@string/debug_vendor_id}" />
+
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
+            </ScrollView>
 
 
-    </LinearLayout>
+        </LinearLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/emoji_picker_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible">
+
+            <FrameLayout
+                android:id="@+id/emoji_picker_container"
+                android:layout_width="match_parent"
+                android:layout_height="480dp"
+                android:layout_marginBottom="-500dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginTop="40dp"
+                    android:background="@drawable/layout_rounded"
+                    android:backgroundTint="@color/md_theme_background"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:elevation="30dp"
+                    android:orientation="horizontal"
+                    android:padding="8dp">
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginBottom="20dp">
+
+                        <androidx.emoji2.emojipicker.EmojiPickerView
+                            android:id="@+id/emoji_picker"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            app:emojiGridColumns="9" />
+
+                    </FrameLayout>
+                </LinearLayout>
+            </FrameLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

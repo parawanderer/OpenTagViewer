@@ -11,11 +11,13 @@ import dev.wander.android.opentagviewer.db.room.dao.DailyHistoryFetchRecordDao;
 import dev.wander.android.opentagviewer.db.room.dao.ImportDao;
 import dev.wander.android.opentagviewer.db.room.dao.LocationReportDao;
 import dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao;
+import dev.wander.android.opentagviewer.db.room.dao.UserBeaconOptionsDao;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 
 @Database(
     entities = {
@@ -23,7 +25,8 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
         BeaconNamingRecord.class,
         OwnedBeacon.class,
         LocationReport.class,
-        DailyHistoryFetchRecord.class
+        DailyHistoryFetchRecord.class,
+        UserBeaconOptions.class
     },
     version = 1
 )
@@ -48,6 +51,6 @@ public abstract class AirTag4AllDatabase extends RoomDatabase {
     public abstract BeaconNamingRecordDao beaconNamingRecordDao();
     public abstract OwnedBeaconDao ownedBeaconDao();
     public abstract LocationReportDao locationReportDao();
-
     public abstract DailyHistoryFetchRecordDao dailyHistoryFetchRecordDao();
+    public abstract UserBeaconOptionsDao userBeaconOptionsDao();
 }

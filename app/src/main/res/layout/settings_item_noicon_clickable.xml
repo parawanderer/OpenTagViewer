@@ -7,6 +7,7 @@
         <variable name="title" type="String" />
         <variable name="sectionSubtitle" type="String" />
         <variable name="onClick" type="Runnable" />
+        <variable name="onLongClick" type="Runnable" />
         <variable name="clickable" type="boolean" />
     </data>
 
@@ -31,7 +32,7 @@
             android:orientation="vertical">
 
             <TextView
-                android:id="@+id/textView4"
+                android:id="@+id/settings_clickable_item_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_semi_bold"
@@ -41,7 +42,7 @@
                 tools:text="Settings Title" />
 
             <TextView
-                android:id="@+id/textView5"
+                android:id="@+id/settings_clickable_item_content"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@{sectionSubtitle}"

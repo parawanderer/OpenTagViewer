@@ -17,6 +17,7 @@ import javax.xml.xpath.XPathFactory;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.BeaconNamingRecordCloudKitMetadata;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
+import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.AccessLevel;
@@ -63,6 +64,8 @@ public final class BeaconDataParser {
 
             var res = new ArrayList<BeaconInformation>();
             for (var beaconData : rawBeaconData) {
+                UserBeaconOptions userOverrides = beaconData.getUserBeaconOptions();
+
                 final String beaconNamingRecordPList = beaconData.getBeaconNamingRecord().content;
                 final String ownedBeaconPList = beaconData.getOwnedBeaconInfo().content;
 
@@ -110,8 +113,8 @@ public final class BeaconDataParser {
                         // BeaconNamingRecord
                         .beaconId(associatedBeacon)
                         .namingRecordId(beaconNamingRecordIdentifier)
-                        .emoji(emoji)
-                        .name(name)
+                        .originalEmoji(emoji)
+                        .originalName(name)
                         // BeaconNamingRecord->cloudKitMetadata
                         .namingRecordModifiedTime(
                                 metaData.map(BeaconNamingRecordCloudKitMetadata::getModifiedTime).orElse(null))
@@ -127,9 +130,15 @@ public final class BeaconDataParser {
                         .stableIdentifier(List.of(stableIdentifier))
                         .systemVersion(systemVersion)
                         .vendorId(vendorId)
-                        .ownedBeaconPlistRaw(ownedBeaconPList)
-                        .build();
-                res.add(extractedData);
+                        .ownedBeaconPlistRaw(ownedBeaconPList);
+
+                if (userOverrides != null) {
+                    // configure user overrides too
+                    extractedData.userOverrideName(userOverrides.uiName)
+                            .userOverrideEmoji(userOverrides.uiEmoji);
+                }
+
+                res.add(extractedData.build());
             }
 
             return res;

@@ -1,7 +1,6 @@
 package dev.wander.android.opentagviewer;
 
 import static android.view.View.GONE;
-import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
@@ -51,7 +50,6 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -536,7 +534,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     }
 
     private String getCurrentBeaconName() {
-        if (this.beaconInformation.getEmoji() != null && !this.beaconInformation.getEmoji().isBlank()) {
+        if (this.beaconInformation.isEmojiFilled()) {
             return String.format("%s %s", this.beaconInformation.getEmoji(), this.beaconInformation.getName());
         }
         if (this.beaconInformation.getName() != null && !this.beaconInformation.getName().isBlank()) {

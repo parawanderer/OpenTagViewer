@@ -247,7 +247,6 @@ public class SettingsActivity extends AppCompatActivity {
     private void onClickEditAnisetteServerUrl() {
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
 
-
         CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(view.getContext(), /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
         final IndeterminateDrawable<CircularProgressIndicatorSpec> progressIndicatorDrawable = IndeterminateDrawable.createCircularDrawable(view.getContext(), spec);
 

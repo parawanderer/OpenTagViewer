@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 @Getter
@@ -33,16 +34,16 @@ public class BeaconInformation {
      * <br><br>
      * Sourced from: {@code BeaconNamingRecord/<beacon-identifier>/<some-id>.plist}
      */
-    private final String emoji;
+    private final String originalEmoji;
     /**
      * The name set up for the beacon.
-     * This MAY be optional, not sure but probably more likely to be present than {@link #getEmoji()}.
+     * This MAY be optional, not sure but probably more likely to be present than {@link #getOriginalEmoji()}.
      * This can be configured using apple devices
      * (e.g. using an iPad you can set a custom name for your beacon)
      * <br><br>
      * Sourced from: {@code BeaconNamingRecord/<beacon-identifier>/<some-id>.plist}
      */
-    private final String name;
+    private final String originalName;
     /**
      * Creation time of the BeaconNamingRecord. May be {@code null} on failure to parse the inner node.
      * <br><br>
@@ -157,6 +158,32 @@ public class BeaconInformation {
      * Sourced from the primary file: {@code OwnedBeacons/<beacon identifier>.plist}
      */
     private final int vendorId;
+
+    /**
+     * User can use this to override the name in the UI
+     */
+    @Setter
+    private String userOverrideName;
+    /**
+     * User can use this to override the emoji in the UI
+     */
+    @Setter
+    private String userOverrideEmoji;
+
+
+    public String getName() {
+        return Optional.ofNullable(this.userOverrideName).orElse(this.originalName);
+    }
+
+    public String getEmoji() {
+        return Optional.ofNullable(this.userOverrideEmoji).orElse(this.originalEmoji);
+    }
+
+    public boolean isEmojiFilled() {
+        var emoji = this.getEmoji();
+        return emoji != null && !emoji.isBlank();
+    }
+
 
     /**
      * Disclaimer: not clear if this is exhaustive enough of a check, but it might be

@@ -108,6 +108,10 @@ dependencies {
     implementation(libs.google.cronet.retrofit)
     implementation(libs.google.play.location)
     implementation(libs.google.places)
+    implementation(libs.androidx.emoji)
+    implementation(libs.androidx.emoji.views)
+    implementation(libs.androidx.emoji.views.helper)
+    implementation(libs.androidx.emoji.picker)
 
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)

@@ -2,26 +2,46 @@ package dev.wander.android.opentagviewer;
 
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
+import static android.view.View.inflate;
 import static android.widget.Toast.LENGTH_LONG;
 
+import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
+
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.DataBindingUtil;
+import androidx.emoji2.emojipicker.EmojiPickerView;
+import androidx.emoji2.emojipicker.EmojiViewItem;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -36,6 +56,7 @@ import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.AirTag4AllDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
+import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
@@ -54,8 +75,12 @@ public class DeviceInfoActivity extends AppCompatActivity {
     private BeaconData beaconData;
     private BeaconInformation beaconInformation;
     private @NonNull Import importData;
-
     private UserSettings userSettings;
+    private EmojiPickerView emojiPickerView;
+    private Button currentIconButton;
+    private ActivityDeviceInfoBinding binding;
+
+    private boolean hasNameChanges = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,12 +108,16 @@ public class DeviceInfoActivity extends AppCompatActivity {
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
         this.importData = this.beaconRepo.getImportById(this.beaconData.getOwnedBeaconInfo().importId).blockingFirst().orElseThrow();
 
-        ActivityDeviceInfoBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
-        binding.setHandleClickBack(this::finish);
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
+        binding.setHandleClickBack(this::handleEndActivity);
         binding.setHandleClickMenu(this::handleClickMenu);
+        binding.setClickItemHandler(() -> Log.d(TAG, "Some device info item was clicked"));
 
         binding.setPageTitle(this.getDeviceNameForTitle());
         binding.setDeviceName(this.beaconInformation.getName());
+        binding.setOnClickDeviceName(this::handleEditDeviceName);
+        binding.setOnClickDeviceEmoji(this::handleEditDeviceEmoji);
+
         binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
         binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
         binding.setExportedBy(this.importData.sourceUser);
@@ -98,6 +127,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 : this.getString(R.string.unknown));
 
         // debug info
+        binding.setDeviceNameOriginal(this.beaconInformation.getOriginalName());
+        binding.setDeviceEmojiOriginal(this.beaconInformation.getOriginalEmoji());
         binding.setBeaconId(this.beaconInformation.getBeaconId());
         binding.setNamingRecordId(this.beaconInformation.getNamingRecordId());
 
@@ -127,15 +158,207 @@ public class DeviceInfoActivity extends AppCompatActivity {
             debugData.setVisibility(GONE);
         }
 
+        currentIconButton = this.findViewById(R.id.pick_icon_button);
+        this.visualiseDeviceEmoji();
+
+        var longClickToClipboardFields = List.of(
+                // always visible info:
+                R.id.device_settings_exported_by,
+                R.id.device_settings_exported_at,
+                R.id.device_settings_imported_at,
+                R.id.device_settings_device_type,
+                // debug info:
+                R.id.settings_debug_device_name_original,
+                R.id.settings_debug_device_emoji_original,
+                R.id.settings_debug_beacon_id,
+                R.id.settings_debug_naming_record_id,
+                R.id.settings_debug_naming_record_create_time,
+                R.id.settings_debug_naming_record_modify_time,
+                R.id.settings_debug_naming_record_modified_by,
+                R.id.settings_debug_naming_record_battery_level,
+                R.id.settings_debug_naming_record_device_model,
+                R.id.settings_debug_naming_record_pairing_date,
+                R.id.settings_debug_naming_record_product_id,
+                R.id.settings_debug_naming_record_system_version,
+                R.id.settings_debug_naming_record_vendor_id
+        );
+
+        ClipboardManager clipboard = (ClipboardManager)
+                getSystemService(Context.CLIPBOARD_SERVICE);
+
+        longClickToClipboardFields.forEach(id -> {
+            View container = this.findViewById(id);
+            TextView title = container.findViewById(R.id.settings_clickable_item_title);
+            TextView content = container.findViewById(R.id.settings_clickable_item_content);
+
+            container.setOnLongClickListener(v -> {
+                Log.d(TAG, "Long clicked element: " + title.getText());
+
+                final String fieldTitle = title.getText().toString();
+                final String fieldContent = content.getText().toString();
+
+                ClipData clip = ClipData.newPlainText(fieldTitle, fieldContent);
+                clipboard.setPrimaryClip(clip);
+                return true;
+            });
+        });
+
+        this.emojiPickerView = this.findViewById(R.id.emoji_picker);
+        emojiPickerView.setOnEmojiPickedListener(this::handleEmojiIsPicked);
+
+        ConstraintLayout emojiPicker = this.findViewById(R.id.emoji_picker_layout);
+        emojiPicker.setOnClickListener((view) -> this.hideEmojiMenu());
+
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
         }
 
-        // TODO: users should be able to rename and change the emojis of their icons.
+        this.getOnBackPressedDispatcher().addCallback(new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleEndActivity();
+            }
+        });
+    }
+
+    private void handleEndActivity() {
+        if (this.hasNameChanges) {
+            Intent data = new Intent();
+            data.putExtra("deviceWasChanged", this.beaconId);
+            setResult(RESULT_OK, data);
+        }
+
+        this.finish();
+    }
+
+    private void visualiseDeviceEmoji() {
+        if (this.beaconInformation.isEmojiFilled()) {
+            currentIconButton.setText(this.beaconInformation.getEmoji());
+            ((MaterialButton)currentIconButton).setIcon(null);
+        } else {
+            currentIconButton.setText(null);
+            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(this, R.drawable.apple));
+        }
+    }
+
+    private void handleEditDeviceName() {
+        View view = inflate(this, R.layout.edit_device_name_dialog, null);
+        TextInputEditText textInput = view.findViewById(R.id.device_name_input);
+        textInput.setText(this.beaconInformation.getName());
+
+        var builder = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.device_name)
+                .setIcon(R.drawable.edit_24px)
+                .setView(view)
+                .setPositiveButton(R.string.confirm, (dialog, which) -> {
+                    Log.d(TAG, "Clicked to confirm device name change to: " + textInput.getText());
+                    this.saveUpdatedDeviceName(Objects.requireNonNull(textInput.getText()).toString());
+                }).setNegativeButton(R.string.cancel, null);
+
+        var dialog = builder.show();
+
+        Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+
+        textInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
+            // disable positive button when input is empty
+            final String userNameInput = s.toString();
+            positiveButton.setEnabled(!userNameInput.isBlank());
+        }));
+    }
+
+    private void saveUpdatedDeviceName(final String newDeviceName) {
+        final String oldDeviceName = this.beaconInformation.getName();
+
+        if (oldDeviceName.equals(newDeviceName)) return; // nothing to do, no change
+
+        this.beaconInformation.setUserOverrideName(newDeviceName);
+        // save changes...
+        var async = this.beaconRepo.storeUserBeaconOptions(new UserBeaconOptions(
+                this.beaconId,
+                System.currentTimeMillis(),
+                this.beaconInformation.getUserOverrideName(),
+                this.beaconInformation.getUserOverrideEmoji()
+        )).observeOn(AndroidSchedulers.mainThread())
+        .subscribe(() -> {
+                Log.d(TAG, "Successfully updated UI-facing device name for beaconId=" + this.beaconId);
+                this.hasNameChanges = true;
+                this.binding.setDeviceName(this.beaconInformation.getName());
+                binding.setPageTitle(this.getDeviceNameForTitle());
+            },
+            error -> Log.e(TAG, "Error occurred while trying to update user-facing device name for beaconId=" + this.beaconId, error));
+    }
+
+    private void handleEditDeviceEmoji() {
+        ConstraintLayout emojiPicker = this.findViewById(R.id.emoji_picker_layout);
+        emojiPicker.setVisibility(VISIBLE);
+        emojiPicker.setClickable(false); // temp
+
+        FrameLayout inner = emojiPicker.findViewById(R.id.emoji_picker_container);
+
+        float pixels = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                480f,
+                this.getResources().getDisplayMetrics()
+        );
+
+        inner.animate()
+                .translationY(-pixels)
+                .withEndAction(() -> {
+                    Log.d(TAG, "Emoji menu was shown!");
+                    emojiPicker.setClickable(true); // undo
+                })
+                .start();
+    }
+
+    private void handleEmojiIsPicked(EmojiViewItem emojiViewItem) {
+        final String newEmoji = emojiViewItem.getEmoji();
+        Log.d(TAG, "New emoji was picked: " + newEmoji);
+        this.hideEmojiMenu();
+
+        final String oldEmoji = this.beaconInformation.getEmoji();
+        if (oldEmoji != null && oldEmoji.equals(newEmoji)) return; // nothing to do, no change
+
+        this.beaconInformation.setUserOverrideEmoji(newEmoji);
+
+        // save changes
+        var async = this.beaconRepo.storeUserBeaconOptions(new UserBeaconOptions(
+                this.beaconId,
+                System.currentTimeMillis(),
+                this.beaconInformation.getUserOverrideName(),
+                this.beaconInformation.getUserOverrideEmoji()
+        )).observeOn(AndroidSchedulers.mainThread())
+        .subscribe(() -> {
+                    Log.d(TAG, "Successfully updated UI-facing device emoji for beaconId=" + this.beaconId);
+                    this.hasNameChanges = true;
+                    this.visualiseDeviceEmoji();
+                    binding.setPageTitle(this.getDeviceNameForTitle());
+                },
+                error -> Log.e(TAG, "Error occurred while trying to update user-facing device emoji for beaconId=" + this.beaconId, error));
+    }
+
+    private void hideEmojiMenu() {
+        final ConstraintLayout emojiPicker = this.findViewById(R.id.emoji_picker_layout);
+        final FrameLayout inner = emojiPicker.findViewById(R.id.emoji_picker_container);
+        emojiPicker.setClickable(false); // temp
+
+        float pixels = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                480f,
+                this.getResources().getDisplayMetrics()
+        );
+
+        inner.animate()
+                .translationY(pixels)
+                .withEndAction(() -> {
+                    Log.d(TAG, "Emoji menu was hidden. Now hiding outer container for it.");
+                    emojiPicker.setClickable(false); // undo
+                    emojiPicker.setVisibility(GONE);
+                })
+                .start();
     }
 
     private String getDeviceNameForTitle() {
-        if (this.beaconInformation.getEmoji() != null && !this.beaconInformation.getEmoji().isBlank()) {
+        if (this.beaconInformation.isEmojiFilled()) {
             return String.format("%s %s", this.beaconInformation.getEmoji(), this.beaconInformation.getName());
         }
         return this.beaconInformation.getName();

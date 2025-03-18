@@ -18,6 +18,7 @@ import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.core.Completable;
@@ -76,8 +77,9 @@ public class BeaconRepository {
             try {
                 List<OwnedBeacon> ownedBeacons = db.ownedBeaconDao().getAll();
                 List<BeaconNamingRecord> beaconNamingRecords = db.beaconNamingRecordDao().getAll();
+                List<UserBeaconOptions> userBeaconOptions = db.userBeaconOptionsDao().getAll();
 
-                return BeaconCombinerUtil.combine(ownedBeacons, beaconNamingRecords);
+                return BeaconCombinerUtil.combine(ownedBeacons, beaconNamingRecords, userBeaconOptions);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error occurred when trying to retrieve all beacons from repository", e);
@@ -86,15 +88,33 @@ public class BeaconRepository {
         }).subscribeOn(Schedulers.io());
     }
 
+    public Completable storeUserBeaconOptions(UserBeaconOptions userOptions) {
+        return Completable.fromRunnable(() -> {
+            try {
+                this.db.userBeaconOptionsDao().insertAll(userOptions);
+            } catch (Exception e) {
+                Log.e(TAG, "Error occurred when trying to insert user options for beaconId="+userOptions.beaconId, e);
+                throw new RepoQueryException(e);
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
     public Observable<BeaconData> getById(final String beaconId) {
         return Observable.fromCallable(() -> {
             OwnedBeacon ownedBeacon = db.ownedBeaconDao().getById(beaconId);
+
+            if (ownedBeacon == null) {
+                return null;
+            }
+
             BeaconNamingRecord namingRecord = db.beaconNamingRecordDao().getByBeaconId(beaconId);
+            UserBeaconOptions userBeaconOptions = db.userBeaconOptionsDao().getById(beaconId);
 
             return new BeaconData(
                     ownedBeacon.id,
                     ownedBeacon,
-                    namingRecord
+                    namingRecord,
+                    userBeaconOptions
             );
         }).subscribeOn(Schedulers.io());
     }

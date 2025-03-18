@@ -84,7 +84,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
         final String beaconId = beacon.getBeaconId();
 
         viewHolder.getDeviceName().setText(beacon.getName());
-        if (beacon.getEmoji() != null && !beacon.getEmoji().isBlank()) {
+        if (beacon.isEmojiFilled()) {
             viewHolder.getItemEmoji().setText(beacon.getEmoji());
             viewHolder.getItemEmoji().setVisibility(VISIBLE);
             viewHolder.getItemImage().setVisibility(GONE);

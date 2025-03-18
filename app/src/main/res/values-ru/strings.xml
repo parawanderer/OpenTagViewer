@@ -81,4 +81,8 @@
     <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Вы уверены, что хотите удалить это устройство? После удаления его нужно будет импортировать заново, чтобы вернуть обратно.</string>
     <string name="confirm">Подтвердить</string>
     <string name="anisette_url_change_warning">При изменении URL-адреса Anisette вам придется повторно войти на сервер Anisette. Подтверждение этого изменения приведет вас на страницу входа.</string>
+    <string name="device_icon">Значок устройства</string>
+    <string name="device_settings">Настройки устройства</string>
+    <string name="device_information">Информация об устройстве</string>
+    <string name="copied_x_to_clipboard">Скопировано «%1$s» в буфер обмена</string>
 </resources>

@@ -81,4 +81,8 @@
     <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Êtes-vous sûr de vouloir supprimer cet appareil ? Une fois supprimé, il devra être réimporté pour le récupérer.</string>
     <string name="confirm">Confirmer</string>
     <string name="anisette_url_change_warning">Lorsque vous modifiez votre URL Anisette, vous devrez vous reconnecter au serveur Anisette. Confirmer cette modification vous redirigera vers la page de connexion.</string>
+    <string name="device_icon">Icône de l\'appareil</string>
+    <string name="device_settings">Paramètres de l\'appareil</string>
+    <string name="device_information">Informations sur l\'appareil</string>
+    <string name="copied_x_to_clipboard">Copié «%1$s» dans le presse-papiers</string>
 </resources>

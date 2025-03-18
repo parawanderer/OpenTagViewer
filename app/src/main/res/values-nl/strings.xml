@@ -81,4 +81,8 @@
     <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Weet u zeker dat u dit apparaat wilt verwijderen? Nadat het is verwijderd, moet het opnieuw worden geïmporteerd om het terug te krijgen.</string>
     <string name="confirm">Bevestigen</string>
     <string name="anisette_url_change_warning">Wanneer u uw Anisette URL wijzigt, moet u opnieuw inloggen op de Anisette server. Door deze wijziging te bevestigen, komt u op de login pagina.</string>
+    <string name="device_icon">Apparaaticoon</string>
+    <string name="device_settings">Apparaatinstellingen</string>
+    <string name="device_information">Apparaatinformatie</string>
+    <string name="copied_x_to_clipboard">\'%1$s\' gekopieerd naar klembord</string>
 </resources>

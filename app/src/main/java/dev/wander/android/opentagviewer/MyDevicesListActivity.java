@@ -52,6 +52,9 @@ public class MyDevicesListActivity extends AppCompatActivity {
                     if (data != null && data.getStringExtra("deviceWasRemoved") != null) {
                         this.refreshListOnItemRemoved(data.getStringExtra("deviceWasRemoved"));
                     }
+                    if (data != null && data.getStringExtra("deviceWasChanged") != null) {
+                        this.refreshListOnBeaconChanged(data.getStringExtra("deviceWasChanged"));
+                    }
                 }
             }
     );
@@ -104,6 +107,27 @@ public class MyDevicesListActivity extends AppCompatActivity {
             final int index = removedIndex.getAsInt();
             this.beaconInfo.remove(index);
             deviceListAdaptor.notifyItemRangeRemoved(index, 1);
+        }
+    }
+
+    private void refreshListOnBeaconChanged(final String beaconId) {
+        this.devicesListChanged = true;
+
+        var changedIndex = IntStream.range(0, this.beaconInfo.size())
+                .filter(i -> this.beaconInfo.get(i).getBeaconId().equals(beaconId))
+                .findFirst();
+
+        if (changedIndex.isPresent()) {
+            final int index = changedIndex.getAsInt();
+
+            var async = this.beaconRepo.getById(beaconId)
+                    .flatMap(beacon -> BeaconDataParser.parseAsync(List.of(beacon)))
+                    .map(parsed -> parsed.get(0))
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(newDataForBeacon -> {
+                        this.beaconInfo.set(index, newDataForBeacon);
+                        deviceListAdaptor.notifyItemChanged(index);
+                    }, error -> Log.e(TAG, "Error occurred while querying for updated data for beaconId=" + beaconId, error));
         }
     }
 

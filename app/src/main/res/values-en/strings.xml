@@ -81,4 +81,8 @@
     <string name="are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back">Are you sure you want to remove this device? Once removed, it will need to be re-imported to get it back.</string>
     <string name="confirm">Confirm</string>
     <string name="anisette_url_change_warning">When you change your Anisette URL, you will have to re-login to the Anisette server. Confirming this change will bring you to the login page.</string>
+    <string name="device_icon">Device Icon</string>
+    <string name="device_settings">Device settings</string>
+    <string name="device_information">Device information</string>
+    <string name="copied_x_to_clipboard">Copied \'%1$s\' to clipboard</string>
 </resources>
