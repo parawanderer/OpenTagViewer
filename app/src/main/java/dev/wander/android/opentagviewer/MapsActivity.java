@@ -508,8 +508,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             this.fetchLastReports(beacons.getOwnedBeacons().stream()
                                     .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
                         )
-                        .doOnNext(this::addBeaconLocationsToCurrent)
-                        .flatMap(this.beaconRepo::storeToLocationCache),
+                        .doOnNext(this::addBeaconLocationsToCurrent),
                         storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(beacons)))
                         .doOnNext(this::addBeaconToCurrent),
                         Pair::create
@@ -598,7 +597,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Objects.requireNonNull(this.beacons.get(beaconId)).getInfo().getOwnedBeaconPlistRaw(),
                 1)
                 .doOnNext(this::addBeaconLocationsToCurrent)
-                .flatMap(this.beaconRepo::storeToLocationCache)
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .subscribe(() -> {
                     Log.i(TAG, "Refreshed location data and markers for beaconId=" + beaconId + " on refresh button click");
@@ -711,7 +709,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             this.fetchLastReports(
                     beacons.stream().collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw)))
         ).flatMap(o -> o)
-        .flatMap(this.beaconRepo::storeToLocationCache)
         .doOnNext(this::addBeaconLocationsToCurrent)
         .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
         .subscribe(lastReports -> {
@@ -1045,7 +1042,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         var async = this.fetchLastReports(beacons)
                 .doOnNext(this::addBeaconLocationsToCurrent)
-                .flatMap(this.beaconRepo::storeToLocationCache)
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .subscribe(() -> {
                     Log.d(TAG, "Refreshed location data and markers!");
@@ -1073,17 +1069,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
-                .doOnNext(reports -> this.last24HHistoryFetchAt = now); // on success, update this time.
+                .doOnNext(reports -> this.last24HHistoryFetchAt = now) // on success, update this time.
+                .flatMap(this.beaconRepo::storeToLocationCache);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist, final int hoursToGoBack) {
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack);
+        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
+                .flatMap(this.beaconRepo::storeToLocationCache);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(Map.of(beaconId, pList), hoursToGoBack);
+        return this.appleService.getLastReports(Map.of(beaconId, pList), hoursToGoBack)
+                .flatMap(this.beaconRepo::storeToLocationCache);
     }
 
     private boolean isAppleServiceInitialised() {
