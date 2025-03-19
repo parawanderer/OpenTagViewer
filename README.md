@@ -1,5 +1,33 @@
 # OpenTagViewer
 
+WIP write new introduction
+
+
+## How To Use 📖
+
+### Prerequisites 🤓
+
+1. An Android phone with the `OpenTagViewer` app installed
+2. A (free) [Apple Account](https://account.apple.com/) with 2FA enabled to be via either `SMS` or `Trusted Device`
+3. One or more **AirTags**, which need to be already registered to some Apple account via the `FindMy` app and shared with your account
+4. A Mac or a MacOS Virtual Machine of MacOS version `Sonoma (14)` or lower (only needed once/initially)
+
+### How to view my AirTag on my Phone?!
+
+See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more details:
+
+1. Install the app and log in to your Apple Account
+2. Create an export `.zip` file by following [this wiki guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags)
+3. Import the `.zip` file in the app
+4. Profit: you can now track your AirTags on your Android Phone indefinitely!
+
+
+-----------
+
+TODO: wip clean it up
+
+
+
 My **Heavily WIP** attempt at making AirTag tracking available via a Map-based UI (like that of iOS FindMy or Samsung SmartThings) on Android via this great project: **[FindMy.py](https://github.com/malmeloo/FindMy.py)**
 
 Android (Java) + Python via Chaquopy
