@@ -54,7 +54,7 @@ import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
-import dev.wander.android.opentagviewer.db.room.AirTag4AllDatabase;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
@@ -102,7 +102,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
         this.userSettings = this.userSettingsRepo.getUserSettings();
 
         this.beaconRepo = new BeaconRepository(
-                AirTag4AllDatabase.getInstance(getApplicationContext()));
+                OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);

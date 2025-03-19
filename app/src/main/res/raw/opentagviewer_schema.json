@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Airtag4All Mac Export Airtag Info schema",
-    "description": "This is the schema that defines how AIRTAG4ALL.yml files should look",
+    "title": "OpenTagViewer Mac Export Airtag Info schema",
+    "description": "This is the schema that defines how OPENTAGVIEWER.yml files should look",
     "type": "object",
     "properties": {
         "version": {

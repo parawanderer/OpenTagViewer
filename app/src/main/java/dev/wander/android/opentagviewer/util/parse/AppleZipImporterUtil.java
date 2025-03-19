@@ -62,7 +62,7 @@ public class AppleZipImporterUtil {
     private static final List<String> ALLOWED_FILE_ENDINGS = List.of(".yml", ".plist");
 
     private static final Map<FILE_TYPE, Pattern> MATCHERS = Map.of(
-            FILE_TYPE.EXPORT_INFO, Pattern.compile("^AIRTAG4ALL\\.yml$"),
+            FILE_TYPE.EXPORT_INFO, Pattern.compile("^OPENTAGVIEWER\\.yml$"),
             FILE_TYPE.OWNED_BEACON, Pattern.compile("^OwnedBeacons/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$"),
             FILE_TYPE.BEACON_NAMING_RECORD, Pattern.compile("^BeaconNamingRecord/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$")
     );
@@ -77,7 +77,7 @@ public class AppleZipImporterUtil {
 
     public ImportData extractZip(@NonNull Uri zipFileUri) throws ZipImporterException {
 
-        String airtag4AllYaml = null;
+        String openTagViewerYaml = null;
         Map<String, String> ownedBeacons = new HashMap<>();
         Map<String, Pair<String, String>> beaconNamingRecords = new HashMap<>();
 
@@ -123,7 +123,7 @@ public class AppleZipImporterUtil {
 
                 switch (typeAndRegexGroups.first) {
                     case EXPORT_INFO:
-                        airtag4AllYaml = fileContent;
+                        openTagViewerYaml = fileContent;
                         break;
                     case OWNED_BEACON:
                         ownedBeacons.put(typeAndRegexGroups.second.get(1), fileContent);
@@ -137,12 +137,12 @@ public class AppleZipImporterUtil {
             throw new RuntimeException(e);
         }
 
-        assertAirTag4AllIsValid(airtag4AllYaml);
+        assertOpenTagViewerYamlIsValid(openTagViewerYaml);
         innerJoinBeaconFiles(ownedBeacons, beaconNamingRecords);
 
         // now we can produce the expected data
         return convert(
-          airtag4AllYaml,
+          openTagViewerYaml,
           ownedBeacons,
           beaconNamingRecords
         );
@@ -202,9 +202,9 @@ public class AppleZipImporterUtil {
         }
     }
 
-    private void assertAirTag4AllIsValid(final String content) {
+    private void assertOpenTagViewerYamlIsValid(final String content) {
         if (content == null || content.isBlank()) {
-            throw new ImportFileFormatException("AIRTAG4ALL.yml was empty!");
+            throw new ImportFileFormatException("OPENTAGVIEWER.yml was empty!");
         }
 
         // validate content: see https://github.com/networknt/json-schema-validator
@@ -213,7 +213,7 @@ public class AppleZipImporterUtil {
         SchemaValidatorsConfig config = builder.build();
 
         try (InputStream inputStream = this.appContext.getResources()
-                .openRawResource(R.raw.airtag4all_schema)) {
+                .openRawResource(R.raw.opentagviewer_schema)) {
 
             JsonSchema schema = jsonSchemaFactory.getSchema(inputStream);
             Set<ValidationMessage> assertions = schema.validate(content, InputFormat.YAML, executionContext -> {
@@ -224,7 +224,7 @@ public class AppleZipImporterUtil {
             if (!assertions.isEmpty()) {
                 throw new ImportFileFormatException(
                         String.format(
-                                "AIRTAG4ALL.yml format validation failed: %s",
+                                "OPENTAGVIEWER.yml format validation failed: %s",
                                 assertions.stream()
                                         .filter(a -> !a.isValid())
                                         .map(ValidationMessage::getMessage)
@@ -234,7 +234,7 @@ public class AppleZipImporterUtil {
 
             // OK
         } catch (IOException e) {
-            throw new ImportFileFormatException("AIRTAG4ALL.yml could not be parsed!", e);
+            throw new ImportFileFormatException("OPENTAGVIEWER.yml could not be parsed!", e);
         }
     }
 
@@ -399,7 +399,7 @@ public class AppleZipImporterUtil {
     }
 
     private static Import parseImportInfo(final String importInfo) throws JsonProcessingException {
-        Airtag4AllYamlContent content = YamlParser.MAPPER.readValue(importInfo, Airtag4AllYamlContent.class);
+        OpenTagViewerYamlContent content = YamlParser.MAPPER.readValue(importInfo, OpenTagViewerYamlContent.class);
 
         return Import.builder()
                 .importedAt(System.currentTimeMillis())
@@ -443,7 +443,7 @@ public class AppleZipImporterUtil {
     }
 
     @Data
-    private static final class Airtag4AllYamlContent {
+    private static final class OpenTagViewerYamlContent {
         private String version;
         private long exportTimestamp;
         private String sourceUser;

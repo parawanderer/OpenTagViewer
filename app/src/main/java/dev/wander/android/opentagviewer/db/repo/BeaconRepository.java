@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
-import dev.wander.android.opentagviewer.db.room.AirTag4AllDatabase;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
@@ -28,9 +28,9 @@ import lombok.NonNull;
 
 public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
-    private final AirTag4AllDatabase db;
+    private final OpenTagViewerDatabase db;
 
-    public BeaconRepository(AirTag4AllDatabase db) {
+    public BeaconRepository(OpenTagViewerDatabase db) {
         this.db = db;
     }
 

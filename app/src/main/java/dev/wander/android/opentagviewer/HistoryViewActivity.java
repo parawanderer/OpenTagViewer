@@ -69,7 +69,7 @@ import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
-import dev.wander.android.opentagviewer.db.room.AirTag4AllDatabase;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
@@ -142,7 +142,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.defaultZoom = intent.getFloatExtra("zoom", 16.0f);
 
         this.beaconRepo = new BeaconRepository(
-                AirTag4AllDatabase.getInstance(getApplicationContext()));
+                OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
         this.userSettingsRepo = new UserSettingsRepository(
                 UserSettingsDataStore.getInstance(this.getApplicationContext()));

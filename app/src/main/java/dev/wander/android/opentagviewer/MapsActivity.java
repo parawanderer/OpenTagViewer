@@ -75,7 +75,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.AppleUserData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
-import dev.wander.android.opentagviewer.db.room.AirTag4AllDatabase;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
@@ -239,7 +239,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 new AppCryptographyUtil());
 
         this.beaconRepo = new BeaconRepository(
-                AirTag4AllDatabase.getInstance(getApplicationContext()));
+                OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 

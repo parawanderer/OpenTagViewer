@@ -30,17 +30,17 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
     },
     version = 1
 )
-public abstract class AirTag4AllDatabase extends RoomDatabase {
-    private static AirTag4AllDatabase INSTANCE = null;
+public abstract class OpenTagViewerDatabase extends RoomDatabase {
+    private static OpenTagViewerDatabase INSTANCE = null;
 
-    public static AirTag4AllDatabase getInstance(Context context) {
+    public static OpenTagViewerDatabase getInstance(Context context) {
         // Singleton pattern for single-process apps: https://developer.android.com/training/data-storage/room#java
 
         if (INSTANCE == null) {
             INSTANCE = Room.databaseBuilder(
                     context,
-                    AirTag4AllDatabase.class,
-                    "airtag4all-db")
+                    OpenTagViewerDatabase.class,
+                    "opentagviewer-db")
                     .build();
         }
 
