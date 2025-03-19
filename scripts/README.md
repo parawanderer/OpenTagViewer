@@ -22,4 +22,5 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
     ```bash
     python airtag-decryptor.py
     ```
+    - Note that it will prompt your password twice.
 - The script will open the specified output folder on success
