@@ -109,7 +109,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="492dp"
+            android:layout_height="match_parent"
             android:orientation="vertical"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -188,8 +188,8 @@
                             android:paddingBottom="0dp"
                             android:textSize="34sp"
                             app:icon="@drawable/apple"
-                            app:iconSize="38dp"
                             app:iconGravity="textTop"
+                            app:iconSize="38dp"
                             app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
 
                         <LinearLayout
@@ -282,7 +282,7 @@
                         android:layout_height="match_parent"
                         android:orientation="vertical"
                         android:visibility="gone"
-                        tools:visibility="gone">
+                        tools:visibility="visible">
 
                         <com.google.android.material.divider.MaterialDivider
                             android:layout_width="match_parent"
@@ -428,7 +428,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            tools:visibility="visible">
+            tools:visibility="gone">
 
             <FrameLayout
                 android:id="@+id/emoji_picker_container"
