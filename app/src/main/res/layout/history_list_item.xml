@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    tools:visibility="visible">
 
     <LinearLayout
         android:id="@+id/history_item_clickable_container"
@@ -10,28 +12,45 @@
         android:layout_height="match_parent"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
+        android:gravity="center"
         android:orientation="horizontal"
-        android:paddingLeft="22dp"
-        android:paddingTop="12dp"
-        android:paddingRight="22dp"
-        android:paddingBottom="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp">
+
+            <ImageView
+                android:id="@+id/location_history_tile"
+                android:layout_width="22dp"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/pin_drop_tile_empty_filled"
+                android:visibility="visible"
+                tools:visibility="visible" />
+        </FrameLayout>
+
         <LinearLayout
             android:id="@+id/history_text_container"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="12dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="12dp">
 
             <TextView
                 android:id="@+id/history_item_location_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_bold"
-                android:text="Location Name Placeholder" />
+                android:text="Location Name Placeholder"
+                tools:text="Blahblahpoort 123, 1234 AB, LongCityName, TheCountry" />
 
             <TextView
                 android:id="@+id/history_item_location_detail"
@@ -40,7 +59,8 @@
                 android:text="Extra data"
                 android:textColor="@color/md_theme_outline"
                 android:textSize="12sp"
-                android:visibility="gone" />
+                android:visibility="gone"
+                tools:visibility="gone" />
 
             <TextView
                 android:id="@+id/history_item_location_time"

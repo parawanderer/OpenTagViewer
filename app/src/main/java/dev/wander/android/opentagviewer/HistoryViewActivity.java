@@ -13,7 +13,6 @@ import android.location.Geocoder;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.Log;
-import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -53,10 +52,12 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -113,7 +114,9 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private BeaconInformation beaconInformation;
 
-    private List<BeaconLocationReport> locations = new ArrayList<>();
+    private final List<BeaconLocationReport> locations = new ArrayList<>();
+
+    private final Set<Integer> selectedItems = new HashSet<>();
 
     private HistoryItemsAdapter historyItemsAdapter;
 
@@ -124,9 +127,13 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private Polyline currentHistoryLine = null;
     private Marker singleCoordMarker = null;
 
-    Button moveLeftButton;
-    Button moveRightButton;
-    Button datePickerButton;
+    private Button moveLeftButton;
+    private Button moveRightButton;
+    private Button datePickerButton;
+
+    private boolean overrideMapPadding = false;
+
+    private BottomSheetBehavior<View> bottomSheetBehavior;
 
 
     @Override
@@ -170,10 +177,18 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         content.addView(getLayoutInflater().inflate(R.layout.view_history_bottom_sheet, content, false));
         this.setupBottomSheet();
 
-        this.historyItemsAdapter = new HistoryItemsAdapter(this.geocoder, this.locations, this.userSettings, this::handleOnClickHistoryListItem);
+        this.historyItemsAdapter = new HistoryItemsAdapter(
+                this.getResources(),
+                this.geocoder,
+                this.locations,
+                this.userSettings,
+                this.selectedItems,
+                this::handleOnClickHistoryListItem
+        );
         RecyclerView recyclerView = findViewById(R.id.recycler_view_history_items);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(this.historyItemsAdapter);
+        recyclerView.setItemAnimator(null);
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -412,7 +427,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         View bottomSheetChildView = this.findViewById(R.id.view_history_bottom_sheet_layout);
         ViewGroup.LayoutParams params = bottomSheetChildView.getLayoutParams();
-        BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
+        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
         if (params != null) {
             params.height = MATCH_PARENT;
             bottomSheetChildView.setLayoutParams(params);
@@ -424,6 +439,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
                 if (map == null) return;
+                if (!overrideMapPadding) return;
 
                 if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
                     // when fully expanded then pretend it's not expanded for now
@@ -437,6 +453,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
                 if (map == null) return;
+                if (!overrideMapPadding) return;
 
                 int height = bottomSheet.getHeight();
                 int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * slideOffset) + bottomSheetBehavior.getPeekHeight();
@@ -562,7 +579,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
         if (!coords.isEmpty()) {
             if (coords.size() == 1) {
-                this.animateCameraToPos(coords.get(0), SINGLE_MARKER_ZOOM);
+                this.animateCameraToPos(coords.get(0), SINGLE_MARKER_ZOOM, null);
             } else {
                 var bounds = this.determineBoundsForCurrent();
                 this.animateCameraToBoundingBox(bounds, FOCUS_PADDING);
@@ -618,9 +635,19 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         }
     }
 
-    private void handleOnClickHistoryListItem(final Pair<BeaconLocationReport, String> clickedReportAndLocationName) {
-        final BeaconLocationReport clickedReport = clickedReportAndLocationName.first;
-        final String locationName = clickedReportAndLocationName.second;
+    private void handleOnClickHistoryListItem(final HistoryItemsAdapter.ClickedItemInfo clickedReportAndLocationName) {
+        final BeaconLocationReport clickedReport = clickedReportAndLocationName.getBeaconLocationReport();
+        final String locationName = clickedReportAndLocationName.getGeocodedLocationName();
+        final int index = clickedReportAndLocationName.getIndex();
+
+        // update left-side icon in UI
+        for (var oldIndex : this.selectedItems) {
+            this.historyItemsAdapter.notifyItemChanged(oldIndex);
+        }
+        this.selectedItems.clear();
+        this.selectedItems.add(index);
+        this.historyItemsAdapter.notifyItemChanged(index);
+
 
         if (this.locations.size() <= 1) {
             Log.d(TAG, "Can't draw single coord marker when <= 1 items! Skipping...");
@@ -632,19 +659,23 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             this.singleCoordMarker.remove();
         }
 
+        final boolean sheetIsFullyExpanded = bottomSheetBehavior.getState() == STATE_EXPANDED;
+
         // replace with new
         var pos = new LatLng(clickedReport.getLatitude(), clickedReport.getLongitude());
         var markerOptions = new MarkerOptions().position(pos).title(locationName);
 
         this.singleCoordMarker = this.map.addMarker(markerOptions);
 
-        View bottomSheetChildView = this.findViewById(R.id.view_history_bottom_sheet_layout);
-        BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetChildView);
-
-        // open the sheet
-        this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM);
-        if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
+        if (sheetIsFullyExpanded) {
+            this.overrideMapPadding = true;
+            this.map.setPadding(0, 0, 0, bottomSheetBehavior.getPeekHeight());
+            this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM, () -> {
+                this.overrideMapPadding = false;
+            });
             bottomSheetBehavior.setState(STATE_HALF_EXPANDED);
+        } else {
+            this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM, null);
         }
     }
 
@@ -652,11 +683,18 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, padding));
     }
 
-    private void moveCameraToPos(final LatLng pos, float zoom) {
-        this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
-    }
 
-    private void animateCameraToPos(final LatLng pos, float zoom) {
-        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+    private void animateCameraToPos(final LatLng pos, float zoom, Runnable onFinished) {
+        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom), new GoogleMap.CancelableCallback() {
+            @Override
+            public void onCancel() {
+                if (onFinished != null) onFinished.run();
+            }
+
+            @Override
+            public void onFinish() {
+                if (onFinished != null) onFinished.run();
+            }
+        });
     }
 }
