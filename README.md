@@ -2,6 +2,13 @@
 
 WIP write new introduction
 
+The apparently first Android App to allow you to view/track your AirTags
+
+## Features ⭐
+
+- View current "live" location of your AirTags on Android
+- Track historical locations of your AirTags (a feature notably missing from the iOS FindMy apps!)
+
 
 ## How To Use 📖
 
