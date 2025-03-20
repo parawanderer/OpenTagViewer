@@ -24,13 +24,13 @@ from airtag_decryptor import (
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
+VERSION = "1.0.1"
 
-APP_TITLE = "OpenTagViewer AirTag Exporter"
+APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
+
 DROPDOWN_DESCRIPTION = "Choose devices to export:"
 GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
 GITHUB_EXPORT_AIRTAGS_WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
-
-VERSION = "1.0.0"
 
 EXPORT_METADATA_FILENAME = "OPENTAGVIEWER.yml"
 EXPORT_METADATA_VERSION = "0.0.1"
