@@ -10,7 +10,7 @@
     <string name="do_import">Importieren</string>
     <string name="information">Information</string>
     <string name="last_updated_x">Letzte Änderung: %1$s</string>
-    <string name="location_history">Standortverlauf</string>
+    <string name="location_history">Standort\n-verlauf</string>
     <string name="refresh">Auffrischen</string>
     <string name="do_ring">Klingeln</string>
     <string name="more">Mehr</string>

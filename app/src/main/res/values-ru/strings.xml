@@ -10,7 +10,7 @@
     <string name="do_import">Импорт</string>
     <string name="information">Информация</string>
     <string name="last_updated_x">Последнее обновление: %1$s</string>
-    <string name="location_history">История Местоположений</string>
+    <string name="location_history">История Мест</string>
     <string name="refresh">Обновить</string>
     <string name="do_ring">Звенеть</string>
     <string name="more">Более</string>

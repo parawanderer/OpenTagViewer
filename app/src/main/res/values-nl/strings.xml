@@ -10,7 +10,7 @@
     <string name="do_import">Importeren</string>
     <string name="information">Informatie</string>
     <string name="last_updated_x">Laatste Update: %1$s</string>
-    <string name="location_history">Locatiegeschiedenis</string>
+    <string name="location_history">Locatie-\ngeschiedenis</string>
     <string name="refresh">Vernieuwen</string>
     <string name="do_ring">Bellen</string>
     <string name="more">Meer</string>

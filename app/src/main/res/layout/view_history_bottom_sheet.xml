@@ -108,8 +108,7 @@
                 android:layout_height="wrap_content"
                 android:singleLine="true"
                 android:text="@string/x_data_points"
-                android:textSize="12sp"
-                tools:text="456 data points" />
+                android:textSize="12sp" />
         </LinearLayout>
 
         <com.google.android.material.divider.MaterialDivider
