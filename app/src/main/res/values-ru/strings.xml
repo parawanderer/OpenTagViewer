@@ -85,4 +85,5 @@
     <string name="device_settings">Настройки устройства</string>
     <string name="device_information">Информация об устройстве</string>
     <string name="copied_x_to_clipboard">Скопировано «%1$s» в буфер обмена</string>
+    <string name="app_wiki">Wiki приложения</string>
 </resources>

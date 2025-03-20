@@ -85,4 +85,5 @@
     <string name="device_settings">Apparaatinstellingen</string>
     <string name="device_information">Apparaatinformatie</string>
     <string name="copied_x_to_clipboard">\'%1$s\' gekopieerd naar klembord</string>
+    <string name="app_wiki">Wiki van de app</string>
 </resources>

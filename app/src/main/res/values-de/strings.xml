@@ -85,4 +85,5 @@
     <string name="device_settings">Geräteeinstellungen</string>
     <string name="device_information">Geräteinformationen</string>
     <string name="copied_x_to_clipboard">\'%1$s\' in die Zwischenablage kopiert</string>
+    <string name="app_wiki">App Wiki</string>
 </resources>

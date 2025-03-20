@@ -85,4 +85,5 @@
     <string name="device_settings">Paramètres de l\'appareil</string>
     <string name="device_information">Informations sur l\'appareil</string>
     <string name="copied_x_to_clipboard">Copié «%1$s» dans le presse-papiers</string>
+    <string name="app_wiki">Wiki de l\'application</string>
 </resources>

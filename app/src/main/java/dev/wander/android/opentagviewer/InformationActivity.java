@@ -68,6 +68,20 @@ public class InformationActivity extends AppCompatActivity {
         }
     }
 
+    public void onClickWiki(View view) {
+        Log.d(TAG, "Clicked App Wiki button");
+
+        var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        assert properties != null;
+        final String projectGithub = properties.getProperty("projectWiki");
+
+        Uri devSite = Uri.parse(projectGithub);
+        Intent intent = new Intent(Intent.ACTION_VIEW, devSite);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            this.startActivity(intent);
+        }
+    }
+
     public void onClickGithub(View view) {
         Log.d(TAG, "Clicked Github button");
 

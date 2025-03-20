@@ -85,4 +85,5 @@
     <string name="device_settings">Device settings</string>
     <string name="device_information">Device information</string>
     <string name="copied_x_to_clipboard">Copied \'%1$s\' to clipboard</string>
+    <string name="app_wiki">App Wiki</string>
 </resources>

@@ -115,4 +115,5 @@
     <string name="copied_x_to_clipboard">Copied \'%1$s\' to clipboard</string>
     <string name="debug_device_name" translatable="false">Device Name (original)</string>
     <string name="debug_device_emoji" translatable="false">Device Emoji (original)</string>
+    <string name="app_wiki">App Wiki</string>
 </resources>
