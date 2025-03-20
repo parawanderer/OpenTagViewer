@@ -382,6 +382,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         if (oldNumItems > 0) {
             // cleanup old items
             this.locations.clear();
+            this.selectedItems.clear();
             this.historyItemsAdapter.notifyItemRangeRemoved(0, oldNumItems);
         }
 
@@ -439,7 +440,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
                 if (map == null) return;
-                if (!overrideMapPadding) return;
+                if (overrideMapPadding) return;
 
                 if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
                     // when fully expanded then pretend it's not expanded for now
@@ -453,7 +454,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
                 if (map == null) return;
-                if (!overrideMapPadding) return;
+                if (overrideMapPadding) return;
 
                 int height = bottomSheet.getHeight();
                 int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * slideOffset) + bottomSheetBehavior.getPeekHeight();
@@ -671,6 +672,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
             this.overrideMapPadding = true;
             this.map.setPadding(0, 0, 0, bottomSheetBehavior.getPeekHeight());
             this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM, () -> {
+                Log.d(TAG, "Undoing overrideMapPadding override!");
                 this.overrideMapPadding = false;
             });
             bottomSheetBehavior.setState(STATE_HALF_EXPANDED);

@@ -4,6 +4,7 @@ import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
 import android.content.res.Resources;
+import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Geocoder;
 import android.text.format.DateFormat;
@@ -121,11 +122,20 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
             viewHolder.getLocationDetail().setVisibility(GONE);
         }
 
-        if (this.selectedItems.contains(position)) {
-            viewHolder.getLocationHistoryTile().setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.pin_drop_tile_pin_filled, null));
+        Drawable tile;
+        if (position < this.locations.size() - 1) {
+            tile = ResourcesCompat.getDrawable(resources,
+                    this.selectedItems.contains(position) ? R.drawable.pin_drop_tile_pin_filled
+                        : R.drawable.pin_drop_tile_empty_filled,
+                    null);
         } else {
-            viewHolder.getLocationHistoryTile().setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.pin_drop_tile_empty_filled, null));
+            // last item gets special icon tile
+            tile = ResourcesCompat.getDrawable(resources,
+                    this.selectedItems.contains(position) ? R.drawable.pin_drop_tile_pin_filled_bottom
+                            : R.drawable.pin_drop_tile_empty_filled_bottom,
+                    null);
         }
+        viewHolder.getLocationHistoryTile().setImageDrawable(tile);
 
         var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss");
         var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());
