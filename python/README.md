@@ -1,14 +1,16 @@
-# 🧙 OpenTagViewer MacOS Tag Export Wizard
+# 🧙 OpenTagViewer MacOS AirTag Export Wizard
 
-This is a very simple GUI-based utility that allows users to select which AirTags to export files for, to be able to then import them in the OpenTagViewer UI
+A very simple GUI-based utility that allows users to select which AirTags to export `.plist` files for, 
+to be able to then import them in the OpenTagViewer Android App.
 
-The UI will generally show you the most recent names for your devices, that can be set using the FindMy app on MacOS or iOS devices.
-The UI is pretty plain looking, but ideally this only needs to be used very rarely! 😀
+The wizard will generally show you the most recent names for your devices.
+These names can be set using the FindMy app on MacOS or iOS devices.
 
-Get the latest version of it [here](https://github.com/parawanderer/OpenTagViewer/releases)
+The UI is pretty plain looking, but ideally this tool only needs to be used once/rarely! 😀
+
+Get the latest version of it [here](https://github.com/parawanderer/OpenTagViewer/releases?q=macos-exporter&expanded=true)
 
 ![Preview of the OpenTagViewer Airtag Export Wizard runnig on MacOS 14](./assets/app_preview.png)
-
 
 
 

@@ -4,6 +4,7 @@ import tempfile
 import time
 import yaml
 import shlex
+import webbrowser
 from zipfile import ZipFile
 import tkinter as tk
 from tkinter import NSEW, ttk
@@ -26,7 +27,8 @@ from airtag_decryptor import (
 
 APP_TITLE = "OpenTagViewer AirTag Exporter"
 DROPDOWN_DESCRIPTION = "Choose devices to export:"
-GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues"
+GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
+GITHUB_EXPORT_AIRTAGS_WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
 
 VERSION = "1.0.0"
 
@@ -69,10 +71,10 @@ class WizardApp(tk.Tk):
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
 
-        self.label = tk.Label(self.container, text=DROPDOWN_DESCRIPTION, font=("Arial", 12))
+        self.label = tk.Label(self.container, text=DROPDOWN_DESCRIPTION, font=("Arial", 11))
         self.label.grid(row=0, column=0, columnspan=3, sticky=NSEW, pady=2)
 
-        self.beacon_data: dict[str, BeaconData] = self._create_beacon_data_map()
+        self.beacon_data: dict[str, BeaconData] = self._retrieve_beacon_data()
 
         self.choices_select = tk.Listbox(
             self.container,
@@ -83,17 +85,46 @@ class WizardApp(tk.Tk):
         self.options.sort()
 
         self.choices_select.insert(1, *self.options)
-        self.choices_select.grid(row=1, column=0, columnspan=3, rowspan=3, sticky=NSEW, pady=2)
+        self.choices_select.grid(row=1, column=0, columnspan=3, rowspan=3, sticky=NSEW, pady=4)
+
+        self.help_label = tk.Label(self.container, text="Need Help?", font='Arial 10 underline', cursor="hand2")
+        self.help_label.grid(row=4, column=0, sticky='SW', padx=10, pady=4)
+        self.help_label.bind("<Button-1>", lambda e: self._send_to_wiki())
 
         self.cancel_button = tk.Button(self.container, text="Cancel", command=self.handle_cancel)
-        self.cancel_button.grid(row=4, column=1, padx=10, pady=2)
+        self.cancel_button.grid(row=4, column=1, padx=10, pady=4)
         self.confirm_button = tk.Button(self.container, text="Confirm", command=self.handle_confirm)
-        self.confirm_button.grid(row=4, column=2, padx=10, pady=2)
+        self.confirm_button.grid(row=4, column=2, padx=10, pady=4)
 
+
+    def _send_to_wiki(self):
+        print(f"Going to open webbrowser to {GITHUB_EXPORT_AIRTAGS_WIKI_LINK}...")
+        webbrowser.open(GITHUB_EXPORT_AIRTAGS_WIKI_LINK, new=2, autoraise=True)
+
+
+    def _retrieve_beacon_data(self) -> dict[str, BeaconData]:
+        do_proceed: bool = messagebox.askokcancel(
+            "Keystore Access Required",
+            f"OpenTagViewer requires access to your keystore for '{KEYCHAIN_LABEL}' in order to export your AirTags. \n\nThis will require TWO password approvals. Proceed?"
+        )
+
+        if do_proceed:
+            return self._create_beacon_data_map()
+        else:
+            self.quit()
+            raise Exception("User does not want to give password access to keystore!")
+            
 
     def _create_beacon_data_map(self) -> dict[str, BeaconData]:
         # get key: prompts password entry (for some reason twice)
         beacon_store_key: bytearray = get_key(KEYCHAIN_LABEL)
+
+        if not beacon_store_key:
+            messagebox.showerror(
+                "Permission Refused Error",
+                f"Permission to access '{KEYCHAIN_LABEL}' was not granted, which means the app cannot function at this time. \n\nIf this was a mistake, restart the app and try entering your password TWICE again."
+            )
+            raise Exception(f"Failure to authenticate for '{KEYCHAIN_LABEL}' access!")
 
         # get needed files
         owned_beacons: list[PListFileInfo]
@@ -121,12 +152,24 @@ class WizardApp(tk.Tk):
         # map OwnedBeacons
         for owned_beacon in owned_beacons:
             beacon_id: str = owned_beacon.data["identifier"]
-            m[beacon_id] = BeaconData(owned_beacon, None)
+
+            has_private_key: bool = "privateKey" in owned_beacon.data
+            if has_private_key:
+                m[beacon_id] = BeaconData(owned_beacon, None)
+            else:
+                messagebox.showwarning(
+                    "Non-Exportable Device found",
+                    f"The device at {owned_beacon.filepath} could not be exported, because its OwnedBeacon file did not include a privateKey field. This Device will be skipped. \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"
+                )
 
         # join them with their BeaconNamingRecords
         for beacon_naming_record in beacon_naming_records:
             beacon_id: str = beacon_naming_record.data["associatedBeacon"]
             if beacon_id not in m:  # this case shouldn't really happen
+                messagebox.showwarning(
+                    "Unkexpected Naming Record",
+                    f"Found an unexpected naming record at {beacon_naming_record.filepath}! \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"
+                )
                 continue
 
             m[beacon_id].beacon_naming_record = beacon_naming_record
@@ -139,6 +182,10 @@ class WizardApp(tk.Tk):
             if m[beacon_id].beacon_naming_record is None:
                 # shouldn't happen, but clean up just in case
                 del m[beacon_id]
+                messagebox.showwarning(
+                    "Unexpected NamingRecord for Device",
+                    f"Device {beacon_id} had an OwnedBeacon file but no BeaconNamingRecord file could be matched for it. This device is being skipped. \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"
+                )
 
         return m
 
@@ -157,7 +204,7 @@ class WizardApp(tk.Tk):
                 except Exception as e:
                     messagebox.showwarning(
                         "Error Decrypting Airtag Data",
-                        f"A non-fatal error occurred when trying to decrypt plist file '{file_fullpath}'. Report this bug on Github: {GITHUB_ISSUES_LINK}"
+                        f"A non-fatal error occurred when trying to decrypt plist file '{file_fullpath}'. \n\nReport this bug on Github: {GITHUB_ISSUES_LINK}"
                     )
 
         return res
@@ -187,11 +234,17 @@ class WizardApp(tk.Tk):
         print(f"Filename choice was: {save_filename}")
         if save_filename is None:
             return # cancelled
+        
+        self._create_zip(save_filename, beacon_ids)
+        print("Bye!")
+        self.quit()
 
+
+    def _create_zip(self, output_zip_path: str, whitelisted_beacon_ids: list[str]):
         with tempfile.TemporaryDirectory() as tmpdirname:
 
             # dump plist files to tmpdir
-            for beacon_id in beacon_ids:
+            for beacon_id in whitelisted_beacon_ids:
                 beacon = self.beacon_data[beacon_id]
 
                 output_file1: str = make_output_path(
@@ -225,22 +278,22 @@ class WizardApp(tk.Tk):
 
 
             # zip to desired target file:
-            print(f"Now writing compressed zip file to '{save_filename}'...")
-            with ZipFile(save_filename, 'w') as zip_obj:
+            print(f"Now writing compressed zip file to '{output_zip_path}'...")
+            with ZipFile(output_zip_path, 'w') as zip_obj:
                 for folder, subfolders, filenames in os.walk(tmpdirname):
                     for filename in filenames:
                         filename_path = os.path.join(folder, filename)
                         print(f"Now zipping '{filename_path}'")
                         zip_obj.write(filename_path, os.path.relpath(filename_path, tmpdirname))
 
-            if os.path.exists(save_filename):
-                print(f"Successfully created zip at '{save_filename}'")
-                os.system(f"open {shlex.quote(os.path.dirname(save_filename))}")
+            if os.path.exists(output_zip_path):
+                print(f"Successfully created zip at '{output_zip_path}'")
+                os.system(f"open {shlex.quote(os.path.dirname(output_zip_path))}")
             else:
-                messagebox.showerror("Export Error", f"Failed to create export zip at {save_filename}!")
-
-        print("Bye!")
-        self.quit()
+                messagebox.showerror(
+                    "Export Error", 
+                    f"Failed to create export zip at {output_zip_path}! \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"
+                )
 
 
     def handle_cancel(self):
