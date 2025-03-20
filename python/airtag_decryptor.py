@@ -184,4 +184,6 @@ def main():
     print("DONE")
     os.system(f'open {OUTPUT_PATH}')
 
-main()
+
+if __name__ == '__main__':
+    main()

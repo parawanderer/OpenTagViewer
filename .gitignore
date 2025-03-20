@@ -14,3 +14,6 @@
 .cxx
 local.properties
 /secrets.properties
+build/
+dist/
+__pycache__/
