@@ -50,6 +50,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 - The script will open the specified output folder on success
 
 
+
 ## 🧑‍💻 Export Wizard Development
 
 ### (Dev) Run it as a python script on MacOS
@@ -66,6 +67,13 @@ Then:
 ```shell
 python wizard.py
 ```
+
+### Build Icons (on MacOS)
+
+```shell
+./make_icon.sh
+```
+
 
 ### Build executable (on MacOS)
 
