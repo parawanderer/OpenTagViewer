@@ -1,10 +1,10 @@
 # 🧙 OpenTagViewer MacOS AirTag Export Wizard
 
-A very simple GUI-based utility that allows users to select which AirTags to export `.plist` files for, 
+A very simple GUI-based utility that allows users to select which AirTags to export `.plist` files for,
 to be able to then import them in the OpenTagViewer Android App.
 
 The wizard will generally show you the most recent names for your devices.
-These names can be set using the FindMy app on MacOS or iOS devices.
+These names (and emojis) can be set using the [FindMy app on MacOS or iOS devices](https://support.apple.com/en-gb/guide/iphone/iphf666e9559/ios#aria-iphe5212d100).
 
 The UI is pretty plain looking, but ideally this tool only needs to be used once/rarely! 😀
 
