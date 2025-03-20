@@ -13,7 +13,9 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 - View current "live" location of your AirTags **on Android**
 - Track & save historical location history of your AirTags (a feature notably missing from the iOS FindMy apps!)
-- UI customisation options
+- UI customisation options:
+    - `☀️ Light mode` / `🌑 Dark mode`
+    - _Some_ 🌐 Language Support
 
 
 ## How To Use 📖
@@ -38,19 +40,22 @@ See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more det
 
 ## Contributing
 
-Contributions are more than welcome.
+Contributions/MRs are more than welcome.
 
 Plenty of things can be improved in this project as it was mostly a "hackathony" thing I tried to throw together ASAP and make presentable for layusers.
 Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setup.
 
 **I think it would be nice if the app could support the following features:**
 
-- **\[BLOCKED due to [Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
-- **\[BLOCKED by [Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
+- **\[🐛 BLOCKED due to [Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
+- **\[🙏 BLOCKED by [Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
 - Support showing unofficial "AirTags" created using [openhaystack](https://github.com/seemoo-lab/openhaystack)
 - Integrate with projects that query **Google**'s/**Samsung**'s network and also show these in the same UI:
    - see [thread](https://github.com/malmeloo/FindMy.py/discussions/30), [thread](https://github.com/seemoo-lab/openhaystack/discussions/210) and repo [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools)
-   - TL;DR I think this (these two?) are separate projects with their own repos.
+   - TL;DR: I think this (these two?) are separate projects with their own repos.
+- If you'd like to contribute a Language or make corrections in my Translations, feel free to do that too
+    - Current list of languages can be found back [here](./app/src/main/res/xml/locales_config.xml)
+    - Translation files can be found back at paths like [`./app/src/main/res/values-en/strings.xml`](./app/src/main/res/values-en/strings.xml) (replace `values-en` with `values-<your locale>`)
 
 ### Credits
 
