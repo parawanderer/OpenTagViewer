@@ -25,7 +25,7 @@ The apparently first Android App to allow you to view/track your AirTags
 See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more details:
 
 1. Install the app and log in to your Apple Account
-2. Create an export `.zip` file by following [this wiki guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags)
+2. Create an export `.zip` file by following [this wiki guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac#opentagviewer-macos-export-app--recommended)
 3. Import the `.zip` file in the app
 4. Profit: you can now track your AirTags on your Android Phone indefinitely!
 
