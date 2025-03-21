@@ -9,6 +9,11 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 (The Android app still calls the Python library under the hood)
 
+
+|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|Placeholder|
+|----|----|----|
+|![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|    |
+
 ## Features ⭐
 
 - View current "live" location of your AirTags **on Android**
