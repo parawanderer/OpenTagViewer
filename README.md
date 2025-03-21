@@ -10,9 +10,17 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 (The Android app still calls the Python library under the hood)
 
 
-|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|Placeholder|
-|----|----|----|
-|![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|    |
+|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|
+|----|----|
+|![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|
+
+
+**Video-Demo**
+
+https://github.com/user-attachments/assets/d3857480-4ef0-48a9-ab63-8d8c15fd5314
+
+
+(No, the location history isn't real)
 
 ## Features ⭐
 
