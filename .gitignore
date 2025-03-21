@@ -17,3 +17,4 @@ local.properties
 build/
 dist/
 __pycache__/
+app/release
