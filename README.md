@@ -53,8 +53,8 @@ Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setu
 
 **I think it would be nice if the app could support the following features:**
 
-- **\[🐛 BLOCKED due to [Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
-- **\[🙏 BLOCKED by [Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
+- **\[BLOCKED due to [🐛Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
+- **\[BLOCKED by [🙏Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
 - Support showing unofficial "AirTags" created using [openhaystack](https://github.com/seemoo-lab/openhaystack)
 - Integrate with projects that query **Google**'s/**Samsung**'s network and also show these in the same UI:
    - see [thread](https://github.com/malmeloo/FindMy.py/discussions/30), [thread](https://github.com/seemoo-lab/openhaystack/discussions/210) and repo [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools)
