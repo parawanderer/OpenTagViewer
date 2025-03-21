@@ -42,7 +42,7 @@ import lombok.NonNull;
 public class SharedMainSettingsManager {
 
     private static final String TAG = SharedMainSettingsManager.class.getSimpleName();
-
+    private final Consumer<Boolean> onAnisetteUrlInputTyped;
 
     private CircularProgressIndicator anisetteProgressIndicator = null;
 
@@ -74,13 +74,15 @@ public class SharedMainSettingsManager {
             @NonNull Consumer<String> onLanguageSelected,
             @NonNull Consumer<String> onNewAnisetteUrlSelected,
             @NonNull GithubRawUtilityFilesService github,
-            @NonNull UserSettings currentUserSettings
+            @NonNull UserSettings currentUserSettings,
+            @NonNull Consumer<Boolean> onAnisetteUrlInputTyped
     ) {
         this.context = context;
         this.onLanguageSelectedCallback = onLanguageSelected;
         this.onNewAnisetteUrlSelectedCallback = onNewAnisetteUrlSelected;
         this.github = github;
         this.currentUserSettings = currentUserSettings;
+        this.onAnisetteUrlInputTyped = onAnisetteUrlInputTyped;
     }
 
     public void setupProgressBars() {
@@ -153,7 +155,8 @@ public class SharedMainSettingsManager {
         });
 
         urlTextInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
-            validateAnisetteUrl(s.toString());
+            boolean result = validateAnisetteUrl(s.toString());
+            this.onAnisetteUrlInputTyped.accept(result);
         }));
 
         var disp = this.github.getSuggestedServers().subscribe(suggestedServers -> {

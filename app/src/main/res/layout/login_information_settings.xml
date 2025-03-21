@@ -45,15 +45,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_bold"
-                android:text="Firstname LastName"
                 android:textColor="@color/md_theme_onPrimaryContainer"
-                android:textSize="20sp" />
+                android:textSize="20sp"
+                tools:text="Firstname Lastname"
+                />
 
             <TextView
                 android:id="@+id/email_settings_block"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="firstname.lastname@email.com" />
+                tools:text="firstname.lastname@test.com"
+                />
 
             <Button
                 android:id="@+id/logout_button"

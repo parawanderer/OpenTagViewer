@@ -209,8 +209,7 @@
                 android:layout_marginTop="40dp"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone"
-                tools:visibility="gone">
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/textView3"
@@ -225,29 +224,18 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:layout_marginBottom="5dp"
                     android:fontFamily="@font/nunito_medium"
                     android:onClick="onClick2FAWithTrustedDevice"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp"
                     android:text="@string/auth_by_trusted_device"
                     android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
                     android:textSize="18sp"
                     app:icon="@drawable/devices_24px"
+                    app:iconSize="24dp"
                     app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
-
-                <!--                <Button-->
-                <!--                    android:id="@+id/twofactorauth_choice_sms"-->
-                <!--                    style="@style/Widget.Material3.Button.OutlinedButton"-->
-                <!--                    android:layout_width="match_parent"-->
-                <!--                    android:layout_height="wrap_content"-->
-                <!--                    android:fontFamily="@font/nunito_medium"-->
-                <!--                    android:text="@string/auth_by_sms_to_x"-->
-                <!--                    android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"-->
-                <!--                    android:textSize="18sp"-->
-                <!--                    app:icon="@drawable/sms_24px"-->
-                <!--                    app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />-->
-
-                <!--                <include-->
-                <!--                    android:id="@+id/sms_button_inclusion"-->
-                <!--                    layout="@layout/apple_login_sms_button" />-->
 
             </LinearLayout>
 
@@ -258,8 +246,7 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone"
-                tools:visibility="gone">
+                android:visibility="gone">
 
 
                 <LinearLayout

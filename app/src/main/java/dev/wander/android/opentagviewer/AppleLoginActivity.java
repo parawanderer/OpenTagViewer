@@ -58,6 +58,7 @@ import dev.wander.android.opentagviewer.ui.login.Apple2FACodeInputManager;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.extern.slf4j.Slf4j;
 
@@ -124,7 +125,8 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this::updateLocale,
                 this::testAndSaveAnisetteUrl,
                 github,
-                this.getUserSettings()
+                this.getUserSettings(),
+                this::onAnisetteUrlInputTyped
         );
 
         this.anisetteServerTesterService = new AnisetteServerTesterService(cronet);
@@ -153,7 +155,6 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.handleAuth();
     }
-
 
     private void testAndSaveAnisetteUrl(final String newUrl) {
         this.sharedMainSettingsManager.showAnisetteTestStatus(SharedMainSettingsManager.ANISETTE_TEST_STATUS.IN_FLIGHT);
@@ -216,29 +217,34 @@ public class AppleLoginActivity extends AppCompatActivity {
         loadingContainer.setVisibility(GONE);
     }
 
+    private void onAnisetteUrlInputTyped(Boolean isValid) {
+        // typing overrides until explicitly validated by pressing the "confirm"
+        // checkmark to test the server
+        this.binding.setAllowServerConfNext(false);
+    }
+
     private void handleAuth() {
         this.setCurrentStepText(R.string.welcome);
         this.showLoading(null);
 
         var sub = this.getAnisetteServerSetupStatus()
+            .observeOn(AndroidSchedulers.mainThread())
             .subscribe(status -> {
-                this.runOnUiThread(() -> {
-                    this.hideLoading();
+                this.hideLoading();
 
-                    if (status == SETUP_STATUS.OK) {
-                        // show account login step
-                        // TODO: show login credentials step!
-                        this.binding.setAllowServerConfNext(true);
-                        this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
-                        this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
+                if (status == SETUP_STATUS.OK) {
+                    // show account login step
+                    // TODO: show login credentials step!
+                    this.binding.setAllowServerConfNext(true);
+                    this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
+                    this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
 
-                        this.showAccountLoginAuthOptions();
+                    this.showAccountLoginAuthOptions();
 
-                    } else {
-                        // show welcome step/server setup step
-                        this.showInitialWelcomeConfOptions(status);
-                    }
-                });
+                } else {
+                    // show welcome step/server setup step
+                    this.showInitialWelcomeConfOptions(status);
+                }
             });
     }
 
