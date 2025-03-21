@@ -28,7 +28,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 ### Requirements 🤓
 
-1. An Android phone with the `OpenTagViewer` app installed
+1. An Android phone with [the `OpenTagViewer` app installed](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Install-App)
 2. A (free) [Apple Account](https://account.apple.com/) with 2FA enabled to be via either `SMS` or `Trusted Device`
 3. One or more **AirTags**, which need to be already registered to some Apple account via the `FindMy` app and shared with your account
 4. A Mac or a [MacOS Virtual Machine](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags#prerequisites) of MacOS version `Sonoma (14)` or lower (only needed once/initially)
@@ -37,7 +37,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more details:
 
-1. Install the app and log in to your Apple Account
+1. [Install the app](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Install-App) and log in to your Apple Account
 2. Create an export `.zip` file by following [this wiki guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac#opentagviewer-macos-export-app--recommended)
 3. Import the `.zip` file in the app
 4. Profit: you can now track your AirTags on your Android Phone indefinitely!
