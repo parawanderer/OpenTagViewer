@@ -12,7 +12,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 |Video Demo|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|
 |----|----|----|
-| https://github.com/user-attachments/assets/d3857480-4ef0-48a9-ab63-8d8c15fd5314 |![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|
+| <video src="https://github.com/user-attachments/assets/d3857480-4ef0-48a9-ab63-8d8c15fd5314"> |![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|
 
 
 **Video-Demo**
