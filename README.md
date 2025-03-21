@@ -21,9 +21,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 - View current "live" location of your AirTags **on Android**
 - Track & save historical location history of your AirTags (a feature notably missing from the iOS FindMy apps!)
-- UI customisation options:
-    - `☀️ Light mode` / `🌑 Dark mode`
-    - _Some_ 🌐 Language Support
+- UI customisation options
 
 
 ## How To Use 📖
