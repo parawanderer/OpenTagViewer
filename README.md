@@ -3,7 +3,9 @@
 OpenTagViewer
 </h1>
 
-Apparently, this is the first Android App to allow you to view/track your **official 🍎 Apple AirTags**, because I couldn't find any app or webpage that lets me do this 😅.
+Apparently, this is the first Android App to allow you to view/track your **official 🍎 Apple AirTags**.
+
+I made this because I couldn't find any app or webpage that lets me do this 😅.
 
 This project is a relatively polished looking Android/Java UI-wrapper around the Python [FindMy.py](https://github.com/malmeloo/FindMy.py) library, which is a derivative of the [openhaystack](https://github.com/seemoo-lab/openhaystack) project.
 
@@ -13,15 +15,13 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 | <video src="https://github.com/user-attachments/assets/d3857480-4ef0-48a9-ab63-8d8c15fd5314"> |![Demo of the app while using Light Mode](./light_mode_preview.jpg)|![Demo of the app while using Dark Mode](./dark_mode_preview.jpg)|
 
 
-(No, the location history isn't real)
+(No, the location history in this demo isn't real)
 
 ## Features ⭐
 
 - View current "live" location of your AirTags **on Android**
-- Track & save historical location history of your AirTags (a feature notably missing from the iOS FindMy apps!)
-- UI customisation options:
-    - `☀️ Light mode` / `🌑 Dark mode`
-    - _Some_ 🌐 Language Support
+- Track & (automatically) save historical location history of your AirTags (a feature notably missing from the iOS FindMy apps!)
+- UI customisation options
 
 
 ## How To Use 📖
@@ -53,8 +53,8 @@ Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setu
 
 **I think it would be nice if the app could support the following features:**
 
-- **\[🐛 BLOCKED due to [Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
-- **\[🙏 BLOCKED by [Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
+- **\[BLOCKED due to [🐛Bug](https://github.com/malmeloo/FindMy.py/issues/118)]** Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case
+- **\[BLOCKED by [🙏Feature Request](https://github.com/malmeloo/FindMy.py/issues/88)]** "Ring"/"Make Noise" button
 - Support showing unofficial "AirTags" created using [openhaystack](https://github.com/seemoo-lab/openhaystack)
 - Integrate with projects that query **Google**'s/**Samsung**'s network and also show these in the same UI:
    - see [thread](https://github.com/malmeloo/FindMy.py/discussions/30), [thread](https://github.com/seemoo-lab/openhaystack/discussions/210) and repo [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools)
