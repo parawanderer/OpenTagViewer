@@ -1,17 +1,20 @@
-![opentagviewer_banner](https://github.com/user-attachments/assets/fe055281-786d-4c8a-9e3f-2932d8dfcb0f)
+![opentagviewer_banner](https://github.com/user-attachments/assets/f26dfbc3-92d7-4af0-950f-e9446c7fb6b9)
 
 <h1>
-<img src="./opentagviewer_icon_xs.png"/>
-OpenTagViewer
+   <img src="./opentagviewer_icon_xs.png"/> OpenTagViewer
 </h1>
 
-Apparently, this is the first Android App to allow you to view/track your **official 🍎 Apple AirTags**.
+Apparently, this is the first **<img src="https://github.com/user-attachments/assets/aa0531f6-6a5e-4c9f-b3c4-dfc3899c8a49" width="20"/> Android App** to allow you to view/track your **<img src="https://github.com/user-attachments/assets/fa3b912f-d204-4252-9449-465eb62f128c" height="20"/> official Apple AirTags**.
 
 I made this because I couldn't find any app or webpage that lets me do this 😅
 <br>
 <br>
 
 This project is a relatively polished looking Android/Java UI-wrapper around the Python [FindMy.py](https://github.com/malmeloo/FindMy.py) library, which is a derivative of the [openhaystack](https://github.com/seemoo-lab/openhaystack) project.
+
+
+> [!WARNING]  
+> This project is not afilliated with Apple Inc. or Android/Google LCC in any official capacity
 
 
 |Video Demo|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|
