@@ -14,7 +14,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 
 > [!WARNING]  
-> This project is not afilliated with Apple Inc. or Android/Google LCC in any official capacity
+> This project is not afilliated with Apple Inc. or Android/Google LCC in any capacity
 
 
 |Video Demo|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|
