@@ -1,3 +1,5 @@
+![opentagviewer_banner](https://github.com/user-attachments/assets/fe055281-786d-4c8a-9e3f-2932d8dfcb0f)
+
 <h1>
 <img src="./opentagviewer_icon_xs.png"/>
 OpenTagViewer
