@@ -40,7 +40,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
     ```bash
     pip install -r requirements.txt
     ```
-- **(OPTIONAL)** Change your output path on [airtag-decryptor.py:30](https://github.com/parawanderer/OpenTagViewer/blob/main/scripts/airtag-decryptor.py#L30) if wanted
+- **(OPTIONAL)** Change your output path on [airtag_decryptor.py:30](https://github.com/parawanderer/OpenTagViewer/blob/main/python/airtag_decryptor.py#L30) if wanted
     - Default output path: `~/plist_decrypt_output`
 - Run the script:
     ```bash
