@@ -6,7 +6,7 @@
 
 Apparently, this is the first **<img src="https://github.com/user-attachments/assets/aa0531f6-6a5e-4c9f-b3c4-dfc3899c8a49" width="20"/> Android App** to allow you to view/track your **<img src="https://github.com/user-attachments/assets/fa3b912f-d204-4252-9449-465eb62f128c" height="20"/> official Apple AirTags**.
 
-I made this because I couldn't find any app or webpage that lets me do this 😅
+I made this because I couldn't find any app or webpage that lets me do this
 <br>
 <br>
 
