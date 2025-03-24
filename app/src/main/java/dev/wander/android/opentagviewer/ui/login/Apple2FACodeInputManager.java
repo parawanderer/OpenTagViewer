@@ -89,7 +89,7 @@ public class Apple2FACodeInputManager {
 
         } else {
             // focus previous one:
-            this.handlers[this.currentIndex-1].setFocus();
+            this.handlers[Math.max(0, this.currentIndex-1)].setFocus();
         }
     }
 
@@ -136,6 +136,7 @@ public class Apple2FACodeInputManager {
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             //Log.d(TAG, "Text is about to be changed at index " + this.index);
+            if (s == null) return;
             this.beforeTextChangedValue = s.toString();
         }
 
@@ -147,6 +148,10 @@ public class Apple2FACodeInputManager {
         @Override
         public void afterTextChanged(Editable s) {
             //Log.d(TAG, "Text was just changed at index " + this.index);
+            if (s == null) {
+                this.lastValue = "";
+                return;
+            }
 
             final int managerCurrentIndex = this.manager.getCurrentIndex();
             final String newInput = s.toString();
@@ -217,7 +222,8 @@ public class Apple2FACodeInputManager {
         }
 
         public void clear() {
-            this.slot.setText("");
+            this.slot.setText(null);
+            this.slot.clearFocus();
         }
 
         public void setFocus() {
@@ -239,6 +245,8 @@ public class Apple2FACodeInputManager {
         for (var handler : this.handlers) {
             handler.clear();
         }
+        this.currentIndex = 0;
+        this.handlers[0].setFocus();
     }
 
     public String getCurrentInput() {

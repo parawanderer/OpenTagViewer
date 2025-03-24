@@ -5,6 +5,8 @@ import static android.view.View.VISIBLE;
 
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
@@ -37,6 +39,7 @@ import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSugg
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
+import io.reactivex.rxjava3.core.Completable;
 import lombok.NonNull;
 
 public class SharedMainSettingsManager {
@@ -95,8 +98,6 @@ public class SharedMainSettingsManager {
     }
 
     public void setupLanguageSwitchField() {
-        final String currentLocale = Locale.getDefault().getLanguage();
-
         this.availableLocales = LocaleConfigUtil.getAvailableLocales(this.context.getResources())
                 .toArray(new String[0]);
 
@@ -113,11 +114,7 @@ public class SharedMainSettingsManager {
         this.shownLocalesAdapter = new ArrayAdapter<>(this.context, android.R.layout.simple_dropdown_item_1line, sortedLanguageOptions);
         languageDropdown.setAdapter(this.shownLocalesAdapter);
 
-        this.mappedLocales.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(currentLocale))
-                .findFirst()
-                .map(Map.Entry::getKey)
-                .ifPresent(option -> languageDropdown.setText(option, false));
+        this.setupCurrentLocalePretty();
 
         languageDropdown.setOnItemClickListener((parent, view, position, id) -> {
             final String selectedLocalePretty = parent.getItemAtPosition(position).toString();
@@ -127,6 +124,24 @@ public class SharedMainSettingsManager {
 
             this.onLanguageSelectedCallback.accept(selectedLocaleId);
         });
+    }
+
+    private void setupCurrentLocalePretty() {
+        final String currentLocale = Locale.getDefault().getLanguage();
+        AppAutoCompleteTextView languageDropdown = this.context.findViewById(R.id.languageSelectDropdown);
+
+        this.mappedLocales.entrySet().stream()
+                .filter(kvp -> kvp.getValue().equals(currentLocale))
+                .findFirst()
+                .map(Map.Entry::getKey)
+                .ifPresent(option -> languageDropdown.setText(option, false));
+
+        // this fixes a stupid issue where I think the dropdown will try to reset its state from before the locale change, which results
+        // in the wrong language choice appearing in the input box (that of the language choice translated in the previous UI language)
+        // BTW: this is probably some kind of race condition situation so not exactly a perfect fix,
+        // but good enough for when the user will perform this switch like once in their lifetime of usage of the app
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(languageDropdown::clearFocus, 10);
     }
 
     public void setupAnisetteServerUrlField() {
@@ -262,17 +277,7 @@ public class SharedMainSettingsManager {
     }
 
     public void handleOnResume() {
-        AppAutoCompleteTextView languageDropdown = this.context.findViewById(R.id.languageSelectDropdown);
-        final String currentLocale = Locale.getDefault().getLanguage();
-
-        final String selectedLocalePrettyName = mappedLocales.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(currentLocale))
-                .findFirst()
-                .map(Map.Entry::getKey)
-                .orElse(null);
-
-        languageDropdown.setText(selectedLocalePrettyName, false);
-        languageDropdown.clearFocus();
+        this.setupCurrentLocalePretty();
     }
 
     public enum ANISETTE_TEST_STATUS {

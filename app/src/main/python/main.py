@@ -167,9 +167,11 @@ def loginSync(email: str, password: str, anisetteServerUrl: str) -> dict:
             "loginMethods": None
         }
 
-    except Exception:
+    except Exception as e:
         print(f"Failed to log in due to error: {traceback.format_exc()}")
-        return None
+        return {
+            "error": str(e)
+        }
 
 
 def exportToString(account: AppleAccount) -> str:

@@ -44,7 +44,7 @@
     <string name="lang_ru">Русский</string>
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
     <string name="welcome">Welcome !</string>
-    <string name="login_failed">"Login failed"</string>
+    <string name="login_failed_x">Login failed: %1$s</string>
     <string name="email_or_phone_number">Email or Phone Number</string>
     <string name="password">password</string>
     <string name="apple_account">Apple Account</string>
@@ -116,4 +116,8 @@
     <string name="debug_device_name" translatable="false">Device Name (original)</string>
     <string name="debug_device_emoji" translatable="false">Device Emoji (original)</string>
     <string name="app_wiki">App Wiki</string>
+    <string name="twofactor_failed_x">Two-Factor Authentication failed: %1$s</string>
+    <string name="twofactor_failed_x_help_msg">Two-Factor Authentication failed: %1$s \nMaybe try a different Anisette server or Apple account?</string>
+    <string name="error_occurred_please_retry_submitting_your_2fa_code">Error occurred. Please retry submitting your 2FA code</string>
+    <string name="failed_to_request_code_please_try_again">Failed to request code. Please try again.</string>
 </resources>

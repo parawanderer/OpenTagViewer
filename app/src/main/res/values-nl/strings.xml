@@ -29,7 +29,7 @@
     <string name="lang_fr">Frans (Français)</string>
     <string name="lang_ru">Russisch (Русский)</string>
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server %1$s kon niet bereikt worden!</string>
-    <string name="login_failed">Inloggen mislukt</string>
+    <string name="login_failed_x">Inloggen mislukt: %1$s</string>
     <string name="email_or_phone_number">Email of Telefoonnummer</string>
     <string name="password">wachtwoord</string>
     <string name="apple_account">Apple Account</string>
@@ -86,4 +86,8 @@
     <string name="device_information">Apparaatinformatie</string>
     <string name="copied_x_to_clipboard">\'%1$s\' gekopieerd naar klembord</string>
     <string name="app_wiki">Wiki van de app</string>
+    <string name="twofactor_failed_x">Twee-factor-authenticatie mislukt: %1$s</string>
+    <string name="twofactor_failed_x_help_msg">Twee-factor-authenticatie mislukt: %1$s \nProbeer misschien een andere Anisette-server of Apple-account?</string>
+    <string name="error_occurred_please_retry_submitting_your_2fa_code">Er is een fout opgetreden. Probeer uw 2FA-code opnieuw in te dienen.</string>
+    <string name="failed_to_request_code_please_try_again">Aanvragen van code mislukt. Probeer het opnieuw.</string>
 </resources>

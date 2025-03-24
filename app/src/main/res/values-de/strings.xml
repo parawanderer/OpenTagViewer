@@ -29,7 +29,7 @@
     <string name="lang_fr">Französisch (Français)</string>
     <string name="lang_ru">Russisch (Русский)</string>
     <string name="anisette_server_at_x_could_not_be_reached">Der Anisette-Server am %1$s konnte nicht erreicht werden!</string>
-    <string name="login_failed">Fehler bei der Anmeldung</string>
+    <string name="login_failed_x">Fehler bei der Anmeldung: %1$s</string>
     <string name="email_or_phone_number">E-Mail oder Telefonnummer</string>
     <string name="password">Passwort</string>
     <string name="apple_account">Apple-Konto</string>
@@ -86,4 +86,8 @@
     <string name="device_information">Geräteinformationen</string>
     <string name="copied_x_to_clipboard">\'%1$s\' in die Zwischenablage kopiert</string>
     <string name="app_wiki">App Wiki</string>
+    <string name="twofactor_failed_x">Zwei-Faktor-Authentifizierung fehlgeschlagen: %1$s</string>
+    <string name="twofactor_failed_x_help_msg">Zwei-Faktor-Authentifizierung fehlgeschlagen: %1$s \nVersuchen Sie es vielleicht mit einem anderen Anisette-Server oder Apple-Konto?</string>
+    <string name="error_occurred_please_retry_submitting_your_2fa_code">Es ist ein Fehler aufgetreten. Bitte versuchen Sie erneut, Ihren 2FA-Code einzusenden.</string>
+    <string name="failed_to_request_code_please_try_again">Codeanforderung fehlgeschlagen. Bitte versuchen Sie es erneut.</string>
 </resources>

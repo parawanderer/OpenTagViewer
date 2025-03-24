@@ -29,7 +29,7 @@
     <string name="lang_fr">Français</string>
     <string name="lang_ru">Russe (Русский)</string>
     <string name="anisette_server_at_x_could_not_be_reached">Le serveur Anisette à %1$s n\'a pas pu être atteint !</string>
-    <string name="login_failed">La connexion a échoué</string>
+    <string name="login_failed_x">La connexion a échoué: %1$s</string>
     <string name="email_or_phone_number">Email ou Numéro de Téléphone</string>
     <string name="password">mot de passe</string>
     <string name="apple_account">Compte Apple</string>
@@ -86,4 +86,8 @@
     <string name="device_information">Informations sur l\'appareil</string>
     <string name="copied_x_to_clipboard">Copié «%1$s» dans le presse-papiers</string>
     <string name="app_wiki">Wiki de l\'application</string>
+    <string name="twofactor_failed_x">Échec de l\'authentification à deux facteurs : %1$s</string>
+    <string name="twofactor_failed_x_help_msg">Échec de l\'authentification à deux facteurs : %1$s \nVous pouvez peut-être essayer un autre serveur Anisette ou un autre compte Apple ?</string>
+    <string name="error_occurred_please_retry_submitting_your_2fa_code">Une erreur s\'est produite. Veuillez réessayer de soumettre votre code 2FA.</string>
+    <string name="failed_to_request_code_please_try_again">Échec de la demande de code. Veuillez réessayer.</string>
 </resources>

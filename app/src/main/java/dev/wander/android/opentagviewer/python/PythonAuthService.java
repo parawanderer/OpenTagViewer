@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.python;
 
 import static dev.wander.android.opentagviewer.AppKeyStoreConstants.KEYSTORE_ALIAS_ACCOUNT;
 
+import android.util.Log;
+
 import com.chaquo.python.Kwarg;
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
@@ -39,12 +41,15 @@ public final class PythonAuthService {
                     new Kwarg("anisetteServerUrl", anisetteServerUrl)
             );
 
-            if (returned == null) {
-                throw new PythonAccountLoginException("Failed to log in to account! (check python for errors)");
+            var resultMap = returned.asMap();
+
+            if (resultMap.containsKey("error")) {
+                Log.e(TAG, "Failed to log in to account! (check python for errors)");
+                final String errorMessage = resultMap.get("error").toString();
+                throw new PythonAccountLoginException(errorMessage);
             }
 
             // need to do an annoying conversion here...
-            var resultMap = returned.asMap();
             var account = resultMap.get("account");
             LOGIN_STATE loginState = LOGIN_STATE.valueOf(resultMap.get("loginState").toInt());
             List<AuthMethod> authMethods = null;

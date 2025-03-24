@@ -58,7 +58,6 @@
         <activity
             android:name=".AppleLoginActivity"
             android:exported="true"
-            android:noHistory="true"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

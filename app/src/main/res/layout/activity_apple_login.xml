@@ -63,7 +63,7 @@
                 android:paddingTop="30dp"
                 android:paddingRight="30dp"
                 android:visibility="gone"
-                tools:visibility="visible">
+                tools:visibility="gone">
 
                 <include
                     android:id="@+id/settings_list"
@@ -111,15 +111,16 @@
                     android:layout_marginBottom="8dp"
                     android:background="@drawable/layout_rounded_less"
                     android:backgroundTint="@color/md_theme_errorContainer"
-                    android:visibility="invisible">
+                    android:visibility="invisible"
+                    tools:visibility="visible">
 
                     <TextView
-                        android:id="@+id/textView2"
+                        android:id="@+id/login_error_message_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:padding="8dp"
-                        android:text="@string/login_failed"
+                        android:text="@string/login_failed_x"
                         android:textColor="@color/md_theme_onErrorContainer"
                         android:textSize="14sp"
                         tools:visibility="visible" />
@@ -191,7 +192,7 @@
                             android:layout_height="match_parent"
                             android:enabled="@{allowAccountLogin}"
                             android:fontFamily="@font/nunito_medium"
-                            android:onClick="onClickLogin"
+                            android:onClick="onClickLoginButton"
                             android:paddingLeft="40dp"
                             android:paddingRight="40dp"
                             android:text="@string/login"
@@ -209,7 +210,8 @@
                 android:layout_marginTop="40dp"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="gone">
 
                 <TextView
                     android:id="@+id/textView3"
@@ -219,23 +221,51 @@
                     android:paddingBottom="10dp"
                     android:text="@string/choose_2fa_authentication_method" />
 
-                <Button
-                    android:id="@+id/twofactorauth_choice_trusted_device"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                <LinearLayout
+                    android:id="@+id/login_2fa_choice_inner"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginBottom="5dp"
-                    android:fontFamily="@font/nunito_medium"
-                    android:onClick="onClick2FAWithTrustedDevice"
-                    android:paddingTop="12dp"
-                    android:paddingBottom="12dp"
-                    android:text="@string/auth_by_trusted_device"
-                    android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
-                    android:textSize="18sp"
-                    app:icon="@drawable/devices_24px"
-                    app:iconSize="24dp"
-                    app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/twofactorauth_choice_trusted_device"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginBottom="5dp"
+                        android:fontFamily="@font/nunito_medium"
+                        android:onClick="onClick2FAWithTrustedDevice"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:text="@string/auth_by_trusted_device"
+                        android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
+                        android:textSize="18sp"
+                        app:icon="@drawable/devices_24px"
+                        app:iconSize="24dp"
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginRight="8dp"
+                    android:gravity="left"
+                    android:orientation="vertical"
+                    android:visibility="visible">
+
+                    <Button
+                        android:id="@+id/twofactorauth_option_selection_back_to_login"
+                        style="?attr/materialIconButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:onClick="onClickBackToLogin"
+                        app:icon="@drawable/arrow_back_24px"
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
@@ -246,7 +276,8 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:padding="20dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                tools:visibility="visible">
 
 
                 <LinearLayout
@@ -385,12 +416,14 @@
                     android:text="@string/enter_the_verification_code_sent_to_your_number_x" />
 
                 <FrameLayout
+                    android:id="@+id/verification_code_error_msg_container"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_margin="8dp"
                     android:background="@drawable/layout_rounded_less"
                     android:backgroundTint="@color/md_theme_errorContainer"
-                    android:visibility="invisible">
+                    android:visibility="invisible"
+                    tools:visibility="visible">
 
                     <TextView
                         android:id="@+id/verification_code_error_message"
@@ -398,7 +431,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:padding="8dp"
-                        android:text="@string/login_failed"
+                        android:text="@string/twofactor_failed_x"
                         android:textColor="@color/md_theme_onErrorContainer"
                         android:textSize="14sp" />
                 </FrameLayout>
@@ -410,16 +443,16 @@
                     android:layout_marginRight="8dp"
                     android:gravity="left"
                     android:orientation="vertical"
-                    android:visibility="invisible">
+                    android:visibility="visible">
 
                     <Button
                         android:id="@+id/twofactorauthchoice_back_button"
-                        style="@style/Widget.Material3.Button.IconButton.Outlined"
+                        style="?attr/materialIconButtonOutlinedStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:onClick="onClickBackTo2FAMethodChoice"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast"
-                        app:strokeColor="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
 
                 </LinearLayout>
 

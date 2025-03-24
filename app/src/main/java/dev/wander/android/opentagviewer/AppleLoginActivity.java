@@ -11,11 +11,15 @@ import static dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsMan
 import static dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager.ANISETTE_TEST_STATUS.OK;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -27,14 +31,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 import androidx.databinding.DataBindingUtil;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.progressindicator.CircularProgressIndicator;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -47,7 +49,6 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
-import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethod;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
@@ -58,19 +59,33 @@ import dev.wander.android.opentagviewer.ui.login.Apple2FACodeInputManager;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.viewmodel.AppleLoginViewModel;
+import dev.wander.android.opentagviewer.viewmodel.LoginActivityState;
+import dev.wander.android.opentagviewer.viewmodel.LoginActivityState.PAGE;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * This entire thing should be refactored and made less convoluted and spaghetti-like
+ * Also: prettier (i.e. add animations)
+ */
 @Slf4j
 public class AppleLoginActivity extends AppCompatActivity {
     private static final String TAG = AppleLoginActivity.class.getSimpleName();
 
+    private static final Pattern REGEX_2FA_CODE = Pattern.compile("^[0-9]{6}$");
+
+    private static final int HINT_DIFFERENT_ANISETTE_SERVER_AFTER_FAILED_2FACODES = 3;
+
+    private static final int DELAY_BEFORE_ALLOW_CHOOSE_OTHER_2FA_METHOD = 15000; // 15 sec
+
+    private AppleLoginViewModel model;
+
     private UserSettingsRepository userSettingsRepo;
 
     private UserAuthRepository userAuthRepo;
-
-    private UserSettings userSettings;
 
     private GithubRawUtilityFilesService github;
 
@@ -80,24 +95,24 @@ public class AppleLoginActivity extends AppCompatActivity {
 
     private ActivityAppleLoginBinding binding;
 
-    private boolean isValidEmailOrPhone = false;
-    private boolean isValidPassword = false;
+    private Apple2FACodeInputManager twoFactorEntryManager;
 
-    private boolean isLoggingIn = false;
+    private TextInputEditText emailOrPhoneInput;
 
-    private final Map<View, AuthMethodPhone> sms2FAButtonToAuthMethod = new HashMap<>();
+    private TextInputEditText passwordInput;
 
-    private PythonAuthResponse authResponse = null;
+    private Button loginButton;
 
-    private AuthMethod chosenAuthMethod = null;
+    private Button twoFactorAuthChoiceBackButton;
 
-    private Apple2FACodeInputManager twoFactorEntryManager = null;
+    private final Handler delayedBackTo2FAOptionList = new Handler(Looper.getMainLooper());;
 
-    private static final Pattern REGEX_2FA_CODE = Pattern.compile("^[0-9]{6}$");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        this.model = new ViewModelProvider(this).get(AppleLoginViewModel.class);
 
         this.getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -153,7 +168,19 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.sharedMainSettingsManager.setupAnisetteServerUrlField();
         this.twoFactorEntryManager.init();
 
-        this.handleAuth();
+        model.getUiState().observe(this, this::handleAuth);
+
+        this.emailOrPhoneInput = this.findViewById(R.id.email_or_phone_input_field);
+        this.passwordInput = this.findViewById(R.id.password_input_field);
+        this.loginButton = this.findViewById(R.id.login_button_main);
+        this.twoFactorAuthChoiceBackButton = this.findViewById(R.id.twofactorauthchoice_back_button);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        this.sharedMainSettingsManager.handleOnResume();
     }
 
     private void testAndSaveAnisetteUrl(final String newUrl) {
@@ -162,26 +189,24 @@ public class AppleLoginActivity extends AppCompatActivity {
         // verify that the server is live right now!
         try {
             var obs = this.anisetteServerTesterService.getIndex(newUrl)
+                    .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(success -> {
                         Log.d(TAG, "Got successful response from anisette server @ " + newUrl);
 
                         this.getUserSettings().setAnisetteServerUrl(newUrl);
                         this.saveSettings();
 
-                        this.runOnUiThread(() -> {
-                            this.binding.setAllowServerConfNext(true);
-                            this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
-                            this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
-                        });
+                        this.binding.setAllowServerConfNext(true);
+                        this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
+                        this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
                     }, error -> {
                         Log.d(TAG, "Got error response from anisette server @ " + newUrl, error);
 
-                        this.runOnUiThread(() -> {
-                            this.binding.setAllowServerConfNext(false);
-                            this.sharedMainSettingsManager.showAnisetteTestStatus(ERROR);
-                            this.sharedMainSettingsManager.setAnisetteTextFieldError(R.string.anisette_server_at_x_could_not_be_reached, newUrl);
-                        });
+                        this.binding.setAllowServerConfNext(false);
+                        this.sharedMainSettingsManager.showAnisetteTestStatus(ERROR);
+                        this.sharedMainSettingsManager.setAnisetteTextFieldError(R.string.anisette_server_at_x_could_not_be_reached, newUrl);
                     });
+
         } catch (Exception e) {
             Log.e(TAG, "Failed to call anisette server", e);
             this.binding.setAllowServerConfNext(false);
@@ -223,7 +248,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.binding.setAllowServerConfNext(false);
     }
 
-    private void handleAuth() {
+    private void handleAuth(LoginActivityState state) {
         this.setCurrentStepText(R.string.welcome);
         this.showLoading(null);
 
@@ -232,15 +257,15 @@ public class AppleLoginActivity extends AppCompatActivity {
             .subscribe(status -> {
                 this.hideLoading();
 
-                if (status == SETUP_STATUS.OK) {
-                    // show account login step
-                    // TODO: show login credentials step!
+                if (status == SETUP_STATUS.OK && (!state.hasSpecifiedCurrentPage() || state.getCurrentPage() == PAGE.LOGIN)) {
                     this.binding.setAllowServerConfNext(true);
                     this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
                     this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
-
                     this.showAccountLoginAuthOptions();
-
+                } else if (state.getCurrentPage() == PAGE.CHOOSE_2FA) {
+                    this.showNextAuthPage(state.getAuthResponse().getLoginState());
+                } else if (state.currentPageIs2faEntry()) {
+                    this.show2FACodeEntryTextbox();
                 } else {
                     // show welcome step/server setup step
                     this.showInitialWelcomeConfOptions(status);
@@ -250,8 +275,9 @@ public class AppleLoginActivity extends AppCompatActivity {
 
     public void onClickToLoginAccount(View view) {
         Log.d(TAG, "Clicked onwards to account login!");
+        // TODO: make a nice transition
         if (this.binding.getAllowServerConfNext()) {
-            // TODO: make a nice transition
+            this.getUiState().setCurrentPage(PAGE.LOGIN);
             this.showAccountLoginAuthOptions();
         }
     }
@@ -261,20 +287,16 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.showInitialWelcomeConfOptions(SETUP_STATUS.NO_SERVER_CONFIGURED);
     }
 
-    public void onClickLogin(View view) {
-        if (this.isLoggingIn) return;
-        this.isLoggingIn = true;
+    public void onClickLoginButton(View view) {
+        var state = this.getUiState();
+        if (state.isLoggingIn()) return;
+        state.setLoggingIn(true);
         Log.d(TAG, "Clicked login button");
         this.showLoading(R.string.logging_in);
-
-        TextInputEditText emailOrPhoneInput = this.findViewById(R.id.email_or_phone_input_field);
-        TextInputEditText passwordInput = this.findViewById(R.id.password_input_field);
 
         // don't allow the user to change their inputs
         emailOrPhoneInput.setEnabled(false);
         passwordInput.setEnabled(false);
-
-        Button loginButton = this.findViewById(R.id.login_button_main);
         loginButton.setClickable(false); // temporarily disable it
 
         // show spinner in button
@@ -288,33 +310,43 @@ public class AppleLoginActivity extends AppCompatActivity {
         final String anisetteServerUrl = Objects.requireNonNull(this.getUserSettings().getAnisetteServerUrl());
 
         var async = PythonAuthService.pythonLogin(emailOrPhone, password, anisetteServerUrl)
+            .observeOn(AndroidSchedulers.mainThread())
             .subscribe(authResponse -> {
                 Log.i(TAG, "Got logged in with response ");
-                this.isLoggingIn = false;
-                this.authResponse = authResponse;
-                this.runOnUiThread(() -> this.handleLoginResponse(authResponse));
+                state.setLoggingIn(false);
+                FrameLayout loginErrorMessage = this.findViewById(R.id.login_error_container);
+                loginErrorMessage.setVisibility(GONE);
+
+                this.handleLoginResponse(authResponse);
             }, error -> {
-                this.isLoggingIn = false;
-                this.authResponse = null;
+                state.setLoggingIn(false);
+                this.getUiState().setAuthResponse(null);
                 Log.e(TAG, "Error while trying to log in via python", error);
 
-                this.runOnUiThread(() -> {
-                    // undo loading and allow user to try again, basically.
-                    this.hideLoading();
-                    accountLoginContainer.setVisibility(VISIBLE);
-                    emailOrPhoneInput.setEnabled(true);
-                    passwordInput.setEnabled(true);
-                    loginButton.setClickable(true);
+                // undo loading and allow user to try again, basically.
+                this.hideLoading();
+                accountLoginContainer.setVisibility(VISIBLE);
+                emailOrPhoneInput.setEnabled(true);
+                passwordInput.setEnabled(true);
+                loginButton.setClickable(true);
 
-                    FrameLayout loginErrorMessage = this.findViewById(R.id.login_error_container);
-                    loginErrorMessage.setVisibility(VISIBLE);
-                });
+                FrameLayout loginErrorMessage = this.findViewById(R.id.login_error_container);
+                loginErrorMessage.setVisibility(VISIBLE);
+
+                TextView loginErrorText = this.findViewById(R.id.login_error_message_text);
+                loginErrorText.setText(this.getString(R.string.login_failed_x, error.getLocalizedMessage()));
             });
     }
 
     private void handleLoginResponse(PythonAuthResponse authResponse) {
-        final var loginState = authResponse.getLoginState();
+        final PythonAuthService.LOGIN_STATE loginState = authResponse.getLoginState();
         Log.d(TAG, "Login state was " + loginState);
+        this.getUiState().setAuthResponse(authResponse);
+
+        this.showNextAuthPage(loginState);
+    }
+
+    private void showNextAuthPage(PythonAuthService.LOGIN_STATE loginState) {
         switch (loginState) {
             case LOGGED_OUT:
                 // TODO: invalid password?
@@ -327,15 +359,21 @@ public class AppleLoginActivity extends AppCompatActivity {
                 break;
             case REQUIRE_2FA:
                 // require 2FA!
-                this.show2FAChoiceScreen(authResponse);
+                this.show2FAChoiceScreen();
                 break;
         }
     }
 
-    private void show2FAChoiceScreen(PythonAuthResponse authResponse) {
+    private void show2FAChoiceScreen() {
+        var state = this.getUiState();
+        state.setCurrentPage(PAGE.CHOOSE_2FA);
+
+        PythonAuthResponse authResponse = state.getAuthResponse();
         // TODO: make this all nice and animated...
         // determine which options should be shown:
         this.hideLoading();
+        LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
+        twoFACodeEntryContainer.setVisibility(GONE);
 
         this.setCurrentStepText(R.string.two_factor_authentication);
         Button trustedDeviceButton = this.findViewById(R.id.twofactorauth_choice_trusted_device);
@@ -343,8 +381,9 @@ public class AppleLoginActivity extends AppCompatActivity {
         trustedDeviceButton.setVisibility(hasTrustedDevice ? VISIBLE : GONE);
 
         // SMS needs to be duplicated by template
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
-        sms2FAButtonToAuthMethod.forEach((view, authMethod) -> accountLoginContainer.removeView(view));
+        LinearLayout accountLoginContainerList = this.findViewById(R.id.login_2fa_choice_inner);
+        var sms2FAButtonToAuthMethod = this.getUiState().getSms2FAButtonToAuthMethod();
+        sms2FAButtonToAuthMethod.forEach((view, authMethod) -> accountLoginContainerList.removeView(view));
         sms2FAButtonToAuthMethod.clear();
 
         // add new SMS buttons
@@ -361,45 +400,61 @@ public class AppleLoginActivity extends AppCompatActivity {
                             this.getString(R.string.auth_by_sms_to_x, authMethodPhone.getPhoneNumber())
                     );
 
-                    accountLoginContainer.addView(v);
-                    sms2FAButtonToAuthMethod.put(v, authMethodPhone);
+                    accountLoginContainerList.addView(v);
+                    this.getUiState().getSms2FAButtonToAuthMethod().put(v, authMethodPhone);
                 });
 
+        LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
         accountLoginContainer.setVisibility(VISIBLE);
     }
 
     public void onClick2FAWithTrustedDevice(View view) {
-        this.chosenAuthMethod = this.authResponse.getAuthMethods().stream()
+        var chosenAuthMethod = this.getUiState().getAuthResponse().getAuthMethods().stream()
                 .filter(method -> method.getType() == TRUSTED_DEVICE)
                 .findFirst()
                 .orElseThrow();
 
-        // TODO: try to do the auth
+        this.getUiState().setChosenAuthMethod(chosenAuthMethod);
 
         LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(this.chosenAuthMethod)
-                .doOnError((error) -> Log.e(TAG, "Error occurred when trying to request 2FA code from Trusted Devices", error))
-                .subscribe(() -> this.runOnUiThread(this::show2FACodeEntryTextbox));
+        var async = PythonAuthService.requestCode(chosenAuthMethod)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::show2FACodeEntryTextbox,
+                error -> {
+                    Log.e(TAG, "Error occurred when trying to request 2FA code from Trusted Devices", error);
+                    this.hideLoading();
+                    Toast.makeText(this, this.getString(R.string.failed_to_request_code_please_try_again), LENGTH_LONG)
+                            .show();
+                });
     }
 
     private void onClick2FAWithSMS(View view) {
-        AuthMethodPhone phoneAuthMethod = Objects.requireNonNull(sms2FAButtonToAuthMethod.get(view));
-        this.chosenAuthMethod = phoneAuthMethod;
+        AuthMethodPhone phoneAuthMethod = Objects.requireNonNull(this.getUiState().getSms2FAButtonToAuthMethod().get(view));
+
+        this.getUiState().setChosenAuthMethod(phoneAuthMethod);
 
         // TODO: try to do the auth
         LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(this.chosenAuthMethod)
-                .doOnError((error) -> Log.e(TAG, "Error occurred when trying to request 2FA code to SMS for phone number " + phoneAuthMethod.getPhoneNumber(), error))
-                .subscribe(() -> this.runOnUiThread(this::show2FACodeEntryTextbox));
+        var async = PythonAuthService.requestCode(phoneAuthMethod)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::show2FACodeEntryTextbox,
+                error -> {
+                    Log.e(TAG, "Error occurred when trying to request 2FA code to SMS for phone number " + phoneAuthMethod.getPhoneNumber(), error);
+                    this.hideLoading();
+                    Toast.makeText(this, this.getString(R.string.failed_to_request_code_please_try_again), LENGTH_LONG)
+                            .show();
+                });
     }
 
     private void showInitialWelcomeConfOptions(SETUP_STATUS setupStatus) {
+        var state = this.getUiState();
+        state.setCurrentPage(PAGE.SETUP);
         LinearLayout accountLoginContainer = this.findViewById(R.id.login_maininfo_container);
         accountLoginContainer.setVisibility(GONE);
 
@@ -437,49 +492,85 @@ public class AppleLoginActivity extends AppCompatActivity {
         LinearLayout anisetteSetupContainer = this.findViewById(R.id.login_anisette_container);
         anisetteSetupContainer.setVisibility(GONE);
 
+        LinearLayout login2FAChoice = this.findViewById(R.id.login_2fa_choice);
+        login2FAChoice.setVisibility(GONE);
+
         // main:
         LinearLayout accountLoginContainer = this.findViewById(R.id.login_maininfo_container);
         accountLoginContainer.setVisibility(VISIBLE);
 
         this.setCurrentStepText(R.string.apple_account);
 
-        // TODO: check valid email + valid password
-        // then send to python for check & 2FA options
-
         TextInputEditText emailOrPhoneInput = this.findViewById(R.id.email_or_phone_input_field);
         TextInputEditText passwordInput = this.findViewById(R.id.password_input_field);
 
         emailOrPhoneInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
             final String currentEmailOrPhone = s.toString();
-            this.isValidEmailOrPhone = isEmailOrPhoneNumber(currentEmailOrPhone);
+            this.getUiState().setValidEmailOrPhone(isEmailOrPhoneNumber(currentEmailOrPhone));
             this.updateLoginButtonState();
         }));
 
         passwordInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
             final String currentPassword = s.toString();
-            this.isValidPassword = !currentPassword.isEmpty();
+            this.getUiState().setValidPassword(!currentPassword.isEmpty());
             this.updateLoginButtonState();
         }));
     }
 
     private void show2FACodeEntryTextbox() {
-        this.hideLoading();
+        this.getUiState().setCurrentPage(PAGE.ENTER_2FA_CODE);
 
+        this.hideLoading();
         this.setCurrentStepText(R.string.two_factor_authentication);
 
         LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
         twoFACodeEntryContainer.setVisibility(VISIBLE);
 
         TextView infoText = this.findViewById(R.id.twofa_sent_info_text);
-        if (this.chosenAuthMethod.getType() == PHONE) {
-            final String phoneNumber = ((AuthMethodPhone) this.chosenAuthMethod).getPhoneNumber();
+        var chosenAuthMethod = this.getUiState().getChosenAuthMethod();
+
+        if (chosenAuthMethod.getType() == PHONE) {
+            final String phoneNumber = ((AuthMethodPhone) chosenAuthMethod).getPhoneNumber();
             infoText.setText(
                     this.getString(R.string.enter_the_verification_code_sent_to_your_number_x, phoneNumber));
-        } else if (this.chosenAuthMethod.getType() == TRUSTED_DEVICE) {
+        } else if (chosenAuthMethod.getType() == TRUSTED_DEVICE) {
             infoText.setText(this.getString(R.string.enter_the_verification_code_sent_to_your_apple_devices));
         } else {
             throw new UnsupportedOperationException("2FA code entry for this device is not supported by the app yet");
         }
+
+        // don't allow user to spam 2FA requests...
+        this.twoFactorAuthChoiceBackButton.setEnabled(false);
+        this.delayedBackTo2FAOptionList.removeCallbacksAndMessages(null);
+        this.delayedBackTo2FAOptionList.postDelayed(() -> {
+            Log.d(TAG, "Unblocked the button to navigate back to the 2FA choice list");
+            this.twoFactorAuthChoiceBackButton.setEnabled(true);
+        }, DELAY_BEFORE_ALLOW_CHOOSE_OTHER_2FA_METHOD);
+    }
+
+    public void onClickBackToLogin(View view) {
+        this.getUiState().setAuthResponse(null); // undo auth response
+
+        emailOrPhoneInput.setText("");
+        passwordInput.setText("");
+        emailOrPhoneInput.setEnabled(true);
+        passwordInput.setEnabled(true);
+        loginButton.setClickable(true);
+
+        this.showAccountLoginAuthOptions();
+    }
+
+    public void onClickBackTo2FAMethodChoice(View view) {
+        View focusView = this.getCurrentFocus();
+        if (focusView != null) {
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+
+        this.twoFactorEntryManager.clear();
+        final FrameLayout twoFactorErrorMessage = this.findViewById(R.id.verification_code_error_msg_container);
+        twoFactorErrorMessage.setVisibility(GONE); // re-show it later if relevant...
+        this.show2FAChoiceScreen();
     }
 
     private void on2FAAuthCodeFilled(final String authCode) {
@@ -492,59 +583,77 @@ public class AppleLoginActivity extends AppCompatActivity {
         final LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
         twoFACodeEntryContainer.setVisibility(GONE); // for now: on error unhide
 
+        final FrameLayout twoFactorErrorMessage = this.findViewById(R.id.verification_code_error_msg_container);
+        final TextView errorMessageText = this.findViewById(R.id.verification_code_error_message);
+
+        var chosenAuthMethod = this.getUiState().getChosenAuthMethod();
 
         var async = PythonAuthService.submitCode(
-                Objects.requireNonNull(this.chosenAuthMethod),
+                Objects.requireNonNull(chosenAuthMethod),
                 authCode
-        ).doOnError(error -> Log.e(TAG, "Failed to authenticate using auth code " + authCode))
-        .andThen(PythonAuthService.retrieveAuthData(this.authResponse))
-        .flatMapCompletable(userAuthRepo::storeUserAuth)
+        ).observeOn(AndroidSchedulers.mainThread())
         .subscribe(() -> {
-            Log.i(TAG, "Retrieved login info after 2FA success and stored it successfully!");
-            this.runOnUiThread(() -> {
-                this.hideLoading();
-                //Toast.makeText(this, "Successfully logged in (after 2FA)", LENGTH_LONG).show();
-                this.finish();
-                this.sendToMapActivity();
-            });
-        }, error -> {
-            Log.e(TAG, "Error during auth data retrieval and storage after 2FA success", error);
-            this.runOnUiThread(() -> {
-                this.hideLoading();
-                twoFACodeEntryContainer.setVisibility(VISIBLE);
-                this.twoFactorEntryManager.clear();
 
-                Snackbar.make(
-                        this.findViewById(R.id.app_login_container),
-                        R.string.error_occurred_for_2fa_attempt,
-                        Snackbar.LENGTH_SHORT).show();
-            });
+            var nextAsync = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+                .flatMapCompletable(userAuthRepo::storeUserAuth)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(() -> {
+                    Log.i(TAG, "Retrieved login info after 2FA success and stored it successfully!");
+                    this.sendToMapActivity();
+                }, error -> {
+
+                    Log.e(TAG, "Error during auth data retrieval and storage after 2FA success", error);
+                    this.hideLoading();
+                    twoFACodeEntryContainer.setVisibility(VISIBLE);
+                    this.twoFactorEntryManager.clear();
+                    this.twoFactorAuthChoiceBackButton.setEnabled(true);
+
+                    // I don't think this error should really happen. Maybe there's some issue with the python backend in this case...
+                    twoFactorErrorMessage.setVisibility(VISIBLE);
+                    errorMessageText.setText(this.getString(R.string.error_occurred_please_retry_submitting_your_2fa_code));
+                });
+
+        }, error -> {
+            // I really would like to handle this error separately from the one above, hence the nesting above.
+            Log.e(TAG, "Failed to authenticate using auth code " + authCode, error);
+            var state = this.getUiState();
+            final int failedLoginAttemptCount = state.getFailed2FAAttemptCount() + 1;
+            state.setFailed2FAAttemptCount(failedLoginAttemptCount);
+
+            this.hideLoading();
+            twoFACodeEntryContainer.setVisibility(VISIBLE);
+            this.twoFactorEntryManager.clear();
+            this.twoFactorAuthChoiceBackButton.setEnabled(true);
+
+            // show error box
+            twoFactorErrorMessage.setVisibility(VISIBLE);
+            errorMessageText.setText(this.getString(
+                    failedLoginAttemptCount >= HINT_DIFFERENT_ANISETTE_SERVER_AFTER_FAILED_2FACODES
+                            ? R.string.twofactor_failed_x_help_msg : R.string.twofactor_failed_x,
+                    error.getLocalizedMessage()
+            ));
         });
     }
 
     private void handleIsAlreadyLoggedIn() {
-        var async = PythonAuthService.retrieveAuthData(this.authResponse)
+        var async = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+            .observeOn(AndroidSchedulers.mainThread())
             .flatMapCompletable(userAuthRepo::storeUserAuth)
             .subscribe(() -> {
                 Log.i(TAG, "Retrieved login info without 2FA (already logged in!) and stored it successfully!");
-                this.runOnUiThread(() -> {
-                    //Toast.makeText(this, "Successfully logged in (no 2FA)", LENGTH_LONG).show();
-                    this.finish();
-                    this.sendToMapActivity();
-                });
+                //Toast.makeText(this, "Successfully logged in (no 2FA)", LENGTH_LONG).show();
+                this.sendToMapActivity();
             }, error -> {
                 Log.e(TAG, "Error during auth data retrieval and storage (when already logged in)", error);
-//                this.runOnUiThread(() -> {
-//                    Toast.makeText(this, "Failed to retrieve login data for user (when no 2FA required)!", LENGTH_LONG).show();
-//                });
-
                 // USER should retry. UI should actually allow him to do that.
             });
     }
 
     private void updateLoginButtonState() {
+        var state = this.getUiState();
+
         this.binding.setAllowAccountLogin(
-                this.isValidEmailOrPhone && this.isValidPassword
+                state.isValidEmailOrPhone() && state.isValidPassword()
         );
     }
 
@@ -570,10 +679,11 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private UserSettings getUserSettings() {
-        if (this.userSettings == null) {
-            this.userSettings = this.userSettingsRepo.getUserSettings();
+        if (this.getUiState().getUserSettings() == null) {
+            var userSettings = this.userSettingsRepo.getUserSettings();
+            this.getUiState().setUserSettings(userSettings);
         }
-        return this.userSettings;
+        return this.getUiState().getUserSettings();
     }
 
     private void setupProgressBars() {
@@ -584,6 +694,8 @@ public class AppleLoginActivity extends AppCompatActivity {
     private void updateLocale(final String newLocale) {
         this.getUserSettings().setLanguage(newLocale);
         this.saveSettings();
+
+        this.getUiState().setCurrentPage(PAGE.SETUP);
 
         LocaleListCompat appLocale = LocaleListCompat.forLanguageTags(newLocale);
         AppCompatDelegate.setApplicationLocales(appLocale);
@@ -604,10 +716,15 @@ public class AppleLoginActivity extends AppCompatActivity {
                 || Patterns.PHONE.matcher(input).matches());
     }
 
-
     private void sendToMapActivity() {
+        this.model.resetUiState();
+        this.finish();
         Intent intent = new Intent(this, MapsActivity.class);
         startActivity(intent);
+    }
+
+    private LoginActivityState getUiState() {
+        return Objects.requireNonNull(this.model.getUiState().getValue());
     }
 
     enum SETUP_STATUS {

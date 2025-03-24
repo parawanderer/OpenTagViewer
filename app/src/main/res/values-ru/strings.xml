@@ -29,7 +29,7 @@
     <string name="lang_fr">Французский (Français)</string>
     <string name="lang_ru">Русский</string>
     <string name="anisette_server_at_x_could_not_be_reached">Не удалось связаться с сервером Anisette по адресу %1$s!</string>
-    <string name="login_failed">Ошибка входа</string>
+    <string name="login_failed_x">Ошибка входа: %1$s</string>
     <string name="email_or_phone_number">Имейл или Номер Телефона</string>
     <string name="password">пароль</string>
     <string name="apple_account">Аккаунт Apple</string>
@@ -86,4 +86,8 @@
     <string name="device_information">Информация об устройстве</string>
     <string name="copied_x_to_clipboard">Скопировано «%1$s» в буфер обмена</string>
     <string name="app_wiki">Wiki приложения</string>
+    <string name="twofactor_failed_x">Двухфакторная аутентификация не пройдена: %1$s</string>
+    <string name="twofactor_failed_x_help_msg">Двухфакторная аутентификация не пройдена: %1$s \nМожет быть, вы можете попробовать другой сервер Anisette или учетную запись Apple?</string>
+    <string name="error_occurred_please_retry_submitting_your_2fa_code">Произошла ошибка. Пожалуйста, повторите отправку кода 2FA</string>
+    <string name="failed_to_request_code_please_try_again">Не удалось запросить код. Попробуйте еще раз.</string>
 </resources>
