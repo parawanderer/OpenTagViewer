@@ -20,14 +20,14 @@ from Crypto.Cipher import AES
 KEYCHAIN_LABEL = "BeaconStore"
 
 BASE_FOLDER = "com.apple.icloud.searchpartyd"
-INPUT_PATH = f"{os.getenv("HOME")}/Library/{BASE_FOLDER}"
+INPUT_PATH = f"{os.getenv('HOME')}/Library/{BASE_FOLDER}"
 
 # NOTE FROM AUTHOR: For my purposes these are sufficient.
 # You can add more if you need more, or remove the filter entirely below
 WHITELISTED_DIRS = { "OwnedBeacons", "BeaconNamingRecord" }
 
 # NOTE FROM AUTHOR: PROVIDE YOUR OWN OUTPUT PATH HERE IF DESIRED!!!
-OUTPUT_PATH = f"/Users/{os.getenv("USER")}/plist_decrypt_output"
+OUTPUT_PATH = f"/Users/{os.getenv('USER')}/plist_decrypt_output"
 
 
 def get_key(label: str):

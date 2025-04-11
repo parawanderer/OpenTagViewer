@@ -81,7 +81,7 @@ class WizardApp(tk.Tk):
             selectmode="multiple"
         )
 
-        self.options = [f"{"" if b.beacon_emoji is None else b.beacon_emoji + " "}{b.beacon_name} - {bid}" for bid, b in self.beacon_data.items()]
+        self.options = [f"{'' if b.beacon_emoji is None else b.beacon_emoji + ' '}{b.beacon_name} - {bid}" for bid, b in self.beacon_data.items()]
         self.options.sort()
 
         self.choices_select.insert(1, *self.options)
@@ -178,7 +178,7 @@ class WizardApp(tk.Tk):
 
 
         # cleanup any bad ones:
-        for beacon_id in m.keys():
+        for beacon_id in list(m.keys()):
             if m[beacon_id].beacon_naming_record is None:
                 # shouldn't happen, but clean up just in case
                 del m[beacon_id]
