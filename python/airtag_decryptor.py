@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import plistlib
 from Crypto.Cipher import AES
@@ -20,33 +21,22 @@ from Crypto.Cipher import AES
 KEYCHAIN_LABEL = "BeaconStore"
 
 BASE_FOLDER = "com.apple.icloud.searchpartyd"
-INPUT_PATH = f"{os.getenv('HOME')}/Library/{BASE_FOLDER}"
+INPUT_PATH = os.path.join(os.getenv('HOME'), 'Library', BASE_FOLDER)
 
 # NOTE FROM AUTHOR: For my purposes these are sufficient.
 # You can add more if you need more, or remove the filter entirely below
 WHITELISTED_DIRS = { "OwnedBeacons", "BeaconNamingRecord" }
 
 # NOTE FROM AUTHOR: PROVIDE YOUR OWN OUTPUT PATH HERE IF DESIRED!!!
-OUTPUT_PATH = f"/Users/{os.getenv('USER')}/plist_decrypt_output"
+OUTPUT_PATH = os.path.join(os.getenv('HOME'), "plist_decrypt_output")
 
 
 def get_key(label: str):
     """
-    TODO: consider contributing this type of command to
-    the `microsoft/keyper` library, as they are missing an output with the `-w`
-    flag like this.
-
-    The problem with this particular key seems to be that it is stored in binary.
-    You can find it in the Keychain Access app on your mac but you can't unhide it (it shows as empty).
-
-    Both these libraries can't seem to support it due to that:
-    - https://github.com/microsoft/keyper/blob/main/keyper/keychain.py
-    - https://pypi.org/project/keyring/
-
-    However the Microsoft one seems to be very easy to adapt to support this `-w`
-    flag since it's using the same `subprocess.getoutput` approach that I use here.
+    TODO: consider switching to this library https://github.com/microsoft/keyper/blob/main/keyper
+    once they publish a version of it that includes my MR with the changes to make it compatible
+    with keys that are non-utf-8 encoded (like the BeaconStore one)
     """
-
     # TODO: if I contribute this, properly escape the label argument here...
     key_in_hex_format: str = subprocess.getoutput(f"security find-generic-password -l '{label}' -w")
     key: bytearray = bytearray.fromhex(key_in_hex_format)
@@ -182,7 +172,7 @@ def main():
         break
 
     print("DONE")
-    os.system(f'open {OUTPUT_PATH}')
+    os.system(f'open {shlex.quote(OUTPUT_PATH)}')
 
 
 if __name__ == '__main__':

@@ -21,7 +21,16 @@ ProductVersion:         14.7.4
 BuildVersion:           23H420
 ```
 
+And Python3 version: `3.13.2`.
+
+
+
 ## 🔧 Python Utility Scripts
+
+> [!WARNING]  
+> It is possible that these scripts will not execute on all python3 versions!
+> 
+> However, the [OpentagViewer Wizard App](https://github.com/parawanderer/OpenTagViewer/releases?q=macos-exporter&expanded=true) that can be downloaded from the `Releases` page will work regardless of the Python version you have installed on your MacOS machine, as it uses its own bundled/embedded version of Python that it gets packaged with.
 
 
 ## airtag_decryptor.py
@@ -34,7 +43,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
 ### How to use:
 
-- You need [python3 and pip](https://packaging.python.org/en/latest/tutorials/installing-packages/)
+- You need [python3 and pip](https://packaging.python.org/en/latest/tutorials/installing-packages/). (You may use [venv](https://docs.python.org/3/library/venv.html) or IDE integration to set up your Python version as `>= 3.13.x` too)
 - Clone the repo and `cd` into this directory
 - Install requirements:
     ```bash
@@ -55,7 +64,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
 ### (Dev) Run it as a python script on MacOS
 
-You need `python` and `tkinter` installed:
+You need `python` and `tkinter` installed (here, tkinter is what provides the GUI functionality):
 ```shell
 brew install python3
 brew install python-tk
