@@ -16,6 +16,7 @@ import androidx.databinding.DataBindingUtil;
 
 
 import dev.wander.android.opentagviewer.databinding.ActivityInformationBinding;
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 
 public class InformationActivity extends AppCompatActivity {
@@ -26,6 +27,7 @@ public class InformationActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         ActivityInformationBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_information);
+        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         binding.setHandleClickBack(this::finish);
 
         if (this.getSupportActionBar() != null) {

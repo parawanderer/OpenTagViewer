@@ -58,6 +58,7 @@ import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
@@ -123,6 +124,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.themeChoices.add(this.getString(R.string.dark_theme));
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
+        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());

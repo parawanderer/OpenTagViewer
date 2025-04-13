@@ -57,6 +57,7 @@ import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
@@ -109,6 +110,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
         this.importData = this.beaconRepo.getImportById(this.beaconData.getOwnedBeaconInfo().importId).blockingFirst().orElseThrow();
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
+        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+
         binding.setHandleClickBack(this::handleEndActivity);
         binding.setHandleClickMenu(this::handleClickMenu);
         binding.setClickItemHandler(() -> Log.d(TAG, "Some device info item was clicked"));

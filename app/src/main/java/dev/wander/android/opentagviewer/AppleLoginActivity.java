@@ -63,7 +63,6 @@ import dev.wander.android.opentagviewer.viewmodel.AppleLoginViewModel;
 import dev.wander.android.opentagviewer.viewmodel.LoginActivityState;
 import dev.wander.android.opentagviewer.viewmodel.LoginActivityState.PAGE;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.extern.slf4j.Slf4j;
 

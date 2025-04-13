@@ -25,6 +25,7 @@ import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -67,6 +68,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
         ActivityMyDevicesListBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
+        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         binding.setHandleClickBack(this::handleEndActivity);
 
         if (this.getSupportActionBar() != null) {
