@@ -10,7 +10,10 @@ public class CronetProvider {
 
     public static CronetEngine getInstance(Context context) {
         if (ENGINE == null) {
-            ENGINE = new CronetEngine.Builder(context).build();
+            ENGINE = new CronetEngine.Builder(context)
+                    // not technically secure but app users can use this at their own risk
+                    .enableHttp2(true)
+                    .build();
         }
         return ENGINE;
     }

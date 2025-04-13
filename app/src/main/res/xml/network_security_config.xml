@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        Allow cleartext traffic (i.e. HTTP rather than HTTPS).
+        This is needed to support users setting up their own servers with http://<base_ip> as the base URL.
+        This is insecure but users can use this at their own risk.
+        If they want to be more secure they can set up HTTPS on their custom server.
+    -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
