@@ -39,7 +39,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 1. An Android phone with [the `OpenTagViewer` app installed](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Install-App)
 2. A (free) [Apple Account](https://account.apple.com/) with 2FA enabled to be via either `SMS` or `Trusted Device`
 3. One or more **AirTags**, which need to be already registered to some Apple account via the `FindMy` app
-4. A Mac or a [MacOS Virtual Machine](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac#prerequisites) of MacOS version `Sonoma (14)` or lower (only needed once/initially)
+4. A Mac or a [MacOS Virtual Machine](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac#prerequisites) (only needed once/initially)
 
 
 ### How to view my AirTag on my Android Phone?!
