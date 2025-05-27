@@ -90,4 +90,6 @@
     <string name="twofactor_failed_x_help_msg">Échec de l\'authentification à deux facteurs : %1$s \nVous pouvez peut-être essayer un autre serveur Anisette ou un autre compte Apple ?</string>
     <string name="error_occurred_please_retry_submitting_your_2fa_code">Une erreur s\'est produite. Veuillez réessayer de soumettre votre code 2FA.</string>
     <string name="failed_to_request_code_please_try_again">Échec de la demande de code. Veuillez réessayer.</string>
+    <string name="lang_ko">Coréen (한국어)</string>
+    <string name="lang_ja">Japonais (日本語)</string>
 </resources>
