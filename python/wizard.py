@@ -24,7 +24,7 @@ from airtag_decryptor import (
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
