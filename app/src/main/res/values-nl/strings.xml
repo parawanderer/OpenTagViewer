@@ -90,4 +90,6 @@
     <string name="twofactor_failed_x_help_msg">Twee-factor-authenticatie mislukt: %1$s \nProbeer misschien een andere Anisette-server of Apple-account?</string>
     <string name="error_occurred_please_retry_submitting_your_2fa_code">Er is een fout opgetreden. Probeer uw 2FA-code opnieuw in te dienen.</string>
     <string name="failed_to_request_code_please_try_again">Aanvragen van code mislukt. Probeer het opnieuw.</string>
+    <string name="lang_ko">Koreaans (한국어)</string>
+    <string name="lang_ja">Japans (日本語)</string>
 </resources>

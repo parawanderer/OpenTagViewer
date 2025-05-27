@@ -120,4 +120,6 @@
     <string name="twofactor_failed_x_help_msg">Two-Factor Authentication failed: %1$s \nMaybe try a different Anisette server or Apple account?</string>
     <string name="error_occurred_please_retry_submitting_your_2fa_code">Error occurred. Please retry submitting your 2FA code</string>
     <string name="failed_to_request_code_please_try_again">Failed to request code. Please try again.</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_ja">日本語</string>
 </resources>
