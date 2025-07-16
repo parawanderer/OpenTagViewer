@@ -7,9 +7,9 @@ import plistlib
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from utils import DIRNAME, skip_unless_macos_le14
+from .utils import DIRNAME, skip_unless_macos_le14
 
-from python.airtag_decryptor import decrypt_folder, decrypt_plist, dump_plist, get_key, make_output_path
+from ..airtag_decryptor import decrypt_folder, decrypt_plist, dump_plist, get_key, make_output_path
 
 
 def create_plist(plistData: dict, key: bytes | None = None) -> bytes:
