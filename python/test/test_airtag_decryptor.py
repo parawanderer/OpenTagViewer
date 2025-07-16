@@ -9,7 +9,15 @@ from Crypto.Random import get_random_bytes
 
 from .utils import DIRNAME, skip_unless_macos_le14
 
-from ..airtag_decryptor import decrypt_folder, decrypt_plist, dump_plist, get_key, make_output_path
+from ..airtag_decryptor import (
+    decrypt_folder,
+    decrypt_plist,
+    dump_plist,
+    extract_gena_key,
+    get_key,
+    get_key_from_full_output,
+    make_output_path
+)
 
 
 def create_plist(plistData: dict, key: bytes | None = None) -> bytes:
@@ -65,6 +73,45 @@ def test_get_key():
 
     key = get_key("BeaconStore")
     assert key is not None
+
+
+@skip_unless_macos_le14
+def test_get_key_from_full_output():
+    """
+    Supposedly works on MacOS 13.3.1 (see: https://github.com/parawanderer/OpenTagViewer/issues/13)
+    """
+    res = get_key_from_full_output("BeaconStore")
+    assert res is not None
+
+
+def test_extract_gena_key():
+    output: str = """
+keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
+version: 512
+class: "genp"
+attributes:
+    0x00000007 <blob>="BeaconStore"
+    0x00000008 <blob>=<NULL>
+    "acct"<blob>="BeaconStoreKey"
+    "cdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "crtr"<uint32>=<NULL>
+    "cusi"<sint32>=<NULL>
+    "desc"<blob>=<NULL>
+    "gena"<blob>=0x4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849  "<IGNORED>"
+    "icmt"<blob>=<NULL>
+    "invi"<sint32>=<NULL>
+    "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "nega"<sint32>=<NULL>
+    "prot"<blob>=<NULL>
+    "scrp"<sint32>=<NULL>
+    "svce"<blob>="BeaconStore"
+    "type"<uint32>=<NULL>
+"""
+
+    result = extract_gena_key(output)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
 
 
 def test_decrypt_plist():

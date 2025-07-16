@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 import subprocess
 import plistlib
@@ -31,14 +32,94 @@ WHITELISTED_DIRS = {"OwnedBeacons", "BeaconNamingRecord"}
 OUTPUT_PATH = os.path.join(os.getenv('HOME'), "plist_decrypt_output")
 
 
-def get_key(label: str):
+class KeyStoreKeyNotFoundException(Exception):
+    pass
+
+
+def get_key(label: str) -> bytearray:
     """
-    TODO: consider switching to this library https://github.com/microsoft/keyper/blob/main/keyper
-    once they publish a version of it that includes my MR with the changes to make it compatible
-    with keys that are non-utf-8 encoded (like the BeaconStore one)
+    Tries to extract the key via the command `security find-generic-password -l <label> -w`.
+
+    :throws KeyStoreKeyNotFoundException: when not found or unable to extract
     """
-    # TODO: if I contribute this, properly escape the label argument here...
-    key_in_hex_format: str = subprocess.getoutput(f"security find-generic-password -l '{label}' -w")
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-l",
+                label,
+                "-w"
+            ],
+            capture_output=True,
+            text=True
+        )
+        key_in_hex_format: str = result.stdout
+        key: bytearray = bytearray.fromhex(key_in_hex_format)
+
+        return key
+    except Exception as e:
+        raise KeyStoreKeyNotFoundException("Failed to retrieve keystore value") from e
+
+
+def get_key_from_full_output(label: str):
+    """
+    Tries to extract the key via the command `security find-generic-password -l <label>`.
+
+    It assumes that the key is stored in the `"gena"<blob>=0x<64 chars>` part of the output.
+
+    :throws KeyStoreKeyNotFoundException: when not found in output or unable to extract
+    """
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-l",
+                label
+            ],
+            capture_output=True,
+            text=True
+        )
+        full_key_info: str = result.stdout
+        return extract_gena_key(full_key_info)
+    except Exception as e:
+        raise KeyStoreKeyNotFoundException("Failed to retrieve keystore value") from e
+
+
+def extract_gena_key(output: str):
+    """Tries to extract the key from the full output (see issue: https://github.com/parawanderer/OpenTagViewer/issues/13), e.g.:
+    ```
+    keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
+    version: 512
+    class: "genp"
+    attributes:
+        0x00000007 <blob>="BeaconStore"
+        0x00000008 <blob>=<NULL>
+        "acct"<blob>="BeaconStoreKey"
+        "cdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+        "crtr"<uint32>=<NULL>
+        "cusi"<sint32>=<NULL>
+        "desc"<blob>=<NULL>
+        "gena"<blob>=0x80B8CBED<HIDEN BY ME BUT 64 charachters>  "\200\270\313\355\302QS\352H-]\207\323\<HIDEN BY ME>"
+        "icmt"<blob>=<NULL>
+        "invi"<sint32>=<NULL>
+        "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+        "nega"<sint32>=<NULL>
+        "prot"<blob>=<NULL>
+        "scrp"<sint32>=<NULL>
+        "svce"<blob>="BeaconStore"
+        "type"<uint32>=<NULL>
+    ```
+
+    We will just assume this "gena" output contains what we need as per the user report here (if it exists)
+    """
+
+    matches = re.findall(r'"gena"<blob>=0x([0-9A-F]{64})\s*".+"', output)
+    if len(matches) == 0:
+        raise KeyStoreKeyNotFoundException("gena value not found!")
+
+    key_in_hex_format: str = matches[0]
     key: bytearray = bytearray.fromhex(key_in_hex_format)
 
     return key

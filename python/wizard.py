@@ -16,8 +16,10 @@ from airtag_decryptor import (
     KEYCHAIN_LABEL,
     INPUT_PATH,
     WHITELISTED_DIRS,
+    KeyStoreKeyNotFoundException,
     get_key,
     decrypt_plist,
+    get_key_from_full_output,
     make_output_path,
     dump_plist
 )
@@ -131,7 +133,13 @@ class WizardApp(tk.Tk):
 
     def _create_beacon_data_map(self) -> dict[str, BeaconData]:
         # get key: prompts password entry (for some reason twice)
-        beacon_store_key: bytearray = get_key(KEYCHAIN_LABEL)
+        beacon_store_key: bytearray = None
+
+        try:
+            beacon_store_key = get_key(KEYCHAIN_LABEL)
+        except KeyStoreKeyNotFoundException:
+            # Fallback to alternate solution (see issue #13)
+            beacon_store_key = get_key_from_full_output(KEYCHAIN_LABEL)
 
         if not beacon_store_key:
             messagebox.showerror(
