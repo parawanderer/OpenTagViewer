@@ -13,7 +13,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -22,25 +22,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-        
+
     - name: Install dependencies
       run: |
         cd python # our python project lives in this dir
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
         pip install -r requirements.txt
-        
+
     # - name: Lint with flake8
     #   run: |
     #     # stop the build if there are Python syntax errors or undefined names
     #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics=
     #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
-        
+
     - name: Test with pytest
       run: |
+        cd python # out python project lives in this dir
         pytest
