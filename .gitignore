@@ -18,3 +18,4 @@ build/
 dist/
 __pycache__/
 app/release
+.coverage

@@ -25,7 +25,7 @@ INPUT_PATH = os.path.join(os.getenv('HOME'), 'Library', BASE_FOLDER)
 
 # NOTE FROM AUTHOR: For my purposes these are sufficient.
 # You can add more if you need more, or remove the filter entirely below
-WHITELISTED_DIRS = { "OwnedBeacons", "BeaconNamingRecord" }
+WHITELISTED_DIRS = {"OwnedBeacons", "BeaconNamingRecord"}
 
 # NOTE FROM AUTHOR: PROVIDE YOUR OWN OUTPUT PATH HERE IF DESIRED!!!
 OUTPUT_PATH = os.path.join(os.getenv('HOME'), "plist_decrypt_output")
@@ -46,11 +46,13 @@ def get_key(label: str):
 
 def decrypt_plist(in_file_path: str, key: bytearray) -> dict:
     """
-    Given an encrypted plist file at path `in_file_path`, decrypt it using `key` and AES-GMC and return the decrypted plist `dict`
+    Given an encrypted plist file at path `in_file_path`, decrypt it using `key` and AES-GMC and return
+    the decrypted plist `dict`
 
     :param in_file_path:    Source path of the encrypted plist file.
 
-                            Generally something like `/Users/<username>/Library/com.apple.icloud.searchpartyd/OwnedBeacons/<UUID>.record`
+                            Generally something like
+                            `/Users/<username>/Library/com.apple.icloud.searchpartyd/OwnedBeacons/<UUID>.record`
 
     :param key:             Raw key to decrypt plist file with.
 
@@ -112,7 +114,8 @@ def dump_plist(plist: dict, out_file_path: str) -> None:
 
 def make_output_path(output_root: str, input_file_path: str, input_root_folder: str) -> str:
     """
-    Transforms `input_file_path` into a dumping `output_file_path` along the lines of this idea (but it works generically for any level of nesting):
+    Transforms `input_file_path` into a dumping `output_file_path` along the lines of this idea (but it works
+    generically for any level of nesting):
 
     Given:
     - `input_file_path` = `/Users/<user>/Library/com.apple.icloud.searchpartyd/SomeFolder/.../<UUID>.record`
@@ -150,7 +153,7 @@ def decrypt_folder(input_base_path: str, folder_name: str, key: bytearray, outpu
                 print(f"Now trying to dump decrypted plist file to: {file_dumpath}")
                 dump_plist(plist, file_dumpath)
 
-                print(f"Success!")
+                print("Success!")
             except Exception as e:
                 print(f"ERROR decrypting plist file: {e}")
 

@@ -1,2 +1,4 @@
 pycryptodome==3.22.0
 PyYAML==6.0.2
+pytest==8.4.1
+pytest-cov==6.2.1
