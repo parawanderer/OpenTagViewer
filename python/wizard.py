@@ -109,11 +109,11 @@ class WizardApp(tk.Tk):
             raise Exception("Unsupported OS")
 
         if MACOS_VER[0] >= 15:
-            messagebox.showerror(
+            messagebox.showwarning(
                 "Unsupported MacOS Version",
-                "This application only works on MacOS <= 14. \n\nCheck the Wiki for alternative approaches for MacOS >= 15!"
+                "This application is only confirmed to work on MacOS <= 14. \n\nCheck the Wiki for alternative approaches for MacOS >= 15!"
             )
-            raise Exception("Unsupported MacOS version")
+            # I'll actually keep the app operational on MacOs >= 15 in case somebody figures out a workaround. But yeah!
 
     def _send_to_wiki(self):
         print(f"Going to open webbrowser to {GITHUB_EXPORT_AIRTAGS_WIKI_LINK}...")
@@ -122,7 +122,7 @@ class WizardApp(tk.Tk):
     def _retrieve_beacon_data(self) -> dict[str, BeaconData]:
         do_proceed: bool = messagebox.askokcancel(
             "Keystore Access Required",
-            f"OpenTagViewer requires access to your keystore for '{KEYCHAIN_LABEL}' in order to export your AirTags. \n\nThis will require TWO password approvals. Proceed?"  # noqa: E501
+            f"OpenTagViewer requires access to your keystore for '{KEYCHAIN_LABEL}' in order to export your AirTags. \n\nProceed?"  # noqa: E501
         )
 
         if do_proceed:
