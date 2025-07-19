@@ -56,6 +56,9 @@ def get_key(label: str) -> bytearray:
         )
         key_in_hex_format: str = result.stdout
         key: bytearray = bytearray.fromhex(key_in_hex_format)
+        
+        if len(key) == 0:
+            raise KeyStoreKeyNotFoundException(f"Key for '{label}' was empty!")
 
         return key
     except Exception as e:
