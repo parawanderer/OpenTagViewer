@@ -29,6 +29,7 @@ import android.os.Handler;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.Pair;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -54,6 +55,10 @@ import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -84,6 +89,7 @@ import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
+import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PermissionUtil;
@@ -205,6 +211,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             || data.getStringExtra("deviceWasChanged") != null) {
                         this.handleDeviceListChanged();
                     }
+                }
+            }
+    );
+
+    private ActivityResultLauncher<Intent> exportLogsActivityLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    Intent data = result.getData();
+                    this.onExportLogsToLocationPicked(data);
                 }
             }
     );
@@ -387,17 +403,27 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         var popupMenu = new PopupMenu(this, bttn);
         popupMenu.getMenuInflater().inflate(R.menu.global_map_more_menu, popupMenu.getMenu());
 
+        // This item is conditionally visible (non-technical users probably don't need this)
+        MenuItem exportLogsItem = popupMenu.getMenu().findItem(R.id.export_logs);
+        UserSettings userSettings = this.getRefreshUserSettings();
+        final boolean shouldShowExport = userSettings.getEnableDebugData() != null && userSettings.getEnableDebugData();
+        exportLogsItem.setVisible(shouldShowExport);
+
         popupMenu.setOnMenuItemClickListener(menuItem -> {
             Log.d(TAG, "Menu option " + menuItem.getTitle() + " was selected");
 
-            if (menuItem.getItemId() == R.id.do_import) {
+            final int itemId = menuItem.getItemId();
+
+            if (itemId == R.id.do_import) {
                 this.handleImport();
-            } else if (menuItem.getItemId() == R.id.settings) {
+            } else if (itemId == R.id.settings) {
                 this.showSettingsPage();
-            } else if (menuItem.getItemId() == R.id.information) {
+            } else if (itemId == R.id.information) {
                 this.showInformationPage();
-            } else if (menuItem.getItemId() == R.id.my_devices) {
+            } else if (itemId == R.id.my_devices) {
                 this.showMyDevicesPage();
+            } else if (itemId == R.id.export_logs) {
+                this.handleExportLogs();
             }
 
             return true;
@@ -537,12 +563,47 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 this.showLastDeviceLocations();
                 Log.i(TAG, "Finished visualising new location reports!");
             }, error -> {
-                Log.e(TAG, "Error occurred while inserting into DB", error);
+                Log.e(TAG, "Error occurred while importing new devices!", error);
                 Toast.makeText(
                         this,
                         R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry,
                         LENGTH_LONG).show();
             });
+    }
+
+    private void onExportLogsToLocationPicked(@lombok.NonNull Intent data) {
+        Log.d(TAG, "Export target location picked");
+
+        Uri writeTarget = data.getData();
+        if (writeTarget == null) {
+            Log.w(TAG, "No write target given! Stopping here");
+            return;
+        }
+
+        String logLines = LogCollectorUtil.getLastLogs();
+
+        try (OutputStream os = this.getContentResolver().openOutputStream(writeTarget)) {
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
+            bw.write(logLines);
+            bw.flush();
+            bw.close();
+
+            Log.d(TAG, "Logs export to " + writeTarget + " complete!");
+
+            Toast.makeText(
+                    this,
+                    R.string.log_file_has_been_exported_successfully,
+                    LENGTH_LONG
+            ).show();
+
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to save file", e);
+            Toast.makeText(
+                    this,
+                    R.string.failed_to_export_log_file,
+                    LENGTH_LONG
+            ).show();
+        }
     }
 
     private Observable<ImportData> extractImportedData(Intent data) {
@@ -570,6 +631,24 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("application/zip");
         pickZipActivityLauncher.launch(intent);
+    }
+
+    private void handleExportLogs() {
+        Log.i(TAG, "Requested to dump logs...");
+
+        String fileName = String.format(
+                Locale.ROOT,
+                "%s-%d.log",
+                this.getString(R.string.app_name),
+                System.currentTimeMillis()
+        );
+
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, fileName);
+
+        exportLogsActivityLauncher.launch(intent);
     }
 
     public void onClickLocationHistory(View view) {
@@ -1178,6 +1257,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         // Login will send back to instance of this if it succeeds.
         Intent intent = new Intent(this, AppleLoginActivity.class);
         startActivity(intent);
+    }
+
+    private UserSettings getRefreshUserSettings() {
+        this.userSettings = this.userSettingsRepo.getUserSettings();
+        return this.userSettings;
     }
 
     private Observable<Optional<UserMapCameraPosition>> getLastCameraPosition() {

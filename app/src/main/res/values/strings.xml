@@ -122,4 +122,7 @@
     <string name="failed_to_request_code_please_try_again">Failed to request code. Please try again.</string>
     <string name="lang_ko">한국어</string>
     <string name="lang_ja">日本語</string>
+    <string name="export_logs" translatable="false">Export Logs</string>
+    <string name="log_file_has_been_exported_successfully" translatable="false">Log file has been exported successfully</string>
+    <string name="failed_to_export_log_file" translatable="false">Failed to export log file!</string>
 </resources>

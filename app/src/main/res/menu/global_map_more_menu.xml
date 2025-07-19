@@ -16,4 +16,8 @@
     <item
         android:id="@+id/information"
         android:title="@string/information" />
+
+    <item
+        android:id="@+id/export_logs"
+        android:title="@string/export_logs" />
 </menu>
