@@ -8,8 +8,20 @@ env:
 on:
   push:
     branches: [ "main" ]
+    paths: &ANDROID_APP_PATHS
+        # only run when Android-related stuff actually changed!
+        - "app/**"
+        - "gradle/**"
+        - "build.gradle.kts"
+        - "gradle.properties"
+        - "gradlew"
+        - "gradle.bat"
+        - "local.defaults.properties"
+        - "settings.gradle.kts"
   pull_request:
     branches: [ "main" ]
+    paths: *ANDROID_APP_PATHS # <- YAML reference to above list
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
