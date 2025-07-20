@@ -111,7 +111,7 @@ def extract_gena_key(output: str):
         "crtr"<uint32>=<NULL>
         "cusi"<sint32>=<NULL>
         "desc"<blob>=<NULL>
-        "gena"<blob>=0x80B8CBED<HIDEN BY ME BUT 64 charachters>  "\200\270\313\355\302QS\352H-]\207\323\<HIDEN BY ME>"
+        "gena"<blob>=0x4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849  "Password"
         "icmt"<blob>=<NULL>
         "invi"<sint32>=<NULL>
         "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
