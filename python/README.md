@@ -101,7 +101,9 @@ pyinstaller \
     --name "OpenTagViewer" \
     --osx-bundle-identifier "dev.wander.opentagviewer" \
     --icon=OpenTagViewer.icns \
-    wizard.py
+# May or may not be necessary depending on the build environment:
+#    --target-arch x86_64 \
+    main/wizard.py
 ```
 
 Zip up result (MacOS):

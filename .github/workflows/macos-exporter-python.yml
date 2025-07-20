@@ -111,6 +111,7 @@ jobs:
           --name "OpenTagViewer" \
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
+          --target-arch universal2 \
           --noconfirm \
           ./main/wizard.py
 
