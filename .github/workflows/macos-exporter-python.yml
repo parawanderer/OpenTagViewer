@@ -34,8 +34,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - &CHECKOUT
-      name: Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
@@ -43,16 +42,14 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - &INSTALL_DEPENDENCIES
-      name: Install dependencies
+    - name: Install dependencies
       working-directory: ./python
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
         pip install -r requirements.txt
 
-    - &LINT_FLAKE8
-      name: Lint with flake8
+    - name: Lint with flake8
       working-directory: . # run flake8 from repository root
       run: |
         # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
@@ -60,8 +57,7 @@ jobs:
         flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 ./python --count --exit-zero --statistics
 
-    - &TEST_PYTEST
-      name: Test with pytest
+    - name: Test with pytest
       working-directory: ./python
       run: |
         pytest ./test
@@ -72,7 +68,8 @@ jobs:
     if: github.event_name == 'release'
 
     steps: # (reuses steps from full flow!)
-    - *CHECKOUT
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
@@ -80,11 +77,25 @@ jobs:
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
-    - *INSTALL_DEPENDENCIES
+    - name: Install dependencies
+      working-directory: ./python
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install flake8 pytest
+        pip install -r requirements.txt
 
-    - *LINT_FLAKE8
+    - name: Lint with flake8
+      working-directory: . # run flake8 from repository root
+      run: |
+        # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 ./python --count --exit-zero --statistics
 
-    - *TEST_PYTEST
+    - name: Test with pytest
+      working-directory: ./python
+      run: |
+        pytest ./test
 
   build-executable:
     environment: 'MacOS Exporter App CI'
