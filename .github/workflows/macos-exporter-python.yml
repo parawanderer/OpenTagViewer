@@ -19,7 +19,7 @@ env:
 jobs:
   build:
 
-    runs-on: macos-latest
+    runs-on: macos-14  # We *need* 14, this whole setup is only supported up to 14 (without weird security disabling hacks)
 
     strategy:
       fail-fast: false
@@ -43,11 +43,12 @@ jobs:
         pip install -r requirements.txt
 
     - name: Lint with flake8
-      working-directory: ./python
+      working-directory: . # run flake8 from repository root
       run: |
+        # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 ./python --count --exit-zero --statistics
 
     - name: Test with pytest
       working-directory: ./python

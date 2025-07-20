@@ -68,6 +68,7 @@ def _create_tmp_out_folder() -> str:
     return os.path.join(DIRNAME, f"resources/{id_part}")
 
 
+@pytest.mark.skip(reason="In CI you'll never get the password prompt, so it just returns empty")
 @skip_unless_macos_le14
 def test_get_key():
     """
@@ -78,6 +79,7 @@ def test_get_key():
     assert key is not None
 
 
+@pytest.mark.skip(reason="In CI you'll never get the password prompt, so it just returns empty")
 @skip_unless_macos_le14
 def test_get_key_from_full_output():
     """
