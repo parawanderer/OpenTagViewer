@@ -13,8 +13,39 @@ jobs:
   build:
     environment: 'Android Build Release'
     runs-on: ubuntu-latest
+
+    # Only run this for 'android-app-v<whatever>' tags!
+    if: |
+      github.event_name == 'release'
+      && (github.event.release.prerelease == true || github.event.release.published_at != null)
+      && startsWith(github.event.release.tag_name, 'android-app-v')
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Extract Version from Tag
+        id: extract_version
+        run: |
+          # GITHUB_REF for tags is like 'refs/tags/android-app-v1.0.3.1'
+          FULL_TAG_NAME="${{ github.ref }}"
+
+          # Remove 'refs/tags/' prefix to get 'android-app-v1.0.3.1'
+          TAG_WITHOUT_PREFIX="${FULL_TAG_NAME##refs/tags/}"
+
+          # Find the index of '-v'
+          # This will be 'android-app-' part, then we add 2 to skip '-v'
+          START_INDEX=$(( $(echo "$TAG_WITHOUT_PREFIX" | awk -F'-v' '{print length($1)}') + 2 ))
+
+          # Extract everything from '-v' onwards
+          # Using cut or substring if available, or just awk
+          VERSION_STRING=$(echo "$TAG_WITHOUT_PREFIX" | cut -c "$START_INDEX"-)
+
+          # Output the extracted version as a step output
+          echo "Extracted version: $VERSION_STRING"
+
+          # !! this is reused below
+          echo "APP_VERSION=$VERSION_STRING" >> $GITHUB_OUTPUT
+
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # Set Current Date As Env Variable
       - name: Set current date as env variable
@@ -48,7 +79,10 @@ jobs:
 
       # Create APK Debug
       - name: Build apk debug project (APK) - ${{ env.main_project_module }} module
-        run: ./gradlew assembleDebug
+        run: |
+          ./gradlew assembleDebug
+          # rename debug build
+          mv ${{ env.main_project_module }}/build/outputs/apk/debug/app-debug.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}-debug.apk
 
       - name: Recreate release keystore
         run: |
@@ -63,7 +97,10 @@ jobs:
 
       # Create APK Release
       - name: Build apk release project (APK) - ${{ env.main_project_module }} module
-        run: ./gradlew assembleRelease
+        run: |
+          ./gradlew assembleRelease
+          # rename release build
+          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
 
       # Create Bundle AAB Release
       # Noted for main module build [main_project_module]:bundleRelease
@@ -72,18 +109,27 @@ jobs:
 
       # Upload Artifact Build
       # Noted For Output [main_project_module]/build/outputs/apk/debug/
-      - name: Upload APK Debug
+      - name: Upload APK Debug - ${{ env.main_project_module }} module
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) debug generated
           path: ${{ env.main_project_module }}/build/outputs/apk/debug/
 
       # Noted For Output [main_project_module]/build/outputs/apk/release/
-      - name: Upload APK Release
+      - name: Upload APK Release - ${{ env.main_project_module }} module
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) release generated
           path: ${{ env.main_project_module }}/build/outputs/apk/release/
+
+      - name: Upload APK Release Asset to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'release'
+        with:
+          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
+          name: ${{ env.app_name }} Android App ${{ steps.extract_version.outputs.APP_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.ANDROID_BUILD_RELEASE_GITHUB_TOKEN }}
 
       # Noted For Output [main_project_module]/build/outputs/bundle/release/
       # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}

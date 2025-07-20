@@ -38,7 +38,8 @@ jobs:
     environment: 'Android Build'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # Set Current Date As Env Variable
       - name: Set current date as env variable
