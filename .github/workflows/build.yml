@@ -58,6 +58,10 @@ jobs:
       - name: Change wrapper permissions
         run: chmod +x ./gradlew
 
+      - name: Inject secrets.properties
+        run: |
+          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
+
       # Run Tests Build
       - name: Run gradle tests
         run: ./gradlew test
