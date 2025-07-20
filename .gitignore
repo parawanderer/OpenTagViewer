@@ -19,3 +19,5 @@ dist/
 __pycache__/
 app/release
 .coverage
+.pytest_cache
+.venv
