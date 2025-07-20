@@ -92,7 +92,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
+    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ runner.arch }})
       uses: actions/setup-python@v3
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
