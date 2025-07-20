@@ -32,7 +32,6 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='universal2',
     codesign_identity=None,
     entitlements_file=None,
     icon=['OpenTagViewer.icns'],
