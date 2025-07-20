@@ -22,14 +22,15 @@ from Crypto.Cipher import AES
 KEYCHAIN_LABEL = "BeaconStore"
 
 BASE_FOLDER = "com.apple.icloud.searchpartyd"
-INPUT_PATH = os.path.join(os.getenv('HOME'), 'Library', BASE_FOLDER)
+HOME = '' if os.getenv('HOME') is None else os.getenv('HOME')
+INPUT_PATH = os.path.join(HOME, 'Library', BASE_FOLDER)
 
 # NOTE FROM AUTHOR: For my purposes these are sufficient.
 # You can add more if you need more, or remove the filter entirely below
 WHITELISTED_DIRS = {"OwnedBeacons", "BeaconNamingRecord"}
 
 # NOTE FROM AUTHOR: PROVIDE YOUR OWN OUTPUT PATH HERE IF DESIRED!!!
-OUTPUT_PATH = os.path.join(os.getenv('HOME'), "plist_decrypt_output")
+OUTPUT_PATH = os.path.join(HOME, "plist_decrypt_output")
 
 
 class KeyStoreKeyNotFoundException(Exception):
@@ -55,14 +56,20 @@ def get_key(label: str) -> bytearray:
             text=True
         )
         key_in_hex_format: str = result.stdout
-        key: bytearray = bytearray.fromhex(key_in_hex_format)
-        
-        if len(key) == 0:
-            raise KeyStoreKeyNotFoundException(f"Key for '{label}' was empty!")
 
-        return key
+        return extract_key(key_in_hex_format)
+
     except Exception as e:
         raise KeyStoreKeyNotFoundException("Failed to retrieve keystore value") from e
+
+
+def extract_key(key_in_hex_format: str) -> bytearray:
+    key: bytearray = bytearray.fromhex(key_in_hex_format)
+
+    if len(key) == 0:
+        raise KeyStoreKeyNotFoundException("Key was empty!")
+
+    return key
 
 
 def get_key_from_full_output(label: str):

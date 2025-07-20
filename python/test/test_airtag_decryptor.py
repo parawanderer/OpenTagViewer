@@ -6,21 +6,24 @@ import uuid
 import plistlib
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+import pytest
 
-from .utils import DIRNAME, skip_unless_macos_le14
+from test.unittestutils import DIRNAME, skip_unless_macos_le14, skip_unless_unix
 
-from ..airtag_decryptor import (
+from main.airtag_decryptor import (
+    KeyStoreKeyNotFoundException,
     decrypt_folder,
     decrypt_plist,
     dump_plist,
     extract_gena_key,
+    extract_key,
     get_key,
     get_key_from_full_output,
     make_output_path
 )
 
 
-def create_plist(plistData: dict, key: bytes | None = None) -> bytes:
+def _create_plist(plistData: dict, key: bytes | None = None) -> bytes:
     if key is None:
         key = get_random_bytes(16)
 
@@ -36,13 +39,13 @@ def create_plist(plistData: dict, key: bytes | None = None) -> bytes:
     return plist_lvl2, key
 
 
-def create_plist_path() -> str:
+def _create_plist_path() -> str:
     timestamp = int(time.time())
     tmp_path = os.path.join(DIRNAME, f"resources/tmp_plist_{timestamp}.record")
     return tmp_path
 
 
-def create_many_nested_paths(count: int) -> tuple[str, list[str]]:
+def _create_many_nested_paths(count: int) -> tuple[str, list[str]]:
     id_part_root: str = str(uuid.uuid4()).upper()
     basepath: str = os.path.join(DIRNAME, f"resources/{id_part_root}")
 
@@ -55,12 +58,12 @@ def create_many_nested_paths(count: int) -> tuple[str, list[str]]:
     return (basepath, sub_paths)
 
 
-def create_nested_plist_path() -> tuple[str, str]:
-    result = create_many_nested_paths(count=1)
+def _create_nested_plist_path() -> tuple[str, str]:
+    result = _create_many_nested_paths(count=1)
     return (result[0], result[1][0])
 
 
-def create_tmp_out_folder() -> str:
+def _create_tmp_out_folder() -> str:
     id_part: str = str(uuid.uuid4()).upper()
     return os.path.join(DIRNAME, f"resources/{id_part}")
 
@@ -82,6 +85,17 @@ def test_get_key_from_full_output():
     """
     res = get_key_from_full_output("BeaconStore")
     assert res is not None
+
+
+@skip_unless_unix
+def test_make_output_path():
+    result: str = make_output_path(
+        input_file_path="/Users/user/Library/com.apple.icloud.searchpartyd/SomeFolder/Foo/Bar/88674E0D-7BC5-412E-A7D2-7A9B278F6B0E.record",  # noqa: E501
+        output_root="/Users/user/my-target-folder",
+        input_root_folder="/Users/user/Library/com.apple.icloud.searchpartyd"
+    )
+
+    assert result == "/Users/user/my-target-folder/SomeFolder/Foo/Bar/88674E0D-7BC5-412E-A7D2-7A9B278F6B0E.plist"
 
 
 def test_extract_gena_key():
@@ -114,6 +128,25 @@ attributes:
     assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
 
 
+def test_extract_gena_key_when_empty():
+    with pytest.raises(KeyStoreKeyNotFoundException):
+        extract_gena_key("")
+
+
+def test_extract_key():
+    output: str = "4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849"
+
+    result = extract_key(output)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
+
+
+def test_extract_key_when_empty():
+    with pytest.raises(KeyStoreKeyNotFoundException):
+        extract_key("")
+
+
 def test_decrypt_plist():
     # create temporary plist
     original_data: dict = {
@@ -126,8 +159,8 @@ def test_decrypt_plist():
         ]
     }
 
-    encrypted_plist, key = create_plist(original_data)
-    tmp_path = create_plist_path()
+    encrypted_plist, key = _create_plist(original_data)
+    tmp_path = _create_plist_path()
 
     try:
         # write to temp file:
@@ -151,7 +184,7 @@ def test_dump_plist():
         "foo": "bar"
     }
 
-    base_path, tmp_path = create_nested_plist_path()
+    base_path, tmp_path = _create_nested_plist_path()
 
     try:
         dump_plist(plist_data, tmp_path)
@@ -165,16 +198,6 @@ def test_dump_plist():
             shutil.rmtree(base_path)
 
 
-def test_make_output_path():
-    result: str = make_output_path(
-        input_file_path="/Users/user/Library/com.apple.icloud.searchpartyd/SomeFolder/Foo/Bar/88674E0D-7BC5-412E-A7D2-7A9B278F6B0E.record",  # noqa: E501
-        output_root="/Users/user/my-target-folder",
-        input_root_folder="/Users/user/Library/com.apple.icloud.searchpartyd"
-    )
-
-    assert result == "/Users/user/my-target-folder/SomeFolder/Foo/Bar/88674E0D-7BC5-412E-A7D2-7A9B278F6B0E.plist"
-
-
 def test_decrypt_folder():
     plist1: dict = {
         "foo": "bar"
@@ -185,9 +208,9 @@ def test_decrypt_folder():
     }
     key = get_random_bytes(16)
 
-    base_path, [item1_path, item2_path] = create_many_nested_paths(count=2)
+    base_path, [item1_path, item2_path] = _create_many_nested_paths(count=2)
     folder_name = 'Foo'
-    tmp_output_to: str = create_tmp_out_folder()
+    tmp_output_to: str = _create_tmp_out_folder()
 
     def setup():
         # make temp directory to test against
@@ -195,10 +218,10 @@ def test_decrypt_folder():
         os.makedirs(os.path.dirname(item2_path), exist_ok=True)
 
         with open(item1_path, 'wb') as f:
-            f.write(create_plist(plist1, key)[0])
+            f.write(_create_plist(plist1, key)[0])
 
         with open(item2_path, 'wb') as f:
-            f.write(create_plist(plist2, key)[0])
+            f.write(_create_plist(plist2, key)[0])
 
     try:
         setup()

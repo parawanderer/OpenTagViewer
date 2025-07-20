@@ -12,7 +12,7 @@ from tkinter.filedialog import asksaveasfilename
 
 from tkinter import messagebox
 
-from airtag_decryptor import (
+from main.airtag_decryptor import (
     KEYCHAIN_LABEL,
     INPUT_PATH,
     WHITELISTED_DIRS,
@@ -23,7 +23,7 @@ from airtag_decryptor import (
     make_output_path,
     dump_plist
 )
-from utils import MACOS_VER
+from main.utils import MACOS_VER
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
