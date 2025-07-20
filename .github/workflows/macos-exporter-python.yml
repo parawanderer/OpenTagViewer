@@ -56,7 +56,7 @@ jobs:
     environment: 'MacOS Exporter App CI'
     needs: test-release-version
     runs-on:
-      - macos-13 # Intel
+      - macos-13-large # Intel
       - macos-14 # Apple Silicon
 
     # Only run this for 'macos-exporter-v<whatever>' tags!
