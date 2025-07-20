@@ -1,17 +1,9 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: MacOS Exporter App - Python Tests
+name: MacOS Exporter App
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - "python/**"
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - "python/**"
   release:
     types: published
 
@@ -21,51 +13,14 @@ env:
   APP_NAME: OpenTagViewer-ExportWizardMacOS
 
 jobs:
-  test:
-
-    runs-on: macos-14  # We *need* 14, this whole setup is only supported up to <= 14 (without weird security disabling hacks)
-
-    # Run *all python versions* against 'push' and 'pull_requests'
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-
-    strategy:
-      fail-fast: true
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      working-directory: ./python
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        pip install -r requirements.txt
-
-    - name: Lint with flake8
-      working-directory: . # run flake8 from repository root
-      run: |
-        # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 ./python --count --exit-zero --statistics
-
-    - name: Test with pytest
-      working-directory: ./python
-      run: |
-        pytest ./test
-
   test-release-version:
     runs-on: macos-14
 
-    if: github.event_name == 'release'
+    # Only run this for 'macos-exporter-v<whatever>' tags!
+    if: |
+      github.event_name == 'release'
+      && (github.event.release.prerelease == true || github.event.release.published_at != null)
+      && startsWith(github.event.release.tag_name, 'macos-exporter-v')
 
     steps: # (reuses steps from full flow!)
     - name: Checkout code
@@ -102,6 +57,7 @@ jobs:
     needs: test-release-version
     runs-on: macos-14  # We *need* 14, this whole setup is only supported up to <= 14 (without weird security disabling hacks)
 
+    # Only run this for 'macos-exporter-v<whatever>' tags!
     if: |
       github.event_name == 'release'
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
@@ -169,7 +125,7 @@ jobs:
         mv ${{ github.workspace }}/python/dist/$APP_ZIP_NAME ${{ github.workspace }}/output/$APP_ZIP_NAME
 
         echo "UPLOAD_ASSET=$APP_ZIP_NAME" >> $GITHUB_ENV
-        echo "UPLOAD_PATH=${{ github.workspace }}/output$APP_ZIP_NAME" >> $GITHUB_ENV
+        echo "UPLOAD_PATH=${{ github.workspace }}/output/$APP_ZIP_NAME" >> $GITHUB_ENV
 
     - name: Upload PyInstaller Artifact
       uses: actions/upload-artifact@v4
