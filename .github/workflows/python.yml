@@ -9,13 +9,14 @@ on:
   pull_request:
     branches: [ "main" ]
 
+
+env:
+    PYTHONPATH: "${{ github.workspace }}/python:$PYTHONPATH"
+
 jobs:
   build:
 
     runs-on: ubuntu-latest
-
-    env:
-        PYTHONPATH: "${{ github.workspace }}/python:${{ env.PYTHONPATH }}"
 
     strategy:
       fail-fast: false
