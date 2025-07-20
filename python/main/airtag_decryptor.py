@@ -98,7 +98,9 @@ def get_key_from_full_output(label: str):
 
 
 def extract_gena_key(output: str):
-    """Tries to extract the key from the full output (see issue: https://github.com/parawanderer/OpenTagViewer/issues/13), e.g.:
+    """Tries to extract the key from the full output
+    (see issue: https://github.com/parawanderer/OpenTagViewer/issues/13), e.g.:
+
     ```
     keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
     version: 512
