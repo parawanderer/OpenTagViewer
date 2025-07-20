@@ -111,7 +111,7 @@ class WizardApp(tk.Tk):
         if MACOS_VER[0] >= 15:
             messagebox.showwarning(
                 "Unsupported MacOS Version",
-                "This application is only confirmed to work on MacOS <= 14. \n\nCheck the Wiki for alternative approaches for MacOS >= 15!"
+                "This application is only confirmed to work on MacOS <= 14. \n\nCheck the Wiki for alternative approaches for MacOS >= 15!"  # noqa: E501
             )
             # I'll actually keep the app operational on MacOs >= 15 in case somebody figures out a workaround. But yeah!
 
@@ -131,24 +131,14 @@ class WizardApp(tk.Tk):
             self.quit()
             raise Exception("User does not want to give password access to keystore!")
 
-    def _create_beacon_data_map(self) -> dict[str, BeaconData]:
-        # get key: prompts password entry (for some reason twice)
-        beacon_store_key: bytearray = None
-
+    def _retrieve_key(self):
         try:
-            beacon_store_key = get_key(KEYCHAIN_LABEL)
+            return get_key(KEYCHAIN_LABEL)
         except KeyStoreKeyNotFoundException:
             # Fallback to alternate solution (see issue #13)
-            beacon_store_key = get_key_from_full_output(KEYCHAIN_LABEL)
+            return get_key_from_full_output(KEYCHAIN_LABEL)
 
-        if not beacon_store_key:
-            messagebox.showerror(
-                "Permission Refused Error",
-                f"Permission to access '{KEYCHAIN_LABEL}' was not granted, which means the app cannot function at this time. \n\nIf this was a mistake, restart the app and try entering your password TWICE again."  # noqa: E501
-            )
-            raise Exception(f"Failure to authenticate for '{KEYCHAIN_LABEL}' access!")
-
-        # get needed files
+    def _read_all_plists(self, beacon_store_key: bytearray) -> tuple[list[PListFileInfo], list[PListFileInfo]]:
         owned_beacons: list[PListFileInfo]
         beacon_naming_records: list[PListFileInfo]
         for path, folders, _ in os.walk(INPUT_PATH):
@@ -168,6 +158,21 @@ class WizardApp(tk.Tk):
                     beacon_naming_records = plists
             break
 
+        return (owned_beacons, beacon_naming_records)
+
+    def _create_beacon_data_map(self) -> dict[str, BeaconData]:
+        # get key: prompts password entry
+        beacon_store_key: bytearray = self._retrieve_key()
+
+        if not beacon_store_key:
+            messagebox.showerror(
+                "Permission Refused Error",
+                f"Permission to access '{KEYCHAIN_LABEL}' was not granted, which means the app cannot function at this time. \n\nIf this was a mistake, restart the app and try entering your password TWICE again."  # noqa: E501
+            )
+            raise Exception(f"Failure to authenticate for '{KEYCHAIN_LABEL}' access!")
+
+        # get needed files
+        owned_beacons, beacon_naming_records = self._read_all_plists(beacon_store_key)
         # map them by beaconId
         m: dict[str, BeaconData] = {}
 
@@ -280,7 +285,7 @@ class WizardApp(tk.Tk):
                 print(f"Now dumping '{beacon.owned_beacon.filepath}' to {output_file2}...")
                 dump_plist(beacon.owned_beacon.data, output_file2)
 
-            # We need tomake an export metadata file in the root dir...
+            # We need to make an export metadata file in the root dir...
             export_metadata = {
                 "version": EXPORT_METADATA_VERSION,
                 "exportTimestamp": int(time.time() * 1000),
