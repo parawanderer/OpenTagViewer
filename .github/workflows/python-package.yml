@@ -42,6 +42,7 @@ jobs:
     #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
     - name: Test with pytest
+      working-directory: ./python
       run: |
-        cd python # out python project lives in this dir
-        pytest
+        export PYTHONPATH=$PYTHONPATH:.
+        pytest ./tests

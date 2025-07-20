@@ -293,7 +293,6 @@ class WizardApp(tk.Tk):
                 yaml.dump(export_metadata, fmeta, default_flow_style=False)
                 print(f"Created metadata file: {metadata_file}")
 
-
             # zip to desired target file:
             print(f"Now writing compressed zip file to '{output_zip_path}'...")
             with ZipFile(output_zip_path, 'w') as zip_obj:
