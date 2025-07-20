@@ -14,6 +14,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    env:
+        PYTHONPATH: "${{ github.workspace }}/python:${{ env.PYTHONPATH }}"
+
     strategy:
       fail-fast: false
       matrix:
@@ -44,5 +47,4 @@ jobs:
     - name: Test with pytest
       working-directory: ./python
       run: |
-        export PYTHONPATH=$PYTHONPATH:.
         pytest ./test
