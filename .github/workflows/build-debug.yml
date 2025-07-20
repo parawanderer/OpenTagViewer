@@ -41,7 +41,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set Current Date As Env Variable
       - name: Set current date as env variable
         run: echo "date_today=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
@@ -59,6 +58,10 @@ jobs:
       - name: Change wrapper permissions
         run: chmod +x ./gradlew
 
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
       - name: Inject secrets.properties
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
@@ -67,13 +70,9 @@ jobs:
       - name: Run gradle tests
         run: ./gradlew test
 
-      # Run Build Project
-      - name: Build gradle project
-        run: ./gradlew build -x lint
-
       # Create APK Debug
-      - name: Build apk debug project (APK) - ${{ env.main_project_module }} module
-        run: ./gradlew assembleDebug
+      - name: Build Debug APK - ${{ env.main_project_module }} module
+        run: ./gradlew testDebugUnitTest assembleDebug
 
       # Upload Artifact Build
       # Noted For Output [main_project_module]/build/outputs/apk/debug/
