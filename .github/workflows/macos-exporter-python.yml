@@ -52,94 +52,14 @@ jobs:
       run: |
         pytest ./test
 
-  build-executable:
-    environment: 'MacOS Exporter App CI'
+  build-apple-silicon:
     needs: test-release-version
-    runs-on:
-      - macos-13 # Intel
-      - macos-14 # Apple Silicon
+    uses: ./.github/workflows/macos-exporter-common.yml
+    with:
+      os-version: macos-14 # Apple Silicon
 
-    # Only run this for 'macos-exporter-v<whatever>' tags!
-    if: |
-      github.event_name == 'release'
-      && (github.event.release.prerelease == true || github.event.release.published_at != null)
-      && startsWith(github.event.release.tag_name, 'macos-exporter-v')
-
-    steps:
-    - name: Extract Version from Tag
-      id: extract_version
-      run: |
-        # GITHUB_REF for tags is like 'refs/tags/macos-exporter-v1.0.3.1'
-        FULL_TAG_NAME="${{ github.ref }}"
-
-        # Remove 'refs/tags/' prefix to get 'macos-exporter-v1.0.3.1'
-        TAG_WITHOUT_PREFIX="${FULL_TAG_NAME##refs/tags/}"
-
-        # Find the index of '-v'
-        # This will be 'macos-exporter-' part, then we add 2 to skip '-v'
-        START_INDEX=$(( $(echo "$TAG_WITHOUT_PREFIX" | awk -F'-v' '{print length($1)}') + 2 ))
-
-        # Extract everything from '-v' onwards
-        # Using cut or substring if available, or just awk
-        VERSION_STRING=$(echo "$TAG_WITHOUT_PREFIX" | cut -c "$START_INDEX"-)
-
-        # Output the extracted version as a step output
-        echo "Extracted version: $VERSION_STRING"
-
-        # !! this is reused below
-        echo "APP_VERSION=$VERSION_STRING" >> $GITHUB_OUTPUT
-
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ runner.arch }})
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
-
-    - name: Install dependencies
-      working-directory: ./python
-      run: |
-        brew install python-tk
-        python -m pip install --upgrade pip
-        pip install pyinstaller -r requirements.txt
-
-    - name: Run PyInstaller for MacOS (${{ runner.arch }})
-      working-directory: ./python
-      run: |
-        pyinstaller \
-          --onefile \
-          --windowed \
-          --name "OpenTagViewer" \
-          --osx-bundle-identifier "dev.wander.opentagviewer" \
-          --icon=OpenTagViewer.icns \
-          --noconfirm \
-          ./main/wizard.py
-
-    - name: Prepare and Upload MacOS App
-      working-directory: ./python
-      run: |
-        echo "Going to build zip with version: ${{ steps.extract_version.outputs.APP_VERSION }}"
-        APP_ZIP_NAME="${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip"
-        cd ./dist
-        zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
-        mkdir -p ${{ github.workspace }}/output
-        mv ${{ github.workspace }}/python/dist/$APP_ZIP_NAME ${{ github.workspace }}/output/$APP_ZIP_NAME
-
-        echo "UPLOAD_ASSET=$APP_ZIP_NAME" >> $GITHUB_ENV
-        echo "UPLOAD_PATH=${{ github.workspace }}/output/$APP_ZIP_NAME" >> $GITHUB_ENV
-
-    - name: Upload PyInstaller Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
-        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
-
-    - name: Upload Release Asset to GitHub Release
-      uses: softprops/action-gh-release@v2
-      if: github.event_name == 'release'
-      with:
-        files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
-        name: OpenTagViewer MacOS AirTag Exporter ${{ steps.extract_version.outputs.APP_VERSION }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions
+  build-intel:
+    needs: test-release-version
+    uses: ./.github/workflows/macos-exporter-common.yml
+    with:
+      os-version: macos-13 # Intel (these runners seem scarcely available for some reason)
