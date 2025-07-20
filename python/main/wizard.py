@@ -26,6 +26,7 @@ from main.airtag_decryptor import (
 from main.utils import MACOS_VER
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
+
 VERSION = "1.0.3"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"

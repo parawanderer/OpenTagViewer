@@ -120,7 +120,7 @@ jobs:
         echo "Going to build zip with version: ${{ steps.extract_version.outputs.APP_VERSION }}"
         APP_ZIP_NAME="${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}.zip"
         cd ./dist
-        zip -r  OpenTagViewer.app/ OpenTagViewer
+        zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
         mkdir -p ${{ github.workspace }}/output
         mv ${{ github.workspace }}/python/dist/$APP_ZIP_NAME ${{ github.workspace }}/output/$APP_ZIP_NAME
 
