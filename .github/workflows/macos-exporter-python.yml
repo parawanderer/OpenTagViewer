@@ -95,7 +95,7 @@ jobs:
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
           --noconfirm \
-          wizard.py
+          ./main/wizard.py
 
     - name: Prepare and Upload MacOS App
       working-directory: ./python
