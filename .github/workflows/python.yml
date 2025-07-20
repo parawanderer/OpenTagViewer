@@ -45,4 +45,4 @@ jobs:
       working-directory: ./python
       run: |
         export PYTHONPATH=$PYTHONPATH:.
-        pytest ./tests
+        pytest ./test
