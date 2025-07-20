@@ -27,9 +27,9 @@ And Python3 version: `3.13.2`.
 
 ## 🔧 Python Utility Scripts
 
-> [!WARNING]  
+> [!WARNING]
 > It is possible that these scripts will not execute on all python3 versions!
-> 
+>
 > However, the [OpentagViewer Wizard App](https://github.com/parawanderer/OpenTagViewer/releases?q=macos-exporter&expanded=true) that can be downloaded from the `Releases` page will work regardless of the Python version you have installed on your MacOS machine, as it uses its own bundled/embedded version of Python that it gets packaged with.
 
 
@@ -53,7 +53,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
     - Default output path: `~/plist_decrypt_output`
 - Run the script:
     ```bash
-    python airtag_decryptor.py
+    python main/airtag_decryptor.py
     ```
     - Note that it will prompt your password twice.
 - The script will open the specified output folder on success
@@ -74,7 +74,7 @@ pip install -r requirements.txt
 
 Then:
 ```shell
-python wizard.py
+python main/wizard.py
 ```
 
 ### Build Icons (on MacOS)
