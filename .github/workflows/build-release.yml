@@ -1,4 +1,4 @@
-name: Generate APK/AAB
+name: Generate APK (Release)
 env:
   # The name of the main module repository
   main_project_module: app
@@ -6,36 +6,12 @@ env:
   app_name: OpenTagViewer
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      # only run when Android-related stuff actually changed!
-      - "app/**"
-      - "gradle/**"
-      - "build.gradle.kts"
-      - "gradle.properties"
-      - "gradlew"
-      - "gradle.bat"
-      - "local.defaults.properties"
-      - "settings.gradle.kts"
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - "app/**"
-      - "gradle/**"
-      - "build.gradle.kts"
-      - "gradle.properties"
-      - "gradlew"
-      - "gradle.bat"
-      - "local.defaults.properties"
-      - "settings.gradle.kts"
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  release:
+    types: published
 
 jobs:
   build:
-    environment: 'Android Build'
+    environment: 'Android Build Release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,33 +50,44 @@ jobs:
       - name: Build apk debug project (APK) - ${{ env.main_project_module }} module
         run: ./gradlew assembleDebug
 
+      - name: Recreate release keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > release-keystore.jks
+
+      - name: Set env variables for Signing
+        run: |
+          echo "KEYSTORE_FILE=release-keystore.jks" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+
       # Create APK Release
       - name: Build apk release project (APK) - ${{ env.main_project_module }} module
-        run: ./gradlew assemble
+        run: ./gradlew assembleRelease
 
       # Create Bundle AAB Release
       # Noted for main module build [main_project_module]:bundleRelease
-      - name: Build app bundle release (AAB) - ${{ env.main_project_module }} module
-        run: ./gradlew ${{ env.main_project_module }}:bundleRelease
+      # - name: Build app bundle release (AAB) - ${{ env.main_project_module }} module
+      #   run: ./gradlew ${{ env.main_project_module }}:bundleRelease
 
       # Upload Artifact Build
       # Noted For Output [main_project_module]/build/outputs/apk/debug/
-      - name: Upload APK Debug - ${{ env.repository_name }}
+      - name: Upload APK Debug
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) debug generated
           path: ${{ env.main_project_module }}/build/outputs/apk/debug/
 
       # Noted For Output [main_project_module]/build/outputs/apk/release/
-      - name: Upload APK Release - ${{ env.repository_name }}
+      - name: Upload APK Release
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) release generated
           path: ${{ env.main_project_module }}/build/outputs/apk/release/
 
       # Noted For Output [main_project_module]/build/outputs/bundle/release/
-      - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - App bundle(s) AAB release generated
-          path: ${{ env.main_project_module }}/build/outputs/bundle/release/
+      # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - App bundle(s) AAB release generated
+      #     path: ${{ env.main_project_module }}/build/outputs/bundle/release/
