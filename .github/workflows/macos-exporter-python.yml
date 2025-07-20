@@ -57,9 +57,11 @@ jobs:
     uses: ./.github/workflows/macos-exporter-common.yml
     with:
       os-version: macos-14 # Apple Silicon
+    environment: 'MacOS Exporter App CI'
 
   build-intel:
     needs: test-release-version
     uses: ./.github/workflows/macos-exporter-common.yml
     with:
       os-version: macos-13 # Intel (these runners seem scarcely available for some reason)
+    environment: 'MacOS Exporter App CI'

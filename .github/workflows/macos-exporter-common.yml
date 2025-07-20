@@ -16,8 +16,6 @@ jobs:
   build-executable:
     runs-on: ${{ inputs.os-version }}
 
-    environment: 'MacOS Exporter App CI'
-
     # Only run this for 'macos-exporter-v<whatever>' tags!
     if: |
       github.event_name == 'release'
