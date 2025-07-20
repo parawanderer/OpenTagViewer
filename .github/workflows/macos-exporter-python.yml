@@ -130,7 +130,7 @@ jobs:
     - name: Upload PyInstaller Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}
+        name: ${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}.zip
         path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}.zip
 
     - name: Upload Release Asset to GitHub Release
