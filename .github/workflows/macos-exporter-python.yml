@@ -61,6 +61,7 @@ jobs:
         pytest ./test
 
   build-executable:
+    environment: 'MacOS Exporter App CI'
     needs: test  # run this job only after 'test' job completes successfully
     runs-on: macos-14  # We *need* 14, this whole setup is only supported up to <= 14 (without weird security disabling hacks)
 
@@ -122,4 +123,4 @@ jobs:
         files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
         name: ${{ env.APP_ZIP_NAME }}
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Provided by GitHub Actions
+        GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions
