@@ -4,6 +4,8 @@ env:
   main_project_module: app
   # The name of the App
   app_name: OpenTagViewer
+  KEYSTORE_FILE: release-keystore.jks
+  ALIAS: upload
 
 on:
   release:
@@ -76,7 +78,7 @@ jobs:
 
       - name: Recreate release keystore
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > ${{ env.main_project_module }}/release-keystore.jks
+          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > ${{ env.main_project_module }}/${{ env.KEYSTORE_FILE }}
 
       - name: Run gradle tests
         run: ./gradlew test
@@ -84,9 +86,8 @@ jobs:
       - name: Build gradle project
         run: ./gradlew build -x lint
         env:
-          KEYSTORE_FILE: release-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_ALIAS: ${{ env.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK Debug
@@ -95,20 +96,18 @@ jobs:
           # rename debug build
           mv ${{ env.main_project_module }}/build/outputs/apk/debug/app-debug.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}-debug.apk
         env:
-          KEYSTORE_FILE: release-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_ALIAS: ${{ env.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK Release
         run: |
           ./gradlew assembleRelease
           # rename release build
-          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
+          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release.apk ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
         env:
-          KEYSTORE_FILE: release-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_ALIAS: ${{ env.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # Create Bundle AAB Release
