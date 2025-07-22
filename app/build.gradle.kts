@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.retrofit.jackson)
     implementation(libs.retrofit.rxjava3)
     implementation(libs.google.cronet.retrofit)
+    implementation(libs.cronet.embedded)
     implementation(libs.google.play.location)
     implementation(libs.google.places)
     implementation(libs.androidx.emoji)
