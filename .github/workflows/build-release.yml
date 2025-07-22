@@ -65,9 +65,25 @@ jobs:
       - name: Change wrapper permissions
         run: chmod +x ./gradlew
 
+
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
       - name: Inject secrets.properties
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
+
+      - name: Recreate release keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > release-keystore.jks
+
+      - name: Set env variables for Signing
+        run: |
+          echo "KEYSTORE_FILE=release-keystore.jks" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
 
       # Run Tests Build
       - name: Run gradle tests
@@ -83,17 +99,6 @@ jobs:
           ./gradlew assembleDebug
           # rename debug build
           mv ${{ env.main_project_module }}/build/outputs/apk/debug/app-debug.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}-debug.apk
-
-      - name: Recreate release keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > release-keystore.jks
-
-      - name: Set env variables for Signing
-        run: |
-          echo "KEYSTORE_FILE=release-keystore.jks" >> $GITHUB_ENV
-          echo "KEYSTORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
 
       # Create APK Release
       - name: Build apk release project (APK) - ${{ env.main_project_module }} module
