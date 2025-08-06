@@ -280,7 +280,7 @@ def main():
     os.makedirs(OUTPUT_PATH, exist_ok=True)
 
     # this thing will pop up 2 Password Input windows...
-    key: bytearray = get_key(KEYCHAIN_LABEL)
+    key: bytearray = get_key_fallback(KEYCHAIN_LABEL)
 
     for path, folders, _ in os.walk(INPUT_PATH):
         for foldername in folders:
