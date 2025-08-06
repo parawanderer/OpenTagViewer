@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import os
 import re
 import shlex
@@ -37,25 +38,42 @@ class KeyStoreKeyNotFoundException(Exception):
     pass
 
 
-def get_key(label: str) -> bytearray:
+class AbstractSubprocessRunner(ABC):
+    """
+    Wrapper class to enable easier unit testing
+    """
+
+    @abstractmethod
+    def run(self, command: list[str]) -> str:
+        ...
+
+
+class SubprocessRunner(AbstractSubprocessRunner):
+    """
+    Runs generic `subprocess` implementation
+    """
+
+    def run(self, command: list[str]) -> str:
+        return subprocess.run(command, capture_output=True, text=True).stdout
+
+
+def get_key(label: str, runner: AbstractSubprocessRunner = SubprocessRunner()) -> bytearray:
     """
     Tries to extract the key via the command `security find-generic-password -l <label> -w`.
 
     :throws KeyStoreKeyNotFoundException: when not found or unable to extract
     """
     try:
-        result = subprocess.run(
-            [
-                "security",
-                "find-generic-password",
-                "-l",
-                label,
-                "-w"
-            ],
-            capture_output=True,
-            text=True
-        )
-        key_in_hex_format: str = result.stdout
+        key_in_hex_format: str = runner.run([
+            "security",
+            "find-generic-password",
+            "-l",
+            label,
+            "-w"
+        ])
+
+        if len(key_in_hex_format.strip()) == 0:
+            raise KeyStoreKeyNotFoundException("security command output with flag -w returned empty")
 
         return extract_key(key_in_hex_format)
 
@@ -72,7 +90,7 @@ def extract_key(key_in_hex_format: str) -> bytearray:
     return key
 
 
-def get_key_from_full_output(label: str):
+def get_key_from_full_output(label: str, runner: AbstractSubprocessRunner = SubprocessRunner()):
     """
     Tries to extract the key via the command `security find-generic-password -l <label>`.
 
@@ -81,17 +99,16 @@ def get_key_from_full_output(label: str):
     :throws KeyStoreKeyNotFoundException: when not found in output or unable to extract
     """
     try:
-        result = subprocess.run(
-            [
-                "security",
-                "find-generic-password",
-                "-l",
-                label
-            ],
-            capture_output=True,
-            text=True
-        )
-        full_key_info: str = result.stdout
+        full_key_info: str = runner.run([
+            "security",
+            "find-generic-password",
+            "-l",
+            label
+        ])
+
+        if len(full_key_info.strip()) == 0:
+            raise KeyStoreKeyNotFoundException("security command full output returned empty")
+
         return extract_gena_key(full_key_info)
     except Exception as e:
         raise KeyStoreKeyNotFoundException("Failed to retrieve keystore value") from e
@@ -135,6 +152,14 @@ def extract_gena_key(output: str):
     key: bytearray = bytearray.fromhex(key_in_hex_format)
 
     return key
+
+
+def get_key_fallback(label: str, runner: AbstractSubprocessRunner = SubprocessRunner()) -> bytearray:
+    try:
+        return get_key(label, runner)
+    except KeyStoreKeyNotFoundException:
+        # Fallback to alternate solution (see issue #13)
+        return get_key_from_full_output(label, runner)
 
 
 def decrypt_plist(in_file_path: str, key: bytearray) -> dict:

@@ -106,7 +106,7 @@ pyinstaller \
 
 Zip up result (MacOS):
 ```shell
-APP_VERSION=1.0.3
+APP_VERSION=1.0.4
 cd ./dist
 zip -r OpenTagViewer-ExportWizardMacOS-$APP_VERSION.zip OpenTagViewer.app/ OpenTagViewer
 ```

@@ -1,7 +1,10 @@
+from dataclasses import dataclass
 import time
 import os
 import shutil
 import uuid
+import pytest
+from unittest.mock import Mock
 
 import plistlib
 from Crypto.Cipher import AES
@@ -11,6 +14,7 @@ import pytest
 from test.unittestutils import DIRNAME, skip_unless_macos_le14, skip_unless_unix
 
 from main.airtag_decryptor import (
+    AbstractSubprocessRunner,
     KeyStoreKeyNotFoundException,
     decrypt_folder,
     decrypt_plist,
@@ -18,9 +22,64 @@ from main.airtag_decryptor import (
     extract_gena_key,
     extract_key,
     get_key,
+    get_key_fallback,
     get_key_from_full_output,
     make_output_path
 )
+
+TEST_FULL_OUTPUT = """
+keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
+version: 512
+class: "genp"
+attributes:
+    0x00000007 <blob>="BeaconStore"
+    0x00000008 <blob>=<NULL>
+    "acct"<blob>="BeaconStoreKey"
+    "cdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "crtr"<uint32>=<NULL>
+    "cusi"<sint32>=<NULL>
+    "desc"<blob>=<NULL>
+    "gena"<blob>=0x4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849  "<IGNORED>"
+    "icmt"<blob>=<NULL>
+    "invi"<sint32>=<NULL>
+    "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "nega"<sint32>=<NULL>
+    "prot"<blob>=<NULL>
+    "scrp"<sint32>=<NULL>
+    "svce"<blob>="BeaconStore"
+    "type"<uint32>=<NULL>
+"""
+
+
+@dataclass
+class GetKeyTestCase:
+    name: str
+    output: str
+
+
+def _make_output(gena_value: str) -> str:
+    return f"""
+keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
+version: 512
+class: "genp"
+attributes:
+    0x00000007 <blob>="BeaconStore"
+    0x00000008 <blob>=<NULL>
+    "acct"<blob>="BeaconStoreKey"
+    "cdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "crtr"<uint32>=<NULL>
+    "cusi"<sint32>=<NULL>
+    "desc"<blob>=<NULL>
+    "gena"<blob>={gena_value}  "<IGNORED>"
+    "icmt"<blob>=<NULL>
+    "invi"<sint32>=<NULL>
+    "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
+    "nega"<sint32>=<NULL>
+    "prot"<blob>=<NULL>
+    "scrp"<sint32>=<NULL>
+    "svce"<blob>="BeaconStore"
+    "type"<uint32>=<NULL>
+"""
 
 
 def _create_plist(plistData: dict, key: bytes | None = None) -> bytes:
@@ -79,6 +138,39 @@ def test_get_key():
     assert key is not None
 
 
+def test_mocked_get_key_success():
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.return_value = "4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849"
+
+    result = get_key("BeaconStore", runner)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
+
+
+GET_KEY_INVALID_CASES = [
+    GetKeyTestCase(name="empty string", output=""),
+    GetKeyTestCase(name="whitespace", output="     "),
+    GetKeyTestCase(name="whitespace + linebreaks", output="   \n "),
+    GetKeyTestCase(name="not hexadecimal", output="ghijk"),
+    GetKeyTestCase(name="not hexadecimal + linebreaks", output="  \nghijk  \n"),
+]
+
+
+@pytest.mark.parametrize(
+    "test_output",
+    [(c.output) for c in GET_KEY_INVALID_CASES],
+    ids=[f"when {c.name}" for c in GET_KEY_INVALID_CASES]
+)
+def test_mocked_get_key_invalid(test_output: str):
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.return_value = test_output
+
+    with pytest.raises(KeyStoreKeyNotFoundException):
+        # this should throw
+        get_key("BeaconStore", runner)
+
+
 @pytest.mark.skip(reason="In CI you'll never get the password prompt, so it just returns empty")
 @skip_unless_macos_le14
 def test_get_key_from_full_output():
@@ -87,6 +179,91 @@ def test_get_key_from_full_output():
     """
     res = get_key_from_full_output("BeaconStore")
     assert res is not None
+
+
+def test_mocked_get_key_from_full_output_success():
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.return_value = TEST_FULL_OUTPUT
+
+    result = get_key_from_full_output("BeaconStore", runner)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
+
+
+GET_KEY_GENA_INVALID_CASES = [
+    GetKeyTestCase(name="output is empty", output=""),
+    GetKeyTestCase(name="output is whitespace", output="   "),
+    GetKeyTestCase(name="output is whitespace + linebreak", output="  \n  "),
+    GetKeyTestCase(name="null", output=_make_output("<NULL>")),
+    GetKeyTestCase(name="invalid hex", output=_make_output("invalid")),
+    GetKeyTestCase(name="missing", output=_make_output("")),
+    GetKeyTestCase(name="empty", output=_make_output("0x0")),
+    GetKeyTestCase(
+        name="less than 64 hex character",
+        output=_make_output("1"*63)
+    ),
+    GetKeyTestCase(
+        name="more than 64 hex character",
+        output=_make_output("1"*65)
+    )
+]
+
+
+@pytest.mark.parametrize(
+    "test_output",
+    [(c.output) for c in GET_KEY_GENA_INVALID_CASES],
+    ids=[f"when {c.name}" for c in GET_KEY_GENA_INVALID_CASES]
+)
+def test_mocked_get_key_from_full_output_invalid(test_output: str):
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.return_value = test_output
+
+    with pytest.raises(KeyStoreKeyNotFoundException):
+        # this should throw
+        get_key_from_full_output("BeaconStore", runner)
+
+
+def test_get_key_fallback_first_success():
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.side_effect = [
+        # first call returns full result
+        "4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849"
+    ]
+
+    result = get_key_fallback("BeaconStore", runner)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
+
+
+def test_get_key_fallback_second_success():
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.side_effect = [
+        # first call returns empty
+        "",
+        # second call returns full result
+        TEST_FULL_OUTPUT
+    ]
+
+    result = get_key_fallback("BeaconStore", runner)
+
+    assert result is not None
+    assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'
+
+
+def test_get_key_fallback_both_fail():
+    runner = Mock(spec=AbstractSubprocessRunner)
+    runner.run.side_effect = [
+        # first call returns empty
+        "",
+        # second call returns empty
+        ""
+    ]
+
+    with pytest.raises(KeyStoreKeyNotFoundException):
+        # this should throw
+        get_key_fallback("BeaconStore", runner)
 
 
 @skip_unless_unix
@@ -101,30 +278,7 @@ def test_make_output_path():
 
 
 def test_extract_gena_key():
-    output: str = """
-keychain: "/Users/<user>/Library/Keychains/login.keychain-db"
-version: 512
-class: "genp"
-attributes:
-    0x00000007 <blob>="BeaconStore"
-    0x00000008 <blob>=<NULL>
-    "acct"<blob>="BeaconStoreKey"
-    "cdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
-    "crtr"<uint32>=<NULL>
-    "cusi"<sint32>=<NULL>
-    "desc"<blob>=<NULL>
-    "gena"<blob>=0x4D792D5365637265742D4B65792D4142434445464748494A4B4C4D4E4F504849  "<IGNORED>"
-    "icmt"<blob>=<NULL>
-    "invi"<sint32>=<NULL>
-    "mdat"<timedate>=0x32303235303630383136303533305A00  "20250608160530Z\000"
-    "nega"<sint32>=<NULL>
-    "prot"<blob>=<NULL>
-    "scrp"<sint32>=<NULL>
-    "svce"<blob>="BeaconStore"
-    "type"<uint32>=<NULL>
-"""
-
-    result = extract_gena_key(output)
+    result = extract_gena_key(TEST_FULL_OUTPUT)
 
     assert result is not None
     assert result == b'My-Secret-Key-ABCDEFGHIJKLMNOPHI'

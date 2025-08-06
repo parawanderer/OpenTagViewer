@@ -16,10 +16,8 @@ from main.airtag_decryptor import (
     KEYCHAIN_LABEL,
     INPUT_PATH,
     WHITELISTED_DIRS,
-    KeyStoreKeyNotFoundException,
-    get_key,
     decrypt_plist,
-    get_key_from_full_output,
+    get_key_fallback,
     make_output_path,
     dump_plist
 )
@@ -27,7 +25,7 @@ from main.utils import MACOS_VER
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
@@ -131,13 +129,6 @@ class WizardApp(tk.Tk):
             self.quit()
             raise Exception("User does not want to give password access to keystore!")
 
-    def _retrieve_key(self):
-        try:
-            return get_key(KEYCHAIN_LABEL)
-        except KeyStoreKeyNotFoundException:
-            # Fallback to alternate solution (see issue #13)
-            return get_key_from_full_output(KEYCHAIN_LABEL)
-
     def _read_all_plists(self, beacon_store_key: bytearray) -> tuple[list[PListFileInfo], list[PListFileInfo]]:
         owned_beacons: list[PListFileInfo]
         beacon_naming_records: list[PListFileInfo]
@@ -162,7 +153,7 @@ class WizardApp(tk.Tk):
 
     def _create_beacon_data_map(self) -> dict[str, BeaconData]:
         # get key: prompts password entry
-        beacon_store_key: bytearray = self._retrieve_key()
+        beacon_store_key: bytearray = get_key_fallback(KEYCHAIN_LABEL)
 
         if not beacon_store_key:
             messagebox.showerror(
