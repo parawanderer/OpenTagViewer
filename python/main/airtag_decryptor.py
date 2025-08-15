@@ -1,10 +1,16 @@
 from abc import ABC, abstractmethod
+import base64
 import os
 import re
 import shlex
 import subprocess
 import plistlib
+import argparse
+import traceback
+from pathlib import Path
 from Crypto.Cipher import AES
+
+from main.utils import MACOS_VER
 
 
 # Author: Shane B. <shane@wander.dev>
@@ -26,11 +32,20 @@ BASE_FOLDER = "com.apple.icloud.searchpartyd"
 HOME = '' if os.getenv('HOME') is None else os.getenv('HOME')
 INPUT_PATH = os.path.join(HOME, 'Library', BASE_FOLDER)
 
-# NOTE FROM AUTHOR: For my purposes these are sufficient.
-# You can add more if you need more, or remove the filter entirely below
-WHITELISTED_DIRS = {"OwnedBeacons", "BeaconNamingRecord"}
+OWNED_BEACONS = "OwnedBeacons"
+MASTER_BEACONS = "MasterBeacons"
+BEACON_NAMING_RECORD = "BeaconNamingRecord"
 
-# NOTE FROM AUTHOR: PROVIDE YOUR OWN OUTPUT PATH HERE IF DESIRED!!!
+WHITELISTED_DIRS = {
+    OWNED_BEACONS,
+    MASTER_BEACONS,  # <- MacOS 11 (see: https://github.com/parawanderer/OpenTagViewer/issues/24)
+    BEACON_NAMING_RECORD
+}
+
+RENAME_LEGACY_MAP = {
+    MASTER_BEACONS: OWNED_BEACONS  # <- MacOS 11 (see: https://github.com/parawanderer/OpenTagViewer/issues/24)
+}
+
 OUTPUT_PATH = os.path.join(HOME, "plist_decrypt_output")
 
 
@@ -230,26 +245,47 @@ def dump_plist(plist: dict, out_file_path: str) -> None:
         plistlib.dump(plist, out_f)
 
 
-def make_output_path(output_root: str, input_file_path: str, input_root_folder: str) -> str:
+def make_output_path(
+        output_root: str,
+        input_file_path: str,
+        input_root_folder: str,
+        rename_legacy: bool = False) -> str:
     """
     Transforms `input_file_path` into a dumping `output_file_path` along the lines of this idea (but it works
     generically for any level of nesting):
 
     Given:
-    - `input_file_path` = `/Users/<user>/Library/com.apple.icloud.searchpartyd/SomeFolder/.../<UUID>.record`
     - `output_root` = `/Users/<user>/my-target-folder`
+    - `input_file_path` = `/Users/<user>/Library/com.apple.icloud.searchpartyd/SomeFolder/.../<UUID>.record`
     - `input_root_folder` = `/Users/<user>/Library/com.apple.icloud.searchpartyd`
 
     This will create the path:
     `/Users/<user>/my-target-folder/SomeFolder/.../<UUID>.plist`
 
+
+    `rename_legacy` controls the behaviour to do some legacy-related folder name remapping
+
     """
+
+    # Given the sample inputs, this would produce: `SomeFolder/.../<UUID>.record`
     rel_path: str = os.path.relpath(input_file_path, input_root_folder)
+
+    # This would extract the `SomeFolder` part
+    first_path_part: str = Path(rel_path).parts[0]
+
+    if rename_legacy and first_path_part in RENAME_LEGACY_MAP:
+        # this is to solve issues like https://github.com/parawanderer/OpenTagViewer/issues/24
+        # basically a rename, like `SomeFolder/UUID.record` -> `AnotherFolder/UUID.record`
+        rel_path = RENAME_LEGACY_MAP[first_path_part] + rel_path[rel_path.index("/"):]
+
+    # replace the file extension: `SomeFolder/.../<UUID>.record` -> `SomeFolder/.../<UUID>.plist`
     replace_file_ext: str = os.path.splitext(rel_path)[0] + ".plist"
+
+    # absolutify it again
     return os.path.join(output_root, replace_file_ext)
 
 
-def decrypt_folder(input_base_path: str, folder_name: str, key: bytearray, output_to: str):
+def decrypt_folder(input_base_path: str, folder_name: str, key: bytearray, output_to: str, rename_legacy: bool = False):
     """
     Decrypt contents of folder `<input_base_path>/<folder_name>` to file path `output_to` recursively using `key`
     """
@@ -266,34 +302,136 @@ def decrypt_folder(input_base_path: str, folder_name: str, key: bytearray, outpu
                 file_dumpath: str = make_output_path(
                     output_to,
                     file_fullpath,
-                    input_base_path
+                    input_base_path,
+                    rename_legacy
                 )
                 print(f"Now trying to dump decrypted plist file to: {file_dumpath}")
                 dump_plist(plist, file_dumpath)
 
                 print("Success!")
-            except Exception as e:
-                print(f"ERROR decrypting plist file: {e}")
+            except Exception:
+                print(_red("ERROR decrypting plist file"))
+                traceback.print_exc()
+
+
+def _red(text: str) -> str:
+    return f"\033[91m{text}\n\033[0m"
+
+
+def _parse_b64_key(key: str) -> bytearray:
+    if len(key) == 0:
+        return None
+
+    try:
+        return bytearray(base64.b64decode(key))
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def _determine_key_to_use(args: argparse.Namespace) -> bytearray:
+    key: bytearray
+
+    if args.key is not None:
+
+        key = _parse_b64_key(args.key)
+
+        if key is None:
+            print(_red("Invalid base64 key provided via --key argument"))
+            exit(1)
+    else:
+
+        if MACOS_VER[0] >= 15:
+            print(_red(f"For MacOS >= 15, extracting the '{KEYCHAIN_LABEL}' key automatically is not supported due to newly introduced OS keychain access limitations. \n\nPlease consider using the --key argument (see --help) and see alternative key retrieval strategies here:\n\n\thttps://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags"))  # noqa: E501
+            exit(1)
+
+        # this thing will pop up 1 or 2 Password Input windows...
+        key = get_key_fallback(KEYCHAIN_LABEL)
+
+    return key
+
+
+def _assert_output_path_valid(output_to: str) -> None:
+    if not os.path.exists(output_to):
+        print("foo")
+        return  # Valid because doesn't exist yet, we can just init it, probably
+
+    if os.path.isdir(output_to):
+        if os.listdir(output_to):
+            print(_red(f"Output path '{output_to}' already exists and this directory is not empty. To prevent overwriting files we will avoid running the script. \n\nEither purge the contents of the directory, like so:\n\n\trm -rf '{output_to}'\n\n or use --output to specify an alternative folder first."))  # noqa: E501
+            exit(1)
+
+    elif os.path.isfile(output_to):
+        print(_red(f"Output path '{output_to}' already existed and is a file. Delete the file or use --output to provide an alternative output path"))  # noqa: E501
+        exit(1)
 
 
 def main():
-    os.makedirs(OUTPUT_PATH, exist_ok=True)
+    if MACOS_VER is None:
+        print(_red("This tool is only supported on MacOS machines"))
+        exit(1)
 
-    # this thing will pop up 2 Password Input windows...
-    key: bytearray = get_key_fallback(KEYCHAIN_LABEL)
+    parser = argparse.ArgumentParser(
+        description="CLI utility for decrypting/dumping MacOS <= 14.x FindMy cache .plist files into a folder",
+        add_help=True,
+        epilog="More here: https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags"
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=OUTPUT_PATH,
+        help=f"which folder to output the decrypted data to. Defaults to '{OUTPUT_PATH}'"
+    )
+
+    parser.add_argument(
+        "-a",
+        "--all",
+        action='store_true',
+        default=False,
+        help=f"whether to decrypt all folders or just the standard subset ({', '.join(WHITELISTED_DIRS)})"
+    )
+
+    parser.add_argument(
+        "-k",
+        "--key",
+        type=str,
+        default=None,
+        help="base64 key belonging to BeaconStore keystore record, in case it is impossible to extract the BeaconStore keychain key but you managed to obtain the key through other means. More here: https://github.com/parawanderer/OpenTagViewer/tree/main/python#-python-utility-scripts",  # noqa: E501
+    )
+
+    parser.add_argument(
+        "--rename-legacy",
+        default=False,
+        action='store_true',
+        help="whether to remap old MacOS folders like 'MasterBeacons' to the new name 'OwnedBeacons'. Required for use in the OpenTagViewer Android app."  # noqa: E501
+    )
+
+    args = parser.parse_args()
+
+    # args
+    output_to: str = args.output
+    _assert_output_path_valid(output_to)
+
+    rename_legacy: bool = args.rename_legacy
+    decode_all: bool = args.all
+    key: bytearray = _determine_key_to_use(args)
+
+    os.makedirs(output_to, exist_ok=True)
 
     for path, folders, _ in os.walk(INPUT_PATH):
         for foldername in folders:
 
-            if foldername not in WHITELISTED_DIRS:
+            if not decode_all and foldername not in WHITELISTED_DIRS:
                 continue
 
-            decrypt_folder(path, foldername, key, OUTPUT_PATH)
+            decrypt_folder(path, foldername, key, output_to, rename_legacy)
 
         break
 
     print("DONE")
-    os.system(f'open {shlex.quote(OUTPUT_PATH)}')
+    os.system(f'open {shlex.quote(output_to)}')
 
 
 if __name__ == '__main__':

@@ -13,8 +13,11 @@ from tkinter.filedialog import asksaveasfilename
 from tkinter import messagebox
 
 from main.airtag_decryptor import (
+    BEACON_NAMING_RECORD,
     KEYCHAIN_LABEL,
     INPUT_PATH,
+    MASTER_BEACONS,
+    OWNED_BEACONS,
     WHITELISTED_DIRS,
     decrypt_plist,
     get_key_fallback,
@@ -25,7 +28,7 @@ from main.utils import MACOS_VER
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
@@ -134,6 +137,7 @@ class WizardApp(tk.Tk):
         beacon_naming_records: list[PListFileInfo]
         for path, folders, _ in os.walk(INPUT_PATH):
             for foldername in folders:
+
                 if foldername not in WHITELISTED_DIRS:
                     continue
 
@@ -143,9 +147,10 @@ class WizardApp(tk.Tk):
                     beacon_store_key
                 )
 
-                if foldername == "OwnedBeacons":
+                if foldername == OWNED_BEACONS or foldername == MASTER_BEACONS:
+                    # MasterBeacons is the legacy name (see: https://github.com/parawanderer/OpenTagViewer/issues/24)
                     owned_beacons = plists
-                elif foldername == "BeaconNamingRecord":
+                elif foldername == BEACON_NAMING_RECORD:
                     beacon_naming_records = plists
             break
 
@@ -263,7 +268,8 @@ class WizardApp(tk.Tk):
                 output_file1: str = make_output_path(
                     tmpdirname,
                     beacon.beacon_naming_record.filepath,
-                    INPUT_PATH
+                    INPUT_PATH,
+                    rename_legacy=True
                 )
                 print(f"Now dumping '{beacon.beacon_naming_record.filepath}' to {output_file1}...")
                 dump_plist(beacon.beacon_naming_record.data, output_file1)
@@ -271,7 +277,8 @@ class WizardApp(tk.Tk):
                 output_file2: str = make_output_path(
                     tmpdirname,
                     beacon.owned_beacon.filepath,
-                    INPUT_PATH
+                    INPUT_PATH,
+                    rename_legacy=True
                 )
                 print(f"Now dumping '{beacon.owned_beacon.filepath}' to {output_file2}...")
                 dump_plist(beacon.owned_beacon.data, output_file2)

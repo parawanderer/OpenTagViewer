@@ -49,13 +49,57 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
     ```bash
     pip install -r requirements.txt
     ```
-- **(OPTIONAL)** Change your output path on [airtag_decryptor.py:30](https://github.com/parawanderer/OpenTagViewer/blob/main/python/airtag_decryptor.py#L30) if wanted
-    - Default output path: `~/plist_decrypt_output`
 - Run the script:
     ```bash
-    python main/airtag_decryptor.py
+    python main/airtag_decryptor.py --rename-legacy
     ```
-    - Note that it will prompt your password twice.
+    Default output path is: `~/plist_decrypt_output`.
+
+    `--rename-legacy` is used to make it automatically perform folder rename logic for MacOS 11.x (see [issue #24](https://github.com/parawanderer/OpenTagViewer/issues/24)). It has no effects for later versions of MacOS.
+
+    <details>
+    <summary><b>Q: How to provide custom output path?</b></summary>
+    <br>
+
+    If you'd like to provide an alternative output path, use optional argument `--path`
+     ```bash
+    python main/airtag_decryptor.py --rename-legacy --path='/your/alternative/path'
+    ```
+    </details>
+
+    <details>
+    <summary><b>Q: How to provide it a custom decryption key?</b></summary>
+    <br>
+
+    If you used some custom method to get the `BeaconStore` keystore key (e.g. on MacOS 15 using [this approach](https://github.com/pajowu/beaconstorekey-extractor)), you can provide it directly as a **[Base64-encoded](https://www.base64encode.org/) string** string using the optional `--key` argument
+
+
+     ```bash
+    python main/airtag_decryptor.py --rename-legacy --key='SGVsbG8gV29ybGQ='
+    ```
+    </details>
+
+    <details>
+    <summary><b>Q: How to make it decrypt all .plist folders?</b></summary>
+    <br>
+
+    If you'd like to decrypt all `.plist` files and not just the ones in `OwnedBeacons` and `BeaconNamingRecord`, you can use the `--all` flag
+     ```bash
+    python main/airtag_decryptor.py --rename-legacy --all
+    ```
+    </details>
+
+    <details>
+    <summary><b>Q: What other options are available?</b></summary>
+    <br>
+
+    For more help and options, run the script with `--help`:
+    ```bash
+    python main/airtag_decryptor.py --help
+    ```
+    </details>
+
+
 - The script will open the specified output folder on success
 
 
@@ -106,7 +150,7 @@ pyinstaller \
 
 Zip up result (MacOS):
 ```shell
-APP_VERSION=1.0.4
+APP_VERSION=1.0.5
 cd ./dist
 zip -r OpenTagViewer-ExportWizardMacOS-$APP_VERSION.zip OpenTagViewer.app/ OpenTagViewer
 ```
