@@ -64,7 +64,7 @@ jobs:
 
       - name: Inject secrets.properties
         run: |
-          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
+          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY || 'default_maps_api_key' }}" > secrets.properties
 
       # Run Tests Build
       - name: Run gradle tests
