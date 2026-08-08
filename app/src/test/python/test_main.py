@@ -228,6 +228,46 @@ def test_probe_failure_is_not_fatal():
 
 
 # --------------------------------------------------------------------------
+# assertAnisetteIsSupported
+#
+# Remote is the only provider that works on Android; local needs the unicorn CPU
+# emulator, which Chaquopy cannot build. Catching that here means a clear message
+# instead of a NotImplementedError from inside the stub package.
+# --------------------------------------------------------------------------
+
+def _account_blob(anisette):
+    return json.dumps({"type": "account", "anisette": anisette})
+
+
+def test_remote_anisette_is_supported():
+    blob = _account_blob({"type": "aniRemote", "url": "https://ani.example.com"})
+    assert main.assertAnisetteIsSupported(blob) is None
+
+
+def test_local_anisette_is_rejected_with_a_readable_reason():
+    blob = _account_blob({"type": "aniLocal"})
+    reason = main.assertAnisetteIsSupported(blob)
+
+    assert reason is not None
+    assert "aniLocal" in reason
+    assert "remote" in reason.lower()
+
+
+def test_missing_anisette_config_is_rejected():
+    reason = main.assertAnisetteIsSupported(json.dumps({"type": "account"}))
+    assert reason is not None
+
+
+def test_unreadable_account_blob_is_rejected():
+    assert main.assertAnisetteIsSupported("not json") is not None
+
+
+def test_getAccount_refuses_local_anisette():
+    """The guard must actually be wired into the restore path."""
+    assert main.getAccount(_account_blob({"type": "aniLocal"})) is None
+
+
+# --------------------------------------------------------------------------
 # Guard against the test environment drifting from what the app ships
 # --------------------------------------------------------------------------
 

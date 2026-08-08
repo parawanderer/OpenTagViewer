@@ -131,5 +131,4 @@
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
     <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
-    <string name="anisette_change_requires_logout">Sign out first to change your Anisette server.</string>
 </resources>
