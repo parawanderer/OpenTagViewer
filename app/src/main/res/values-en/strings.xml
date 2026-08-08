@@ -31,7 +31,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
     <string name="login_failed_x">Login failed: %1$s</string>
     <string name="email_or_phone_number">Email or Phone Number</string>
-    <string name="password">password</string>
+    <string name="password">Password</string>
     <string name="apple_account">Apple Account</string>
     <string name="login">Login</string>
     <string name="welcome">Welcome !</string>

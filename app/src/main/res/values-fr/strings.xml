@@ -31,7 +31,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Le serveur Anisette à %1$s n\'a pas pu être atteint !</string>
     <string name="login_failed_x">La connexion a échoué: %1$s</string>
     <string name="email_or_phone_number">Email ou Numéro de Téléphone</string>
-    <string name="password">mot de passe</string>
+    <string name="password">Mot de passe</string>
     <string name="apple_account">Compte Apple</string>
     <string name="login">Connexion</string>
     <string name="welcome">Bienvenue !</string>
