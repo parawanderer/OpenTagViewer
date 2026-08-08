@@ -40,6 +40,13 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+
+import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
+import dev.wander.android.opentagviewer.ui.maps.MapMarker;
+import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
+import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.datepicker.CalendarConstraints;
@@ -86,7 +93,7 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Synchronized;
 
-public class HistoryViewActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class HistoryViewActivity extends AppCompatActivity implements IMapProvider.OnMapReadyCallback {
     private static final String TAG = HistoryViewActivity.class.getSimpleName();
 
     private static final float HISTORY_SHEET_HALF_EXPANDED_RATIO = 0.4f;
@@ -100,7 +107,8 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
 
     private static final long SEVEN_DAYS_IN_MS = DAY_IN_MS * 7;
 
-    private GoogleMap map;
+    private IMapProvider mapProvider;
+    private GoogleMap map; // 保留用于向后兼容
 
     private BeaconRepository beaconRepo;
     private UserSettingsRepository userSettingsRepo;
@@ -127,9 +135,9 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     private int daysBack = 0;
     private long currentBeginningOfDay = -1;
 
-    private Polyline currentHistoryLineOutline = null;
-    private Polyline currentHistoryLine = null;
-    private Marker singleCoordMarker = null;
+    private String currentHistoryLineOutlineId = null;
+    private String currentHistoryLineId = null;
+    private String singleCoordMarkerId = null;
 
     private Button moveLeftButton;
     private Button moveRightButton;
@@ -197,25 +205,58 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         recyclerView.setItemAnimator(null);
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.history_map);
-        mapFragment.getMapAsync(this);
+        // 根据用户设置创建地图提供商
+        String mapProviderType = this.userSettings.getMapProvider();
+        this.mapProvider = MapProviderFactory.create(mapProviderType);
+        
+        // 初始化地图
+        this.mapProvider.initialize(this, R.id.history_map, this);
     }
 
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        this.map = googleMap;
+    public void onMapReady(IMapProvider provider) {
+        this.mapProvider = provider;
+
+        // 如果是Google Maps，保留向后兼容
+        if (provider instanceof GoogleMapProvider) {
+            this.map = ((GoogleMapProvider) provider).getGoogleMap();
+        }
 
         if (this.userSettings.hasDarkThemeEnabled()) {
             // DARK THEME map
-            map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
+            mapProvider.setMapStyle(true);
+        } else {
+            mapProvider.setMapStyle(false);
         }
 
         // move to same position that we left when we went to the history page from the main page
-        this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                new LatLng(this.defaultLatitude, this.defaultLongitude), this.defaultZoom));
+        this.mapProvider.moveCamera(this.defaultLatitude, this.defaultLongitude, this.defaultZoom);
 
         this.fetchAndUpdateDataForCurrentDay();
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onResume();
+        }
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onPause();
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onDestroy();
+        }
     }
 
     private void fetchAndUpdateDataForCurrentDay() {
@@ -413,17 +454,19 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void cleanupOldLines() {
-        if (this.currentHistoryLine != null) {
-            this.currentHistoryLine.remove();
-            this.currentHistoryLine = null;
+        if (this.mapProvider == null) return;
+        
+        if (this.currentHistoryLineId != null) {
+            this.mapProvider.removePolyline(this.currentHistoryLineId);
+            this.currentHistoryLineId = null;
         }
-        if (this.currentHistoryLineOutline != null) {
-            this.currentHistoryLineOutline.remove();
-            this.currentHistoryLineOutline = null;
+        if (this.currentHistoryLineOutlineId != null) {
+            this.mapProvider.removePolyline(this.currentHistoryLineOutlineId);
+            this.currentHistoryLineOutlineId = null;
         }
-        if (this.singleCoordMarker != null) {
-            this.singleCoordMarker.remove();
-            this.singleCoordMarker = null;
+        if (this.singleCoordMarkerId != null) {
+            this.mapProvider.removeMarker(this.singleCoordMarkerId);
+            this.singleCoordMarkerId = null;
         }
     }
 
@@ -445,7 +488,7 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         bottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
-                if (map == null) return;
+                if (mapProvider == null) return;
                 if (overrideMapPadding) return;
 
                 if (bottomSheetBehavior.getState() == STATE_EXPANDED) {
@@ -453,19 +496,19 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
                     // so that when the user unexpands they will see things in a more centred way
                     int height = bottomSheet.getHeight();
                     int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * bottomSheetBehavior.getHalfExpandedRatio()) + bottomSheetBehavior.getPeekHeight();
-                    map.setPadding(0, 0, 0, offset);
+                    mapProvider.setPadding(0, 0, 0, offset);
                 }
             }
 
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
-                if (map == null) return;
+                if (mapProvider == null) return;
                 if (overrideMapPadding) return;
 
                 int height = bottomSheet.getHeight();
                 int offset = (int)((height - bottomSheetBehavior.getPeekHeight()) * slideOffset) + bottomSheetBehavior.getPeekHeight();
 
-                map.setPadding(0, 0, 0, offset);
+                mapProvider.setPadding(0, 0, 0, offset);
             }
         });
 
@@ -579,14 +622,16 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         this.historyItemsAdapter.notifyItemRangeInserted(0, this.locations.size());
 
         // draw datapoints on map
-        var coords = this.locations.stream().map(rep -> new LatLng(rep.getLatitude(), rep.getLongitude()))
+        var coords = this.locations.stream()
+                .map(rep -> new MapPolyline.LatLng(rep.getLatitude(), rep.getLongitude()))
                 .collect(Collectors.toList());
 
         this.drawNewLines(coords);
 
         if (!coords.isEmpty()) {
             if (coords.size() == 1) {
-                this.animateCameraToPos(coords.get(0), SINGLE_MARKER_ZOOM, null);
+                MapPolyline.LatLng coord = coords.get(0);
+                this.animateCameraToPos(coord.getLatitude(), coord.getLongitude(), SINGLE_MARKER_ZOOM, null);
             } else {
                 var bounds = this.determineBoundsForCurrent();
                 this.animateCameraToBoundingBox(bounds, FOCUS_PADDING);
@@ -617,28 +662,44 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         );
     }
 
-    private void drawNewLines(final List<LatLng> coords) {
+    private void drawNewLines(final List<MapPolyline.LatLng> coords) {
+        if (this.mapProvider == null) {
+            Log.w(TAG, "Map provider is not ready yet, cannot draw lines");
+            return;
+        }
+        
         final int numCoords = coords.size();
         if (numCoords > 1) {
-            var optionsOutlineLine = new PolylineOptions()
+            // 清除旧的路径线
+            this.cleanupOldLines();
+            
+            // 添加轮廓线
+            MapPolyline outlineLine = MapPolyline.builder()
+                    .points(coords)
+                    .id("history_line_outline")
                     .color(this.getColor(R.color.maps_line_outline))
                     .width(OUTLINE_WIDTH)
-                    .clickable(false)
-                    .addAll(coords);
-            this.currentHistoryLineOutline = this.map.addPolyline(optionsOutlineLine);
+                    .build();
+            this.currentHistoryLineOutlineId = this.mapProvider.addPolyline(outlineLine);
 
-            var optionsPrimaryLine = new PolylineOptions()
+            // 添加主路径线
+            MapPolyline primaryLine = MapPolyline.builder()
+                    .points(coords)
+                    .id("history_line_primary")
                     .color(this.getColor(R.color.maps_line_primary))
                     .width(LINE_WIDTH)
-                    .clickable(true)
-                    .addAll(coords);
-
-            this.currentHistoryLine = this.map.addPolyline(optionsPrimaryLine);
+                    .build();
+            this.currentHistoryLineId = this.mapProvider.addPolyline(primaryLine);
         } else if (numCoords == 1) {
             // if we just had a single item, then draw a single marker
-            var markerOptions = new MarkerOptions()
-                    .position(coords.get(0));
-            this.singleCoordMarker = this.map.addMarker(markerOptions);
+            MapPolyline.LatLng coord = coords.get(0);
+            MapMarker marker = MapMarker.builder()
+                    .id("single_coord_marker")
+                    .latitude(coord.getLatitude())
+                    .longitude(coord.getLongitude())
+                    .useDefaultIcon(true)
+                    .build();
+            this.singleCoordMarkerId = this.mapProvider.addMarker(marker);
         }
     }
 
@@ -662,47 +723,58 @@ public class HistoryViewActivity extends AppCompatActivity implements OnMapReady
         }
 
         // remove current
-        if (this.singleCoordMarker != null) {
-            this.singleCoordMarker.remove();
+        if (this.singleCoordMarkerId != null && this.mapProvider != null) {
+            this.mapProvider.removeMarker(this.singleCoordMarkerId);
         }
 
         final boolean sheetIsFullyExpanded = bottomSheetBehavior.getState() == STATE_EXPANDED;
 
         // replace with new
-        var pos = new LatLng(clickedReport.getLatitude(), clickedReport.getLongitude());
-        var markerOptions = new MarkerOptions().position(pos).title(locationName);
+        if (this.mapProvider != null) {
+            MapMarker marker = MapMarker.builder()
+                    .id("single_coord_marker")
+                    .latitude(clickedReport.getLatitude())
+                    .longitude(clickedReport.getLongitude())
+                    .title(locationName)
+                    .useDefaultIcon(true)
+                    .build();
+            this.singleCoordMarkerId = this.mapProvider.addMarker(marker);
 
-        this.singleCoordMarker = this.map.addMarker(markerOptions);
-
-        if (sheetIsFullyExpanded) {
-            this.overrideMapPadding = true;
-            this.map.setPadding(0, 0, 0, bottomSheetBehavior.getPeekHeight());
-            this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM, () -> {
-                Log.d(TAG, "Undoing overrideMapPadding override!");
-                this.overrideMapPadding = false;
-            });
-            bottomSheetBehavior.setState(STATE_HALF_EXPANDED);
-        } else {
-            this.animateCameraToPos(pos, SINGLE_MARKER_ZOOM, null);
+            if (sheetIsFullyExpanded) {
+                this.overrideMapPadding = true;
+                this.mapProvider.setPadding(0, 0, 0, bottomSheetBehavior.getPeekHeight());
+                this.animateCameraToPos(clickedReport.getLatitude(), clickedReport.getLongitude(), SINGLE_MARKER_ZOOM, () -> {
+                    Log.d(TAG, "Undoing overrideMapPadding override!");
+                    this.overrideMapPadding = false;
+                });
+                bottomSheetBehavior.setState(STATE_HALF_EXPANDED);
+            } else {
+                this.animateCameraToPos(clickedReport.getLatitude(), clickedReport.getLongitude(), SINGLE_MARKER_ZOOM, null);
+            }
         }
     }
 
     private void animateCameraToBoundingBox(final LatLngBounds bounds, int padding) {
-        this.map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, padding));
+        if (this.mapProvider == null || bounds == null) return;
+        
+        // 将LatLngBounds转换为点列表
+        List<MapPolyline.LatLng> points = new ArrayList<>();
+        points.add(new MapPolyline.LatLng(bounds.southwest.latitude, bounds.southwest.longitude));
+        points.add(new MapPolyline.LatLng(bounds.northeast.latitude, bounds.northeast.longitude));
+        
+        // 使用GoogleMapProvider的特殊方法（如果可用）
+        if (this.mapProvider instanceof GoogleMapProvider) {
+            ((GoogleMapProvider) this.mapProvider).animateCameraToBounds(points, padding);
+        } else {
+            // 对于其他提供商，计算中心点和缩放级别
+            double centerLat = (bounds.southwest.latitude + bounds.northeast.latitude) / 2.0;
+            double centerLon = (bounds.southwest.longitude + bounds.northeast.longitude) / 2.0;
+            this.mapProvider.animateCamera(centerLat, centerLon, this.defaultZoom, null);
+        }
     }
 
-
-    private void animateCameraToPos(final LatLng pos, float zoom, Runnable onFinished) {
-        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom), new GoogleMap.CancelableCallback() {
-            @Override
-            public void onCancel() {
-                if (onFinished != null) onFinished.run();
-            }
-
-            @Override
-            public void onFinish() {
-                if (onFinished != null) onFinished.run();
-            }
-        });
+    private void animateCameraToPos(double latitude, double longitude, float zoom, Runnable onFinished) {
+        if (this.mapProvider == null) return;
+        this.mapProvider.animateCamera(latitude, longitude, zoom, onFinished);
     }
 }

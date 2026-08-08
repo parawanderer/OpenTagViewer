@@ -21,9 +21,6 @@ import androidx.annotation.RequiresApi;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 
-import com.google.android.gms.maps.model.BitmapDescriptor;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -42,7 +39,7 @@ import lombok.NonNull;
 public final class VectorImageGeneratorUtil {
     private static final String TAG = VectorImageGeneratorUtil.class.getSimpleName();
 
-    private static final Map<String, BitmapDescriptor> BITMAP_CACHE = new HashMap<>();
+    private static final Map<String, Bitmap> BITMAP_CACHE = new HashMap<>();
 
     @ColorInt private static final int COLOR_BLACK = 0xFF000000;
     @ColorInt private static final int COLOR_BLACK_ALPHA_100 = 0xD1000000;
@@ -59,19 +56,19 @@ public final class VectorImageGeneratorUtil {
 
     private static final float EMOJI_TEXT_SIZE = 60;
 
-    public static BitmapDescriptor vectorToBitmap(@NonNull Resources resources, @DrawableRes int id) {
+    public static Bitmap vectorToBitmap(@NonNull Resources resources, @DrawableRes int id) {
         Drawable vectorDrawable = Objects.requireNonNull(ResourcesCompat.getDrawable(resources, id, null));
         Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         vectorDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
         vectorDrawable.draw(canvas);
-        return BitmapDescriptorFactory.fromBitmap(bitmap);
+        return bitmap;
     }
 
     /**
      * Create marker with emoji centred in the middle of it (cached)
      */
-    public static BitmapDescriptor makeMarker(@NonNull Resources resources, final String emoji, @ColorInt int markerColor) {
+    public static Bitmap makeMarker(@NonNull Resources resources, final String emoji, @ColorInt int markerColor) {
         final String key = String.format(Locale.ROOT, "%s-%d", emoji, markerColor);
         if (BITMAP_CACHE.containsKey(key)) {
             return BITMAP_CACHE.get(key);
@@ -93,15 +90,14 @@ public final class VectorImageGeneratorUtil {
         final float emojiY = (markerDrawable.getIntrinsicHeight()/2.f) + (EMOJI_TEXT_SIZE/8f);
         canvas.drawText(emoji, emojiX, emojiY, paint);
 
-        var desc = BitmapDescriptorFactory.fromBitmap(bitmap);
-        BITMAP_CACHE.put(key, desc);
-        return desc;
+        BITMAP_CACHE.put(key, bitmap);
+        return bitmap;
     }
 
     /**
      * Create marker with some drawable resource in the middle of it (cached)
      */
-    public static BitmapDescriptor makeMarker(@NonNull Resources resources, @DrawableRes int innerIcon, @ColorInt int markerColor, @ColorInt int iconColor) {
+    public static Bitmap makeMarker(@NonNull Resources resources, @DrawableRes int innerIcon, @ColorInt int markerColor, @ColorInt int iconColor) {
         final String key = String.format(Locale.ROOT, "%d-%d-%d", innerIcon, markerColor, iconColor);
         if (BITMAP_CACHE.containsKey(key)) {
             return BITMAP_CACHE.get(key);
@@ -122,9 +118,8 @@ public final class VectorImageGeneratorUtil {
         DrawableCompat.setTint(iconOnMarkerDrawable, iconColor);
         iconOnMarkerDrawable.draw(canvas);
 
-        var desc = BitmapDescriptorFactory.fromBitmap(bitmap);
-        BITMAP_CACHE.put(key, desc);
-        return desc;
+        BITMAP_CACHE.put(key, bitmap);
+        return bitmap;
     }
 
     private static void drawMarker(Canvas canvas, Drawable markerDrawable, @ColorInt int markerColor) {
@@ -178,13 +173,17 @@ public final class VectorImageGeneratorUtil {
         var hardwareBuffer = Optional.ofNullable(image.getHardwareBuffer()).orElseThrow(() -> new RuntimeException("No HardwareBuffer"));
         var blurredBitmap = Optional.ofNullable(Bitmap.wrapHardwareBuffer(hardwareBuffer, null)).orElseThrow(() -> new RuntimeException("Create Bitmap failed"));
 
+        // 立即创建可变的 ARGB_8888 副本，避免 Hardware Bitmap 在跨线程使用时出现 BufferQueue 问题
+        Bitmap softwareBitmap = blurredBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        
+        // 清理 Hardware 资源
         hardwareBuffer.close();
         image.close();
         imageReader.close();
         renderNode.discardDisplayList();
         hardwareRenderer.destroy();
 
-        return blurredBitmap.copy(Bitmap.Config.ARGB_8888,true);
+        return softwareBitmap;
     }
 
     /**

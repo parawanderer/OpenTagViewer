@@ -125,4 +125,7 @@
     <string name="export_logs" translatable="false">Export Logs</string>
     <string name="log_file_has_been_exported_successfully" translatable="false">Log file has been exported successfully</string>
     <string name="failed_to_export_log_file" translatable="false">Failed to export log file!</string>
+    <string name="map_provider">Map Provider</string>
+    <string name="map_provider_google">Google Maps</string>
+    <string name="map_provider_amap">高德地图 (AMap)</string>
 </resources>

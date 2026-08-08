@@ -27,18 +27,11 @@
             android:layout_height="match_parent">
 
             <FrameLayout
-                android:id="@+id/history_map_container"
+                android:id="@+id/history_map"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
-                <fragment
-                    android:id="@+id/history_map"
-                    android:name="com.google.android.gms.maps.SupportMapFragment"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    map:backgroundColor="@color/md_theme_background"
-                    tools:context=".HistoryViewActivity" />
-            </FrameLayout>
+                android:layout_height="match_parent"
+                android:background="@color/md_theme_background"
+                tools:context=".HistoryViewActivity" />
         </androidx.coordinatorlayout.widget.CoordinatorLayout>
     </LinearLayout>
 </layout>

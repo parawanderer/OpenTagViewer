@@ -46,12 +46,18 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
+
+import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
+import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapMarker;
+import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -106,7 +112,7 @@ import lombok.Data;
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
  */
-public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, OnMapClickListener, GoogleMap.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMapReadyCallback, IMapProvider.OnMapClickListener, IMapProvider.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
@@ -125,7 +131,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final float MARKER_ZINDEX_TOP = 10.0f;
 
-    private GoogleMap map;
+    private IMapProvider mapProvider;
+    private GoogleMap map; // 保留用于向后兼容，逐步迁移
 
     private ActivityMapsBinding binding;
 
@@ -149,9 +156,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
 
-    private final Map<String, Marker> currentMarkers = new ConcurrentHashMap<>();
-
-    private Marker lastFocusedMarker = null;
+    private final Map<String, String> currentMarkers = new ConcurrentHashMap<>(); // 存储markerId
+    private Marker lastFocusedMarker = null; // 保留用于向后兼容（仅Google Maps）
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
@@ -268,10 +274,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             .subscribe(pos -> {
                 Log.d(TAG, "Got previous camera position to reset us to: " + pos);
 
-                pos.ifPresent(userMapCameraPosition -> this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                        new LatLng(userMapCameraPosition.getLat(), userMapCameraPosition.getLon()),
-                        userMapCameraPosition.getZoom()
-                )));
+                pos.ifPresent(userMapCameraPosition -> {
+                    if (this.mapProvider != null) {
+                        this.mapProvider.moveCamera(
+                                userMapCameraPosition.getLat(),
+                                userMapCameraPosition.getLon(),
+                                userMapCameraPosition.getZoom()
+                        );
+                    }
+                });
 
             }, error -> Log.e(TAG, "Failed to get last camera position!", error));
 
@@ -279,10 +290,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         this.windowWidth = this.getResources().getDisplayMetrics().widthPixels;
 
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
+        // 根据用户设置创建地图提供商
+        String mapProviderType = this.userSettings.getMapProvider();
+        IMapProvider tempProvider = MapProviderFactory.create(mapProviderType);
+        
+        // 初始化地图（注意：this.mapProvider 仅在 onMapReady 后赋值，避免初始化竞态）
+        tempProvider.initialize(this, R.id.map, this);
     }
 
 
@@ -290,59 +303,71 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
      */
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        map = googleMap;
+    public void onMapReady(IMapProvider provider) {
+        this.mapProvider = provider;
 
-        map.setOnMapClickListener(this);
-        map.setOnMarkerClickListener(this);
+        // 如果是Google Maps，保留向后兼容
+        if (provider instanceof GoogleMapProvider) {
+            this.map = ((GoogleMapProvider) provider).getGoogleMap();
+        }
 
-        map.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
+        mapProvider.setOnMapClickListener(this);
+        mapProvider.setOnMarkerClickListener(this);
+
+        mapProvider.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
         // We don't want to use the default button. We have a custom button
-        map.getUiSettings().setMyLocationButtonEnabled(false);
-        map.getUiSettings().setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
-        map.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
-        map.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
+        mapProvider.setMyLocationButtonEnabled(false);
+        mapProvider.setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
+        mapProvider.setCompassEnabled(false); // not needed due to no rotation being allowed
+        mapProvider.setMapToolbarEnabled(false); // we have a custom button for this
 
         if (this.userSettings.hasDarkThemeEnabled()) {
             // DARK THEME map
-            map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
+            mapProvider.setMapStyle(true);
+        } else {
+            mapProvider.setMapStyle(false);
         }
 
         this.enableMyLocation(false);
+
+        // 地图准备好后，刷新一次当前显示的信标位置
+        this.showLastDeviceLocations();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
 
-        if (this.map != null) {
-            var pos = this.map.getCameraPosition();
-            var async = this.userDataRepository.storeLastCameraPosition(
-                    UserMapCameraPosition.builder()
-                            .zoom(pos.zoom)
-                            .lat(pos.target.latitude)
-                            .lon(pos.target.longitude)
-                            .build()
-            ).subscribe(
-                    success -> Log.d(TAG, "Success storing last camera position!"),
-                    error -> Log.e(TAG, "Error storing last camera position!", error));
+        if (this.mapProvider != null) {
+            IMapProvider.CameraPosition pos = this.mapProvider.getCameraPosition();
+            if (pos != null) {
+                var async = this.userDataRepository.storeLastCameraPosition(
+                        UserMapCameraPosition.builder()
+                                .zoom(pos.getZoom())
+                                .lat(pos.getLatitude())
+                                .lon(pos.getLongitude())
+                                .build()
+                ).subscribe(
+                        success -> Log.d(TAG, "Success storing last camera position!"),
+                        error -> Log.e(TAG, "Error storing last camera position!", error));
+            }
 
             // cleanup location refresh task
             refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
             this.nextLocationRefreshTask = null;
         }
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onPause();
+        }
     }
 
     @Override
-    public void onMapClick(LatLng point) {
-        Log.i(TAG, "tapped, point=" + point);
+    public void onMapClick(double latitude, double longitude) {
+        Log.i(TAG, "tapped, point=(" + latitude + ", " + longitude + ")");
         // TODO: hide UI elements when this occurs!
     }
 
@@ -354,6 +379,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         this.refreshIfAllowed();
         this.reSchedulePeriodicTagLocationRefresher();
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onDestroy();
+        }
     }
 
     private void reSchedulePeriodicTagLocationRefresher() {
@@ -450,9 +490,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
 
                         Log.d(TAG, "Navigating to current user position on the map...");
-                        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                                new LatLng(location.getLatitude(), location.getLongitude()),
-                                CAMERA_ON_MAP_INITIAL_ZOOM));
+                        if (this.mapProvider != null) {
+                            this.mapProvider.animateCamera(
+                                    location.getLatitude(),
+                                    location.getLongitude(),
+                                    CAMERA_ON_MAP_INITIAL_ZOOM,
+                                    null
+                            );
+                        }
                     });
 
         } else {
@@ -660,14 +705,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Click location history event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
 
-        var pos = this.map.getCameraPosition();
+        IMapProvider.CameraPosition pos = this.mapProvider != null ? this.mapProvider.getCameraPosition() : null;
 
         Log.d(TAG, "Going to the history page for beaconId=" + beaconId);
         Intent viewHistoryIntent = new Intent(this, HistoryViewActivity.class);
         viewHistoryIntent.putExtra("beaconId", beaconId);
-        viewHistoryIntent.putExtra("lon", pos.target.longitude);
-        viewHistoryIntent.putExtra("lat", pos.target.latitude);
-        viewHistoryIntent.putExtra("zoom", pos.zoom);
+        if (pos != null) {
+            viewHistoryIntent.putExtra("lon", pos.getLongitude());
+            viewHistoryIntent.putExtra("lat", pos.getLatitude());
+            viewHistoryIntent.putExtra("zoom", pos.getZoom());
+        }
 
         startActivity(viewHistoryIntent);
     }
@@ -933,25 +980,28 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private synchronized void showBeaconOnMap(final BeaconInformation beacon, final BeaconLocationReport lastLocation) {
         final String beaconId = beacon.getBeaconId();
-        final LatLng locationTag = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+        
+        if (this.mapProvider == null) {
+            Log.w(TAG, "Map provider is not ready yet, cannot show beacon");
+            return;
+        }
 
         if (this.currentMarkers.containsKey(beaconId)) {
-            // remove the old marker
-            Log.d(TAG, "Going to move the existing marker for beaconId=" + beaconId);
-            var marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
-            marker.setPosition(locationTag);
-            return;
+            // remove the old marker and add a new one
+            Log.d(TAG, "Going to replace the existing marker for beaconId=" + beaconId);
+            this.mapProvider.removeMarker(beaconId);
         }
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
-        BitmapDescriptor icon;
+        // 创建自定义标记图标
+        android.graphics.Bitmap iconBitmap;
         if (beacon.isEmojiFilled()) {
-            icon = VectorImageGeneratorUtil.makeMarker(
+            iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
                     getColor(R.color.md_theme_background));
         } else {
-            icon = VectorImageGeneratorUtil.makeMarker(
+            iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     R.drawable.apple,
                     getColor(R.color.md_theme_background),
@@ -959,18 +1009,19 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             );
         }
 
-        var markerOptions = new MarkerOptions()
-                .position(locationTag)
-                //.title(markerTitle)
-                .icon(icon);
-        Marker marker = this.map.addMarker(markerOptions);
+        // 使用抽象接口添加标记
+        MapMarker marker = MapMarker.builder()
+                .id(beaconId)
+                .latitude(lastLocation.getLatitude())
+                .longitude(lastLocation.getLongitude())
+                .icon(iconBitmap)
+                .build();
+        
+        String markerId = this.mapProvider.addMarker(marker);
+        this.currentMarkers.put(beaconId, markerId); // 存储markerId而不是Marker对象
 
-        this.currentMarkers.put(beaconId, marker);
         if (this.currentMarkers.size() == 1) {
             // for the first marker, navigate to it smoothly on the map!
-            // (we choose the first added marker here because it is the
-            // one that will become visible in the UI tag list at the
-            // bottom of the screen)
             this.goToBeaconOnMap(beaconId, CAMERA_ON_MAP_INITIAL_ZOOM);
         }
     }
@@ -991,34 +1042,35 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void goToBeaconOnMap(final String beaconId, Float zoom) {
         try {
-            Marker marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
-            this.bringMarkerToTop(marker);
-
-            var pos = marker.getPosition();
+            if (this.mapProvider == null) {
+                Log.w(TAG, "Map provider is not ready yet");
+                return;
+            }
+            
+            // 从beaconLocations获取位置信息
+            List<BeaconLocationReport> locations = this.beaconLocations.get(beaconId);
+            if (locations == null || locations.isEmpty()) {
+                Log.w(TAG, "No locations found for beaconId=" + beaconId);
+                return;
+            }
+            
+            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            double lat = lastLocation.getLatitude();
+            double lon = lastLocation.getLongitude();
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
             if (zoom != null) {
-                this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+                this.mapProvider.animateCamera(lat, lon, zoom, null);
             } else {
-                this.map.animateCamera(CameraUpdateFactory.newLatLng(pos));
+                // 使用当前缩放级别
+                IMapProvider.CameraPosition currentPos = this.mapProvider.getCameraPosition();
+                float currentZoom = currentPos != null ? currentPos.getZoom() : CAMERA_ON_MAP_INITIAL_ZOOM;
+                this.mapProvider.animateCamera(lat, lon, currentZoom, null);
             }
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
         }
-    }
-
-    private void bringMarkerToTop(Marker marker) {
-        if (this.lastFocusedMarker == marker) {
-            // do nothing
-            return;
-        }
-
-        if (this.lastFocusedMarker != null) {
-            this.lastFocusedMarker.setZIndex(MARKER_ZINDEX_DEFAULT);
-        }
-        marker.setZIndex(MARKER_ZINDEX_TOP);
-        this.lastFocusedMarker = marker;
     }
 
     private synchronized void updateBeaconCards() {
@@ -1179,7 +1231,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
             Log.i(TAG, "Enabling 'my location' related UI features...");
-            this.map.setMyLocationEnabled(true);
+            // 注意：抽象接口可能不支持setMyLocationEnabled，这里保留向后兼容
+            if (this.map != null) {
+                this.map.setMyLocationEnabled(true);
+            }
 
             // This UI button is only available if the user enables own location permissions.
             ImageButton button = findViewById(R.id.button_my_location);
@@ -1230,14 +1285,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public boolean onMarkerClick(@NonNull Marker marker) {
-        this.bringMarkerToTop(marker);
-
-        Optional<String> beaconIdForMarker = this.currentMarkers.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(marker))
-                .map(Map.Entry::getKey)
-                .findFirst();
-
+    public boolean onMarkerClick(String markerId) {
+        // 查找对应的beaconId
+        Optional<String> beaconIdForMarker = Optional.ofNullable(markerId);
+        
         if (beaconIdForMarker.isPresent()) {
             this.tagListSwiperHelper.navigateToCard(beaconIdForMarker.get());
         } else {
