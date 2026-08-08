@@ -99,4 +99,6 @@
     <string name="amap_key_saved">AMap-API-Schlüssel gespeichert.</string>
     <string name="amap_key_cleared">AMap-API-Schlüssel entfernt.</string>
     <string name="amap_how_to_get_a_key">Schlüssel anfordern</string>
+    <string name="lang_zh_cn">Chinesisch, vereinfacht (简体中文)</string>
+    <string name="lang_zh_tw">Chinesisch, traditionell (繁體中文)</string>
 </resources>

@@ -99,4 +99,6 @@
     <string name="amap_key_saved">AMap API-sleutel opgeslagen.</string>
     <string name="amap_key_cleared">AMap API-sleutel verwijderd.</string>
     <string name="amap_how_to_get_a_key">Een sleutel aanvragen</string>
+    <string name="lang_zh_cn">Chinees, vereenvoudigd (简体中文)</string>
+    <string name="lang_zh_tw">Chinees, traditioneel (繁體中文)</string>
 </resources>
