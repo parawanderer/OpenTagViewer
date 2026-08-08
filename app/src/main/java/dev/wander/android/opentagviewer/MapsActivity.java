@@ -42,15 +42,9 @@ import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
 
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
@@ -91,6 +85,7 @@ import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
+import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
@@ -190,6 +185,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     Intent data = result.getData();
                     if (data != null && data.getBooleanExtra("requestSendToLogin", false)) {
                         this.handleSendToLogin();
+                        return;
+                    }
+                    if (data != null && data.getBooleanExtra("mapProviderChanged", false)) {
+                        this.recreate();
                     }
                 }
             }
@@ -213,8 +212,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 if (result.getResultCode() == RESULT_OK) {
                     Intent data = result.getData();
                     if (data != null && (
-                            data.getStringExtra("deviceWasRemoved") != null)
-                            || data.getStringExtra("deviceWasChanged") != null) {
+                            data.getStringExtra("deviceWasRemoved") != null
+                            || data.getStringExtra("deviceWasChanged") != null)) {
                         this.handleDeviceListChanged();
                     }
                 }
@@ -323,12 +322,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         mapProvider.setCompassEnabled(false); // not needed due to no rotation being allowed
         mapProvider.setMapToolbarEnabled(false); // we have a custom button for this
 
-        if (this.userSettings.hasDarkThemeEnabled()) {
-            // DARK THEME map
-            mapProvider.setMapStyle(true);
-        } else {
-            mapProvider.setMapStyle(false);
-        }
+        mapProvider.setMapStyle(this.getPreferredMapStyle());
 
         this.enableMyLocation(false);
 
@@ -374,6 +368,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     @Override
     protected void onResume() {
         super.onResume();
+
+        this.userSettings = this.userSettingsRepo.getUserSettings();
+        if (this.mapProvider != null) {
+            this.mapProvider.setMapStyle(this.getPreferredMapStyle());
+        }
 
          // TODO: when a user changes their anisette URL in settings and returns here, this should be able to deal with querying the new URL
 
@@ -803,11 +802,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.sendToLogin();
             return;
         }
-        // else stay here & restore the account & get the user settings
-        var userSettings = userSettingsRepo.getUserSettings();
-
-        // Get Apple account
-        var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get(), userSettings.getAnisetteServerUrl())
+        // else stay here & restore the account.
+        // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
+        // so we no longer need to read userSettings.getAnisetteServerUrl() here.
+        var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get())
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;
@@ -857,9 +855,39 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.initialFetchComplete = true;
             Log.e(TAG, "Error while restoring account and trying to get latest beacons", error);
             TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+
+            if (isAccountRestoreFailure(error)) {
+                // Most likely cause: a session blob saved by FindMy 0.7.6 that 0.9.x cannot
+                // restore. Wipe the bad blob and route the user back to login with a hint.
+                Log.w(TAG, "Account restore failed; clearing saved auth and prompting re-login");
+                handleAccountRestoreFailureOnUiThread();
+            }
             //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
             // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
+    }
+
+    private static boolean isAccountRestoreFailure(Throwable t) {
+        for (Throwable cur = t; cur != null; cur = cur.getCause()) {
+            if (cur instanceof PythonAccountLoginException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void handleAccountRestoreFailureOnUiThread() {
+        var disposable = this.userAuthRepo.clearUser()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(() -> {
+                    Toast.makeText(this, R.string.relogin_required_after_upgrade, LENGTH_LONG).show();
+                    this.finish();
+                    this.sendToLogin();
+                }, err -> {
+                    Log.e(TAG, "Failed to clear stale auth blob during restore-failure recovery", err);
+                    // Fall through silently — at worst the user has to log out manually.
+                });
     }
 
     private synchronized void addBeaconToCurrent(final List<BeaconInformation> newBeaconInformation) {
@@ -1174,6 +1202,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         startActivity(intent);
     }
 
+    private IMapProvider.MapStyle getPreferredMapStyle() {
+        if (this.userSettings == null || this.userSettings.getUseDarkTheme() == null) {
+            return IMapProvider.MapStyle.FOLLOW_SYSTEM;
+        }
+        return this.userSettings.getUseDarkTheme()
+                ? IMapProvider.MapStyle.DARK
+                : IMapProvider.MapStyle.LIGHT;
+    }
+
     private void fetchAndUpdateCurrentBeacons() {
         var beacons = this.beacons.values().stream()
                 .collect(Collectors.toMap(b -> b.getInfo().getBeaconId(), b -> b.getInfo().getOwnedBeaconPlistRaw()));
@@ -1205,21 +1242,24 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         );
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
+        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
                 .doOnNext(reports -> this.last24HHistoryFetchAt = now) // on success, update this time.
-                .flatMap(this.beaconRepo::storeToLocationCache);
+                .flatMap(this.beaconRepo::storeFetchResult);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist, final int hoursToGoBack) {
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
-                .flatMap(this.beaconRepo::storeToLocationCache);
+        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
+                .flatMap(this.beaconRepo::storeFetchResult);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(Map.of(beaconId, pList), hoursToGoBack)
-                .flatMap(this.beaconRepo::storeToLocationCache);
+        return this.beaconRepo.toAccessoryRequests(Map.of(beaconId, pList))
+                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
+                .flatMap(this.beaconRepo::storeFetchResult);
     }
 
     private boolean isAppleServiceInitialised() {

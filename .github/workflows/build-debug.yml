@@ -67,6 +67,9 @@ jobs:
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY || 'maps_key_default_value' }}" > secrets.properties
           echo "AMAP_API_KEY=${{ secrets.AMAP_API_KEY || 'amap_key_default_value' }}" >> secrets.properties
 
+      - name: Validate checked-in stub wheels
+        run: python3 scripts/validate_stub_wheels.py app/libs/unicorn-2.1.1-py3-none-any.whl
+
       # Run Tests Build
       - name: Run gradle tests
         run: ./gradlew test

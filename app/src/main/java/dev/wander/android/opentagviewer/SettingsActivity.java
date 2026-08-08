@@ -94,6 +94,7 @@ public class SettingsActivity extends AppCompatActivity {
     private String editorSelectedLocateId = null;
 
     private String initialAnisetteUrl = null;
+    private boolean mapProviderChanged = false;
 
 
     @Override
@@ -160,7 +161,17 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleEndActivity() {
+        if (this.mapProviderChanged) {
+            Intent data = new Intent();
+            data.putExtra("mapProviderChanged", true);
+            setResult(RESULT_OK, data);
+        }
         this.finish();
+    }
+
+    @Override
+    public void onBackPressed() {
+        this.handleEndActivity();
     }
 
     private void onDebugDataEnabledChange(CompoundButton buttonView, boolean isChecked) {
@@ -246,6 +257,8 @@ public class SettingsActivity extends AppCompatActivity {
     }
     
     private void updateMapProvider(String provider) {
+        final String currentProvider = this.currentSettings.getMapProvider();
+        this.mapProviderChanged = this.mapProviderChanged || !java.util.Objects.equals(currentProvider, provider);
         this.currentSettings.setMapProvider(provider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.saveSettings();
@@ -255,7 +268,14 @@ public class SettingsActivity extends AppCompatActivity {
     private void onClickEditLanguage() {
         View view = inflate(this, R.layout.language_input_dialog, null);
 
-        final String currentLocale = Locale.getDefault().getLanguage();
+        final String currentLocale = Optional.ofNullable(this.currentSettings.getLanguage())
+                .orElseGet(() -> {
+                    String appLocales = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+                    if (appLocales != null && !appLocales.isBlank()) {
+                        return appLocales.split(",")[0];
+                    }
+                    return Locale.getDefault().toLanguageTag();
+                });
         var availableLocales = LocaleConfigUtil.getAvailableLocales(this.getResources())
                 .toArray(new String[0]);
 
@@ -269,7 +289,8 @@ public class SettingsActivity extends AppCompatActivity {
                 .sorted().toArray(String[]::new));
 
         mappedLocales.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(currentLocale))
+                .filter(kvp -> kvp.getValue().equalsIgnoreCase(currentLocale)
+                        || currentLocale.toLowerCase(Locale.ROOT).startsWith(kvp.getValue().toLowerCase(Locale.ROOT) + "-"))
                 .findFirst()
                 .map(Map.Entry::getKey)
                 .ifPresent(option -> languageDropdown.setText(option, false));
@@ -296,6 +317,19 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void onClickEditAnisetteServerUrl() {
+        // FindMy 0.9.x embeds the anisette URL inside the saved account JSON and
+        // refuses to swap providers post-login. Block changes while a session
+        // exists; the user can sign out below to change provider.
+        var existingAuth = this.authRepository.getUserAuth().blockingFirst();
+        if (existingAuth.isPresent()) {
+            Toast.makeText(
+                    this,
+                    R.string.anisette_change_requires_logout,
+                    Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
+
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
 
         CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(view.getContext(), /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
@@ -520,7 +554,7 @@ public class SettingsActivity extends AppCompatActivity {
     private String getPrettyLanguageName(final String languageId) {
         var res = this.getResources();
         return res.getString(res.getIdentifier(
-                "lang_" + languageId,
+                LocaleConfigUtil.toLocaleLabelResourceName(languageId),
                 "string",
                 this.getPackageName()));
     }

@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ui.maps;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
+import android.content.res.Configuration;
 import android.util.Log;
 import android.view.View;
 
@@ -57,7 +58,7 @@ public class AMapProvider implements IMapProvider {
     private Object aMap; // com.amap.api.maps.AMap
     private View mapView; // com.amap.api.maps.TextureMapView
     
-    private boolean isDarkMode = false;
+    private MapStyle currentMapStyle = MapStyle.FOLLOW_SYSTEM;
     
     @Override
     public void initialize(Activity activity, int containerViewId, OnMapReadyCallback callback) {
@@ -114,25 +115,37 @@ public class AMapProvider implements IMapProvider {
     }
     
     @Override
-    public void setMapStyle(boolean darkMode) {
-        this.isDarkMode = darkMode;
+    public void setMapStyle(MapStyle mapStyle) {
+        this.currentMapStyle = mapStyle == null ? MapStyle.FOLLOW_SYSTEM : mapStyle;
         if (aMap == null) return;
-        
+
         try {
-            // 高德地图设置地图类型和样式
-            // com.amap.api.maps.AMap.MAP_TYPE_NORMAL = 1 (白天模式)
-            // com.amap.api.maps.AMap.MAP_TYPE_NIGHT = 4 (夜间模式)
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             java.lang.reflect.Method setMapTypeMethod = aMapClass.getMethod("setMapType", int.class);
-            
-            // 设置地图类型：夜间模式或普通模式
-            int mapType = darkMode ? 4 : 1; // MAP_TYPE_NIGHT : MAP_TYPE_NORMAL
+
+            int normalMapType = aMapClass.getField("MAP_TYPE_NORMAL").getInt(null);
+            int nightMapType = aMapClass.getField("MAP_TYPE_NIGHT").getInt(null);
+            int mapType = this.shouldUseDarkMap() ? nightMapType : normalMapType;
             setMapTypeMethod.invoke(aMap, mapType);
-            
-            Log.d(TAG, "Map style set to dark mode: " + darkMode);
+
+            Log.d(TAG, "Map style set to " + this.currentMapStyle + ", dark=" + this.shouldUseDarkMap());
         } catch (Exception e) {
             Log.e(TAG, "Failed to set map style", e);
         }
+    }
+
+    private boolean shouldUseDarkMap() {
+        if (this.currentMapStyle == MapStyle.DARK) {
+            return true;
+        }
+        if (this.currentMapStyle == MapStyle.LIGHT) {
+            return false;
+        }
+        if (this.activity == null) {
+            return false;
+        }
+        int currentNightMode = this.activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return currentNightMode == Configuration.UI_MODE_NIGHT_YES;
     }
     
     @Override
