@@ -183,6 +183,42 @@ def exportToString(account: AppleAccount) -> str:
     return json.dumps(account.to_json())
 
 
+# The only anisette provider that works on Android. `aniLocal` needs the unicorn CPU
+# emulator to run Apple's ADI blob, and Chaquopy cannot build unicorn's native code -
+# which is why app/stubs/unicorn exists at all.
+SUPPORTED_ANISETTE_TYPE = "aniRemote"
+
+
+def assertAnisetteIsSupported(serializedAccountData: str) -> str:
+    """
+    Check a stored account uses a provider we can actually run, before anything tries
+    to use it.
+
+    Without this the failure surfaces as a NotImplementedError raised from inside the
+    stub `unicorn` package, several layers down in anisette, at whatever unlucky moment
+    the provider is first exercised. Checking the serialized state up front turns that
+    into a clear message at the app boundary.
+
+    :returns: None if supported, otherwise a human-readable reason.
+    """
+    try:
+        data = json.loads(serializedAccountData)
+        anisette_type = (data.get("anisette") or {}).get("type")
+
+        if anisette_type == SUPPORTED_ANISETTE_TYPE:
+            return None
+        if anisette_type is None:
+            return "This saved login has no Anisette configuration and cannot be restored."
+        return (
+            f"This saved login uses an unsupported Anisette provider ({anisette_type}). "
+            "OpenTagViewer supports remote Anisette servers only on Android - local "
+            "Anisette needs a CPU emulator that cannot be built for this platform."
+        )
+    except Exception:
+        print(f"Could not inspect anisette configuration: {traceback.format_exc()}")
+        return "This saved login could not be read."
+
+
 def getAccount(serializedAccountData: str, anisetteServerUrl: str = None) -> AppleAccount:
     """
     Restore an AppleAccount via FindMy 0.9.x's `from_json`. The anisette provider is rebuilt
@@ -191,6 +227,11 @@ def getAccount(serializedAccountData: str, anisetteServerUrl: str = None) -> App
     in Phase 2 when the Java bridge is updated.
     """
     try:
+        unsupported = assertAnisetteIsSupported(serializedAccountData)
+        if unsupported:
+            print(f"Refusing to restore account: {unsupported}")
+            return None
+
         data = json.loads(serializedAccountData)
 
         acc = AppleAccount.from_json(data)

@@ -317,19 +317,6 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void onClickEditAnisetteServerUrl() {
-        // FindMy 0.9.x embeds the anisette URL inside the saved account JSON and
-        // refuses to swap providers post-login. Block changes while a session
-        // exists; the user can sign out below to change provider.
-        var existingAuth = this.authRepository.getUserAuth().blockingFirst();
-        if (existingAuth.isPresent()) {
-            Toast.makeText(
-                    this,
-                    R.string.anisette_change_requires_logout,
-                    Toast.LENGTH_LONG
-            ).show();
-            return;
-        }
-
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
 
         CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(view.getContext(), /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
@@ -433,7 +420,14 @@ public class SettingsActivity extends AppCompatActivity {
         var finalUrl = Optional.ofNullable(this.currentSettings.getAnisetteServerUrl());
 
         if (!originalUrl.equals(finalUrl)) {
-            // we need to force a re-login, unfortunately
+            // A re-login is genuinely required, not just a limitation of how the account
+            // is serialized. Anisette supplies a machine identity (X-Apple-I-MD-M and
+            // friends) derived from that server's own ADI provisioning, and Apple binds
+            // the session to it, so a session established via one server is not valid
+            // when presented with another server's identity. Rewriting the stored
+            // provider would keep the app running but leave it failing auth against
+            // Apple, which is worse than an honest re-login. The dialog warns about this
+            // up front (see anisette_url_change_warning).
             this.performLogout();
         }
     }

@@ -98,5 +98,4 @@
     <string name="map_provider_google">Google 地图</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
     <string name="relogin_required_after_upgrade">FindMy 库已更新，请重新登录。</string>
-    <string name="anisette_change_requires_logout">请先退出登录，再更换 Anisette 服务器。</string>
 </resources>
