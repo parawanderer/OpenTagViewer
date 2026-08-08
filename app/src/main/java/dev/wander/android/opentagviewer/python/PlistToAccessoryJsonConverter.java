@@ -11,11 +11,15 @@ package dev.wander.android.opentagviewer.python;
 public interface PlistToAccessoryJsonConverter {
 
     /**
-     * @param plistXml the raw plist XML as stored in {@code OwnedBeacons.content}
+     * @param plistXml      the raw plist XML as stored in {@code OwnedBeacons.content}
+     * @param alignmentPlistXml the accessory's KeyAlignmentRecord plist, or {@code null}.
+     *                      Supplies the rolling-key index macOS last observed so fetching
+     *                      can start there instead of at the tag's pairing date. Absent
+     *                      for exports made before format 0.0.2.
      * @return the serialized accessory JSON, or {@code null} if conversion was not
      *         possible. Callers should treat {@code null} as "not available right now"
      *         and retry later, not as a permanent failure - a conversion can fail simply
      *         because the Python runtime has not started yet.
      */
-    String convert(String plistXml);
+    String convert(String plistXml, String alignmentPlistXml);
 }

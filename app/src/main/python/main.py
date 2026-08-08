@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 import json
 import traceback
 from datetime import datetime, timezone
@@ -25,7 +26,7 @@ class TwoFactorMethods(Enum):
     PHONE = 2
 
 
-def _toUnixEpochMs(dt: datetime) -> int:
+def _toUnixEpochMs(dt: datetime | None) -> int | None:
     """
     Convert datetime to unix epoch (milliseconds)
     """
@@ -59,7 +60,7 @@ def foo(arg: str):
     }
 
 
-def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
+def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict | None:
     """
     Extract some extra information from within the plist file `cloudKitMetadata` node
     (that is followed by a `<data>` element containing base64)
@@ -90,9 +91,9 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
 
         # This is actually a pretty large object, but very little of the data seems useful to our app
 
-        RecordCtime: datetime = d_dict.get("RecordCtime", None)
-        RecordMtime: datetime = d_dict.get("RecordMtime", None)
-        ModifiedByDevice: str = d_dict.get("ModifiedByDevice", None)
+        RecordCtime: datetime | None = d_dict.get("RecordCtime", None)
+        RecordMtime: datetime | None = d_dict.get("RecordMtime", None)
+        ModifiedByDevice: str | None = d_dict.get("ModifiedByDevice", None)
 
         res = {
             "creationTime": _toUnixEpochMs(RecordCtime),
@@ -109,8 +110,11 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
         return None
 
 
-def _convertToJavaDictWrapper(method: SyncSecondFactorMethod):
-    return_obj = {
+def _convertToJavaDictWrapper(method: SyncSecondFactorMethod) -> dict[str, Any]:
+    # Deliberately heterogeneous: it carries the method object plus the ints and strings
+    # the Java side reads back out. Without the annotation the type is inferred from the
+    # first entry alone, and every later assignment looks like an error.
+    return_obj: dict[str, Any] = {
         "obj": method
     }
 
@@ -189,7 +193,7 @@ def exportToString(account: AppleAccount) -> str:
 SUPPORTED_ANISETTE_TYPE = "aniRemote"
 
 
-def assertAnisetteIsSupported(serializedAccountData: str) -> str:
+def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
     """
     Check a stored account uses a provider we can actually run, before anything tries
     to use it.
@@ -219,7 +223,9 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str:
         return "This saved login could not be read."
 
 
-def getAccount(serializedAccountData: str, anisetteServerUrl: str = None) -> AppleAccount:
+def getAccount(
+        serializedAccountData: str,
+        anisetteServerUrl: str | None = None) -> AppleAccount | None:
     """
     Restore an AppleAccount via FindMy 0.9.x's `from_json`. The anisette provider is rebuilt
     from the embedded state inside the JSON, so `anisetteServerUrl` is unused here. We accept
@@ -245,7 +251,9 @@ def getAccount(serializedAccountData: str, anisetteServerUrl: str = None) -> App
         return None
 
 
-def convertPlistToJson(plistXmlString: str) -> str:
+def convertPlistToJson(
+        plistXmlString: str,
+        alignmentPlistXmlString: str | None = None) -> str | None:
     """
     One-shot conversion from the legacy plist XML representation (still stored in
     OwnedBeacon.content) to the JSON form that FindMy 0.9.x expects.
@@ -254,11 +262,25 @@ def convertPlistToJson(plistXmlString: str) -> str:
     - During .zip import: convert once and store alongside the raw plist
     - As a lazy backfill: when reading an OwnedBeacon row that predates the upgrade
 
+    `alignmentPlistXmlString` is the accessory's KeyAlignmentRecord, if the export
+    contained one (format 0.0.2 and later). It supplies the rolling-key index macOS last
+    observed, so fetching can start there. Without it the accessory starts at index 0 from
+    its pairing date and the first fetch searches the tag's entire history - tens of
+    thousands of keys for an older tag. Optional, because exports predating 0.0.2 have no
+    such record and must keep working.
+
     Returns None on failure so Java can decide how to recover.
     """
     try:
         fp = BytesIO(plistXmlString.encode('utf-8'))
-        accessory = FindMyAccessory.from_plist(fp)
+
+        # from_plist accepts bytes for the alignment record but not a file object,
+        # unlike its first parameter.
+        alignment_bytes = (
+            alignmentPlistXmlString.encode('utf-8') if alignmentPlistXmlString else None
+        )
+
+        accessory = FindMyAccessory.from_plist(fp, alignment_bytes)
         return json.dumps(accessory.to_json())
     except Exception:
         print(f"convertPlistToJson failed: {traceback.format_exc()}")
@@ -363,7 +385,7 @@ def _serializeReports(reports):
 def getLastReports(
         account: AppleAccount,
         idToAccessoryData,
-        hoursBack: int) -> dict:
+        hoursBack: int) -> dict | None:
     """
     Fetch the most recent reports for each beacon over the requested time window.
 
@@ -425,7 +447,7 @@ def getReports(
         account: AppleAccount,
         idToAccessoryData,
         unixStartMs: int,
-        unixEndMs: int) -> dict:
+        unixEndMs: int) -> dict | None:
     """
     Time-range variant. Apple's network only retains ~7 days of history; ranges further
     back than that will return empty (the local Room cache is already the canonical store

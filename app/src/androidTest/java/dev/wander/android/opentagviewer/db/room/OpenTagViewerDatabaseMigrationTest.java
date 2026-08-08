@@ -165,6 +165,69 @@ public class OpenTagViewerDatabaseMigrationTest {
         }
     }
 
+    /**
+     * v2 → v3 adds alignment_plist. Existing rows keep their data and gain a NULL column,
+     * which is correct: their exports predate format 0.0.2 and have no alignment record.
+     */
+    @Test
+    public void migrate2To3_preservesExistingBeacons() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        // reach v2 the way a real device would, then apply the new one
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 3, true, OpenTagViewerDatabase.MIGRATION_2_3);
+
+        try (Cursor cursor = db.query(
+                "SELECT content, accessory_json, alignment_plist FROM OwnedBeacons WHERE id = ?",
+                new Object[]{BEACON_ID})) {
+            assertTrue("beacon row did not survive v2 to v3", cursor.moveToFirst());
+            assertEquals(BEACON_PLIST, cursor.getString(0));
+            assertTrue("accessory_json should still be NULL", cursor.isNull(1));
+            assertTrue("alignment_plist starts NULL for pre-0.0.2 exports", cursor.isNull(2));
+        }
+    }
+
+    /**
+     * The case that actually reaches users: someone who never took the v2 release and
+     * upgrades straight from v1. Both migrations have to run in sequence.
+     */
+    @Test
+    public void migrate1To3_directUpgradePreservesEverything() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
+            insertOwnedBeaconV1(db, "beacon-b", 1L, BEACON_PLIST, true);
+            insertLocationReport(db, "hash-1", "beacon-a", 1700000000000L);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 3, true,
+                OpenTagViewerDatabase.MIGRATION_1_2,
+                OpenTagViewerDatabase.MIGRATION_2_3);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("beacons lost on a direct v1 to v3 upgrade", 2, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("location history lost on a direct v1 to v3 upgrade", 1, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query(
+                "SELECT accessory_json, alignment_plist FROM OwnedBeacons WHERE id = ?",
+                new Object[]{"beacon-a"})) {
+            assertTrue(cursor.moveToFirst());
+            assertTrue(cursor.isNull(0));
+            assertTrue(cursor.isNull(1));
+        }
+    }
+
     private static void insertImport(SupportSQLiteDatabase db, long id) {
         ContentValues values = new ContentValues();
         values.put("id", id);

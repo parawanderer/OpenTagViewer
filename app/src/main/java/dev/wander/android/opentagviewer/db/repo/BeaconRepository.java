@@ -173,7 +173,8 @@ public class BeaconRepository {
                             ? row.content
                             : entry.getValue();
 
-                    accessoryJson = this.accessoryJsonConverter.convert(plist);
+                    final String alignmentPlist = row == null ? null : row.alignmentPlist;
+                    accessoryJson = this.accessoryJsonConverter.convert(plist, alignmentPlist);
                     if (accessoryJson != null) {
                         dao.updateAccessoryJson(beaconId, accessoryJson);
                         Log.d(TAG, "Lazy-backfilled accessory_json for beaconId=" + beaconId);

@@ -308,3 +308,77 @@ def test_probe_survives_an_accessory_that_cannot_report_indices():
 
     assert main._narrowAlignmentIfNeeded(account, BrokenAccessory(), now - timedelta(hours=24), now) is False
     assert account.fetch_location_calls == 0
+
+# --------------------------------------------------------------------------
+# Key alignment records
+#
+# The whole point: without one, an accessory starts at index 0 from its pairing
+# date and the first fetch searches the tag's entire history. With one, it starts
+# where macOS last observed the key index.
+# --------------------------------------------------------------------------
+
+def _alignment_plist_bytes(days_ago: int, index: int) -> bytes:
+    """A KeyAlignmentRecord in the shape macOS writes it."""
+    import plistlib
+    observed = (datetime.now(tz=timezone.utc) - timedelta(days=days_ago)).replace(
+        tzinfo=None, microsecond=0)
+    return plistlib.dumps({
+        "lastIndexObservationDate": observed,
+        "lastIndexObserved": index,
+    })
+
+
+@pytest.mark.skipif(not BEACON_PLISTS, reason="no redacted beacon fixture available")
+def test_alignment_record_collapses_the_first_fetch_key_search():
+    """An old tag with an alignment record must not search its whole history."""
+    from findmy import FindMyAccessory
+
+    plist_path = BEACON_PLISTS[0]
+    now = datetime.now(tz=timezone.utc)
+    start = now - timedelta(hours=24)
+
+    without = FindMyAccessory.from_plist(plist_path)
+    unaligned_keys = without.get_max_index(now) - without.get_min_index(start) + 1
+
+    # Same accessory, but macOS observed its index yesterday.
+    import io as _io
+    with_alignment = FindMyAccessory.from_plist(
+        plist_path, _io.BytesIO(_alignment_plist_bytes(days_ago=1, index=50_000)))
+    aligned_keys = with_alignment.get_max_index(now) - with_alignment.get_min_index(start) + 1
+
+    assert aligned_keys < unaligned_keys, (
+        f"alignment record did not narrow the search "
+        f"({aligned_keys} vs {unaligned_keys} keys)"
+    )
+    # Apple accepts ~290 keys per request; a day's drift either side should stay small.
+    assert aligned_keys < 1000, f"expected a bounded search, got {aligned_keys} keys"
+
+
+@pytest.mark.skipif(not BEACON_PLISTS, reason="no redacted beacon fixture available")
+def test_convertPlistToJson_accepts_an_alignment_record():
+    plist_xml = _read_plist_xml(BEACON_PLISTS[0])
+    alignment_xml = _alignment_plist_bytes(days_ago=1, index=50_000).decode("utf-8")
+
+    result = main.convertPlistToJson(plist_xml, alignment_xml)
+
+    assert result is not None
+    parsed = json.loads(result)
+    assert parsed.get("type") == "accessory"
+
+
+@pytest.mark.skipif(not BEACON_PLISTS, reason="no redacted beacon fixture available")
+def test_convertPlistToJson_still_works_without_an_alignment_record():
+    """Exports predating format 0.0.2 have none, and must keep importing."""
+    plist_xml = _read_plist_xml(BEACON_PLISTS[0])
+    assert main.convertPlistToJson(plist_xml) is not None
+    assert main.convertPlistToJson(plist_xml, None) is not None
+
+
+@pytest.mark.skipif(not BEACON_PLISTS, reason="no redacted beacon fixture available")
+def test_convertPlistToJson_survives_a_corrupt_alignment_record():
+    """A bad alignment record must not cost us the beacon entirely."""
+    plist_xml = _read_plist_xml(BEACON_PLISTS[0])
+    result = main.convertPlistToJson(plist_xml, "this is not a plist")
+    # from_plist raises on a malformed alignment plist, so we return None and the caller
+    # retries later rather than storing something wrong.
+    assert result is None

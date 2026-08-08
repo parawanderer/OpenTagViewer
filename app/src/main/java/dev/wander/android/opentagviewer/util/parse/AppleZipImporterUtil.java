@@ -54,7 +54,13 @@ public class AppleZipImporterUtil {
     enum FILE_TYPE {
         EXPORT_INFO,
         OWNED_BEACON,
-        BEACON_NAMING_RECORD;
+        BEACON_NAMING_RECORD,
+        /**
+         * Optional. Carries the rolling-key alignment macOS last observed for an accessory,
+         * which lets FindMy 0.9.x start fetching from the right key index instead of
+         * searching the tag's entire history. Absent from exports made before format 0.0.2.
+         */
+        KEY_ALIGNMENT_RECORD;
     }
 
     private static final String TAG = AppleZipImporterUtil.class.getSimpleName();
@@ -80,6 +86,9 @@ public class AppleZipImporterUtil {
         String openTagViewerYaml = null;
         Map<String, String> ownedBeacons = new HashMap<>();
         Map<String, Pair<String, String>> beaconNamingRecords = new HashMap<>();
+        // Optional per accessory: absent for exports made before format 0.0.2, and for
+        // accessories macOS has never observed a key index for.
+        Map<String, String> keyAlignmentRecords = new HashMap<>();
 
         try (ZipInputStream zipInput = new ZipInputStream(
                 this.appContext.getContentResolver()
@@ -131,6 +140,10 @@ public class AppleZipImporterUtil {
                     case BEACON_NAMING_RECORD:
                         processBeaconNamingRecord(typeAndRegexGroups.second, fileContent, beaconNamingRecords);
                         break;
+                    case KEY_ALIGNMENT_RECORD:
+                        // Keyed by the parent directory, which is the accessory id.
+                        keyAlignmentRecords.put(typeAndRegexGroups.second.get(1), fileContent);
+                        break;
                 }
             }
         } catch (IOException e) {
@@ -144,7 +157,8 @@ public class AppleZipImporterUtil {
         return convert(
           openTagViewerYaml,
           ownedBeacons,
-          beaconNamingRecords
+          beaconNamingRecords,
+          keyAlignmentRecords
         );
     }
 
@@ -382,10 +396,11 @@ public class AppleZipImporterUtil {
     private static ImportData convert(
             final String importInfo,
             final Map<String, String> ownedBeacons,
-            final Map<String, Pair<String, String>> beaconNamingRecords) {
+            final Map<String, Pair<String, String>> beaconNamingRecords,
+            final Map<String, String> keyAlignmentRecords) {
         try {
             Import anImport = parseImportInfo(importInfo);
-            List<OwnedBeacon> beacons = makeOwnedBeacons(ownedBeacons, anImport.version);
+            List<OwnedBeacon> beacons = makeOwnedBeacons(ownedBeacons, keyAlignmentRecords, anImport.version);
             List<BeaconNamingRecord> records = makeBeaconNamingRecords(beaconNamingRecords, anImport.version);
 
             return new ImportData(
@@ -410,25 +425,33 @@ public class AppleZipImporterUtil {
                 .build();
     }
 
-    private static List<OwnedBeacon> makeOwnedBeacons(final Map<String, String> ownedBeacons, final String version) {
+    private static List<OwnedBeacon> makeOwnedBeacons(
+            final Map<String, String> ownedBeacons,
+            final Map<String, String> keyAlignmentRecords,
+            final String version) {
         return ownedBeacons.entrySet().stream()
                 .map(kvp -> OwnedBeacon.builder()
                         .id(kvp.getKey())
                         .importId(null) // TODO: fill on create Import
                         .version(version)
                         .content(kvp.getValue())
+                        // Null when the export predates format 0.0.2 or macOS had no
+                        // alignment for this accessory; conversion handles that.
+                        .alignmentPlist(keyAlignmentRecords.get(kvp.getKey()))
                         // Eagerly convert plist → JSON for FindMy 0.9.x; nullable on failure
                         // (lazy backfill in BeaconRepository will retry on first fetch).
-                        .accessoryJson(plistToAccessoryJsonOrNull(kvp.getValue()))
+                        .accessoryJson(plistToAccessoryJsonOrNull(
+                                kvp.getValue(), keyAlignmentRecords.get(kvp.getKey())))
                         .build())
                 .collect(Collectors.toList());
     }
 
-    private static String plistToAccessoryJsonOrNull(final String plistXml) {
+    private static String plistToAccessoryJsonOrNull(
+            final String plistXml, final String alignmentPlistXml) {
         try {
             var py = com.chaquo.python.Python.getInstance();
             var module = py.getModule("main");
-            var result = module.callAttr("convertPlistToJson", plistXml);
+            var result = module.callAttr("convertPlistToJson", plistXml, alignmentPlistXml);
             return result == null ? null : result.toString();
         } catch (Exception e) {
             Log.w(TAG, "convertPlistToJson at import time failed; will backfill lazily on first fetch", e);
