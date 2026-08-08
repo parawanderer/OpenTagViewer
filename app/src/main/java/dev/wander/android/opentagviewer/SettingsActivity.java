@@ -63,6 +63,7 @@ import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
+import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -297,6 +298,21 @@ public class SettingsActivity extends AppCompatActivity {
             clipboard.setPrimaryClip(
                     android.content.ClipData.newPlainText("AMap registration details", registrationDetails));
             Toast.makeText(this, R.string.amap_registration_details_copied, Toast.LENGTH_SHORT).show();
+        });
+
+        // Registering a key is a multi-step process on a Chinese-language console, so send
+        // people to the walkthrough rather than expecting them to work it out.
+        final MaterialButton guideButton = view.findViewById(R.id.amap_open_guide);
+        guideButton.setOnClickListener(v -> {
+            var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+            if (properties == null) {
+                return;
+            }
+            final String guideUrl = properties.getProperty("amapWikiPage");
+            if (guideUrl == null || guideUrl.isBlank()) {
+                return;
+            }
+            startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(guideUrl)));
         });
 
         new MaterialAlertDialogBuilder(this)

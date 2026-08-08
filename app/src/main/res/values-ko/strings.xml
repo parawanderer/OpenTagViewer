@@ -98,4 +98,5 @@
     <string name="amap_key_required">AMap에는 본인의 API 키가 필요합니다. 키를 입력해야 이 지도를 사용할 수 있습니다.</string>
     <string name="amap_key_saved">AMap API 키를 저장했습니다.</string>
     <string name="amap_key_cleared">AMap API 키를 삭제했습니다.</string>
+    <string name="amap_how_to_get_a_key">키 발급 방법</string>
 </resources>
