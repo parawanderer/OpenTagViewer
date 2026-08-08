@@ -2,8 +2,6 @@ package dev.wander.android.opentagviewer.db.repo;
 
 import android.util.Log;
 
-import com.chaquo.python.Python;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +22,9 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
+import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -34,9 +34,19 @@ import lombok.NonNull;
 public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
     private final OpenTagViewerDatabase db;
+    private final PlistToAccessoryJsonConverter accessoryJsonConverter;
 
     public BeaconRepository(OpenTagViewerDatabase db) {
+        this(db, new ChaquopyPlistToAccessoryJsonConverter());
+    }
+
+    /**
+     * Injectable converter, so the lazy accessory_json backfill can be tested without a
+     * running Python runtime.
+     */
+    public BeaconRepository(OpenTagViewerDatabase db, PlistToAccessoryJsonConverter accessoryJsonConverter) {
         this.db = db;
+        this.accessoryJsonConverter = accessoryJsonConverter;
     }
 
     /**
@@ -146,39 +156,36 @@ public class BeaconRepository {
             }
 
             final var dao = db.ownedBeaconDao();
-            final var py = Python.getInstance();
-            final var module = py.getModule("main");
 
             List<AccessoryRequest> out = new ArrayList<>(beaconIdToPlistFallback.size());
             for (var entry : beaconIdToPlistFallback.entrySet()) {
                 final String beaconId = entry.getKey();
-                final String plistFallback = entry.getValue();
 
-                String accessoryJson = null;
                 final OwnedBeacon row = dao.getById(beaconId);
-                if (row != null) {
-                    accessoryJson = row.accessoryJson;
-                }
+                String accessoryJson = row == null ? null : row.accessoryJson;
 
                 if (accessoryJson == null) {
-                    // Lazy backfill: rows imported under FindMy 0.7.6 won't have accessory_json.
-                    try {
-                        var converted = module.callAttr("convertPlistToJson", plistFallback);
-                        if (converted != null) {
-                            accessoryJson = converted.toString();
-                            dao.updateAccessoryJson(beaconId, accessoryJson);
-                            Log.d(TAG, "Lazy-backfilled accessory_json for beaconId=" + beaconId);
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "convertPlistToJson failed for beaconId=" + beaconId
-                                + "; this beacon will be skipped this fetch", e);
+                    // Lazy backfill: rows imported under FindMy 0.7.6 have no accessory_json,
+                    // and neither do rows whose import-time conversion failed. Prefer the
+                    // plist retained on the row over the caller's copy - the row is the
+                    // source of truth, and the caller's map may be stale.
+                    final String plist = (row != null && row.content != null)
+                            ? row.content
+                            : entry.getValue();
+
+                    accessoryJson = this.accessoryJsonConverter.convert(plist);
+                    if (accessoryJson != null) {
+                        dao.updateAccessoryJson(beaconId, accessoryJson);
+                        Log.d(TAG, "Lazy-backfilled accessory_json for beaconId=" + beaconId);
                     }
                 }
 
                 if (accessoryJson != null) {
                     out.add(new AccessoryRequest(beaconId, accessoryJson));
                 } else {
-                    Log.w(TAG, "Skipping beaconId=" + beaconId + " — no accessory_json available");
+                    // Dropped rather than passed on: FindMyAccessory.from_json would throw
+                    // and take down the whole batch. A short result is better than none.
+                    Log.w(TAG, "Skipping beaconId=" + beaconId + " - no accessory_json available");
                 }
             }
             return out;
