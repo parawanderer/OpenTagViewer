@@ -8,8 +8,16 @@ plugins {
 secrets {
     // To add your Maps API key to this project:
     // 1. If the secrets.properties file does not exist, create it in the same folder as the local.properties file.
-    // 2. Add this line, where YOUR_API_KEY is your API key:
+    // 2. Add these lines, where YOUR_API_KEY is your API key:
     //        MAPS_API_KEY=YOUR_API_KEY
+    //        AMAP_API_KEY=YOUR_AMAP_API_KEY
+    // 
+    // How to get Google Maps API Key:
+    //    - Visit: https://console.cloud.google.com/google/maps-apis/
+    //
+    // How to get AMap API Key (高德地图 API Key):
+    //    - Visit: https://console.amap.com/dev/key/app
+    //    - Guide: https://lbs.amap.com/api/android-sdk/guide/create-project/get-key
     propertiesFileName = "secrets.properties"
 
     // A properties file containing default secret values. This file can be
@@ -127,6 +135,11 @@ dependencies {
     implementation(libs.androidx.emoji.views)
     implementation(libs.androidx.emoji.views.helper)
     implementation(libs.androidx.emoji.picker)
+
+    // 高德地图SDK - Android 3D地图 V9.8.3
+    // 参考文档：https://lbs.amap.com/api/android-sdk/gettingstarted
+    // 注意：3D地图SDK已包含定位功能，无需单独引入location SDK
+    implementation(libs.amap.map3d)
 
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)

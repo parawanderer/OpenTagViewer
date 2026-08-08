@@ -75,6 +75,7 @@ jobs:
       - name: Inject secrets.properties
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
+          echo "AMAP_API_KEY=${{ secrets.AMAP_API_KEY }}" >> secrets.properties
 
       - name: Recreate release keystore
         run: |

@@ -11,6 +11,8 @@
         <variable name="currentLanguage" type="String" />
         <variable name="onClickAnisetteServerUrl" type="Runnable" />
         <variable name="currentAnisetteServerUrl" type="String" />
+        <variable name="onClickMapProvider" type="Runnable" />
+        <variable name="currentMapProvider" type="String" />
         <variable name="isDebugDataEnabled" type="boolean" />
     </data>
 
@@ -72,6 +74,15 @@
                 app:sectionSubtitle="@{currentAnisetteServerUrl}"
                 app:title="@{@string/anisette_server_url}"
                 app:onClick="@{onClickAnisetteServerUrl}"
+                />
+
+            <include
+                android:id="@+id/setting_app_map_provider"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/directions_24px}"
+                app:sectionSubtitle="@{currentMapProvider}"
+                app:title="@{@string/map_provider}"
+                app:onClick="@{onClickMapProvider}"
                 />
 
             <com.google.android.material.divider.MaterialDivider

@@ -132,6 +132,8 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setCurrentLanguage(Optional.ofNullable(this.currentSettings.getLanguage()).map(this::getPrettyLanguageName).orElse(this.getString(R.string.use_system_default)));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
         this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
+        this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
+        this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
 
         if (this.getSupportActionBar() != null) {
@@ -203,6 +205,53 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
+    private String getCurrentMapProviderUiString() {
+        String provider = this.currentSettings.getMapProvider();
+        if (provider == null || provider.isEmpty() || "google".equals(provider)) {
+            return this.getString(R.string.map_provider_google);
+        } else if ("amap".equals(provider)) {
+            return this.getString(R.string.map_provider_amap);
+        }
+        return this.getString(R.string.map_provider_google);
+    }
+    
+    private void onClickEditMapProvider() {
+        List<String> providerChoices = new ArrayList<>();
+        providerChoices.add(this.getString(R.string.map_provider_google));
+        providerChoices.add(this.getString(R.string.map_provider_amap));
+        
+        String currentProvider = this.currentSettings.getMapProvider();
+        int currentOption = 0; // 默认Google Maps
+        if ("amap".equals(currentProvider)) {
+            currentOption = 1;
+        }
+        
+        var builder = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.map_provider)
+                .setPositiveButton(R.string.accept, (dialog, which) -> {
+                    Log.d(TAG, "Selected new map provider option!");
+                    
+                    int checkedItemPosition = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
+                    
+                    if (checkedItemPosition != AdapterView.INVALID_POSITION) {
+                        String selectedProvider = checkedItemPosition == 0 ? "google" : "amap";
+                        Log.d(TAG, "Selected map provider: " + selectedProvider);
+                        this.updateMapProvider(selectedProvider);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .setSingleChoiceItems(providerChoices.toArray(new CharSequence[0]), currentOption, null);
+        
+        builder.show();
+    }
+    
+    private void updateMapProvider(String provider) {
+        this.currentSettings.setMapProvider(provider);
+        this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
+        this.saveSettings();
+        Log.i(TAG, "Updated map provider to: " + provider);
+    }
+    
     private void onClickEditLanguage() {
         View view = inflate(this, R.layout.language_input_dialog, null);
 
