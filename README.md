@@ -58,7 +58,6 @@ See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more det
 Contributions/MRs are more than welcome.
 
 Plenty of things can be improved in this project as it was mostly a "hackathony" thing I tried to throw together ASAP and make presentable for layusers.
-Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setup.
 
 📋 **[TESTING.md](./TESTING.md)** lists how to run every test suite in the repo — the Android
 unit and instrumented tests, the Chaquopy bridge tests, and the desktop wizard tests — plus what
