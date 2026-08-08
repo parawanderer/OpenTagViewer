@@ -35,11 +35,21 @@ INPUT_PATH = os.path.join(HOME, 'Library', BASE_FOLDER)
 OWNED_BEACONS = "OwnedBeacons"
 MASTER_BEACONS = "MasterBeacons"
 BEACON_NAMING_RECORD = "BeaconNamingRecord"
+KEY_ALIGNMENT_RECORDS = "KeyAlignmentRecords"
 
 WHITELISTED_DIRS = {
     OWNED_BEACONS,
     MASTER_BEACONS,  # <- MacOS 11 (see: https://github.com/parawanderer/OpenTagViewer/issues/24)
-    BEACON_NAMING_RECORD
+    BEACON_NAMING_RECORD,
+    # Holds `lastIndexObserved` / `lastIndexObservationDate` per accessory: where the tag's
+    # rolling key index had got to when macOS last saw it. FindMy.py >= 0.9 accepts this as
+    # `FindMyAccessory.from_plist(plist, key_alignment_plist)`.
+    #
+    # Without it, an imported accessory starts at index 0 from its pairing date, so the very
+    # first fetch searches the tag's entire lifetime of keys - roughly 96 per day, i.e. ~50k
+    # for an 18-month-old AirTag, and Apple accepts only ~290 keys per request. That is a few
+    # hundred requests per tag on first use. See issue #30.
+    KEY_ALIGNMENT_RECORDS
 }
 
 RENAME_LEGACY_MAP = {
