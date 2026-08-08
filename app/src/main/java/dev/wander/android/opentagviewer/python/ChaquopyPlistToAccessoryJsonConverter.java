@@ -16,14 +16,15 @@ public class ChaquopyPlistToAccessoryJsonConverter implements PlistToAccessoryJs
     private static final String MODULE_MAIN = "main";
 
     @Override
-    public String convert(final String plistXml) {
+    public String convert(final String plistXml, final String alignmentPlistXml) {
         if (plistXml == null || plistXml.isEmpty()) {
             return null;
         }
 
         try {
             var module = Python.getInstance().getModule(MODULE_MAIN);
-            var converted = module.callAttr("convertPlistToJson", plistXml);
+            // Passing null for the alignment record is fine - Python treats it as absent.
+            var converted = module.callAttr("convertPlistToJson", plistXml, alignmentPlistXml);
             return converted == null ? null : converted.toString();
         } catch (Exception e) {
             // Either Python has not started yet, or the plist is not one FindMy 0.9.x can

@@ -47,6 +47,7 @@ public class BeaconRepositoryBackfillTest {
     /** Records what it was asked to convert so tests can assert on call count and input. */
     private static class RecordingConverter implements PlistToAccessoryJsonConverter {
         final List<String> calls = new ArrayList<>();
+        final List<String> alignmentCalls = new ArrayList<>();
         private final String result;
 
         RecordingConverter(String result) {
@@ -54,8 +55,9 @@ public class BeaconRepositoryBackfillTest {
         }
 
         @Override
-        public String convert(String plistXml) {
+        public String convert(String plistXml, String alignmentPlistXml) {
             this.calls.add(plistXml);
+            this.alignmentCalls.add(alignmentPlistXml);
             return this.result;
         }
     }
@@ -74,6 +76,10 @@ public class BeaconRepositoryBackfillTest {
     }
 
     private void insertBeacon(String beaconId, String content, String accessoryJson) {
+        insertBeacon(beaconId, content, accessoryJson, null);
+    }
+
+    private void insertBeacon(String beaconId, String content, String accessoryJson, String alignmentPlist) {
         this.db.ownedBeaconDao().insertAll(OwnedBeacon.builder()
                 .id(beaconId)
                 .importId(null)
@@ -81,7 +87,37 @@ public class BeaconRepositoryBackfillTest {
                 .version("1.0")
                 .isRemoved(false)
                 .accessoryJson(accessoryJson)
+                .alignmentPlist(alignmentPlist)
                 .build());
+    }
+
+    /**
+     * The alignment record is what stops the first fetch searching the tag's whole
+     * history, so the backfill has to hand it to the converter rather than dropping it.
+     */
+    @Test
+    public void backfillPassesTheStoredAlignmentRecordToTheConverter() {
+        insertBeacon("beacon-a", PLIST, null, "ALIGNMENT-PLIST");
+        var converter = new RecordingConverter(CONVERTED_JSON);
+        var repo = new BeaconRepository(this.db, converter);
+
+        repo.toAccessoryRequests(Map.of("beacon-a", PLIST)).blockingFirst();
+
+        assertEquals(1, converter.alignmentCalls.size());
+        assertEquals("ALIGNMENT-PLIST", converter.alignmentCalls.get(0));
+    }
+
+    /** Exports predating format 0.0.2 have no alignment record; that must still convert. */
+    @Test
+    public void backfillWorksWithoutAnAlignmentRecord() {
+        insertBeacon("beacon-a", PLIST, null, null);
+        var converter = new RecordingConverter(CONVERTED_JSON);
+        var repo = new BeaconRepository(this.db, converter);
+
+        var requests = repo.toAccessoryRequests(Map.of("beacon-a", PLIST)).blockingFirst();
+
+        assertEquals(1, requests.size());
+        assertNull("no alignment record should be passed as null", converter.alignmentCalls.get(0));
     }
 
     /** The migrated case: NULL accessory_json is converted from the retained plist and persisted. */

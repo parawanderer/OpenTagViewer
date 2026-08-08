@@ -56,4 +56,19 @@ public class OwnedBeacon {
      */
     @ColumnInfo(name = "accessory_json")
     public String accessoryJson;
+
+    /**
+     * The KeyAlignmentRecord plist for this accessory, as exported from macOS.
+     * <br>
+     * Supplies the rolling-key index macOS last observed, which
+     * {@code FindMyAccessory.from_plist(plist, key_alignment_plist)} uses as its starting
+     * point. Without it an accessory starts at index 0 from its pairing date, so the first
+     * fetch searches the tag's whole history - tens of thousands of keys for an older tag.
+     * <br>
+     * Nullable: exports made before format 0.0.2 do not contain one, and macOS has none for
+     * accessories it has never observed. Retained rather than only converted, so a future
+     * FindMy.py that reads more of this record can re-derive from it.
+     */
+    @ColumnInfo(name = "alignment_plist")
+    public String alignmentPlist;
 }
