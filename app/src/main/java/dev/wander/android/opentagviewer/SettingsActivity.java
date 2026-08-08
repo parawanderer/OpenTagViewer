@@ -60,6 +60,7 @@ import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
@@ -280,70 +281,25 @@ public class SettingsActivity extends AppCompatActivity {
      *                                 silently dropping it.
      */
     private void onClickEditAmapApiKey(final String providerToApplyOnSuccess) {
-        View view = inflate(this, R.layout.amap_api_key_input_dialog, null);
+        AmapApiKeyDialog.show(this, this.currentSettings.getAmapApiKey(), enteredKey -> {
+            this.currentSettings.setAmapApiKey(enteredKey);
+            this.saveSettings();
 
-        final TextInputEditText keyInput = view.findViewById(R.id.amapApiKey);
-        final TextView details = view.findViewById(R.id.amap_registration_details);
-        final MaterialButton copyButton = view.findViewById(R.id.amap_copy_registration_details);
-
-        keyInput.setText(Optional.ofNullable(this.currentSettings.getAmapApiKey()).orElse(""));
-
-        // Read from the installed package, so these are right for whichever build is in the
-        // user's hand rather than a documented value that goes stale when signing changes.
-        final String registrationDetails = SigningInfoUtil.getRegistrationDetails(this);
-        details.setText(registrationDetails);
-
-        copyButton.setOnClickListener(v -> {
-            var clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            clipboard.setPrimaryClip(
-                    android.content.ClipData.newPlainText("AMap registration details", registrationDetails));
-            Toast.makeText(this, R.string.amap_registration_details_copied, Toast.LENGTH_SHORT).show();
-        });
-
-        // Registering a key is a multi-step process on a Chinese-language console, so send
-        // people to the walkthrough rather than expecting them to work it out.
-        final MaterialButton guideButton = view.findViewById(R.id.amap_open_guide);
-        guideButton.setOnClickListener(v -> {
-            var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
-            if (properties == null) {
+            if (enteredKey == null) {
+                // Without a key AMap cannot render anything, so fall back rather than
+                // leaving a provider selected that will only ever show a blank map.
+                Toast.makeText(this, R.string.amap_key_cleared, Toast.LENGTH_SHORT).show();
+                if ("amap".equals(this.currentSettings.getMapProvider())) {
+                    this.updateMapProvider("google");
+                }
                 return;
             }
-            final String guideUrl = properties.getProperty("amapWikiPage");
-            if (guideUrl == null || guideUrl.isBlank()) {
-                return;
+
+            Toast.makeText(this, R.string.amap_key_saved, Toast.LENGTH_SHORT).show();
+            if (providerToApplyOnSuccess != null) {
+                this.updateMapProvider(providerToApplyOnSuccess);
             }
-            startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(guideUrl)));
         });
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.amap_api_key)
-                .setView(view)
-                .setPositiveButton(R.string.accept, (dialog, which) -> {
-                    final String entered = Optional.ofNullable(keyInput.getText())
-                            .map(CharSequence::toString)
-                            .map(String::trim)
-                            .orElse("");
-
-                    this.currentSettings.setAmapApiKey(entered.isEmpty() ? null : entered);
-                    this.saveSettings();
-
-                    if (entered.isEmpty()) {
-                        // Without a key AMap cannot render anything, so fall back rather
-                        // than leaving a provider selected that will show a blank map.
-                        Toast.makeText(this, R.string.amap_key_cleared, Toast.LENGTH_SHORT).show();
-                        if ("amap".equals(this.currentSettings.getMapProvider())) {
-                            this.updateMapProvider("google");
-                        }
-                        return;
-                    }
-
-                    Toast.makeText(this, R.string.amap_key_saved, Toast.LENGTH_SHORT).show();
-                    if (providerToApplyOnSuccess != null) {
-                        this.updateMapProvider(providerToApplyOnSuccess);
-                    }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
     }
 
     private void updateMapProvider(String provider) {
