@@ -306,58 +306,60 @@ def _filterReportsByTimeRange(reports, startMs, endMs):
     return out
 
 
-# Apple accepts at most ~290 hashed keys per request, and FindMy.py walks the key
-# index range one step at a time (15 minutes per step for an AirTag). A window wider
-# than this is worth paying one cheap probe to avoid.
+# Apple accepts at most ~290 hashed keys per request, and FindMy.py walks the key index
+# range one step at a time (15 minutes per step for an AirTag). Anything wider than this
+# is enough round trips to be worth avoiding.
 _ALIGNMENT_PROBE_THRESHOLD_INDICES = 2000
 
 
-def _narrowAlignmentIfNeeded(account: AppleAccount, accessory: FindMyAccessory, start, end) -> bool:
-    """
-    Collapse a wide key-search window before doing a history fetch.
-
-    The export wizard captures no key alignment record, so a freshly converted
-    accessory starts at `alignment_date = paired_at, alignment_index = 0`. The key
-    search then spans the whole life of the tag: a two-year-old AirTag is ~70,000
-    indices, which at 290 keys per request is a few hundred round trips to Apple on
-    the very first fetch after upgrading. That is the account-flagging risk raised in
-    issue #30.
-
-    `fetch_location` asks for the latest report only, which makes FindMy.py walk
-    backwards from now and stop at the first hit instead of traversing the entire
-    range. Alignment is updated as a side effect of any successful fetch, so one cheap
-    call collapses the window for everything that follows. The updated alignment is
-    persisted by the caller via updatedAccessoryJson.
-
-    Worst case - a tag with no reports at all - this costs the same traversal the
-    history fetch would have done anyway, so it is never a net loss.
-
-    :returns: True if a probe was performed.
-    """
+def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
+    """Width of the key-index range a history fetch would search, or 0 if unknown."""
     try:
-        width = accessory.get_max_index(end) - accessory.get_min_index(start)
+        return accessory.get_max_index(end) - accessory.get_min_index(start)
     except Exception:
         print(f"Could not determine key index width: {traceback.format_exc()}")
-        return False
+        return 0
 
-    if width <= _ALIGNMENT_PROBE_THRESHOLD_INDICES:
-        return False
 
-    print(f"Key search window is {width} indices wide; probing for latest report first "
-          f"to establish alignment before fetching history.")
-    try:
-        account.fetch_location(accessory)
-    except Exception:
-        # A failed probe is not fatal - fall through to the full history fetch.
-        print(f"Alignment probe failed, continuing anyway: {traceback.format_exc()}")
-        return False
+def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory, start, end):
+    """
+    Fetch reports for one accessory, avoiding a full-history key search when possible.
 
-    try:
-        narrowed = accessory.get_max_index(end) - accessory.get_min_index(start)
-        print(f"Key search window narrowed from {width} to {narrowed} indices.")
-    except Exception:
-        pass
-    return True
+    Without a key alignment record an accessory starts at index 0 from its pairing date,
+    so a history fetch searches the tag's entire life - measured at ~50,000 indices for an
+    18-month-old AirTag, which at ~290 keys per request is hundreds of round trips. That is
+    the account-flagging risk from issue #30.
+
+    When the window is that wide we ask for the latest location *instead of* the history,
+    not before it. `fetch_location` walks backwards from now and stops at the first hit, and
+    alignment is updated as a side effect of any successful fetch. So one call both returns
+    something useful and collapses the window for every fetch that follows.
+
+    Doing it as a probe *before* a history fetch was worse: for a tag with no recent reports
+    the probe traverses the whole range, finds nothing, narrows nothing, and then the history
+    fetch traverses it all over again - double the work, in the worst case rather than the
+    best. Replacing the call avoids that.
+    """
+    width = _isAlignmentWide(accessory, start, end)
+
+    if width > _ALIGNMENT_PROBE_THRESHOLD_INDICES:
+        print(f"Key search window is {width} indices wide; fetching latest location only, "
+              f"to establish alignment without searching the tag's whole history.")
+        latest = account.fetch_location(accessory)
+
+        narrowed = _isAlignmentWide(accessory, start, end)
+        if narrowed < width:
+            print(f"Key search window narrowed from {width} to {narrowed} indices; "
+                  f"subsequent fetches will search the narrow range.")
+        else:
+            # No report found anywhere in range. Nothing to align to, and a history fetch
+            # would search the same empty range again, so don't.
+            print(f"No reports found for this accessory; leaving alignment untouched and "
+                  f"skipping the history fetch.")
+
+        return [latest] if latest is not None else []
+
+    return account.fetch_location_history(accessory)
 
 
 def _serializeReports(reports):
@@ -415,24 +417,29 @@ def getLastReports(
             print(f"Fetching report for {beaconId} for the last {hoursBack} hours...")
 
             airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
-
             start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
             now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
-            _narrowAlignmentIfNeeded(account, airtag, start_dt, now_dt)
 
-            reports = account.fetch_location_history(airtag)
-            if reports is None:
-                reports = []
+            # Per-accessory isolation. One beacon failing used to abort the whole call,
+            # which meant no beacon's updated alignment was persisted - so every later
+            # fetch started from the same wide range again and never converged.
+            try:
+                reports = _fetchReportsForAccessory(account, airtag, start_dt, now_dt) or []
+            except Exception:
+                print(f"Fetch failed for {beaconId}, continuing with the rest: "
+                      f"{traceback.format_exc()}")
+                continue
+
             print(f"Got {len(reports)} raw reports for {beaconId}")
 
             filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
             print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
 
-            updated_accessory_json = json.dumps(airtag.to_json())
-
             res[beaconId] = {
                 "reports": _serializeReports(filtered),
-                "updatedAccessoryJson": updated_accessory_json,
+                # Always written, even when there were no reports: the alignment may still
+                # have moved, and persisting it is what stops the next fetch re-searching.
+                "updatedAccessoryJson": json.dumps(airtag.to_json()),
             }
 
         return res
@@ -469,14 +476,15 @@ def getReports(
             print(f"Fetching report for {beaconId} in time range {unixStartMs}-{unixEndMs}...")
 
             airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
-
             start_dt = datetime.fromtimestamp(unixStartMs / 1000, tz=timezone.utc)
             end_dt = datetime.fromtimestamp(unixEndMs / 1000, tz=timezone.utc)
-            _narrowAlignmentIfNeeded(account, airtag, start_dt, end_dt)
 
-            reports = account.fetch_location_history(airtag)
-            if reports is None:
-                reports = []
+            try:
+                reports = _fetchReportsForAccessory(account, airtag, start_dt, end_dt) or []
+            except Exception:
+                print(f"Fetch failed for {beaconId}, continuing with the rest: "
+                      f"{traceback.format_exc()}")
+                continue
             print(f"Got {len(reports)} raw reports for {beaconId}")
 
             filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)

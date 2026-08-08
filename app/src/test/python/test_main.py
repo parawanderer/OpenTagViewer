@@ -168,6 +168,8 @@ def test_serializeReports_sorts_chronologically():
 # --------------------------------------------------------------------------
 
 class FakeAccessory:
+    """Reports a key-index width, and can narrow once a fetch has "found" something."""
+
     def __init__(self, width):
         self._width = width
         self.narrowed = False
@@ -180,122 +182,74 @@ class FakeAccessory:
 
 
 class FakeAccount:
-    def __init__(self, on_fetch=None):
+    def __init__(self, latest=None, history=None, on_fetch=None):
         self.fetch_location_calls = 0
+        self.fetch_history_calls = 0
+        self._latest = latest
+        self._history = history if history is not None else []
         self._on_fetch = on_fetch
 
     def fetch_location(self, accessory):
         self.fetch_location_calls += 1
         if self._on_fetch:
             self._on_fetch(accessory)
-        return None
+        return self._latest
+
+    def fetch_location_history(self, accessory):
+        self.fetch_history_calls += 1
+        return self._history
 
 
-def test_probe_runs_when_the_key_window_is_wide():
-    """A two-year-old tag is ~70k indices - exactly the case worth probing."""
-    accessory = FakeAccessory(width=70_000)
-    account = FakeAccount(on_fetch=lambda acc: setattr(acc, "narrowed", True))
+def test_wide_window_fetches_latest_instead_of_history():
+    """
+    An unaligned tag must not trigger a full-history key search. Asking for the latest
+    location narrows the window as a side effect and still returns something useful.
+    """
     now = datetime.now(tz=timezone.utc)
+    report = FakeReport(now)
+    accessory = FakeAccessory(width=50_000)
+    account = FakeAccount(latest=report, on_fetch=lambda acc: setattr(acc, "narrowed", True))
 
-    probed = main._narrowAlignmentIfNeeded(account, accessory, now - timedelta(hours=24), now)
+    out = main._fetchReportsForAccessory(account, accessory, now - timedelta(hours=24), now)
 
-    assert probed is True
     assert account.fetch_location_calls == 1
+    assert account.fetch_history_calls == 0, "must not also search the whole history"
+    assert out == [report]
 
 
-def test_probe_skipped_when_the_window_is_already_narrow():
-    """An aligned accessory must not pay an extra request on every fetch."""
-    accessory = FakeAccessory(width=96)  # ~1 day for an AirTag
-    account = FakeAccount()
+def test_narrow_window_uses_the_normal_history_fetch():
+    """Once aligned, fetches go back to normal - no extra round trip per call."""
     now = datetime.now(tz=timezone.utc)
+    history = [FakeReport(now), FakeReport(now - timedelta(hours=2))]
+    accessory = FakeAccessory(width=96)  # about a day for an AirTag
+    account = FakeAccount(history=history)
 
-    probed = main._narrowAlignmentIfNeeded(account, accessory, now - timedelta(hours=24), now)
+    out = main._fetchReportsForAccessory(account, accessory, now - timedelta(hours=24), now)
 
-    assert probed is False
+    assert account.fetch_history_calls == 1
     assert account.fetch_location_calls == 0
+    assert out == history
 
 
-def test_probe_failure_is_not_fatal():
-    """A failed probe must fall through to the normal fetch, not abort it."""
-    class ExplodingAccount:
-        def fetch_location(self, accessory):
-            raise RuntimeError("anisette server unreachable")
-
-    accessory = FakeAccessory(width=70_000)
+def test_wide_window_with_no_reports_does_not_then_search_the_history():
+    """
+    The regression this design exists to avoid: a tag with no recent reports used to
+    traverse the entire range for the probe, narrow nothing, then traverse it again for
+    the history fetch - double the work in the worst case.
+    """
     now = datetime.now(tz=timezone.utc)
+    accessory = FakeAccessory(width=50_000)          # never narrows
+    account = FakeAccount(latest=None)
 
-    assert main._narrowAlignmentIfNeeded(ExplodingAccount(), accessory, now - timedelta(hours=24), now) is False
+    out = main._fetchReportsForAccessory(account, accessory, now - timedelta(hours=24), now)
 
-
-# --------------------------------------------------------------------------
-# assertAnisetteIsSupported
-#
-# Remote is the only provider that works on Android; local needs the unicorn CPU
-# emulator, which Chaquopy cannot build. Catching that here means a clear message
-# instead of a NotImplementedError from inside the stub package.
-# --------------------------------------------------------------------------
-
-def _account_blob(anisette):
-    return json.dumps({"type": "account", "anisette": anisette})
+    assert account.fetch_location_calls == 1
+    assert account.fetch_history_calls == 0, "must not traverse the same empty range twice"
+    assert out == []
 
 
-def test_remote_anisette_is_supported():
-    blob = _account_blob({"type": "aniRemote", "url": "https://ani.example.com"})
-    assert main.assertAnisetteIsSupported(blob) is None
-
-
-def test_local_anisette_is_rejected_with_a_readable_reason():
-    blob = _account_blob({"type": "aniLocal"})
-    reason = main.assertAnisetteIsSupported(blob)
-
-    assert reason is not None
-    assert "aniLocal" in reason
-    assert "remote" in reason.lower()
-
-
-def test_missing_anisette_config_is_rejected():
-    reason = main.assertAnisetteIsSupported(json.dumps({"type": "account"}))
-    assert reason is not None
-
-
-def test_unreadable_account_blob_is_rejected():
-    assert main.assertAnisetteIsSupported("not json") is not None
-
-
-def test_getAccount_refuses_local_anisette():
-    """The guard must actually be wired into the restore path."""
-    assert main.getAccount(_account_blob({"type": "aniLocal"})) is None
-
-
-# --------------------------------------------------------------------------
-# Guard against the test environment drifting from what the app ships
-# --------------------------------------------------------------------------
-
-def test_pinned_versions_match_the_app_build():
-    """
-    These tests only mean anything if they run against the same library version
-    Chaquopy installs into the APK. Keeps requirements.txt honest.
-    """
-    import re
-
-    gradle = (Path(__file__).resolve().parents[3] / "build.gradle.kts").read_text(encoding="utf-8")
-    requirements = (Path(__file__).resolve().parent / "requirements.txt").read_text(encoding="utf-8")
-
-    installed = dict(re.findall(r'install\("([A-Za-z_][\w.-]*)==([\d.]+)"\)', gradle))
-    required = dict(re.findall(r'^([A-Za-z_][\w.-]*)==([\d.]+)', requirements, re.MULTILINE))
-
-    assert installed, "could not find any pinned pip installs in build.gradle.kts"
-
-    for package, version in installed.items():
-        assert package in required, (
-            f"{package} is installed by Chaquopy but not pinned in requirements.txt"
-        )
-        assert required[package] == version, (
-            f"{package} is {version} in build.gradle.kts but {required[package]} in requirements.txt"
-        )
-
-
-def test_probe_survives_an_accessory_that_cannot_report_indices():
+def test_unknown_width_falls_back_to_the_history_fetch():
+    """If the width cannot be determined, behave exactly as before this optimisation."""
     class BrokenAccessory:
         def get_min_index(self, _dt):
             raise ValueError("nope")
@@ -303,11 +257,15 @@ def test_probe_survives_an_accessory_that_cannot_report_indices():
         def get_max_index(self, _dt):
             raise ValueError("nope")
 
-    account = FakeAccount()
     now = datetime.now(tz=timezone.utc)
+    history = [FakeReport(now)]
+    account = FakeAccount(history=history)
 
-    assert main._narrowAlignmentIfNeeded(account, BrokenAccessory(), now - timedelta(hours=24), now) is False
-    assert account.fetch_location_calls == 0
+    out = main._fetchReportsForAccessory(account, BrokenAccessory(), now - timedelta(hours=24), now)
+
+    assert account.fetch_history_calls == 1
+    assert out == history
+
 
 # --------------------------------------------------------------------------
 # Key alignment records
@@ -382,3 +340,68 @@ def test_convertPlistToJson_survives_a_corrupt_alignment_record():
     # from_plist raises on a malformed alignment plist, so we return None and the caller
     # retries later rather than storing something wrong.
     assert result is None
+
+
+# --------------------------------------------------------------------------
+# assertAnisetteIsSupported
+#
+# Remote is the only provider that works on Android; local needs the unicorn CPU
+# emulator, which Chaquopy cannot build. Catching it here means a clear message
+# rather than a NotImplementedError from inside the stub package.
+# --------------------------------------------------------------------------
+
+def _account_blob(anisette):
+    return json.dumps({"type": "account", "anisette": anisette})
+
+
+def test_remote_anisette_is_supported():
+    blob = _account_blob({"type": "aniRemote", "url": "https://ani.example.com"})
+    assert main.assertAnisetteIsSupported(blob) is None
+
+
+def test_local_anisette_is_rejected_with_a_readable_reason():
+    reason = main.assertAnisetteIsSupported(_account_blob({"type": "aniLocal"}))
+    assert reason is not None
+    assert "aniLocal" in reason
+    assert "remote" in reason.lower()
+
+
+def test_missing_anisette_config_is_rejected():
+    assert main.assertAnisetteIsSupported(json.dumps({"type": "account"})) is not None
+
+
+def test_unreadable_account_blob_is_rejected():
+    assert main.assertAnisetteIsSupported("not json") is not None
+
+
+def test_getAccount_refuses_local_anisette():
+    """The guard must actually be wired into the restore path."""
+    assert main.getAccount(_account_blob({"type": "aniLocal"})) is None
+
+
+# --------------------------------------------------------------------------
+# Guard against the test environment drifting from what the app ships
+# --------------------------------------------------------------------------
+
+def test_pinned_versions_match_the_app_build():
+    """
+    These tests only mean anything if they run against the same library version
+    Chaquopy installs into the APK. Keeps requirements.txt honest.
+    """
+    import re
+
+    gradle = (Path(__file__).resolve().parents[3] / "build.gradle.kts").read_text(encoding="utf-8")
+    requirements = (Path(__file__).resolve().parent / "requirements.txt").read_text(encoding="utf-8")
+
+    installed = dict(re.findall(r'install\("([A-Za-z_][\w.-]*)==([\d.]+)"\)', gradle))
+    required = dict(re.findall(r'^([A-Za-z_][\w.-]*)==([\d.]+)', requirements, re.MULTILINE))
+
+    assert installed, "could not find any pinned pip installs in build.gradle.kts"
+
+    for package, version in installed.items():
+        assert package in required, (
+            f"{package} is installed by Chaquopy but not pinned in requirements.txt"
+        )
+        assert required[package] == version, (
+            f"{package} is {version} in build.gradle.kts but {required[package]} in requirements.txt"
+        )

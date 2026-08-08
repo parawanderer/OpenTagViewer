@@ -35,6 +35,21 @@ public class PythonAppleService {
         return INSTANCE;
     }
 
+    /**
+     * Serialises all calls into Python.
+     * <br>
+     * FindMy.py's synchronous AppleAccount wraps an async one and drives it with a single
+     * asyncio event loop. RxJava schedules our fetches on a thread pool, and the periodic
+     * refresh in MapsActivity fires every 60 seconds regardless of whether the previous
+     * fetch has finished. Two fetches overlapping means two threads calling
+     * run_until_complete on the same loop, which fails with
+     * "RuntimeError: This event loop is already running" and then keeps failing.
+     * <br>
+     * A fetch that takes longer than the refresh interval is entirely normal for an
+     * accessory with no alignment yet, so this is not a rare race.
+     */
+    private static final Object PYTHON_LOCK = new Object();
+
     private PythonAppleService(PythonAppleAccount account) {
         this.account = account;
     }
@@ -45,6 +60,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
+            synchronized (PYTHON_LOCK) {
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
 
@@ -61,7 +77,7 @@ public class PythonAppleService {
             }
 
             return mapResults(returned);
-
+            }
         }).subscribeOn(Schedulers.io());
     }
 
@@ -71,6 +87,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
+            synchronized (PYTHON_LOCK) {
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
 
@@ -88,6 +105,7 @@ public class PythonAppleService {
             }
 
             return mapResults(returned);
+            }
         }).subscribeOn(Schedulers.io());
     }
 
