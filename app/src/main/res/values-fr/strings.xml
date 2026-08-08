@@ -98,4 +98,5 @@
     <string name="amap_key_required">AMap nécessite votre propre clé d’API. Saisissez-en une pour utiliser ce fournisseur.</string>
     <string name="amap_key_saved">Clé d’API AMap enregistrée.</string>
     <string name="amap_key_cleared">Clé d’API AMap supprimée.</string>
+    <string name="amap_how_to_get_a_key">Comment obtenir une clé</string>
 </resources>

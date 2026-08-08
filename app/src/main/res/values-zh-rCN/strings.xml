@@ -104,4 +104,5 @@
     <string name="amap_key_required">高德地图需要您自己的 API Key。请先输入 Key 才能使用此地图源。</string>
     <string name="amap_key_saved">已保存高德地图 API Key。</string>
     <string name="amap_key_cleared">已移除高德地图 API Key。</string>
+    <string name="amap_how_to_get_a_key">如何获取 Key</string>
 </resources>

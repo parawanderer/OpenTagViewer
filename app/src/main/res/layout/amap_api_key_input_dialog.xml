@@ -48,6 +48,15 @@
             android:layout_marginTop="4dp"
             android:text="@string/amap_copy_registration_details" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/amap_open_guide"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/amap_how_to_get_a_key"
+            app:icon="@drawable/help_center_24px"
+            app:iconSize="18dp" />
+
         <TextView
             android:id="@+id/amap_registration_details"
             android:layout_width="match_parent"

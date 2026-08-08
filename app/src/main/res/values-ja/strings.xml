@@ -98,4 +98,5 @@
     <string name="amap_key_required">AMap にはご自身の API キーが必要です。入力するとこの地図を利用できます。</string>
     <string name="amap_key_saved">AMap の API キーを保存しました。</string>
     <string name="amap_key_cleared">AMap の API キーを削除しました。</string>
+    <string name="amap_how_to_get_a_key">キーの取得方法</string>
 </resources>
