@@ -31,7 +31,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server %1$s kon niet bereikt worden!</string>
     <string name="login_failed_x">Inloggen mislukt: %1$s</string>
     <string name="email_or_phone_number">Email of Telefoonnummer</string>
-    <string name="password">wachtwoord</string>
+    <string name="password">Wachtwoord</string>
     <string name="apple_account">Apple Account</string>
     <string name="login">Inloggen</string>
     <string name="welcome">Welkom !</string>

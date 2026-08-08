@@ -31,7 +31,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Не удалось связаться с сервером Anisette по адресу %1$s!</string>
     <string name="login_failed_x">Ошибка входа: %1$s</string>
     <string name="email_or_phone_number">Имейл или Номер Телефона</string>
-    <string name="password">пароль</string>
+    <string name="password">Пароль</string>
     <string name="apple_account">Аккаунт Apple</string>
     <string name="login">Вход</string>
     <string name="welcome">Добро Пожаловать !</string>

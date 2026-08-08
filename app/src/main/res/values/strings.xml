@@ -48,7 +48,7 @@
     <string name="welcome">Welcome !</string>
     <string name="login_failed_x">Login failed: %1$s</string>
     <string name="email_or_phone_number">Email or Phone Number</string>
-    <string name="password">password</string>
+    <string name="password">Password</string>
     <string name="apple_account">Apple Account</string>
     <string name="login">Login</string>
     <string name="auth_by_sms_to_x">SMS (%1$s)</string>
