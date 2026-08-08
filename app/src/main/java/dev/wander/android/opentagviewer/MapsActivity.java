@@ -4,6 +4,7 @@ import static android.Manifest.permission.ACCESS_COARSE_LOCATION;
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.view.View.GONE;
+import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.widget.Toast.LENGTH_LONG;
 import static android.widget.Toast.LENGTH_SHORT;
@@ -1189,7 +1190,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         ImageButton navigationButton = this.findViewById(R.id.button_navigate_to);
         if (this.dynamicCardsForTag.isEmpty()) {
-            scrollContainer.setVisibility(GONE); // HIDE PARENT CONTAINER (FOR NOW)
+            // INVISIBLE, not GONE. buttons_bottom_right is positioned with layout_above
+            // against this view, and RelativeLayout ignores layout_above when the anchor is
+            // GONE - the buttons would then fall back to the top of the screen and render
+            // under the status bar. Left INVISIBLE it still occupies its (zero, since it has
+            // no cards) height at the bottom, so the anchor keeps resolving.
+            scrollContainer.setVisibility(INVISIBLE);
             navigationButton.setVisibility(GONE);
         } else {
             scrollContainer.setVisibility(VISIBLE); // UNHIDE PARENT CONTAINER
