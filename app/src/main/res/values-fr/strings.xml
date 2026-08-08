@@ -99,4 +99,6 @@
     <string name="amap_key_saved">Clé d’API AMap enregistrée.</string>
     <string name="amap_key_cleared">Clé d’API AMap supprimée.</string>
     <string name="amap_how_to_get_a_key">Comment obtenir une clé</string>
+    <string name="lang_zh_cn">Chinois simplifié (简体中文)</string>
+    <string name="lang_zh_tw">Chinois traditionnel (繁體中文)</string>
 </resources>
