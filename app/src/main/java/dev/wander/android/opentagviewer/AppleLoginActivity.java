@@ -56,6 +56,7 @@ import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.ui.login.Apple2FACodeInputManager;
+import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
@@ -722,6 +723,24 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void updateMapProvider(final String newProvider) {
+        // AMap needs a key the user supplies themselves, so selecting it here without one
+        // would silently save a provider that can only render a blank map. Prompt instead,
+        // and only apply the choice once a key exists.
+        if ("amap".equals(newProvider) && !this.getUserSettings().hasAmapApiKey()) {
+            AmapApiKeyDialog.show(this, this.getUserSettings().getAmapApiKey(), enteredKey -> {
+                if (enteredKey == null) {
+                    Toast.makeText(this, R.string.amap_key_required, Toast.LENGTH_LONG).show();
+                    this.sharedMainSettingsManager.setupMapProviderField();
+                    return;
+                }
+                this.getUserSettings().setAmapApiKey(enteredKey);
+                this.getUserSettings().setMapProvider(newProvider);
+                this.saveSettings();
+                Log.i(TAG, "Updating app settings map provider to " + newProvider);
+            });
+            return;
+        }
+
         this.getUserSettings().setMapProvider(newProvider);
         this.saveSettings();
         Log.i(TAG, "Updating app settings map provider to " + newProvider);
