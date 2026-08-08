@@ -81,6 +81,19 @@ android {
         }
         debug {
             isDebuggable = true
+
+            // Install debug builds alongside a release install rather than colliding with
+            // it. Without this, both share the applicationId but are signed with different
+            // keys, so installing a debug build over a real one fails with
+            // INSTALL_FAILED_UPDATE_INCOMPATIBLE and the only way forward is to uninstall -
+            // which permanently destroys the user's imported beacons and location history.
+            // allowBackup is false, so there is no backup to restore from either.
+            //
+            // Note: a Maps API key restricted to the release package name will not authorise
+            // this one. Add "dev.wander.android.opentagviewer.debug" (with the debug keystore
+            // SHA-1) to the key's restrictions if you need maps to render in debug builds.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
     compileOptions {
