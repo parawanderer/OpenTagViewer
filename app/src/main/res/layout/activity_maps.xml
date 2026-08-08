@@ -68,11 +68,17 @@
 
     </LinearLayout>
 
+    <!-- layout_alignParentBottom is kept alongside layout_above on purpose. RelativeLayout
+         ignores layout_above when its anchor is GONE, which is the case whenever there are
+         no tags to show (MapsActivity hides tags_scrollable_area). Without a fallback rule
+         these buttons lose all vertical positioning and jump to the top of the screen,
+         landing under the status bar. -->
     <LinearLayout
         android:id="@+id/buttons_bottom_right"
         android:layout_width="wrap_content"
         android:layout_height="70dp"
         android:layout_above="@id/tags_scrollable_area"
+        android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
         android:layout_marginRight="10dp"
         android:layout_marginBottom="8dp"
