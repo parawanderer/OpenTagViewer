@@ -60,6 +60,10 @@ Contributions/MRs are more than welcome.
 Plenty of things can be improved in this project as it was mostly a "hackathony" thing I tried to throw together ASAP and make presentable for layusers.
 Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setup.
 
+📋 **[TESTING.md](./TESTING.md)** lists how to run every test suite in the repo — the Android
+unit and instrumented tests, the Chaquopy bridge tests, and the desktop wizard tests — plus what
+CI runs and a few offline diagnostic scripts that need no Apple account.
+
 **I think it would be nice if the app could support the following features:**
 
 - [`🔴 BLOCKED due to 🐛Bug`](https://github.com/malmeloo/FindMy.py/issues/118) Locate Nearby AirTags using Low-Power Bluetooth & display the latest update in that case

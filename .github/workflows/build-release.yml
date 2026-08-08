@@ -87,6 +87,18 @@ jobs:
       - name: Run gradle tests
         run: ./gradlew test
 
+      # Covers app/src/main/python, the module Chaquopy packages into the APK.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Chaquopy bridge test dependencies
+        run: python -m pip install -r app/src/test/python/requirements.txt
+
+      - name: Run Chaquopy bridge tests
+        run: python -m pytest app/src/test/python -v
+
       - name: Build gradle project
         run: ./gradlew build -x lint
         env:

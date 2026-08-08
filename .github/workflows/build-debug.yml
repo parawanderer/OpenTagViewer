@@ -134,6 +134,19 @@ jobs:
       - name: Run gradle tests
         run: ./gradlew test
 
+      # Covers app/src/main/python (the module Chaquopy packages into the APK).
+      # Runs on plain CPython - it imports no Android or Java types.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Chaquopy bridge test dependencies
+        run: python -m pip install -r app/src/test/python/requirements.txt
+
+      - name: Run Chaquopy bridge tests
+        run: python -m pytest app/src/test/python -v
+
       # Create APK Debug
       - name: Build Debug APK - ${{ env.main_project_module }} module
         run: ./gradlew testDebugUnitTest assembleDebug
