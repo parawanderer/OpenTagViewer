@@ -41,6 +41,23 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        // Export the Room schema as JSON on every build. These are committed (see
+        // app/schemas/) so schema changes show up as a reviewable diff, and so
+        // MigrationTestHelper can build an old database to migrate from.
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
+            }
+        }
+    }
+
+    // Makes the exported schemas readable by instrumented tests at runtime, which is
+    // how MigrationTestHelper creates a v1 database to run MIGRATION_1_2 against.
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs(files("$projectDir/schemas"))
+        }
     }
 
     signingConfigs {
@@ -150,6 +167,7 @@ dependencies {
 
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.android.room.testing)
 
     annotationProcessor(libs.projectlombok)
     annotationProcessor(libs.android.room.compiler)
