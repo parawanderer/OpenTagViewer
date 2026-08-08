@@ -22,14 +22,35 @@ the desktop for the export wizard). Each needs a different runner.
 
 ## Run everything
 
+Two aggregate tasks wrap all four suites:
+
 ```bash
 export JAVA_HOME="/path/to/jbr"
 
-./gradlew testDebugUnitTest                                  # JVM unit tests
-./gradlew connectedDebugAndroidTest                          # needs a running emulator/device
-python -m pytest app/src/test/python                         # Chaquopy bridge
-(cd python && python -m pytest ./test)                       # desktop wizard
+./gradlew testAll           # everything that needs no device
+./gradlew testAllOnDevice   # the above, plus instrumented tests (emulator/device required)
 ```
+
+`testAll` is deliberately separate so you don't get a failure just for not having an
+emulator booted. It will tell you the instrumented tests were skipped.
+
+Both create a virtualenv under `app/build/test-venv` on first run and install the
+Python dependencies into it, so a fresh clone works without any manual setup. The
+first run is slow; afterwards it's reused.
+
+If your Python isn't discovered automatically:
+
+```bash
+./gradlew testAll -PpythonExecutable=/path/to/python
+```
+
+> On Windows, `python3.exe` in `%LOCALAPPDATA%\Microsoft\WindowsApps\` is a zero-byte
+> Microsoft Store alias that **hangs** rather than failing when run non-interactively.
+> The build skips those deliberately and prefers a real interpreter; if you hit a
+> mysterious hang in any Python-invoking tooling on Windows, that alias is a good first
+> suspect.
+
+The individual commands are below if you want to run one suite directly.
 
 ---
 

@@ -121,14 +121,74 @@ lombok {
     version = libs.versions.lombokVersion.get()
 }
 
+// FindMy >= 0.9 depends on anisette, which depends on unicorn (a CPU emulator used only
+// for *local* Anisette). Chaquopy cannot build unicorn's native code for Android, so the
+// whole dependency tree fails to resolve without a stand-in. We build a pure-Python stub
+// wheel from the real sources in app/stubs/unicorn/ rather than checking in a prebuilt
+// .whl - a binary artifact impersonating a well-known dependency is hard to audit.
+val unicornStubWheel = layout.buildDirectory.file(
+    "generated/stub-wheels/unicorn-2.1.1-py3-none-any.whl"
+)
+
+/**
+ * Locate a usable Python 3 interpreter.
+ *
+ * On Windows, `python3` is usually a zero-byte Microsoft Store "App Execution Alias" that
+ * hangs indefinitely when run non-interactively instead of failing, so candidates are
+ * ordered per-platform and stub aliases are filtered out by inspecting the file rather
+ * than by executing it.
+ */
+fun resolvePythonExecutable(): String {
+    providers.gradleProperty("pythonExecutable").orNull?.let { return it }
+
+    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    val names = if (isWindows) listOf("python.exe", "python3.exe") else listOf("python3", "python")
+
+    val pathDirs = (System.getenv("PATH") ?: "").split(File.pathSeparator).filter { it.isNotBlank() }
+    for (name in names) {
+        for (dir in pathDirs) {
+            val candidate = File(dir, name)
+            if (!candidate.isFile || !candidate.canExecute()) continue
+            // Store aliases are zero-length reparse points; executing one blocks forever.
+            if (candidate.length() == 0L) continue
+            if (candidate.absolutePath.contains("WindowsApps", ignoreCase = true)) continue
+            return candidate.absolutePath
+        }
+    }
+
+    throw GradleException(
+        "No usable Python 3 interpreter found on PATH (looked for ${names.joinToString(", ")}). " +
+        "Chaquopy needs one to build the unicorn stub wheel. " +
+        "Install Python 3 or pass -PpythonExecutable=/path/to/python."
+    )
+}
+
+// A real task rather than configuration-time work: this used to run on every Gradle
+// invocation, including every IDE sync, which blocked them.
+val generateUnicornStubWheel by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds the pure-Python unicorn stub wheel that lets FindMy 0.9.x resolve."
+
+    val script = rootProject.file("scripts/build_unicorn_stub_wheel.py")
+
+    inputs.dir(layout.projectDirectory.dir("stubs/unicorn")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(script).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(unicornStubWheel)
+    outputs.cacheIf { true }
+
+    commandLine(resolvePythonExecutable(), script.absolutePath, unicornStubWheel.get().asFile.absolutePath)
+}
+
+// Chaquopy installs from the wheel path, so it must exist before pip runs.
+tasks.matching { it.name.contains("PythonRequirements") || it.name.contains("PythonReqs") }
+    .configureEach { dependsOn(generateUnicornStubWheel) }
+
 chaquopy {
     defaultConfig {
         version = "3.12"
         pip {
             // SEE: https://chaquo.com/chaquopy/doc/current/android.html#android-requirements
-            // Stub wheel satisfies anisette's unicorn>=2.1.1 dependency without native compilation.
-            // We only use RemoteAnisetteProvider so unicorn is never actually instantiated.
-            install("libs/unicorn-2.1.1-py3-none-any.whl")
+            install(unicornStubWheel.get().asFile.absolutePath)
             install("FindMy==0.9.8")
             install("NSKeyedUnArchiver==1.5")
         }
