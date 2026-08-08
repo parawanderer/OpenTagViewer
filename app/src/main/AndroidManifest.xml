@@ -88,18 +88,16 @@
             1. Open the root project's secrets.properties file
             2. Add this line, where YOUR_API_KEY is your API key:
                 MAPS_API_KEY=YOUR_API_KEY
-                AMAP_API_KEY=YOUR_AMAP_API_KEY
         -->
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
-        <!-- 高德地图API Key -->
-        <!-- 申请地址：https://console.amap.com/dev/key/app -->
-        <meta-data
-            android:name="com.amap.api.v2.apikey"
-            android:value="${AMAP_API_KEY}" />
+        <!-- No AMap API key is declared here on purpose. AMap issues keys per developer
+             account, bound to a package name and signing fingerprint, and expects the key
+             holder to be the app's operator - so users supply their own in Settings and it
+             is applied at runtime via MapsInitializer.setApiKey. See the AMap wiki page. -->
 
         <activity
             android:name=".MapsActivity"

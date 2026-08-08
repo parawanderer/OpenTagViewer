@@ -92,4 +92,10 @@
     <string name="twofactor_failed_x_help_msg">二要素認証に失敗しました: %1$s \n別のAnisetteサーバーまたはApple アカウントを試してみませんか?</string>
     <string name="error_occurred_please_retry_submitting_your_2fa_code">エラーが発生しました。二要素認証コードの再送信をお試しください。</string>
     <string name="failed_to_request_code_please_try_again">コードを要求できませんでした。もう一度お試しください。</string>
+    <string name="amap_api_key_explanation">AMap を使うには、各ユーザーが自分の API キーを用意する必要があります。lbs.amap.com で「Android SDK」を選んで登録し、ここに貼り付けてください。</string>
+    <string name="amap_copy_registration_details">パッケージ名と SHA1 をコピー</string>
+    <string name="amap_registration_details_copied">コピーしました。キーを作成する際に AMap コンソールへ貼り付けてください。</string>
+    <string name="amap_key_required">AMap にはご自身の API キーが必要です。入力するとこの地図を利用できます。</string>
+    <string name="amap_key_saved">AMap の API キーを保存しました。</string>
+    <string name="amap_key_cleared">AMap の API キーを削除しました。</string>
 </resources>

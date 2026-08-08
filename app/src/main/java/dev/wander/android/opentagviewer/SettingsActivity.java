@@ -33,6 +33,7 @@ import com.google.android.material.progressindicator.CircularProgressIndicatorSp
 import com.google.android.material.progressindicator.IndeterminateDrawable;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
@@ -62,6 +63,7 @@ import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
+import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import lombok.Data;
@@ -247,6 +249,18 @@ public class SettingsActivity extends AppCompatActivity {
                     if (checkedItemPosition != AdapterView.INVALID_POSITION) {
                         String selectedProvider = checkedItemPosition == 0 ? "google" : "amap";
                         Log.d(TAG, "Selected map provider: " + selectedProvider);
+
+                        // AMap ships with no key: they are issued per developer account and
+                        // bound to a package name and signing fingerprint, so each user
+                        // brings their own. Selecting it without one would leave a blank map
+                        // and no explanation, so gate the change on having a key and take
+                        // the user straight to entering one.
+                        if ("amap".equals(selectedProvider) && !this.currentSettings.hasAmapApiKey()) {
+                            Toast.makeText(this, R.string.amap_key_required, Toast.LENGTH_LONG).show();
+                            this.onClickEditAmapApiKey(selectedProvider);
+                            return;
+                        }
+
                         this.updateMapProvider(selectedProvider);
                     }
                 })
@@ -256,6 +270,66 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
     
+    /**
+     * Prompt for the user's own AMap API key.
+     *
+     * @param providerToApplyOnSuccess if non-null, the provider to switch to once a key has
+     *                                 been supplied. Lets the picker route the user here and
+     *                                 have their selection complete afterwards, rather than
+     *                                 silently dropping it.
+     */
+    private void onClickEditAmapApiKey(final String providerToApplyOnSuccess) {
+        View view = inflate(this, R.layout.amap_api_key_input_dialog, null);
+
+        final TextInputEditText keyInput = view.findViewById(R.id.amapApiKey);
+        final TextView details = view.findViewById(R.id.amap_registration_details);
+        final MaterialButton copyButton = view.findViewById(R.id.amap_copy_registration_details);
+
+        keyInput.setText(Optional.ofNullable(this.currentSettings.getAmapApiKey()).orElse(""));
+
+        // Read from the installed package, so these are right for whichever build is in the
+        // user's hand rather than a documented value that goes stale when signing changes.
+        final String registrationDetails = SigningInfoUtil.getRegistrationDetails(this);
+        details.setText(registrationDetails);
+
+        copyButton.setOnClickListener(v -> {
+            var clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            clipboard.setPrimaryClip(
+                    android.content.ClipData.newPlainText("AMap registration details", registrationDetails));
+            Toast.makeText(this, R.string.amap_registration_details_copied, Toast.LENGTH_SHORT).show();
+        });
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.amap_api_key)
+                .setView(view)
+                .setPositiveButton(R.string.accept, (dialog, which) -> {
+                    final String entered = Optional.ofNullable(keyInput.getText())
+                            .map(CharSequence::toString)
+                            .map(String::trim)
+                            .orElse("");
+
+                    this.currentSettings.setAmapApiKey(entered.isEmpty() ? null : entered);
+                    this.saveSettings();
+
+                    if (entered.isEmpty()) {
+                        // Without a key AMap cannot render anything, so fall back rather
+                        // than leaving a provider selected that will show a blank map.
+                        Toast.makeText(this, R.string.amap_key_cleared, Toast.LENGTH_SHORT).show();
+                        if ("amap".equals(this.currentSettings.getMapProvider())) {
+                            this.updateMapProvider("google");
+                        }
+                        return;
+                    }
+
+                    Toast.makeText(this, R.string.amap_key_saved, Toast.LENGTH_SHORT).show();
+                    if (providerToApplyOnSuccess != null) {
+                        this.updateMapProvider(providerToApplyOnSuccess);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
     private void updateMapProvider(String provider) {
         final String currentProvider = this.currentSettings.getMapProvider();
         this.mapProviderChanged = this.mapProviderChanged || !java.util.Objects.equals(currentProvider, provider);

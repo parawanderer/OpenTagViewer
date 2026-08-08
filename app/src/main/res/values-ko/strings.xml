@@ -92,4 +92,10 @@
     <string name="error_occurred_please_retry_submitting_your_2fa_code">오류가 발생했습니다. 2FA 코드 재승받기를 시도해주세요</string>
     <string name="failed_to_request_code_please_try_again">코드 요청에 실패했습니다. 다시 시도해주세요.</string>
     <string name="lang_ko">한국어</string>
+    <string name="amap_api_key_explanation">AMap을 사용하려면 사용자가 직접 API 키를 준비해야 합니다. lbs.amap.com에서 ‘Android SDK’를 선택해 등록한 뒤 여기에 붙여넣으세요.</string>
+    <string name="amap_copy_registration_details">패키지 이름과 SHA1 복사</string>
+    <string name="amap_registration_details_copied">복사했습니다. 키를 만들 때 AMap 콘솔에 붙여넣으세요.</string>
+    <string name="amap_key_required">AMap에는 본인의 API 키가 필요합니다. 키를 입력해야 이 지도를 사용할 수 있습니다.</string>
+    <string name="amap_key_saved">AMap API 키를 저장했습니다.</string>
+    <string name="amap_key_cleared">AMap API 키를 삭제했습니다.</string>
 </resources>
