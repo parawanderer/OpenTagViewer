@@ -34,6 +34,66 @@ on:
   workflow_dispatch:
 
 jobs:
+  # The Room v1 -> v2 migration can only be exercised on a real Android runtime, so it
+  # lives in src/androidTest and needs an emulator. `./gradlew test` in the build job
+  # below runs JVM unit tests only and would silently skip it - which matters because a
+  # broken migration destroys every existing user's imported beacons and location
+  # history, and only reproduces on upgrade, never on a fresh install.
+  instrumented-tests:
+    name: Instrumented tests (emulator)
+    environment: 'Android Build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Change wrapper permissions
+        run: chmod +x ./gradlew
+
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Inject secrets.properties
+        run: |
+          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY || 'maps_key_default_value' }}" > secrets.properties
+
+      # KVM is required for a hardware-accelerated emulator; without it the run times out.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./gradlew connectedDebugAndroidTest --console=plain
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+
   build:
     environment: 'Android Build'
     runs-on: ubuntu-latest
