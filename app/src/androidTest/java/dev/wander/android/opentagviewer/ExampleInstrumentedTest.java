@@ -24,6 +24,9 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("dev.wander.android.opentagviewer", appContext.getPackageName());
+        // Debug builds carry an applicationIdSuffix so they can install alongside a real
+        // one, so the package name is only the base id in a release build.
+        assertEquals(BuildConfig.APPLICATION_ID, appContext.getPackageName());
+        assertTrue(appContext.getPackageName().startsWith("dev.wander.android.opentagviewer"));
     }
 }
