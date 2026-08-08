@@ -1,0 +1,10 @@
+# Dependencies for testing app/src/main/python on a normal CPython interpreter.
+#
+# These MUST match the pins in app/build.gradle.kts (the chaquopy { pip { ... } }
+# block), otherwise the tests exercise a different library version than the app
+# actually ships. test_main.py::test_pinned_versions_match_the_app_build asserts
+# they stay in sync.
+FindMy==0.9.8
+NSKeyedUnArchiver==1.5
+
+pytest>=8.0
