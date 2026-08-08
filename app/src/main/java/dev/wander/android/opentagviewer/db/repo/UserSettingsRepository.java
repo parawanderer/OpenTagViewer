@@ -1,5 +1,6 @@
 package dev.wander.android.opentagviewer.db.repo;
 
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.AMAP_API_KEY;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_SERVER_URL;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ENABLE_DEBUG_DATA;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
@@ -30,6 +31,7 @@ public class UserSettingsRepository {
                 Boolean useDarkTheme = settings.get(USE_DARK_THEME);
                 Boolean enableDebugData = settings.get(ENABLE_DEBUG_DATA);
                 String mapProvider = settings.get(MAP_PROVIDER);
+                String amapApiKey = settings.get(AMAP_API_KEY);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
@@ -37,6 +39,7 @@ public class UserSettingsRepository {
                         .useDarkTheme(useDarkTheme)
                         .enableDebugData(enableDebugData)
                         .mapProvider(mapProvider)
+                        .amapApiKey(amapApiKey)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -53,6 +56,9 @@ public class UserSettingsRepository {
             mutablePreferences.set(USE_DARK_THEME, userSettings.getUseDarkTheme());
             mutablePreferences.set(ENABLE_DEBUG_DATA, userSettings.getEnableDebugData());
             mutablePreferences.set(MAP_PROVIDER, userSettings.getMapProvider());
+            // Null would throw; an empty string reads back as "no key supplied".
+            mutablePreferences.set(AMAP_API_KEY,
+                    userSettings.getAmapApiKey() == null ? "" : userSettings.getAmapApiKey());
 
             return Single.just(mutablePreferences);
         }).subscribeOn(Schedulers.io())

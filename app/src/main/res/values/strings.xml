@@ -131,4 +131,11 @@
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
     <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
+    <string name="amap_api_key" translatable="false">AMap API Key</string>
+    <string name="amap_api_key_explanation">AMap requires each user to supply their own API key. Register one at lbs.amap.com, choosing "Android SDK" as the platform, and paste it here.</string>
+    <string name="amap_copy_registration_details">Copy package name and SHA1</string>
+    <string name="amap_registration_details_copied">Copied. Paste these into the AMap console when creating your key.</string>
+    <string name="amap_key_required">AMap needs your own API key. Enter one to use this provider.</string>
+    <string name="amap_key_saved">AMap API key saved.</string>
+    <string name="amap_key_cleared">AMap API key removed.</string>
 </resources>

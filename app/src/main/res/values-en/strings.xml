@@ -92,4 +92,10 @@
     <string name="failed_to_request_code_please_try_again">Failed to request code. Please try again.</string>
     <string name="lang_ko">Korean (한국어)</string>
     <string name="lang_ja">Japanese (日本語)</string>
+    <string name="amap_api_key_explanation">AMap requires each user to supply their own API key. Register one at lbs.amap.com, choosing "Android SDK" as the platform, and paste it here.</string>
+    <string name="amap_copy_registration_details">Copy package name and SHA1</string>
+    <string name="amap_registration_details_copied">Copied. Paste these into the AMap console when creating your key.</string>
+    <string name="amap_key_required">AMap needs your own API key. Enter one to use this provider.</string>
+    <string name="amap_key_saved">AMap API key saved.</string>
+    <string name="amap_key_cleared">AMap API key removed.</string>
 </resources>

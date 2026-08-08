@@ -92,4 +92,10 @@
     <string name="failed_to_request_code_please_try_again">Не удалось запросить код. Попробуйте еще раз.</string>
     <string name="lang_ko">Корейский (한국어)</string>
     <string name="lang_ja">Японский (日本語)</string>
+    <string name="amap_api_key_explanation">AMap требует, чтобы каждый пользователь указал собственный API-ключ. Зарегистрируйте его на lbs.amap.com, выбрав платформу «Android SDK», и вставьте сюда.</string>
+    <string name="amap_copy_registration_details">Скопировать имя пакета и SHA1</string>
+    <string name="amap_registration_details_copied">Скопировано. Вставьте эти данные в консоль AMap при создании ключа.</string>
+    <string name="amap_key_required">Для AMap нужен ваш собственный API-ключ. Введите его, чтобы использовать этот источник карт.</string>
+    <string name="amap_key_saved">API-ключ AMap сохранён.</string>
+    <string name="amap_key_cleared">API-ключ AMap удалён.</string>
 </resources>

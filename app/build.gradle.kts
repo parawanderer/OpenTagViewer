@@ -10,7 +10,6 @@ secrets {
     // 1. If the secrets.properties file does not exist, create it in the same folder as the local.properties file.
     // 2. Add these lines, where YOUR_API_KEY is your API key:
     //        MAPS_API_KEY=YOUR_API_KEY
-    //        AMAP_API_KEY=YOUR_AMAP_API_KEY
     // 
     // How to get Google Maps API Key:
     //    - Visit: https://console.cloud.google.com/google/maps-apis/

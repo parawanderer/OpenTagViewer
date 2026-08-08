@@ -25,41 +25,48 @@ public class OpenAirTagApplication extends PyApplication {
     }
 
     /**
+     * Hands the user's own AMap API key to the SDK.
+     * <br>
+     * Reflection is used throughout so the app still runs when the AMap SDK is absent,
+     * which is the normal case for anyone using Google Maps.
+     */
+    private void applyUserSuppliedAMapKey() {
+        try {
+            var settings = new UserSettingsRepository(
+                    UserSettingsDataStore.getInstance(this.getApplicationContext())
+            ).getUserSettings();
+
+            if (!settings.hasAmapApiKey()) {
+                // Expected unless the user has chosen AMap and supplied a key.
+                Log.d(TAG, "No user-supplied AMap API key; skipping AMap initialisation");
+                return;
+            }
+
+            Class<?> mapsInitializerClass = Class.forName("com.amap.api.maps.MapsInitializer");
+            mapsInitializerClass
+                    .getMethod("setApiKey", String.class)
+                    .invoke(null, settings.getAmapApiKey());
+
+            Log.i(TAG, "Applied user-supplied AMap API key");
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "AMap SDK not present; skipping");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to apply the user-supplied AMap API key", e);
+        }
+    }
+
+    /**
      * 高德地图隐私合规设置
      * 根据《个人信息保护法》要求，必须在调用SDK任何接口之前进行隐私合规配置
      * 参考文档：https://lbs.amap.com/api/android-sdk/guide/create-map/dev-attention
      */
     private void initAMapPrivacyCompliance() {
         try {
-            // FIX: 尝试读取并修复可能被误解析为Integer的AMap API Key
-            try {
-                android.content.pm.ApplicationInfo appInfo = this.getPackageManager().getApplicationInfo(this.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
-                if (appInfo.metaData != null) {
-                    Object keyObj = appInfo.metaData.get("com.amap.api.v2.apikey");
-                    if (keyObj instanceof Integer) {
-                        Log.w(TAG, "AMap API Key was parsed as Integer (" + keyObj + "), converting to String...");
-                        String keyStr;
-                        try {
-                            // 尝试作为资源ID读取
-                            keyStr = this.getString((Integer) keyObj);
-                        } catch (Exception e) {
-                            // 否则直接转换为字符串
-                            keyStr = String.valueOf(keyObj);
-                        }
-                        
-                        Log.i(TAG, "Recovered AMap Key: " + keyStr);
-
-                        // 尝试通过反射设置Key
-                        // com.amap.api.maps.MapsInitializer.setApiKey(String)
-                        Class<?> mapsInitializerClass = Class.forName("com.amap.api.maps.MapsInitializer");
-                        java.lang.reflect.Method setApiKeyMethod = mapsInitializerClass.getMethod("setApiKey", String.class);
-                        setApiKeyMethod.invoke(null, keyStr);
-                        Log.i(TAG, "Successfully set AMap API Key manually via reflection");
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to fix AMap API Key", e);
-            }
+            // The app ships no AMap key. Keys are issued per developer account and bound to
+            // a package name and signing fingerprint, and AMap's terms expect the key holder
+            // to be the app's operator - so each user supplies their own in Settings, the
+            // same way the Anisette server URL works. Apply it before any SDK call.
+            this.applyUserSuppliedAMapKey();
 
             // 使用反射加载高德地图SDK，避免编译时依赖
             Class<?> mapsInitializerClass = Class.forName("com.amap.api.maps.MapsInitializer");

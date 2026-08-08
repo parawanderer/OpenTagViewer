@@ -92,4 +92,10 @@
     <string name="failed_to_request_code_please_try_again">Codeanforderung fehlgeschlagen. Bitte versuchen Sie es erneut.</string>
     <string name="lang_ko">Koreanisch (한국어)</string>
     <string name="lang_ja">Japanisch (日本語)</string>
+    <string name="amap_api_key_explanation">AMap verlangt, dass jede Person einen eigenen API-Schlüssel angibt. Registriere einen unter lbs.amap.com, wähle als Plattform „Android SDK“ und füge ihn hier ein.</string>
+    <string name="amap_copy_registration_details">Paketname und SHA1 kopieren</string>
+    <string name="amap_registration_details_copied">Kopiert. Füge diese Angaben beim Erstellen des Schlüssels in der AMap-Konsole ein.</string>
+    <string name="amap_key_required">AMap benötigt einen eigenen API-Schlüssel. Gib einen ein, um diesen Anbieter zu verwenden.</string>
+    <string name="amap_key_saved">AMap-API-Schlüssel gespeichert.</string>
+    <string name="amap_key_cleared">AMap-API-Schlüssel entfernt.</string>
 </resources>

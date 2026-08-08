@@ -92,4 +92,10 @@
     <string name="failed_to_request_code_please_try_again">Aanvragen van code mislukt. Probeer het opnieuw.</string>
     <string name="lang_ko">Koreaans (한국어)</string>
     <string name="lang_ja">Japans (日本語)</string>
+    <string name="amap_api_key_explanation">AMap vereist dat iedereen een eigen API-sleutel opgeeft. Registreer er een op lbs.amap.com, kies „Android SDK” als platform en plak hem hier.</string>
+    <string name="amap_copy_registration_details">Pakketnaam en SHA1 kopiëren</string>
+    <string name="amap_registration_details_copied">Gekopieerd. Plak deze gegevens in de AMap-console bij het aanmaken van je sleutel.</string>
+    <string name="amap_key_required">AMap heeft je eigen API-sleutel nodig. Voer er een in om deze aanbieder te gebruiken.</string>
+    <string name="amap_key_saved">AMap API-sleutel opgeslagen.</string>
+    <string name="amap_key_cleared">AMap API-sleutel verwijderd.</string>
 </resources>

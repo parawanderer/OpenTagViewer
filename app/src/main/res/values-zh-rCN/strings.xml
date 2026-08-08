@@ -98,4 +98,10 @@
     <string name="map_provider_google">Google 地图</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
     <string name="relogin_required_after_upgrade">FindMy 库已更新，请重新登录。</string>
+    <string name="amap_api_key_explanation">高德地图需要您自行提供 API Key。请前往 lbs.amap.com 注册，平台选择“Android 平台 SDK”，然后将 Key 粘贴到此处。</string>
+    <string name="amap_copy_registration_details">复制包名和 SHA1</string>
+    <string name="amap_registration_details_copied">已复制。创建 Key 时请将这些信息粘贴到高德控制台。</string>
+    <string name="amap_key_required">高德地图需要您自己的 API Key。请先输入 Key 才能使用此地图源。</string>
+    <string name="amap_key_saved">已保存高德地图 API Key。</string>
+    <string name="amap_key_cleared">已移除高德地图 API Key。</string>
 </resources>
