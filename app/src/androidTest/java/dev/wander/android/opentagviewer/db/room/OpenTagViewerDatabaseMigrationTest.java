@@ -1,0 +1,206 @@
+package dev.wander.android.opentagviewer.db.room;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import android.content.ContentValues;
+import android.database.Cursor;
+
+import androidx.room.testing.MigrationTestHelper;
+import androidx.sqlite.db.SupportSQLiteDatabase;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import java.io.IOException;
+
+/**
+ * Regression tests for the v1 → v2 database upgrade.
+ * <br>
+ * This exists because the failure mode is invisible on a fresh install: a version bump
+ * without a registered {@link androidx.room.migration.Migration} only throws for users
+ * who already have a database, and it throws at first DB access rather than at build
+ * time. Every existing install would have crashed with
+ * {@code IllegalStateException: A migration from 1 to 2 was required but not found}.
+ * <br>
+ * The migration must also be non-destructive: falling back to a destructive migration
+ * here would wipe imported beacons and location history, forcing users through the
+ * macOS export wizard again — the exact thing this app exists to avoid.
+ */
+@RunWith(AndroidJUnit4.class)
+public class OpenTagViewerDatabaseMigrationTest {
+    private static final String TEST_DB = "migration-test-db";
+
+    private static final String BEACON_ID = "ABCDEF01-2345-6789-ABCD-EF0123456789";
+    private static final String BEACON_PLIST = "<?xml version=\"1.0\"?><plist><dict></dict></plist>";
+
+    @Rule
+    public MigrationTestHelper helper = new MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            OpenTagViewerDatabase.class
+    );
+
+    /**
+     * The core guarantee: an existing v1 database survives the upgrade with its rows and
+     * column values intact, and gains a NULL {@code accessory_json}.
+     */
+    @Test
+    public void migrate1To2_preservesExistingBeacons() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 2, /* validateDroppedTables= */ true, OpenTagViewerDatabase.MIGRATION_1_2);
+
+        try (Cursor cursor = db.query(
+                "SELECT id, import_id, content, version, is_removed, accessory_json"
+                        + " FROM OwnedBeacons WHERE id = ?", new Object[]{BEACON_ID})) {
+
+            assertTrue("beacon row did not survive the migration", cursor.moveToFirst());
+            assertEquals(BEACON_ID, cursor.getString(0));
+            assertEquals(1L, cursor.getLong(1));
+            assertEquals("plist content was altered by the migration", BEACON_PLIST, cursor.getString(2));
+            assertEquals("1.0", cursor.getString(3));
+            assertEquals(0, cursor.getInt(4));
+
+            // Pre-existing rows have no accessory JSON yet. BeaconRepository#toAccessoryRequests
+            // backfills it from the retained plist on the next fetch.
+            assertTrue("accessory_json should start NULL for migrated rows", cursor.isNull(5));
+            assertFalse("expected exactly one row for this beacon", cursor.moveToNext());
+        }
+    }
+
+    /**
+     * The plist in {@code content} is what the lazy backfill re-converts from, so the
+     * migration must not drop it once {@code accessory_json} exists. Guards against a
+     * future "clean up the now-redundant column" change.
+     */
+    @Test
+    public void migrate1To2_retainsPlistContentColumn() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+
+        try (Cursor cursor = db.query("SELECT content FROM OwnedBeacons WHERE id = ?", new Object[]{BEACON_ID})) {
+            assertTrue(cursor.moveToFirst());
+            assertNotNull("content must survive - the backfill re-reads it", cursor.getString(0));
+        }
+    }
+
+    /**
+     * Multiple beacons across imports, including a soft-deleted one, all survive. Row
+     * count is the thing users would notice going wrong.
+     */
+    @Test
+    public void migrate1To2_preservesAllRowsIncludingRemoved() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertImport(db, 2L);
+            insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
+            insertOwnedBeaconV1(db, "beacon-b", 1L, BEACON_PLIST, true);
+            insertOwnedBeaconV1(db, "beacon-c", 2L, BEACON_PLIST, false);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("beacons were lost during the migration", 3, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons WHERE is_removed = 1")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("soft-delete state was not preserved", 1, cursor.getInt(0));
+        }
+    }
+
+    /**
+     * An empty v1 database (installed but never imported) must also upgrade cleanly.
+     */
+    @Test
+    public void migrate1To2_handlesEmptyDatabase() throws IOException {
+        helper.createDatabase(TEST_DB, 1).close();
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(0, cursor.getInt(0));
+        }
+    }
+
+    /**
+     * Location history is the expensive-to-rebuild data, and it is not what the migration
+     * touches — so it is exactly what a careless destructive fallback would silently eat.
+     */
+    @Test
+    public void migrate1To2_preservesLocationHistory() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, BEACON_ID, 1L, BEACON_PLIST, false);
+            insertLocationReport(db, "hash-1", BEACON_ID, 1700000000000L);
+            insertLocationReport(db, "hash-2", BEACON_ID, 1700000600000L);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+
+        try (Cursor cursor = db.query(
+                "SELECT COUNT(*) FROM LocationReport WHERE beacon_id = ?", new Object[]{BEACON_ID})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("location history was lost during the migration", 2, cursor.getInt(0));
+        }
+    }
+
+    private static void insertImport(SupportSQLiteDatabase db, long id) {
+        ContentValues values = new ContentValues();
+        values.put("id", id);
+        values.put("version", "1.0");
+        values.put("imported_at", 1700000000000L);
+        values.put("exported_at", 1699999999000L);
+        values.put("source_user", "someone@example.com");
+        values.put("via", "test");
+        db.insert("Import", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+    }
+
+    private static void insertOwnedBeaconV1(
+            SupportSQLiteDatabase db, String id, long importId, String content, boolean isRemoved) {
+        ContentValues values = new ContentValues();
+        values.put("id", id);
+        values.put("import_id", importId);
+        values.put("content", content);
+        values.put("version", "1.0");
+        values.put("is_removed", isRemoved ? 1 : 0);
+        db.insert("OwnedBeacons", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+    }
+
+    private static void insertLocationReport(
+            SupportSQLiteDatabase db, String hashId, String beaconId, long timestamp) {
+        ContentValues values = new ContentValues();
+        values.put("hash_id", hashId);
+        values.put("beacon_id", beaconId);
+        values.put("published_at", timestamp);
+        values.put("description", "test report");
+        values.put("timestamp", timestamp);
+        values.put("confidence", 2);
+        values.put("latitude", 52.379189);
+        values.put("longitude", 4.899431);
+        values.put("horizontal_accuracy", 10);
+        values.put("status", 0);
+        values.put("last_update", timestamp);
+        db.insert("LocationReport", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+    }
+}

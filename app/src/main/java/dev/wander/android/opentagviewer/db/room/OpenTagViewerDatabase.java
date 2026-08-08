@@ -41,7 +41,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
      * stateful FindMyAccessory persistence (issue #30 fix). Pure additive ALTER —
      * existing rows survive with NULL and are lazily backfilled on first fetch.
      */
-    static final Migration MIGRATION_1_2 = new Migration(1, 2) {
+    public static final Migration MIGRATION_1_2 = new Migration(1, 2) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase db) {
             db.execSQL("ALTER TABLE OwnedBeacons ADD COLUMN accessory_json TEXT");
