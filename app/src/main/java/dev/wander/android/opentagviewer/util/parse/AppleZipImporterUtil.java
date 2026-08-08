@@ -417,8 +417,23 @@ public class AppleZipImporterUtil {
                         .importId(null) // TODO: fill on create Import
                         .version(version)
                         .content(kvp.getValue())
+                        // Eagerly convert plist → JSON for FindMy 0.9.x; nullable on failure
+                        // (lazy backfill in BeaconRepository will retry on first fetch).
+                        .accessoryJson(plistToAccessoryJsonOrNull(kvp.getValue()))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private static String plistToAccessoryJsonOrNull(final String plistXml) {
+        try {
+            var py = com.chaquo.python.Python.getInstance();
+            var module = py.getModule("main");
+            var result = module.callAttr("convertPlistToJson", plistXml);
+            return result == null ? null : result.toString();
+        } catch (Exception e) {
+            Log.w(TAG, "convertPlistToJson at import time failed; will backfill lazily on first fetch", e);
+            return null;
+        }
     }
 
     private static List<BeaconNamingRecord> makeBeaconNamingRecords(final Map<String, Pair<String, String>> beaconNamingRecords, final String version) {

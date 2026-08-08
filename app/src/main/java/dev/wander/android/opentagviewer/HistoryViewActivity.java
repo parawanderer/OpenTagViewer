@@ -222,12 +222,7 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
             this.map = ((GoogleMapProvider) provider).getGoogleMap();
         }
 
-        if (this.userSettings.hasDarkThemeEnabled()) {
-            // DARK THEME map
-            mapProvider.setMapStyle(true);
-        } else {
-            mapProvider.setMapStyle(false);
-        }
+        mapProvider.setMapStyle(this.getPreferredMapStyle());
 
         // move to same position that we left when we went to the history page from the main page
         this.mapProvider.moveCamera(this.defaultLatitude, this.defaultLongitude, this.defaultZoom);
@@ -238,6 +233,10 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
     @Override
     protected void onResume() {
         super.onResume();
+        this.userSettings = this.userSettingsRepo.getUserSettings();
+        if (this.mapProvider != null) {
+            this.mapProvider.setMapStyle(this.getPreferredMapStyle());
+        }
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onResume();
         }
@@ -257,6 +256,15 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onDestroy();
         }
+    }
+
+    private IMapProvider.MapStyle getPreferredMapStyle() {
+        if (this.userSettings == null || this.userSettings.getUseDarkTheme() == null) {
+            return IMapProvider.MapStyle.FOLLOW_SYSTEM;
+        }
+        return this.userSettings.getUseDarkTheme()
+                ? IMapProvider.MapStyle.DARK
+                : IMapProvider.MapStyle.LIGHT;
     }
 
     private void fetchAndUpdateDataForCurrentDay() {
@@ -365,7 +373,9 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
         final boolean isForToday = this.daysBack == 0;
 
         var reqData = Map.of(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
-        var asyncReq = this.appleService.getReportsBetween(reqData, beginningOfDay, endOfDay);
+        // asyncReq emits Observable<FetchResult> (reports + updated accessory state per beacon)
+        var asyncReq = this.beaconRepo.toAccessoryRequests(reqData)
+                .flatMap(requests -> this.appleService.getReportsBetween(requests, beginningOfDay, endOfDay));
 
         final long now = System.currentTimeMillis();
         if (beginningOfDay < now - SEVEN_DAYS_IN_MS) {
@@ -378,7 +388,7 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
             Log.d(TAG, "Going to perform a merged localdb + remote fetch for beaconId=" + beaconId + " location data in range: " + beginningOfDay + "-" + endOfDay);
             return Observable.zip(
                             // try to fetch remotely anyways and combine uniquely later
-                            asyncReq.flatMap(this.beaconRepo::storeToLocationCache).map(locations -> locations.get(beaconId)),
+                            asyncReq.flatMap(this.beaconRepo::storeFetchResult).map(locations -> locations.get(beaconId)),
                             // also try to fetch from DB for same time range
                             asyncDB,
                             (locationsRemote, locationsLocal) -> {
@@ -401,14 +411,14 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
 
         Log.d(TAG, "Going to perform a fresh fetch for beaconId=" + beaconId + " location data in range: " + beginningOfDay + "-" + endOfDay);
         return asyncReq
-                .doOnNext(locations -> {
+                .doOnNext(fetchResult -> {
                     // Don't cache the current day (it could still update)!
                     if (!isForToday) {
-                        MEMORY_REPORTS_CACHE.put(cacheKey, locations.get(beaconId));
+                        MEMORY_REPORTS_CACHE.put(cacheKey, fetchResult.getReports().get(beaconId));
                     }
                 })
-                .flatMap(locations -> this.storeLocationFetchToLocalDb(isForToday, beaconId, beginningOfDay).andThen(Observable.just(locations)))
-                .flatMap(this.beaconRepo::storeToLocationCache)
+                .flatMap(fetchResult -> this.storeLocationFetchToLocalDb(isForToday, beaconId, beginningOfDay).andThen(Observable.just(fetchResult)))
+                .flatMap(this.beaconRepo::storeFetchResult)
                 .map(locations -> locations.get(beaconId))
                 .subscribeOn(Schedulers.computation());
     }

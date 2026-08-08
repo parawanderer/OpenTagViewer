@@ -24,18 +24,19 @@
             <LinearLayout
                 android:id="@+id/tag_item_top_text"
                 android:layout_width="match_parent"
-                android:layout_height="85dp"
+                android:layout_height="wrap_content"
+                android:minHeight="96dp"
                 android:orientation="horizontal"
                 android:paddingLeft="15dp"
                 android:paddingTop="10dp"
                 android:paddingRight="15dp"
-                android:paddingBottom="0dp">
+                android:paddingBottom="8dp">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="102dp"
-                    android:layout_height="52dp"
-                    android:layout_gravity="center"
-                    android:layout_weight="1">
+                    android:layout_height="72dp"
+                    android:layout_gravity="top"
+                    android:layout_weight="0">
 
                     <TextView
                         android:id="@+id/device_icon_emoji"
@@ -65,11 +66,10 @@
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical"
                     android:paddingLeft="15dp"
-                    android:paddingTop="8dp"
                     android:paddingRight="15dp">
 
                     <TextView
@@ -77,6 +77,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_bold"
+                        android:maxLines="2"
                         android:text="SomeTag 1"
                         android:textColor="@color/md_theme_onBackground"
                         android:textSize="18sp" />
@@ -104,11 +105,11 @@
                         <TextView
                             android:id="@+id/device_location"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
                             android:layout_marginStart="5sp"
                             android:fontFamily="@font/nunito_bold"
                             android:gravity="center_vertical"
-                            android:singleLine="true"
+                            android:maxLines="3"
                             android:text="Streetstreet 1, 1234 CityThatIsLong Actually, Country"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
@@ -130,19 +131,22 @@
             <LinearLayout
                 android:id="@+id/tag_bottom_menu"
                 android:layout_width="match_parent"
-                android:layout_height="85dp"
+                android:layout_height="wrap_content"
                 android:gravity="center"
                 android:orientation="horizontal"
+                android:paddingTop="4dp"
                 android:paddingBottom="10dp">
 
                 <LinearLayout
                     android:id="@+id/device_history_button_container"
-                    android:layout_width="80dp"
-                    android:layout_height="match_parent"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:layout_marginLeft="8dp"
                     android:layout_marginRight="8dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:gravity="top|center_horizontal"
                     android:onClick="onClickLocationHistory"
                     android:orientation="vertical"
                     android:padding="5dp">
@@ -183,9 +187,10 @@
                     <TextView
                         android:id="@+id/locationHistoryText"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:gravity="center"
+                        android:maxLines="2"
                         android:text="@string/location_history"
                         android:textAlignment="gravity"
                         android:textSize="10sp" />
@@ -193,12 +198,14 @@
 
                 <LinearLayout
                     android:id="@+id/device_refresh_button_container"
-                    android:layout_width="80dp"
-                    android:layout_height="match_parent"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginLeft="8dp"
                     android:layout_marginRight="8dp"
+                    android:layout_weight="1"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:gravity="top|center_horizontal"
                     android:onClick="onClickRefresh"
                     android:orientation="vertical"
                     android:padding="5dp">
@@ -239,19 +246,22 @@
                     <TextView
                         android:id="@+id/refreshText"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:gravity="center"
+                        android:maxLines="2"
                         android:text="@string/refresh"
                         android:textSize="10sp" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/device_ring_button_container"
-                    android:layout_width="80dp"
-                    android:layout_height="match_parent"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:gravity="top|center_horizontal"
                     android:onClick="onClickRing"
                     android:orientation="vertical"
                     android:padding="5dp"
@@ -293,21 +303,24 @@
                     <TextView
                         android:id="@+id/ringText"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:gravity="center"
+                        android:maxLines="2"
                         android:text="@string/do_ring"
                         android:textSize="10sp" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/device_more_button_container"
-                    android:layout_width="80dp"
-                    android:layout_height="match_parent"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginLeft="8dp"
                     android:layout_marginRight="8dp"
+                    android:layout_weight="1"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:gravity="top|center_horizontal"
                     android:onClick="onClickMoreForDevice"
                     android:orientation="vertical"
                     android:padding="5dp"
@@ -347,9 +360,10 @@
                     <TextView
                         android:id="@+id/moreText"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:gravity="center"
+                        android:maxLines="2"
                         android:text="@string/more"
                         android:textSize="10sp" />
                 </LinearLayout>

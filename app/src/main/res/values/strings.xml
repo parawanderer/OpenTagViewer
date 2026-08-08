@@ -42,6 +42,8 @@
     <string name="lang_de">Deutsch</string>
     <string name="lang_fr">Français</string>
     <string name="lang_ru">Русский</string>
+    <string name="lang_zh_cn">简体中文</string>
+    <string name="lang_zh_tw">繁體中文</string>
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
     <string name="welcome">Welcome !</string>
     <string name="login_failed_x">Login failed: %1$s</string>
@@ -128,4 +130,6 @@
     <string name="map_provider">Map Provider</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
+    <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
+    <string name="anisette_change_requires_logout">Sign out first to change your Anisette server.</string>
 </resources>

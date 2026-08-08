@@ -16,7 +16,6 @@ import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
@@ -38,7 +37,7 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
     private Activity activity;
     private GoogleMap googleMap;
     private SupportMapFragment mapFragment;
-    private OnMapReadyCallback callback;
+    private IMapProvider.OnMapReadyCallback callback;
     
     // 存储标记点和路径线
     private final Map<String, Marker> markers = new HashMap<>();
@@ -47,9 +46,10 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
     // 监听器
     private OnMapClickListener onMapClickListener;
     private OnMarkerClickListener onMarkerClickListener;
+    private MapStyle currentMapStyle = MapStyle.FOLLOW_SYSTEM;
     
     @Override
-    public void initialize(Activity activity, int containerViewId, OnMapReadyCallback callback) {
+    public void initialize(Activity activity, int containerViewId, IMapProvider.OnMapReadyCallback callback) {
         this.activity = activity;
         this.callback = callback;
         
@@ -100,7 +100,9 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
                 return false;
             });
         }
-        
+
+        applyMapStyle();
+
         // 通知回调
         if (callback != null) {
             callback.onMapReady(this);
@@ -117,17 +119,28 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
     }
     
     @Override
-    public void setMapStyle(boolean darkMode) {
+    public void setMapStyle(MapStyle mapStyle) {
+        this.currentMapStyle = mapStyle == null ? MapStyle.FOLLOW_SYSTEM : mapStyle;
+        applyMapStyle();
+    }
+
+    private void applyMapStyle() {
         if (googleMap == null) return;
-        
-        if (darkMode) {
-            MapStyleOptions style = MapStyleOptions.loadRawResourceStyle(
-                    activity.getApplicationContext(),
-                    R.raw.map_dark_style
-            );
-            googleMap.setMapStyle(style);
-        } else {
-            googleMap.setMapStyle(null);
+
+        try {
+            Class<?> mapColorSchemeClass = Class.forName("com.google.android.gms.maps.model.MapColorScheme");
+            int colorScheme;
+            if (this.currentMapStyle == MapStyle.DARK) {
+                colorScheme = mapColorSchemeClass.getField("DARK").getInt(null);
+            } else if (this.currentMapStyle == MapStyle.LIGHT) {
+                colorScheme = mapColorSchemeClass.getField("LIGHT").getInt(null);
+            } else {
+                colorScheme = mapColorSchemeClass.getField("FOLLOW_SYSTEM").getInt(null);
+            }
+
+            GoogleMap.class.getMethod("setMapColorScheme", int.class).invoke(googleMap, colorScheme);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to apply Google Maps color scheme, falling back to default map appearance", e);
         }
     }
     

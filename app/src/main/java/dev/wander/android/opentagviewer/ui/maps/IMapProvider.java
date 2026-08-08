@@ -23,9 +23,8 @@ public interface IMapProvider {
     
     /**
      * 设置地图样式
-     * @param darkMode true为夜间模式,false为白天模式
      */
-    void setMapStyle(boolean darkMode);
+    void setMapStyle(MapStyle mapStyle);
     
     /**
      * 添加标记点
@@ -202,5 +201,11 @@ public interface IMapProvider {
         public float getZoom() {
             return zoom;
         }
+    }
+
+    enum MapStyle {
+        LIGHT,
+        DARK,
+        FOLLOW_SYSTEM
     }
 }

@@ -12,6 +12,7 @@ import org.xmlpull.v1.XmlPullParserException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import dev.wander.android.opentagviewer.R;
@@ -66,5 +67,14 @@ public final class LocaleConfigUtil {
         if (name != null) {
             out.add(name);
         }
+    }
+
+    public static String toLocaleLabelResourceName(String localeTag) {
+        if (localeTag == null || localeTag.isBlank()) {
+            return "lang_en";
+        }
+        return "lang_" + localeTag
+                .replace('-', '_')
+                .toLowerCase(Locale.ROOT);
     }
 }

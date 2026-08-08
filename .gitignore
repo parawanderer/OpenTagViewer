@@ -21,3 +21,5 @@ app/release
 .coverage
 .pytest_cache
 .venv
+# Local Claude Code settings
+.claude/settings.local.json

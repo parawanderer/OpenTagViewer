@@ -12,7 +12,7 @@ from findmy.reports import (
     AppleAccount,
     LoginState,
     SmsSecondFactorMethod,
-    TrustedDeviceSecondFactorMethod
+    TrustedDeviceSecondFactorMethod,
 )
 from findmy.reports.twofactor import (
     SyncSecondFactorMethod
@@ -175,17 +175,25 @@ def loginSync(email: str, password: str, anisetteServerUrl: str) -> dict:
 
 
 def exportToString(account: AppleAccount) -> str:
-    return json.dumps(account.export())
+    """
+    Replaces the old account.export() pattern. In FindMy 0.9.x, AppleAccount uses to_json/from_json.
+    The returned dict (AccountStateMapping) embeds the anisette provider state, so the
+    server URL no longer needs to be supplied at restore time.
+    """
+    return json.dumps(account.to_json())
 
 
-def getAccount(
-        serializedAccountData: str, anisetteServerUrl: str) -> AppleAccount:
+def getAccount(serializedAccountData: str, anisetteServerUrl: str = None) -> AppleAccount:
+    """
+    Restore an AppleAccount via FindMy 0.9.x's `from_json`. The anisette provider is rebuilt
+    from the embedded state inside the JSON, so `anisetteServerUrl` is unused here. We accept
+    the parameter for now to keep the existing Java callsite compiling; it will be dropped
+    in Phase 2 when the Java bridge is updated.
+    """
     try:
         data = json.loads(serializedAccountData)
 
-        anisette = RemoteAnisetteProvider(anisetteServerUrl)
-        acc = AppleAccount(anisette)
-        acc.restore(data)
+        acc = AppleAccount.from_json(data)
 
         print(f"Login State: {acc.login_state}")
 
@@ -196,44 +204,115 @@ def getAccount(
         return None
 
 
+def convertPlistToJson(plistXmlString: str) -> str:
+    """
+    One-shot conversion from the legacy plist XML representation (still stored in
+    OwnedBeacon.content) to the JSON form that FindMy 0.9.x expects.
+
+    Used in two places (called from Java):
+    - During .zip import: convert once and store alongside the raw plist
+    - As a lazy backfill: when reading an OwnedBeacon row that predates the upgrade
+
+    Returns None on failure so Java can decide how to recover.
+    """
+    try:
+        fp = BytesIO(plistXmlString.encode('utf-8'))
+        accessory = FindMyAccessory.from_plist(fp)
+        return json.dumps(accessory.to_json())
+    except Exception:
+        print(f"convertPlistToJson failed: {traceback.format_exc()}")
+        return None
+
+
+def _filterReportsByTimeRange(reports, startMs, endMs):
+    """
+    Apple's network only ever returns ~7 days of history and 0.9.x removed the
+    user-facing time-range parameters from fetch_location_history. We filter
+    here so the Java side keeps the same time-window semantics it had before.
+    """
+    out = []
+    for r in reports:
+        ts_ms = _toUnixEpochMs(r.timestamp)
+        if ts_ms is None:
+            continue
+        if startMs is not None and ts_ms < startMs:
+            continue
+        if endMs is not None and ts_ms > endMs:
+            continue
+        out.append(r)
+    return out
+
+
+def _serializeReports(reports):
+    """
+    Map FindMy 0.9.x LocationReport objects to the dict shape Java's mapResults expects.
+    Note: `published_at` and `description` no longer exist on LocationReport in 0.9.x; we
+    fall back to `timestamp` and an empty string respectively. Java's BeaconLocationReport
+    can absorb that without changes.
+    """
+    items = []
+    for report in sorted(reports):
+        items.append({
+            "publishedAt": _toUnixEpochMs(report.timestamp),
+            "description": getattr(report, "description", "") or "",
+            "timestamp": _toUnixEpochMs(report.timestamp),
+            "confidence": report.confidence,
+            "latitude": report.latitude,
+            "longitude": report.longitude,
+            "horizontalAccuracy": report.horizontal_accuracy,
+            "status": report.status
+        })
+    return items
+
+
 def getLastReports(
         account: AppleAccount,
-        idToPList,
+        idToAccessoryData,
         hoursBack: int) -> dict:
-    # JAVA typing: see https://chaquo.com/chaquopy/doc/current/python.html
-    # especially this: https://chaquo.com/chaquopy/doc/current/python.html#classes
+    """
+    Fetch the most recent reports for each beacon over the requested time window.
+
+    `idToAccessoryData` is a List<AccessoryRequest> from Java where each element exposes
+    getBeaconId() / getAccessoryJson() (the persisted FindMyAccessory JSON).
+
+    Each entry in the result dict carries:
+      - "reports": list of report dicts (same shape as before)
+      - "updatedAccessoryJson": JSON string of the accessory AFTER fetch — Java must
+        write this back to OwnedBeacon.accessory_json so the rolling key alignment
+        survives across calls (this is the issue #30 fix).
+    """
     try:
         res = {}
 
-        num_items = idToPList.size()
-        print(f"num_items is {num_items}")
+        num_items = idToAccessoryData.size()
+        print(f"getLastReports: num_items={num_items}, hoursBack={hoursBack}")
+
+        now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        start_ms = now_ms - (hoursBack * 60 * 60 * 1000)
 
         for i in range(0, num_items):
-            pair = idToPList.get(i)
-            beaconId = pair.first
-            plistContent = pair.second
+            req = idToAccessoryData.get(i)
+            beaconId = req.getBeaconId()
+            accessoryJson = req.getAccessoryJson()
 
             print(f"Fetching report for {beaconId} for the last {hoursBack} hours...")
-            fp = BytesIO(plistContent.encode('utf-8'))
-            airtag = FindMyAccessory.from_plist(fp)
 
-            reports = account.fetch_last_reports(airtag, hoursBack)
-            print(f"Got {len(reports)} reports for {beaconId}")
+            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
 
-            items = []
-            for report in sorted(reports):
-                items.append({
-                    "publishedAt": _toUnixEpochMs(report.published_at),
-                    "description": report.description,
-                    "timestamp": _toUnixEpochMs(report.timestamp),
-                    "confidence": report.confidence,
-                    "latitude": report.latitude,
-                    "longitude": report.longitude,
-                    "horizontalAccuracy": report.horizontal_accuracy,
-                    "status": report.status
-                })
+            reports = account.fetch_location_history(airtag)
+            if reports is None:
+                reports = []
+            print(f"Got {len(reports)} raw reports for {beaconId}")
 
-            res[beaconId] = items
+            filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
+            print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
+
+            updated_accessory_json = json.dumps(airtag.to_json())
+
+            res[beaconId] = {
+                "reports": _serializeReports(filtered),
+                "updatedAccessoryJson": updated_accessory_json,
+            }
 
         return res
 
@@ -245,51 +324,45 @@ def getLastReports(
 
 def getReports(
         account: AppleAccount,
-        idToPList,
+        idToAccessoryData,
         unixStartMs: int,
         unixEndMs: int) -> dict:
-    # JAVA typing: see https://chaquo.com/chaquopy/doc/current/python.html
-    # especially this: https://chaquo.com/chaquopy/doc/current/python.html#classes
+    """
+    Time-range variant. Apple's network only retains ~7 days of history; ranges further
+    back than that will return empty (the local Room cache is already the canonical store
+    for older history via DailyHistoryFetchRecord).
+
+    Same input/output shape as `getLastReports`.
+    """
     try:
         res = {}
 
-        num_items = idToPList.size()
-        print(f"num_items is {num_items}")
+        num_items = idToAccessoryData.size()
+        print(f"getReports: num_items={num_items}, range=[{unixStartMs}, {unixEndMs}]")
 
         for i in range(0, num_items):
-            pair = idToPList.get(i)
-            beaconId = pair.first
-            plistContent = pair.second
+            req = idToAccessoryData.get(i)
+            beaconId = req.getBeaconId()
+            accessoryJson = req.getAccessoryJson()
 
             print(f"Fetching report for {beaconId} in time range {unixStartMs}-{unixEndMs}...")
-            fp = BytesIO(plistContent.encode('utf-8'))
-            airtag = FindMyAccessory.from_plist(fp)
 
-            start: datetime = datetime.fromtimestamp(
-                unixStartMs/1000,
-                tz=timezone.utc
-            )
-            end: datetime = datetime.fromtimestamp(
-                unixEndMs/1000,
-                tz=timezone.utc
-            )
-            reports = account.fetch_reports(airtag, start, end)
-            print(f"Got {len(reports)} reports for {beaconId} for time range {unixStartMs}-{unixEndMs}")
+            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
 
-            items = []
-            for report in sorted(reports):
-                items.append({
-                    "publishedAt": _toUnixEpochMs(report.published_at),
-                    "description": report.description,
-                    "timestamp": _toUnixEpochMs(report.timestamp),
-                    "confidence": report.confidence,
-                    "latitude": report.latitude,
-                    "longitude": report.longitude,
-                    "horizontalAccuracy": report.horizontal_accuracy,
-                    "status": report.status
-                })
+            reports = account.fetch_location_history(airtag)
+            if reports is None:
+                reports = []
+            print(f"Got {len(reports)} raw reports for {beaconId}")
 
-            res[beaconId] = items
+            filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)
+            print(f"  -> {len(filtered)} reports after filtering to requested range")
+
+            updated_accessory_json = json.dumps(airtag.to_json())
+
+            res[beaconId] = {
+                "reports": _serializeReports(filtered),
+                "updatedAccessoryJson": updated_accessory_json,
+            }
 
         return res
 

@@ -97,6 +97,10 @@ public class OpenAirTagApplication extends PyApplication {
         var userSettings = userSettingsRepo.getUserSettings();
         final Boolean useDarkTheme = userSettings.getUseDarkTheme();
 
+        if (useDarkTheme == null) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+            return;
+        }
 
         if (currentNightMode == Configuration.UI_MODE_NIGHT_NO && useDarkTheme == Boolean.TRUE) {
             Log.i(TAG, "Updating to app dark theme choice");

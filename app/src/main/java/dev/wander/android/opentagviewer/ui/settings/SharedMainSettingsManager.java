@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import androidx.appcompat.app.AppCompatDelegate;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
@@ -62,6 +63,7 @@ public class SharedMainSettingsManager {
     private ArrayAdapter<String> shownLocalesAdapter = null;
 
     private final Consumer<String> onLanguageSelectedCallback;
+    private final Consumer<String> onMapProviderSelectedCallback;
 
 
     private final Set<String> urlOptions = new HashSet<>();
@@ -75,6 +77,7 @@ public class SharedMainSettingsManager {
     public SharedMainSettingsManager(
             @NonNull AppCompatActivity context,
             @NonNull Consumer<String> onLanguageSelected,
+            @NonNull Consumer<String> onMapProviderSelected,
             @NonNull Consumer<String> onNewAnisetteUrlSelected,
             @NonNull GithubRawUtilityFilesService github,
             @NonNull UserSettings currentUserSettings,
@@ -82,6 +85,7 @@ public class SharedMainSettingsManager {
     ) {
         this.context = context;
         this.onLanguageSelectedCallback = onLanguageSelected;
+        this.onMapProviderSelectedCallback = onMapProviderSelected;
         this.onNewAnisetteUrlSelectedCallback = onNewAnisetteUrlSelected;
         this.github = github;
         this.currentUserSettings = currentUserSettings;
@@ -127,11 +131,11 @@ public class SharedMainSettingsManager {
     }
 
     private void setupCurrentLocalePretty() {
-        final String currentLocale = Locale.getDefault().getLanguage();
+        final String currentLocale = this.getCurrentLocaleTag();
         AppAutoCompleteTextView languageDropdown = this.context.findViewById(R.id.languageSelectDropdown);
 
         this.mappedLocales.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(currentLocale))
+                .filter(kvp -> this.localeTagMatches(kvp.getValue(), currentLocale))
                 .findFirst()
                 .map(Map.Entry::getKey)
                 .ifPresent(option -> languageDropdown.setText(option, false));
@@ -142,6 +146,39 @@ public class SharedMainSettingsManager {
         // but good enough for when the user will perform this switch like once in their lifetime of usage of the app
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(languageDropdown::clearFocus, 10);
+    }
+
+    public void setupMapProviderField() {
+        AppAutoCompleteTextView mapProviderDropdown = this.context.findViewById(R.id.mapProviderSelectDropdown);
+
+        String[] providerLabels = new String[] {
+                this.context.getString(R.string.map_provider_google),
+                this.context.getString(R.string.map_provider_amap)
+        };
+
+        mapProviderDropdown.setSimpleItems(providerLabels);
+        this.setupCurrentMapProviderPretty();
+
+        mapProviderDropdown.setOnItemClickListener((parent, view, position, id) -> {
+            final String selectedProvider = position == 1 ? "amap" : "google";
+            final String selectedLabel = parent.getItemAtPosition(position).toString();
+            mapProviderDropdown.setText(selectedLabel, false);
+            mapProviderDropdown.clearFocus();
+            this.onMapProviderSelectedCallback.accept(selectedProvider);
+        });
+    }
+
+    private void setupCurrentMapProviderPretty() {
+        AppAutoCompleteTextView mapProviderDropdown = this.context.findViewById(R.id.mapProviderSelectDropdown);
+        if (mapProviderDropdown == null) {
+            return;
+        }
+
+        final String provider = this.currentUserSettings.getMapProvider();
+        final int labelRes = "amap".equals(provider)
+                ? R.string.map_provider_amap
+                : R.string.map_provider_google;
+        mapProviderDropdown.setText(this.context.getString(labelRes), false);
     }
 
     public void setupAnisetteServerUrlField() {
@@ -271,13 +308,38 @@ public class SharedMainSettingsManager {
     private String getPrettyLanguageName(final String languageId) {
         var res = this.context.getResources();
         return res.getString(res.getIdentifier(
-                        "lang_" + languageId,
+                        LocaleConfigUtil.toLocaleLabelResourceName(languageId),
                         "string",
                         this.context.getPackageName()));
     }
 
     public void handleOnResume() {
         this.setupCurrentLocalePretty();
+        this.setupCurrentMapProviderPretty();
+    }
+
+    private String getCurrentLocaleTag() {
+        String configuredTag = this.currentUserSettings.getLanguage();
+        if (configuredTag != null && !configuredTag.isBlank()) {
+            return configuredTag;
+        }
+
+        String appLocaleTags = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        if (appLocaleTags != null && !appLocaleTags.isBlank()) {
+            return appLocaleTags.split(",")[0];
+        }
+
+        return Locale.getDefault().toLanguageTag();
+    }
+
+    private boolean localeTagMatches(String supportedLocaleTag, String currentLocaleTag) {
+        if (supportedLocaleTag == null || currentLocaleTag == null) {
+            return false;
+        }
+        if (supportedLocaleTag.equalsIgnoreCase(currentLocaleTag)) {
+            return true;
+        }
+        return currentLocaleTag.toLowerCase(Locale.ROOT).startsWith(supportedLocaleTag.toLowerCase(Locale.ROOT) + "-");
     }
 
     public enum ANISETTE_TEST_STATUS {
