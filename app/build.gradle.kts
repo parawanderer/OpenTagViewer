@@ -71,6 +71,8 @@ android {
 
     buildTypes {
         release {
+            // Keeps the launcher name as-is for real installs.
+            manifestPlaceholders["appLabel"] = "@string/app_name"
             signingConfig = signingConfigs.getByName("release")
             isDebuggable = false
             isMinifyEnabled = false
@@ -94,6 +96,10 @@ android {
             // SHA-1) to the key's restrictions if you need maps to render in debug builds.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+
+            // Distinct launcher name, otherwise a debug install sits next to a real one
+            // with an identical icon and label and there is no way to tell them apart.
+            manifestPlaceholders["appLabel"] = "OpenTagViewer (debug)"
         }
     }
     compileOptions {
