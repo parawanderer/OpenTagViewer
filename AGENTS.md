@@ -109,7 +109,7 @@ So releasing is two steps, in this order:
 1. Commit the `VERSION` bump to `main`
 2. Tag that commit `macos-exporter-v<the same version>` and publish the release
 
-`scripts/exporter_version.py --tag <tag>` enforces it, and runs in `test-release-version`
+`scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`
 before either build job. A tag that disagrees fails the release rather than shipping a build
 that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
 
