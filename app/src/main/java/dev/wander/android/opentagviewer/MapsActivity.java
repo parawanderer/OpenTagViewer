@@ -27,11 +27,13 @@ import android.location.Geocoder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
@@ -47,6 +49,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
@@ -68,6 +71,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -85,6 +89,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
+import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
@@ -165,6 +170,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private final Handler refreshSchedulerHandler = new Handler();
     private Runnable nextLocationRefreshTask = null;
 
+    /**
+     * How long a fetch may run before we tell the user it is still working.
+     * <br>
+     * Long enough that an ordinary refresh never flashes the banner, short enough that a
+     * first fetch does not sit there looking frozen.
+     */
+    private static final long SHOW_LONG_FETCH_BANNER_AFTER_MS = 6000L;
+
+    private final Handler longFetchBannerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable showLongFetchBanner = () -> this.setLongFetchBannerVisible(true);
+
+    /** All three are only ever touched on the main looper, so they need no synchronisation. */
+    private int fetchesInFlight = 0;
+    private int fetchProgressDone = 0;
+    private int fetchProgressTotal = 0;
+
     private Optional<UserMapCameraPosition> lastCameraPositionOnLoad;
 
     private int windowWidth = 0;
@@ -202,6 +223,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     Intent data = result.getData();
                     if (data != null && data.getBooleanExtra("isDeviceListChanged", false)) {
                         this.handleDeviceListChanged();
+                    }
+                    // The empty state on the device list offers to import, but the picker and
+                    // everything that runs after it live here, so it asks us to start it.
+                    if (data != null && data.getBooleanExtra("startImport", false)) {
+                        this.handleImport();
                     }
                 }
             }
@@ -353,6 +379,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
             this.nextLocationRefreshTask = null;
         }
+
+        this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
         
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
@@ -416,6 +444,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         if (!this.initialFetchComplete) {
             Log.d(TAG, "Skipping refresh due to not having fully initialised yet");
+            return;
+        }
+
+        if (PythonAppleService.isBusy()) {
+            // A first fetch for an accessory with no key alignment can run for minutes, so
+            // this tick would otherwise block on the lock rather than be skipped, and the
+            // backlog would grow by one every minute until the fetch finished.
+            Log.d(TAG, "Skipping scheduled refresh: a fetch is still in progress");
             return;
         }
 
@@ -1057,6 +1093,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private void setupTagScrollArea() {
         HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
+
+        // The cards size themselves to their content now, so nothing absorbs the navigation bar
+        // any more. This used to be hidden by the area's fixed 240dp height, which held about
+        // 70dp of slack below the card.
+        WindowPaddingUtil.insertUIBottomPadding(scrollContainer);
+
         this.tagListSwiperHelper = new TagListSwiperHelper(
                 scrollContainer,
                 this.dynamicCardsForTag,
@@ -1148,6 +1190,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             assert v != null;
             var params = v.getLayoutParams();
             params.width = this.windowWidth != 0 ? (this.windowWidth - 80) : (this.getWindow().getDecorView().getWidth() - 80);
+
+            // Cards size themselves to their own content, so a two-line address made one card
+            // taller than its neighbours. Inflating with a null root drops the layout's own
+            // height, and the container hands out WRAP_CONTENT by default, so it has to be set
+            // here: MATCH_PARENT inside a wrap_content horizontal LinearLayout triggers
+            // forceUniformHeight, which measures every card to the height of the tallest.
+            params.height = ViewGroup.LayoutParams.MATCH_PARENT;
 
             v.setLayoutParams(params);
 
@@ -1249,23 +1298,131 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
-                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
+                .doOnSubscribe(__ -> this.markFetchStarted())
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doOnNext(reports -> this.last24HHistoryFetchAt = now) // on success, update this time.
-                .flatMap(this.beaconRepo::storeFetchResult);
+                .doFinally(this::markFetchFinished);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist, final int hoursToGoBack) {
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
-                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
-                .flatMap(this.beaconRepo::storeFetchResult);
+                .doOnSubscribe(__ -> this.markFetchStarted())
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
+                .doFinally(this::markFetchFinished);
+    }
+
+    /**
+     * Fetches each accessory in its own call into Python, storing the result before moving on.
+     * <br>
+     * Handing Python the whole list meant it returned a single dict at the very end, so the
+     * updated key alignment for every accessory was written in one go. A tag with no alignment
+     * record takes minutes to resolve, and quitting part-way through discarded the work for
+     * all of them - including the ones that had already finished - so the next launch searched
+     * the same tens of thousands of key indices again. One call per accessory means each one
+     * is persisted as soon as it resolves.
+     * <br>
+     * It also lets the UI update per tag instead of all at once, and keeps a single failure
+     * from taking the rest of the batch with it.
+     * <br>
+     * Sequential on purpose: FindMy.py's synchronous account drives one asyncio event loop,
+     * and calls into Python are serialised anyway (see PythonAppleService). concatMap makes
+     * that explicit rather than leaving threads queued on a lock.
+     */
+    private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
+            final List<AccessoryRequest> requests, final int hoursToGoBack) {
+
+        final int total = requests.size();
+        final AtomicInteger completed = new AtomicInteger(0);
+        this.setLongFetchProgress(0, total);
+
+        return Observable.fromIterable(requests)
+                .concatMap(request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
+                        .flatMap(this.beaconRepo::storeFetchResult)
+                        .doOnError(error -> Log.e(TAG,
+                                "Failed to fetch reports for beaconId=" + request.getBeaconId()
+                                        + "; continuing with the remaining accessories", error))
+                        .onErrorResumeNext(__ -> Observable.empty())
+                        .doOnComplete(() -> this.setLongFetchProgress(completed.incrementAndGet(), total)));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(Map.of(beaconId, pList))
+                .doOnSubscribe(__ -> this.markFetchStarted())
                 .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
-                .flatMap(this.beaconRepo::storeFetchResult);
+                .flatMap(this.beaconRepo::storeFetchResult)
+                .doFinally(this::markFetchFinished);
+    }
+
+    /**
+     * Starts the clock on the "still working" banner.
+     * <br>
+     * A tag whose export carried no KeyAlignmentRecord starts at index 0 from its pairing
+     * date, so its first fetch searches the tag's whole life - tens of thousands of key
+     * indices, at roughly 290 per request. That is minutes of sequential requests during
+     * which nothing changes on screen, and it is indistinguishable from a hang.
+     * <br>
+     * It also matters that the user does not walk away: Python returns the updated
+     * alignment for every accessory in one dict at the end of the batch, so quitting
+     * part-way through discards the work for all of them and the next launch starts over.
+     */
+    private void markFetchStarted() {
+        this.longFetchBannerHandler.post(() -> {
+            if (this.fetchesInFlight++ == 0) {
+                // Clear the previous run's counts so a stale "3 of 5" cannot flash up.
+                this.fetchProgressDone = 0;
+                this.fetchProgressTotal = 0;
+                this.longFetchBannerHandler.postDelayed(
+                        this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
+            }
+        });
+    }
+
+    private void markFetchFinished() {
+        this.longFetchBannerHandler.post(() -> {
+            this.fetchesInFlight = Math.max(0, this.fetchesInFlight - 1);
+            if (this.fetchesInFlight > 0) {
+                return;
+            }
+            this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
+            this.setLongFetchBannerVisible(false);
+        });
+    }
+
+    /** Records how far through the batch we are, so the banner can say so. */
+    private void setLongFetchProgress(int done, int total) {
+        this.longFetchBannerHandler.post(() -> {
+            this.fetchProgressDone = done;
+            this.fetchProgressTotal = total;
+
+            TextView banner = this.findViewById(R.id.long_fetch_banner);
+            if (banner != null && banner.getVisibility() == VISIBLE) {
+                banner.setText(this.longFetchBannerText());
+            }
+        });
+    }
+
+    private String longFetchBannerText() {
+        if (this.fetchProgressTotal <= 1) {
+            // "1 of 1" tells the user nothing they cannot already see.
+            return this.getString(R.string.resolving_tags_banner);
+        }
+        return this.getString(
+                R.string.resolving_tags_banner_progress,
+                Math.min(this.fetchProgressDone + 1, this.fetchProgressTotal),
+                this.fetchProgressTotal);
+    }
+
+    private void setLongFetchBannerVisible(boolean visible) {
+        TextView banner = this.findViewById(R.id.long_fetch_banner);
+        if (banner == null) {
+            return;
+        }
+        if (visible) {
+            banner.setText(this.longFetchBannerText());
+        }
+        banner.setVisibility(visible ? VISIBLE : GONE);
     }
 
     private boolean isAppleServiceInitialised() {
