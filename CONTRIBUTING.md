@@ -17,6 +17,7 @@ contributors.
 | **Android SDK** | Either `local.properties` with `sdk.dir=...`, or `ANDROID_HOME` set |
 | **Python 3** on `PATH` | The build shells out to it to generate the stub `unicorn` wheel (`scripts/build_unicorn_stub_wheel.py`). If your interpreter has an unusual name, pass `-PpythonExecutable=...` |
 | **Android Studio** (optional) | Everything works from the CLI, but the IDE is easier for running the app on a device |
+| **[`gh`](https://cli.github.com/)** (optional) | Strongly recommended if you work with a coding agent — see below |
 
 Easiest route to the first three is Android Studio, which ships a JDK and can install the
 SDK for you. Otherwise: [Temurin 17](https://adoptium.net/temurin/releases/?version=17),
@@ -64,6 +65,23 @@ Optional but recommended for Python work:
 ```bash
 python -m pip install flake8 pyright
 ```
+
+### If you use a coding agent, install `gh`
+
+```bash
+gh auth login
+```
+
+Worth doing before anything else. Without it, a red check on your PR is a coloured square on
+a web page your agent cannot see, so it can only guess. With it, the agent reads the failing
+step and its log, fixes the cause, and tells you what it was.
+
+`gh` also lets an agent check whether something is already reported before changing anything. AGENTS.md has the specific
+commands, including how to read a failure while the rest of the run is still going.
+
+Note that `gh` authenticates separately from git: `gh` can be logged in while `git push`
+still fails, if your remote is HTTPS with no cached credential, or SSH with a
+passphrase-protected key and no agent running.
 
 ### Build it
 
