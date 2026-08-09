@@ -17,7 +17,7 @@ plugins {
 // ---------------------------------------------------------------------------
 // Aggregate test tasks
 //
-// Tests live in four places across three runners (see TESTING.md). These wrap them
+// Tests live in five places across three runners (see CONTRIBUTING.md). These wrap them
 // so there is one command to run everything, rather than four to remember.
 // ---------------------------------------------------------------------------
 
@@ -120,14 +120,17 @@ val testAll by tasks.registering {
     doLast {
         logger.lifecycle("")
         logger.lifecycle("All device-free suites passed.")
-        logger.lifecycle("Instrumented tests were NOT run - use ./gradlew testAllOnDevice with an emulator booted.")
+        logger.lifecycle("Instrumented tests were NOT run - use ./gradlew testAllOnDevice.")
     }
 }
 
 val testAllOnDevice by tasks.registering {
     group = "verification"
-    description = "Runs every test suite, including instrumented tests (needs a device or emulator)."
-    dependsOn(testAll, ":app:connectedDebugAndroidTest")
+    description = "Runs every test suite, including instrumented tests on a self-provisioned emulator."
+    // The managed device rather than connectedDebugAndroidTest: Gradle creates and destroys
+    // the emulator per run, so nothing needs to be booted first and there is no reused ADB
+    // bridge to go stale. See the testOptions block in app/build.gradle.kts.
+    dependsOn(testAll, ":app:testEmulatorDebugAndroidTest")
 
     doLast {
         logger.lifecycle("")
