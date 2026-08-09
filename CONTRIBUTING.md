@@ -457,7 +457,7 @@ The tag must be `macos-exporter-v` followed by exactly what `VERSION` says. Befo
 build job starts, `test-release-version` runs:
 
 ```bash
-python scripts/exporter_version.py --tag macos-exporter-v1.0.6
+python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6
 ```
 
 which fails the release, with instructions, if the two disagree — so the mistake costs a
@@ -468,13 +468,54 @@ name, the release title, and the version the app reports cannot come apart.
 You can run the same check locally before tagging:
 
 ```bash
-python scripts/exporter_version.py --print               # what the source declares
-python scripts/exporter_version.py --tag macos-exporter-v1.0.6   # would this tag be accepted?
+python scripts/release_version.py --kind exporter --print               # what the source declares
+python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6   # would this tag be accepted?
 ```
 
 If you tagged before bumping, the fix is to push the bump, delete the release and its tag, and
 re-tag the new commit. Releasing the Android app is unrelated and unaffected — its version
 lives in `app/build.gradle.kts`.
+
+## Releasing the Android app
+
+Same shape as the exporter, with the version in a different file — `versionName` in
+`app/build.gradle.kts`:
+
+```kotlin
+versionCode = 3
+versionName = "1.0.5"
+```
+
+**Bump `versionCode` too.** Android refuses to install an APK whose code is not higher than
+the installed one, so a `versionName`-only bump leaves existing users unable to update — and
+it fails on their phone, never in any build.
+
+```bash
+# 1. Bump both, commit, push
+git commit -am "Bump the Android app to 1.0.6"
+git push origin main
+
+# 2. Draft the release, then publish it from the GitHub UI
+python scripts/release_notes.py draft --kind android --changes-file notes.md
+
+# 3. Collapse the release it replaced
+python scripts/release_notes.py demote --kind android
+```
+
+Publishing runs `build-release.yml`, which checks the tag against the source before building
+anything:
+
+```bash
+python scripts/release_version.py --kind android --tag android-app-v1.0.6
+```
+
+then runs the tests, builds and signs the APK, and attaches it to the release. The tag must be
+`android-app-v` followed by exactly what `versionName` says; the check fails the release, with
+instructions, if they disagree.
+
+Signing needs `SIGNING_KEY`, `KEY_STORE_PASSWORD`, `KEY_PASSWORD` and the `ALIAS` in the
+**Android Build Release** environment. Those are separate from the exporter's token, and a
+release is a bad time to discover one has expired.
 
 ## Opening a pull request
 
