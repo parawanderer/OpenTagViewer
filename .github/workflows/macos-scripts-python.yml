@@ -66,4 +66,4 @@ jobs:
     - name: Check the exporter version is still readable
       working-directory: .
       run: |
-        python scripts/exporter_version.py --print
+        python scripts/release_version.py --kind exporter --print

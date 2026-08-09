@@ -152,7 +152,7 @@ Zip up result (MacOS):
 ```shell
 # Read from the source rather than typed, so the zip cannot end up named after a version the
 # app does not report. See "Versioning" below.
-APP_VERSION="$(python ../scripts/exporter_version.py --print)"
+APP_VERSION="$(python ../scripts/release_version.py --kind exporter --print)"
 cd ./dist
 zip -r OpenTagViewer-ExportWizardMacOS-$APP_VERSION.zip OpenTagViewer.app/ OpenTagViewer
 ```
@@ -169,8 +169,8 @@ Releases are tagged `macos-exporter-v<version>`, and CI refuses to publish one w
 disagrees with the source:
 
 ```shell
-python ../scripts/exporter_version.py --print                     # what the source declares
-python ../scripts/exporter_version.py --tag macos-exporter-v1.0.6 # would this tag be accepted?
+python ../scripts/release_version.py --kind exporter --print                     # what the source declares
+python ../scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6 # would this tag be accepted?
 ```
 
 Not to be confused with `EXPORT_METADATA_VERSION`, a few lines below it: that is the version

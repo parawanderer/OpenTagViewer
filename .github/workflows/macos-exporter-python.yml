@@ -39,11 +39,11 @@ jobs:
     # a mismatch costs one minute rather than two full PyInstaller builds.
     #
     # Deliberately not the reverse - patching the tag into the source - because the wizard
-    # also runs from source, and those exports stamp `via:` too. See scripts/exporter_version.py.
+    # also runs from source, and those exports stamp `via:` too. See scripts/release_version.py.
     - name: Check the release tag matches the version in the source
       id: version
       run: |
-        APP_VERSION="$(python3 scripts/exporter_version.py --tag "${{ github.ref }}")"
+        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "${{ github.ref }}")"
         echo "Tag and source agree on version: $APP_VERSION"
         echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
