@@ -114,6 +114,31 @@ android {
     androidResources {
         // generateLocaleConfig = true
     }
+
+    testOptions {
+        managedDevices {
+            localDevices {
+                // Gradle provisions, boots, and tears down this emulator itself.
+                //
+                // Running against an emulator you started by hand is unreliable: the Android
+                // Gradle Plugin holds its ADB connection inside the Gradle daemon and reuses
+                // it between invocations, so once the emulator's adb daemon goes stale the
+                // next run fails to install or hangs, with an error that has nothing to do
+                // with the code. A managed device is created fresh per run, so there is no
+                // connection left over to go stale. It is also what CI can run unattended.
+                //
+                // aosp-atd is a stripped-down image built for tests: no Play Services, and no
+                // Maps as a result. Fine here, because none of the instrumented tests start
+                // MapsActivity - they cover the database migrations, the repositories and the
+                // keystore. Anything that needs Maps has to move to a "google" image.
+                create("testEmulator") {
+                    device = "Pixel 6"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
+    }
 }
 
 lombok {
@@ -181,6 +206,28 @@ val generateUnicornStubWheel by tasks.registering(Exec::class) {
 // Chaquopy installs from the wheel path, so it must exist before pip runs.
 tasks.matching { it.name.contains("PythonRequirements") || it.name.contains("PythonReqs") }
     .configureEach { dependsOn(generateUnicornStubWheel) }
+
+// Deliberately NOT wired into assembleDebug/assembleRelease.
+//
+// Its output is committed source, so running it on every build would either dirty the working
+// tree whenever somebody pushes a commit or changes their GitHub avatar, or make an offline
+// build fail. Refreshing it is a repository event, not a build event: the scheduled workflow
+// in .github/workflows/update-contributors.yml runs this and opens a PR when the list moves.
+// Run it by hand any time with ./gradlew updateContributors.
+val updateContributors by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Regenerates the contributor list and avatars bundled into the Information page."
+
+    val script = rootProject.file("scripts/fetch_contributors.py")
+
+    inputs.file(script).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(layout.projectDirectory.file("src/main/assets/contributors.json"))
+    outputs.dir(layout.projectDirectory.dir("src/main/assets/contributors"))
+    // Talks to the network, so its result is not reproducible from its inputs.
+    outputs.upToDateWhen { false }
+
+    commandLine(resolvePythonExecutable(), script.absolutePath)
+}
 
 chaquopy {
     defaultConfig {
