@@ -38,7 +38,19 @@ public interface IMapProvider {
      * @param markerId 标记点ID
      */
     void removeMarker(String markerId);
-    
+
+    /**
+     * 设置标记点的绘制顺序（数值大的显示在上层）
+     * <br>
+     * Raises or lowers an existing marker. Tags kept in the same place overlap completely at
+     * anything but the closest zoom, so selecting one has to bring it to the front - otherwise
+     * the user taps a card and nothing visibly happens.
+     *
+     * @param markerId 标记点ID
+     * @param zIndex 绘制顺序
+     */
+    void setMarkerZIndex(String markerId, float zIndex);
+
     /**
      * 清除所有标记点
      */

@@ -168,6 +168,23 @@ public class RefreshPolicyTest {
     }
 
     @Test
+    public void saysSoWhenThereHasBeenNoFetchAtAll() {
+        // Reporting the interval since the epoch reads as a 56-year-old fetch, which sends
+        // whoever is reading the log looking for a clock bug that is not there.
+        assertFalse(policy().hasEverFetched());
+        assertEquals("no successful fetch yet", policy().describeTimeSinceLastFetch(NOW));
+    }
+
+    @Test
+    public void reportsTheRealIntervalOnceSomethingHasBeenFetched() {
+        final RefreshPolicy policy = policy();
+        policy.markFetched(NOW);
+
+        assertTrue(policy.hasEverFetched());
+        assertEquals("60000 ms since the last fetch", policy.describeTimeSinceLastFetch(NOW + ONE_MINUTE));
+    }
+
+    @Test
     public void aSuccessfulRefreshStartsTheIntervalAgain() {
         final RefreshPolicy policy = policy();
         policy.markFetched(0L);

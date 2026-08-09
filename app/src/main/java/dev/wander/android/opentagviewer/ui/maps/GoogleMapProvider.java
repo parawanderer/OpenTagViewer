@@ -158,7 +158,8 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
                 .snippet(marker.getSnippet())
                 .draggable(marker.isDraggable())
                 .visible(marker.isVisible())
-                .alpha(marker.getAlpha());
+                .alpha(marker.getAlpha())
+                .zIndex(marker.getZIndex());
         
         // 设置图标
         if (marker.getIconBitmap() != null) {
@@ -187,6 +188,16 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
         if (marker != null) {
             marker.remove();
         }
+    }
+
+    @Override
+    public void setMarkerZIndex(String markerId, float zIndex) {
+        Marker marker = markers.get(markerId);
+        if (marker == null) {
+            Log.d(TAG, "No marker to re-order for markerId=" + markerId);
+            return;
+        }
+        marker.setZIndex(zIndex);
     }
     
     @Override

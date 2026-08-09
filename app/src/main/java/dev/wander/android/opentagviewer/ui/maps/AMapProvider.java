@@ -194,6 +194,17 @@ public class AMapProvider implements IMapProvider {
                 iconMethod.invoke(markerOptions, bitmapDescriptor);
             }
             
+            // 设置绘制顺序
+            // Best-effort: AMap's MarkerOptions.zIndex(float) matches Google's, but this whole
+            // class talks to the SDK reflectively, so a rename in a future AMap version has to
+            // degrade to an unordered marker rather than no marker at all.
+            try {
+                java.lang.reflect.Method zIndexMethod = markerOptionsClass.getMethod("zIndex", float.class);
+                zIndexMethod.invoke(markerOptions, marker.getZIndex());
+            } catch (Exception e) {
+                Log.w(TAG, "Could not set the marker draw order; overlapping tags may not raise on selection", e);
+            }
+
             // 添加标记
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             java.lang.reflect.Method addMarkerMethod = aMapClass.getMethod("addMarker", markerOptionsClass);
@@ -221,6 +232,22 @@ public class AMapProvider implements IMapProvider {
         }
     }
     
+    @Override
+    public void setMarkerZIndex(String markerId, float zIndex) {
+        Object marker = markers.get(markerId);
+        if (marker == null) {
+            Log.d(TAG, "No marker to re-order for markerId=" + markerId);
+            return;
+        }
+        try {
+            java.lang.reflect.Method setZIndexMethod = marker.getClass().getMethod("setZIndex", float.class);
+            setZIndexMethod.invoke(marker, zIndex);
+        } catch (Exception e) {
+            // Not fatal: the marker stays where it is, just possibly behind another one.
+            Log.w(TAG, "Failed to re-order marker for markerId=" + markerId, e);
+        }
+    }
+
     @Override
     public void clearMarkers() {
         for (Object marker : markers.values()) {

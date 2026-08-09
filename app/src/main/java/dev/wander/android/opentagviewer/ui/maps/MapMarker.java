@@ -34,7 +34,13 @@ public class MapMarker {
     
     // 透明度（0.0 - 1.0）
     private final float alpha;
-    
+
+    // 绘制顺序：数值大的标记显示在上层
+    // Draw order. Tags in the same building overlap completely at anything but the closest
+    // zoom, so the selected one has to be raised or it stays hidden behind whichever marker
+    // the map happened to draw last.
+    private final float zIndex;
+
     private MapMarker(Builder builder) {
         this.latitude = builder.latitude;
         this.longitude = builder.longitude;
@@ -48,6 +54,7 @@ public class MapMarker {
         this.draggable = builder.draggable;
         this.visible = builder.visible;
         this.alpha = builder.alpha;
+        this.zIndex = builder.zIndex;
     }
     
     public double getLatitude() {
@@ -100,7 +107,11 @@ public class MapMarker {
     public float getAlpha() {
         return alpha;
     }
-    
+
+    public float getZIndex() {
+        return zIndex;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -120,7 +131,8 @@ public class MapMarker {
         private boolean draggable = false;
         private boolean visible = true;
         private float alpha = 1.0f;
-        
+        private float zIndex = 0.0f;
+
         public Builder latitude(double latitude) {
             this.latitude = latitude;
             return this;
@@ -189,6 +201,11 @@ public class MapMarker {
             return this;
         }
         
+        public Builder zIndex(float zIndex) {
+            this.zIndex = zIndex;
+            return this;
+        }
+
         public MapMarker build() {
             if (id == null || id.isEmpty()) {
                 id = "marker_" + System.currentTimeMillis() + "_" + Math.random();
