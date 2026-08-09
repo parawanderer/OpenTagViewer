@@ -71,11 +71,74 @@ fi
 cd "$DEST/python" || die "No python/ directory - is $DEST the right checkout?"
 
 # ---------------------------------------------------------------------------------------
-# 3. Dependencies, kept out of the system Python.
+# 3. Pick an interpreter whose Tk actually works.
+#
+# The wizard is a tkinter app, and "has tkinter" is not the same as "can open a window".
+# Importing tkinter succeeds in cases where creating one does not: the Command Line Tools
+# python3 links the system Tk, which refuses to start if it decides the OS is too old, and
+# the process then dies during Tk_Init with "Abort trap: 6" and no traceback. Seen on a
+# Docker-OSX VM whose SystemVersion.plist claimed 14.8.9 while the API Tk queries reported
+# 14.6.
+#
+# So candidates are tried newest-first and each is judged by whether it can construct a Tk
+# window, not by version. python.org and Homebrew builds bring their own Tcl/Tk and target
+# macOS 11+, so they generally work where the Command Line Tools one does not.
 # ---------------------------------------------------------------------------------------
+tk_works() {
+    "$1" -c 'import tkinter; tkinter.Tk().destroy()' >/dev/null 2>&1
+}
+
+PY=""
+for candidate in \
+    /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 \
+    /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+    /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 \
+    /opt/homebrew/bin/python3 \
+    /usr/local/bin/python3 \
+    "$(command -v python3 2>/dev/null)"
+do
+    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    if tk_works "$candidate"; then
+        PY="$candidate"
+        break
+    fi
+done
+
+if [ -n "$PY" ]; then
+    say "Using $PY ($("$PY" -V 2>&1))"
+else
+    system_python="$(command -v python3 2>/dev/null)"
+    tk_error="$("${system_python:-python3}" -c 'import tkinter; tkinter.Tk().destroy()' 2>&1 | tail -2)"
+
+    printf '\nNo Python on this machine can open a Tk window, so the GUI wizard cannot run:\n\n'
+    printf '%s\n\n' "$tk_error"
+    printf 'Most likely fix - python.org builds bundle their own Tcl/Tk:\n\n'
+    printf '    curl -LO https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg\n'
+    printf '    sudo installer -pkg python-3.12.7-macos11.pkg -target /\n'
+    printf '    rm -rf %s/python/.venv && bash %s\n\n' "$DEST" "$0"
+    printf 'Or skip the GUI entirely - the export does not need it:\n\n'
+    printf '    cd %s/python\n' "$DEST"
+    printf '    python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt\n'
+    printf '    PYTHONPATH=. python3 main/airtag_decryptor.py -o ~/Desktop/otv_decrypted --rename-legacy\n\n'
+    printf 'That writes the decrypted OwnedBeacons, BeaconNamingRecord and KeyAlignmentRecords\n'
+    printf 'folders. CONTRIBUTING.md covers turning them into a zip the app can import.\n\n'
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------------------
+# 4. Dependencies, kept out of the system Python.
+#
+# The venv is rebuilt if it was made from a different interpreter, which happens whenever
+# someone installs a newer Python after a first run that fell back to the system one.
+# ---------------------------------------------------------------------------------------
+if [ -d .venv ] && ! tk_works .venv/bin/python3; then
+    say "Existing virtualenv cannot open a Tk window; rebuilding it from $PY"
+    rm -rf .venv
+fi
+
 if [ ! -d .venv ]; then
     say "Creating a virtualenv"
-    python3 -m venv .venv || die "Could not create a virtualenv"
+    "$PY" -m venv .venv || die "Could not create a virtualenv"
 fi
 
 # shellcheck disable=SC1091
@@ -84,25 +147,6 @@ fi
 say "Installing dependencies"
 python3 -m pip install --quiet --upgrade pip
 python3 -m pip install --quiet -r requirements.txt || die "Dependency install failed"
-
-# The wizard is a tkinter app, so check Tk can actually start rather than merely import.
-#
-# Importing tkinter succeeds in cases where creating a window does not: a Homebrew python3
-# without python-tk fails at import, but a Tk framework that refuses the OS version aborts
-# later, during Tk_Init, and the process dies with "Abort trap: 6" and no traceback. Seen on
-# a Docker-OSX VM whose SystemVersion.plist claimed 14.8.9 while the API Tk queries reported
-# 14.6, so Tk decided the OS was too old for itself.
-if ! python3 -c "import tkinter; tkinter.Tk().destroy()" >/dev/null 2>&1; then
-    tk_error="$(python3 -c "import tkinter; tkinter.Tk().destroy()" 2>&1 | tail -2)"
-
-    printf '\nThe GUI wizard cannot start on this machine:\n\n%s\n\n' "$tk_error"
-    printf 'The export does not need the GUI. Run the decryptor directly instead:\n\n'
-    printf '    cd %s/python && . .venv/bin/activate\n' "$DEST"
-    printf '    PYTHONPATH=. python3 main/airtag_decryptor.py -o ~/Desktop/otv_decrypted --rename-legacy\n\n'
-    printf 'That writes the decrypted OwnedBeacons, BeaconNamingRecord and KeyAlignmentRecords\n'
-    printf 'folders. See CONTRIBUTING.md for turning them into a zip the app can import.\n\n'
-    exit 1
-fi
 
 # macOS 15 tightened keychain access, so the BeaconStore key cannot be read automatically.
 # The wizard says so itself, but saying it up front saves a confusing detour.
@@ -114,7 +158,7 @@ if [ "$macos_major" -ge 15 ] 2>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------------------
-# 4. Run it.
+# 5. Run it.
 #
 # PYTHONPATH=. is required: wizard.py does `from main.airtag_decryptor import ...`, and
 # running the file directly puts python/main on sys.path rather than python/.
