@@ -22,9 +22,30 @@ jobs:
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
       && startsWith(github.event.release.tag_name, 'macos-exporter-v')
 
+    # The version both build jobs name their artifacts with. It comes from here rather than
+    # from each job parsing the tag again, so there is exactly one place it can be wrong.
+    outputs:
+      app-version: ${{ steps.version.outputs.APP_VERSION }}
+
     steps: # (reuses steps from full flow!)
     - name: Checkout code
       uses: actions/checkout@v4
+
+    # Nothing in this pipeline rewrites VERSION in python/main/wizard.py: the tag names the
+    # artifact, and the app keeps whatever was committed. So a tag that disagrees with the
+    # source ships a build that calls itself the old version in its title bar and in the
+    # `via:` field of every export it writes. This step is what makes that a failed release
+    # instead of a confusing zip. It runs before either build job (they `need` this one), so
+    # a mismatch costs one minute rather than two full PyInstaller builds.
+    #
+    # Deliberately not the reverse - patching the tag into the source - because the wizard
+    # also runs from source, and those exports stamp `via:` too. See scripts/exporter_version.py.
+    - name: Check the release tag matches the version in the source
+      id: version
+      run: |
+        APP_VERSION="$(python3 scripts/exporter_version.py --tag "${{ github.ref }}")"
+        echo "Tag and source agree on version: $APP_VERSION"
+        echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
@@ -83,30 +104,13 @@ jobs:
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
       && startsWith(github.event.release.tag_name, 'macos-exporter-v')
 
+    # The version is not parsed out of the tag here. It is whatever test-release-version
+    # confirmed the tag and python/main/wizard.py agree on, so the zip name, the release
+    # name, and the version the app reports about itself cannot come apart.
+    env:
+      APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
+
     steps:
-    - name: Extract Version from Tag
-      id: extract_version
-      run: |
-        # GITHUB_REF for tags is like 'refs/tags/macos-exporter-v1.0.3.1'
-        FULL_TAG_NAME="${{ github.ref }}"
-
-        # Remove 'refs/tags/' prefix to get 'macos-exporter-v1.0.3.1'
-        TAG_WITHOUT_PREFIX="${FULL_TAG_NAME##refs/tags/}"
-
-        # Find the index of '-v'
-        # This will be 'macos-exporter-' part, then we add 2 to skip '-v'
-        START_INDEX=$(( $(echo "$TAG_WITHOUT_PREFIX" | awk -F'-v' '{print length($1)}') + 2 ))
-
-        # Extract everything from '-v' onwards
-        # Using cut or substring if available, or just awk
-        VERSION_STRING=$(echo "$TAG_WITHOUT_PREFIX" | cut -c "$START_INDEX"-)
-
-        # Output the extracted version as a step output
-        echo "Extracted version: $VERSION_STRING"
-
-        # !! this is reused below
-        echo "APP_VERSION=$VERSION_STRING" >> $GITHUB_OUTPUT
-
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -137,8 +141,8 @@ jobs:
     - name: Prepare and Upload MacOS App
       working-directory: ./python
       run: |
-        echo "Going to build zip with version: ${{ steps.extract_version.outputs.APP_VERSION }}"
-        APP_ZIP_NAME="${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip"
+        echo "Going to build zip with version: $APP_VERSION"
+        APP_ZIP_NAME="${{ env.APP_NAME }}-$APP_VERSION-${{ runner.arch }}.zip"
         cd ./dist
         zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
         mkdir -p ${{ github.workspace }}/output
@@ -150,15 +154,15 @@ jobs:
     - name: Upload PyInstaller Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
-        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
+        name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
+        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
 
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'release'
       with:
         files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
-        name: OpenTagViewer MacOS AirTag Exporter ${{ steps.extract_version.outputs.APP_VERSION }}
+        name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
       env:
         GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions
 
@@ -173,30 +177,13 @@ jobs:
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
       && startsWith(github.event.release.tag_name, 'macos-exporter-v')
 
+    # The version is not parsed out of the tag here. It is whatever test-release-version
+    # confirmed the tag and python/main/wizard.py agree on, so the zip name, the release
+    # name, and the version the app reports about itself cannot come apart.
+    env:
+      APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
+
     steps:
-    - name: Extract Version from Tag
-      id: extract_version
-      run: |
-        # GITHUB_REF for tags is like 'refs/tags/macos-exporter-v1.0.3.1'
-        FULL_TAG_NAME="${{ github.ref }}"
-
-        # Remove 'refs/tags/' prefix to get 'macos-exporter-v1.0.3.1'
-        TAG_WITHOUT_PREFIX="${FULL_TAG_NAME##refs/tags/}"
-
-        # Find the index of '-v'
-        # This will be 'macos-exporter-' part, then we add 2 to skip '-v'
-        START_INDEX=$(( $(echo "$TAG_WITHOUT_PREFIX" | awk -F'-v' '{print length($1)}') + 2 ))
-
-        # Extract everything from '-v' onwards
-        # Using cut or substring if available, or just awk
-        VERSION_STRING=$(echo "$TAG_WITHOUT_PREFIX" | cut -c "$START_INDEX"-)
-
-        # Output the extracted version as a step output
-        echo "Extracted version: $VERSION_STRING"
-
-        # !! this is reused below
-        echo "APP_VERSION=$VERSION_STRING" >> $GITHUB_OUTPUT
-
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -227,8 +214,8 @@ jobs:
     - name: Prepare and Upload MacOS App
       working-directory: ./python
       run: |
-        echo "Going to build zip with version: ${{ steps.extract_version.outputs.APP_VERSION }}"
-        APP_ZIP_NAME="${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip"
+        echo "Going to build zip with version: $APP_VERSION"
+        APP_ZIP_NAME="${{ env.APP_NAME }}-$APP_VERSION-${{ runner.arch }}.zip"
         cd ./dist
         zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
         mkdir -p ${{ github.workspace }}/output
@@ -240,14 +227,14 @@ jobs:
     - name: Upload PyInstaller Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
-        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ steps.extract_version.outputs.APP_VERSION }}-${{ runner.arch }}.zip
+        name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
+        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
 
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'release'
       with:
         files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
-        name: OpenTagViewer MacOS AirTag Exporter ${{ steps.extract_version.outputs.APP_VERSION }}
+        name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
       env:
         GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions

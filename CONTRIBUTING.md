@@ -413,11 +413,68 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 | `build-debug.yml` | push/PR to `main` | Translation check, pyright, string tooling tests, instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Wizard tests across Python 3.10–3.13 on macOS 14 |
-| `macos-exporter-python.yml` | on release | Wizard tests plus the PyInstaller build |
+| `macos-exporter-python.yml` | on release | Tag/version check, wizard tests, the PyInstaller build for both architectures |
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
 
 The instrumented job needs KVM on the runner; the workflow enables it before starting the
 emulator.
+
+---
+
+## Releasing the macOS exporter
+
+The exporter's version lives in exactly one place — `VERSION` in `python/main/wizard.py`:
+
+```python
+VERSION = "1.0.5"
+```
+
+It shows in the window title, and it is stamped into every export as
+`via: OpenTagViewer.app:1.0.5` inside `OPENTAGVIEWER.yml`. That field is how a maintainer
+reading a bug report works out which exporter produced the zip in front of them, so it has to
+be true.
+
+**Nothing rewrites it at build time.** The release tag names the zip and the GitHub release;
+the app keeps whatever was committed. That is deliberate rather than an oversight — the wizard
+also runs straight from source (the VM bootstrap below, `python main/wizard.py`), and those
+runs stamp `via:` as well. If CI patched the tag into the source, a binary and a from-source
+export built from the same commit would claim different versions, which is the same drift in a
+place nobody would think to look.
+
+So a release is two steps, in this order:
+
+```bash
+# 1. Bump it, commit it, push it
+#    (edit python/main/wizard.py -> VERSION = "1.0.6")
+git commit -am "Bump the macOS exporter to 1.0.6"
+git push origin main
+
+# 2. Tag that commit and publish the release
+gh release create macos-exporter-v1.0.6 --title "OpenTagViewer MacOS AirTag Exporter 1.0.6"
+```
+
+The tag must be `macos-exporter-v` followed by exactly what `VERSION` says. Before either
+build job starts, `test-release-version` runs:
+
+```bash
+python scripts/exporter_version.py --tag macos-exporter-v1.0.6
+```
+
+which fails the release, with instructions, if the two disagree — so the mistake costs a
+minute rather than an incorrectly labelled build on the releases page. Both build jobs then
+take the version from that job's output instead of parsing the tag themselves, so the zip
+name, the release title, and the version the app reports cannot come apart.
+
+You can run the same check locally before tagging:
+
+```bash
+python scripts/exporter_version.py --print               # what the source declares
+python scripts/exporter_version.py --tag macos-exporter-v1.0.6   # would this tag be accepted?
+```
+
+If you tagged before bumping, the fix is to push the bump, delete the release and its tag, and
+re-tag the new commit. Releasing the Android app is unrelated and unaffected — its version
+lives in `app/build.gradle.kts`.
 
 ## Opening a pull request
 
