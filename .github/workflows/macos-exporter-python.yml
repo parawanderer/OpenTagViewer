@@ -39,11 +39,11 @@ jobs:
     # a mismatch costs one minute rather than two full PyInstaller builds.
     #
     # Deliberately not the reverse - patching the tag into the source - because the wizard
-    # also runs from source, and those exports stamp `via:` too. See scripts/exporter_version.py.
+    # also runs from source, and those exports stamp `via:` too. See scripts/release_version.py.
     - name: Check the release tag matches the version in the source
       id: version
       run: |
-        APP_VERSION="$(python3 scripts/exporter_version.py --tag "${{ github.ref }}")"
+        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "${{ github.ref }}")"
         echo "Tag and source agree on version: $APP_VERSION"
         echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
@@ -116,6 +116,12 @@ jobs:
     env:
       APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
 
+      # The wizard only works on macOS 14 and earlier - 15 tightened keychain access so the
+      # BeaconStore key cannot be read - so every machine this binary has to run on is older
+      # than the machine building it. Setting the target explicitly stops the toolchain
+      # stamping the runner's own OS version onto the result and locking out every user.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -143,6 +149,14 @@ jobs:
           --icon=OpenTagViewer.icns \
           --noconfirm \
           ./main/wizard.py
+
+    # Verifies rather than assumes. A dependency built on the runner's own macOS - Homebrew
+    # bottles especially, which are not backward compatible - can raise the whole bundle's
+    # floor to the builder's OS version. That produces a binary which installs fine and then
+    # refuses to launch, on a user's Mac, with no traceback and nothing in any build log.
+    # Runs before the upload so a build nobody could use never reaches the release page.
+    - name: Check the build can run on the macOS the wizard supports
+      run: python3 scripts/check_macos_min_version.py python/dist
 
     - name: Prepare and Upload MacOS App
       working-directory: ./python
@@ -179,7 +193,11 @@ jobs:
 
   build-intel:
     needs: test-release-version
-    runs-on: macos-13 # Intel
+    # macos-13 no longer exists. GitHub's supported images are macOS 26, 15 and 14 (14 itself
+    # deprecated), so a job asking for macos-13 is never picked up - it sits queued until the
+    # six-hour timeout rather than failing, which is why the 1.0.5 release went out with only
+    # the ARM64 binary attached. macos-15-intel is the current standard-size x64 label.
+    runs-on: macos-15-intel # Intel
     environment: 'MacOS Exporter App CI'
 
     # The repository default is read-only, which is what turned a missing token into a 403 at
@@ -199,6 +217,12 @@ jobs:
     # name, and the version the app reports about itself cannot come apart.
     env:
       APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
+
+      # The wizard only works on macOS 14 and earlier - 15 tightened keychain access so the
+      # BeaconStore key cannot be read - so every machine this binary has to run on is older
+      # than the machine building it. Setting the target explicitly stops the toolchain
+      # stamping the runner's own OS version onto the result and locking out every user.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     steps:
     - name: Checkout code
@@ -227,6 +251,14 @@ jobs:
           --icon=OpenTagViewer.icns \
           --noconfirm \
           ./main/wizard.py
+
+    # Verifies rather than assumes. A dependency built on the runner's own macOS - Homebrew
+    # bottles especially, which are not backward compatible - can raise the whole bundle's
+    # floor to the builder's OS version. That produces a binary which installs fine and then
+    # refuses to launch, on a user's Mac, with no traceback and nothing in any build log.
+    # Runs before the upload so a build nobody could use never reaches the release page.
+    - name: Check the build can run on the macOS the wizard supports
+      run: python3 scripts/check_macos_min_version.py python/dist
 
     - name: Prepare and Upload MacOS App
       working-directory: ./python
