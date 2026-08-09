@@ -179,6 +179,42 @@ It deliberately does not build or run tests. A hook that takes a minute gets byp
 `--no-verify` within a day, and a hook people routinely bypass is worse than none, because it
 looks like a safety net that is not there. Use `--no-verify` when you genuinely need to.
 
+## Install the GitHub CLI
+
+If you are working with an agent, install and authenticate [`gh`](https://cli.github.com/):
+
+```bash
+gh auth login
+gh auth status
+```
+
+It is the difference between an agent that can only guess at a red build and one that can
+read it. Without `gh`, a failing check is a coloured square on a web page the agent cannot
+see; with it, the agent can find the failing step, read the log, fix the cause and say what
+it was. The same applies to triaging issues before changing anything.
+
+```bash
+gh pr checks <pr>                       # which checks passed, failed, are pending
+gh run list --limit 5                   # recent runs
+gh run view --job <id> --log-failed     # the failing output, once the run has finished
+gh issue list --state all --limit 100   # is this already reported?
+gh issue view <n> --comments            # the discussion, which often has the diagnosis
+```
+
+**While a run is still in progress, `--log-failed` refuses**, reporting only that logs will
+be available when the run completes — unhelpful when one job failed in seconds and another
+has half an hour of emulator left. The step-level API answers immediately and tells you
+exactly which step died:
+
+```bash
+gh api repos/<owner>/<repo>/actions/jobs/<id> \
+  --jq '.steps[] | "\(.conclusion // .status)\t\(.name)"'
+```
+
+Note that `gh`'s authentication is separate from git's. `gh` can be logged in while
+`git push` still fails, if the remote is HTTPS with no cached credential or SSH with a
+passphrase-protected key and no agent running. `gh` will still work for everything above.
+
 ## Windows traps
 
 Each of these has already produced a hang that looked like something else:
