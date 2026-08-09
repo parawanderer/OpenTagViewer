@@ -70,7 +70,10 @@ public class AppleZipImporterUtil {
     private static final Map<FILE_TYPE, Pattern> MATCHERS = Map.of(
             FILE_TYPE.EXPORT_INFO, Pattern.compile("^OPENTAGVIEWER\\.yml$"),
             FILE_TYPE.OWNED_BEACON, Pattern.compile("^OwnedBeacons/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$"),
-            FILE_TYPE.BEACON_NAMING_RECORD, Pattern.compile("^BeaconNamingRecord/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$")
+            FILE_TYPE.BEACON_NAMING_RECORD, Pattern.compile("^BeaconNamingRecord/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$"),
+            // Same nesting as BeaconNamingRecord: <accessory uuid>/<record uuid>. The wizard
+            // rewrites the .record extension macOS uses to .plist on export.
+            FILE_TYPE.KEY_ALIGNMENT_RECORD, Pattern.compile("^KeyAlignmentRecords/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})/([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\\.plist$")
     );
 
     private static final String X_PATH_TO_CLOUDKIT_METADATA = "/plist/dict/key[.='cloudKitMetadata']/following-sibling::data[1]";
