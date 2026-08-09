@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.db.repo;
 
 import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,10 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
+import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
+import dev.wander.android.opentagviewer.python.FetchResult;
+import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -29,9 +34,19 @@ import lombok.NonNull;
 public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
     private final OpenTagViewerDatabase db;
+    private final PlistToAccessoryJsonConverter accessoryJsonConverter;
 
     public BeaconRepository(OpenTagViewerDatabase db) {
+        this(db, new ChaquopyPlistToAccessoryJsonConverter());
+    }
+
+    /**
+     * Injectable converter, so the lazy accessory_json backfill can be tested without a
+     * running Python runtime.
+     */
+    public BeaconRepository(OpenTagViewerDatabase db, PlistToAccessoryJsonConverter accessoryJsonConverter) {
         this.db = db;
+        this.accessoryJsonConverter = accessoryJsonConverter;
     }
 
     /**
@@ -117,6 +132,85 @@ public class BeaconRepository {
                     userBeaconOptions
             );
         }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Build the FindMy 0.9.x fetch input for the given beacons. For each beacon we use
+     * the persisted {@code accessory_json} if present, otherwise lazily backfill it
+     * from the legacy XML plist via {@code main.py:convertPlistToJson} (and persist
+     * the result so the next call is cheap).
+     *
+     * Beacons whose plist cannot be converted are dropped — passing them to Python
+     * would just throw inside FindMyAccessory.from_json. The caller will see a
+     * shorter fetch result than it asked for, which is preferable to taking down
+     * the whole batch.
+     *
+     * @param beaconIdToPlistFallback beacon ID → legacy XML plist (used only when the
+     *                                row's accessory_json is still NULL, e.g. for rows
+     *                                imported under FindMy 0.7.6).
+     */
+    public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
+        return Observable.fromCallable(() -> {
+            if (beaconIdToPlistFallback.isEmpty()) {
+                return java.util.Collections.<AccessoryRequest>emptyList();
+            }
+
+            final var dao = db.ownedBeaconDao();
+
+            List<AccessoryRequest> out = new ArrayList<>(beaconIdToPlistFallback.size());
+            for (var entry : beaconIdToPlistFallback.entrySet()) {
+                final String beaconId = entry.getKey();
+
+                final OwnedBeacon row = dao.getById(beaconId);
+                String accessoryJson = row == null ? null : row.accessoryJson;
+
+                if (accessoryJson == null) {
+                    // Lazy backfill: rows imported under FindMy 0.7.6 have no accessory_json,
+                    // and neither do rows whose import-time conversion failed. Prefer the
+                    // plist retained on the row over the caller's copy - the row is the
+                    // source of truth, and the caller's map may be stale.
+                    final String plist = (row != null && row.content != null)
+                            ? row.content
+                            : entry.getValue();
+
+                    final String alignmentPlist = row == null ? null : row.alignmentPlist;
+                    accessoryJson = this.accessoryJsonConverter.convert(plist, alignmentPlist);
+                    if (accessoryJson != null) {
+                        dao.updateAccessoryJson(beaconId, accessoryJson);
+                        Log.d(TAG, "Lazy-backfilled accessory_json for beaconId=" + beaconId);
+                    }
+                }
+
+                if (accessoryJson != null) {
+                    out.add(new AccessoryRequest(beaconId, accessoryJson));
+                } else {
+                    // Dropped rather than passed on: FindMyAccessory.from_json would throw
+                    // and take down the whole batch. A short result is better than none.
+                    Log.w(TAG, "Skipping beaconId=" + beaconId + " - no accessory_json available");
+                }
+            }
+            return out;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Persist a {@link FetchResult} from {@code PythonAppleService}: location reports
+     * go to the cache (delegating to {@link #storeToLocationCache}), and the freshly
+     * serialized {@code accessory_json} per beacon (which now carries the rolling-key
+     * alignment from FindMy 0.9.x — the issue #30 fix) is written back to the
+     * {@code OwnedBeacons} table.
+     */
+    public Observable<Map<String, List<BeaconLocationReport>>> storeFetchResult(FetchResult fetchResult) {
+        return Observable.fromCallable(() -> {
+            final var dao = db.ownedBeaconDao();
+            for (var entry : fetchResult.getUpdatedAccessoryJson().entrySet()) {
+                if (entry.getValue() != null) {
+                    dao.updateAccessoryJson(entry.getKey(), entry.getValue());
+                }
+            }
+            return fetchResult.getReports();
+        }).subscribeOn(Schedulers.io())
+        .flatMap(this::storeToLocationCache);
     }
 
     public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {

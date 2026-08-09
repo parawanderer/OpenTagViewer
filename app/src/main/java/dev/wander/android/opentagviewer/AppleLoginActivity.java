@@ -56,6 +56,7 @@ import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.ui.login.Apple2FACodeInputManager;
+import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
@@ -137,6 +138,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.sharedMainSettingsManager = new SharedMainSettingsManager(
                 this,
                 this::updateLocale,
+                this::updateMapProvider,
                 this::testAndSaveAnisetteUrl,
                 github,
                 this.getUserSettings(),
@@ -164,6 +166,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.setupProgressBars();
         this.sharedMainSettingsManager.setupProgressBars();
         this.sharedMainSettingsManager.setupLanguageSwitchField();
+        this.sharedMainSettingsManager.setupMapProviderField();
         this.sharedMainSettingsManager.setupAnisetteServerUrlField();
         this.twoFactorEntryManager.init();
 
@@ -183,6 +186,10 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void testAndSaveAnisetteUrl(final String newUrl) {
+        this.testAndSaveAnisetteUrl(newUrl, null);
+    }
+
+    private void testAndSaveAnisetteUrl(final String newUrl, final Runnable onSuccess) {
         this.sharedMainSettingsManager.showAnisetteTestStatus(SharedMainSettingsManager.ANISETTE_TEST_STATUS.IN_FLIGHT);
 
         // verify that the server is live right now!
@@ -198,6 +205,9 @@ public class AppleLoginActivity extends AppCompatActivity {
                         this.binding.setAllowServerConfNext(true);
                         this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
                         this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
+                        if (onSuccess != null) {
+                            onSuccess.run();
+                        }
                     }, error -> {
                         Log.d(TAG, "Got error response from anisette server @ " + newUrl, error);
 
@@ -242,9 +252,9 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void onAnisetteUrlInputTyped(Boolean isValid) {
-        // typing overrides until explicitly validated by pressing the "confirm"
-        // checkmark to test the server
-        this.binding.setAllowServerConfNext(false);
+        // Let the user proceed after typing a syntactically valid URL.
+        // The actual connectivity test happens when the user continues.
+        this.binding.setAllowServerConfNext(isValid);
     }
 
     private void handleAuth(LoginActivityState state) {
@@ -274,11 +284,21 @@ public class AppleLoginActivity extends AppCompatActivity {
 
     public void onClickToLoginAccount(View view) {
         Log.d(TAG, "Clicked onwards to account login!");
-        // TODO: make a nice transition
-        if (this.binding.getAllowServerConfNext()) {
+        MaterialAutoCompleteTextView urlTextInput = findViewById(R.id.anisetteServerUrl);
+        final String currentInput = Optional.ofNullable(urlTextInput.getText())
+                .map(CharSequence::toString)
+                .map(String::trim)
+                .orElse("");
+
+        if (!this.sharedMainSettingsManager.validateAnisetteUrl(currentInput)) {
+            this.binding.setAllowServerConfNext(false);
+            return;
+        }
+
+        this.testAndSaveAnisetteUrl(currentInput, () -> {
             this.getUiState().setCurrentPage(PAGE.LOGIN);
             this.showAccountLoginAuthOptions();
-        }
+        });
     }
 
     public void onClickBackToAnisetteSettings(View view) {
@@ -700,6 +720,30 @@ public class AppleLoginActivity extends AppCompatActivity {
         AppCompatDelegate.setApplicationLocales(appLocale);
 
         Log.i(TAG, "Updating app settings language");
+    }
+
+    private void updateMapProvider(final String newProvider) {
+        // AMap needs a key the user supplies themselves, so selecting it here without one
+        // would silently save a provider that can only render a blank map. Prompt instead,
+        // and only apply the choice once a key exists.
+        if ("amap".equals(newProvider) && !this.getUserSettings().hasAmapApiKey()) {
+            AmapApiKeyDialog.show(this, this.getUserSettings().getAmapApiKey(), enteredKey -> {
+                if (enteredKey == null) {
+                    Toast.makeText(this, R.string.amap_key_required, Toast.LENGTH_LONG).show();
+                    this.sharedMainSettingsManager.setupMapProviderField();
+                    return;
+                }
+                this.getUserSettings().setAmapApiKey(enteredKey);
+                this.getUserSettings().setMapProvider(newProvider);
+                this.saveSettings();
+                Log.i(TAG, "Updating app settings map provider to " + newProvider);
+            });
+            return;
+        }
+
+        this.getUserSettings().setMapProvider(newProvider);
+        this.saveSettings();
+        Log.i(TAG, "Updating app settings map provider to " + newProvider);
     }
 
     private void saveSettings()  {

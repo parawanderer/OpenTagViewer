@@ -4,6 +4,10 @@
    <img src="./opentagviewer_icon_xs.png"/> OpenTagViewer
 </h1>
 
+[![Android build & tests](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-debug.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-debug.yml)
+[![macOS export wizard](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml)
+[![Release](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml/badge.svg)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml)
+
 Apparently, this is the first **<img src="https://github.com/user-attachments/assets/aa0531f6-6a5e-4c9f-b3c4-dfc3899c8a49" width="20"/> Android App** to allow you to view/track your **<img src="https://github.com/user-attachments/assets/fa3b912f-d204-4252-9449-465eb62f128c" height="20"/> official Apple AirTags**.
 
 I made this because I couldn't find any app or webpage that lets me do this
@@ -14,7 +18,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 <br>
 
-> [!WARNING]  
+> [!WARNING]
 > This project is not afilliated with Apple Inc. or Android/Google LLC in any capacity
 
 
@@ -57,8 +61,20 @@ See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more det
 
 Contributions/MRs are more than welcome.
 
-Plenty of things can be improved in this project as it was mostly a "hackathony" thing I tried to throw together ASAP and make presentable for layusers.
-Plenty of best practices haven't been followed, e.g. in the Testing & CI/CD setup.
+This started as a "hackathony" thing thrown together ASAP and made presentable for layusers,
+and plenty can still be improved.
+
+There are tests: Android unit and instrumented tests, tests for the Python bridge that talks
+to Apple, and tests for the macOS export wizard. CI runs all of them, including the
+instrumented tests on an emulator it provisions itself. New useful test contributions are welcome!
+
+📋 **[CONTRIBUTING.md](./CONTRIBUTING.md)** covers getting set up — the JDK, the SDK, the Maps
+API key, the git hook — and how to run every test suite: the Android unit and instrumented
+tests, the Chaquopy bridge tests, and the desktop wizard tests, plus what CI runs and a few
+offline diagnostic scripts that need no Apple account.
+
+📐 **[AGENTS.md](./AGENTS.md)** is the rules a change has to satisfy — migrations, Anisette,
+API keys, attribution. Written for automated contributors, but it applies to people too.
 
 **I think it would be nice if the app could support the following features:**
 

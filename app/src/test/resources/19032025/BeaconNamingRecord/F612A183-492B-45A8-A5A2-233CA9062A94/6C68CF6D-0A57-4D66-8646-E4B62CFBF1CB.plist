@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>associatedBeacon</key>
+	<string>F612A183-492B-45A8-A5A2-233CA9062A94</string>
+	<key>cloudKitMetadata</key>
+	<data>
+	TODO
+	</data>
+	<key>emoji</key>
+	<string>🐈</string>
+	<key>identifier</key>
+	<string>6C68CF6D-0A57-4D66-8646-E4B62CFBF1CB</string>
+	<key>name</key>
+	<string>cat</string>
+	<key>roleId</key>
+	<integer>999</integer>
+</dict>
+</plist>

@@ -15,9 +15,8 @@
     <string name="do_ring">링크</string>
     <string name="more">더보기</string>
     <string name="version_x">버전 %1$s</string>
-    <string name="free_opensource_software_by">Shane B가 개발한 무료 오픈소스 소프트웨어</string>
+    <string name="free_opensource_software_by">무료 오픈소스 소프트웨어 개발자:</string>
     <string name="github">Github</string>
-    <string name="developer_website">개발자 웹사이트</string>
     <string name="anisette_server_url">Anisette 서버 URL</string>
     <string name="url_to_an_anisette_server">URL to an <a href="">Anisette</a> server</string>
     <string name="this_is_not_a_valid_url">유효하지 않은 URL입니다</string>
@@ -92,4 +91,26 @@
     <string name="error_occurred_please_retry_submitting_your_2fa_code">오류가 발생했습니다. 2FA 코드 재승받기를 시도해주세요</string>
     <string name="failed_to_request_code_please_try_again">코드 요청에 실패했습니다. 다시 시도해주세요.</string>
     <string name="lang_ko">한국어</string>
+    <string name="amap_api_key_explanation">AMap을 사용하려면 사용자가 직접 API 키를 준비해야 합니다. lbs.amap.com에서 ‘Android SDK’를 선택해 등록한 뒤 여기에 붙여넣으세요.</string>
+    <string name="amap_copy_registration_details">패키지 이름과 SHA1 복사</string>
+    <string name="amap_registration_details_copied">복사했습니다. 키를 만들 때 AMap 콘솔에 붙여넣으세요.</string>
+    <string name="amap_key_required">AMap에는 본인의 API 키가 필요합니다. 키를 입력해야 이 지도를 사용할 수 있습니다.</string>
+    <string name="amap_key_saved">AMap API 키를 저장했습니다.</string>
+    <string name="amap_key_cleared">AMap API 키를 삭제했습니다.</string>
+    <string name="amap_how_to_get_a_key">키 발급 방법</string>
+    <string name="lang_zh_cn">중국어 간체 (简体中文)</string>
+    <string name="lang_zh_tw">중국어 번체 (繁體中文)</string>
+    <string name="no_devices_imported_yet">기기가 없습니다</string>
+    <string name="import_a_zip_exported_from_a_mac">Mac에서 내보낸 zip 파일을 가져와서 시작하세요.</string>
+    <string name="import_devices">기기 가져오기</string>
+    <string name="error_occurred_while_removing_the_device">기기를 제거하는 중 오류가 발생했습니다</string>
+    <string name="how_do_i_get_the_zip"><u>zip 파일은 어떻게 받나요?</u></string>
+    <string name="map_provider">지도 제공자</string>
+    <string name="map_provider_google">Google 지도</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">FindMy 라이브러리가 업데이트되었습니다. 다시 로그인해 주세요.</string>
+    <string name="maps_api_key_missing_title">Google 지도 API 키가 없습니다</string>
+    <string name="maps_api_key_missing_message">이 빌드에는 Google 지도 API 키가 없어 지도를 불러올 수 없습니다. secrets.properties에 MAPS_API_KEY를 추가한 후 다시 빌드하거나, 설정에서 다른 지도 제공자를 선택하세요.</string>
+    <string name="resolving_tags_banner">태그의 위치를 처음으로 확인하는 중입니다. 몇 분 정도 걸릴 수 있으니 앱을 열어 두세요.</string>
+    <string name="resolving_tags_banner_progress">태그 위치를 확인하는 중입니다 (%1$d/%2$d). 몇 분 정도 걸릴 수 있으니 앱을 열어 두세요.</string>
 </resources>

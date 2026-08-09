@@ -15,9 +15,8 @@
     <string name="do_ring">Sonner</string>
     <string name="more">Plus</string>
     <string name="version_x">Version %1$s</string>
-    <string name="free_opensource_software_by">Logiciel libre et open source par Shane B.</string>
+    <string name="free_opensource_software_by">Logiciel libre et open source par :</string>
     <string name="github">Github</string>
-    <string name="developer_website">Site Web du Développeur</string>
     <string name="anisette_server_url">URL du Serveur Anisette</string>
     <string name="url_to_an_anisette_server">URL vers un serveur <a href="">Anisette</a></string>
     <string name="this_is_not_a_valid_url">Ce n\'est pas une URL valide</string>
@@ -31,7 +30,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Le serveur Anisette à %1$s n\'a pas pu être atteint !</string>
     <string name="login_failed_x">La connexion a échoué: %1$s</string>
     <string name="email_or_phone_number">Email ou Numéro de Téléphone</string>
-    <string name="password">mot de passe</string>
+    <string name="password">Mot de passe</string>
     <string name="apple_account">Compte Apple</string>
     <string name="login">Connexion</string>
     <string name="welcome">Bienvenue !</string>
@@ -92,4 +91,26 @@
     <string name="failed_to_request_code_please_try_again">Échec de la demande de code. Veuillez réessayer.</string>
     <string name="lang_ko">Coréen (한국어)</string>
     <string name="lang_ja">Japonais (日本語)</string>
+    <string name="amap_api_key_explanation">AMap exige que chaque personne fournisse sa propre clé d’API. Créez-en une sur lbs.amap.com en choisissant « Android SDK » comme plateforme, puis collez-la ici.</string>
+    <string name="amap_copy_registration_details">Copier le nom du package et le SHA1</string>
+    <string name="amap_registration_details_copied">Copié. Collez ces informations dans la console AMap lors de la création de votre clé.</string>
+    <string name="amap_key_required">AMap nécessite votre propre clé d’API. Saisissez-en une pour utiliser ce fournisseur.</string>
+    <string name="amap_key_saved">Clé d’API AMap enregistrée.</string>
+    <string name="amap_key_cleared">Clé d’API AMap supprimée.</string>
+    <string name="amap_how_to_get_a_key">Comment obtenir une clé</string>
+    <string name="lang_zh_cn">Chinois simplifié (简体中文)</string>
+    <string name="lang_zh_tw">Chinois traditionnel (繁體中文)</string>
+    <string name="no_devices_imported_yet">Aucun appareil</string>
+    <string name="import_a_zip_exported_from_a_mac">Importez une archive zip exportée depuis un Mac pour commencer.</string>
+    <string name="import_devices">Importer des appareils</string>
+    <string name="error_occurred_while_removing_the_device">Une erreur s’est produite lors de la suppression de l’appareil</string>
+    <string name="how_do_i_get_the_zip"><u>Comment obtenir l’archive zip ?</u></string>
+    <string name="map_provider">Fournisseur de cartes</string>
+    <string name="map_provider_google">Google Maps</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">Veuillez vous reconnecter : la bibliothèque FindMy a été mise à jour.</string>
+    <string name="maps_api_key_missing_title">Clé API Google Maps manquante</string>
+    <string name="maps_api_key_missing_message">Cette version ne contient pas de clé API Google Maps, la carte ne se chargera donc pas. Ajoutez MAPS_API_KEY à secrets.properties et recompilez, ou choisissez un autre fournisseur de cartes dans les paramètres.</string>
+    <string name="resolving_tags_banner">Localisation de vos balises pour la première fois. Cela peut prendre quelques minutes : veuillez laisser l’application ouverte.</string>
+    <string name="resolving_tags_banner_progress">Localisation de vos balises (%1$d sur %2$d). Cela peut prendre quelques minutes : veuillez laisser l’application ouverte.</string>
 </resources>

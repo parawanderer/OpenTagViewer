@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One contributor in the Information page's grid. Inflated per entry from
+     assets/contributors.json; see InformationActivity.showContributors. -->
+<com.google.android.material.imageview.ShapeableImageView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/contributor_avatar"
+    android:layout_width="56dp"
+    android:layout_height="56dp"
+    android:layout_margin="8dp"
+    android:background="?attr/selectableItemBackgroundBorderless"
+    android:clickable="true"
+    android:focusable="true"
+    android:scaleType="centerCrop"
+    app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.OpenTagViewer.Circle"
+    app:strokeColor="@color/md_theme_outlineVariant"
+    app:strokeWidth="1dp" />

@@ -27,6 +27,14 @@ public interface OwnedBeaconDao {
     @Query("UPDATE OwnedBeacons SET is_removed = 1 WHERE id = :beaconId")
     void setRemoved(String beaconId);
 
+    /**
+     * Persist the rolling-key alignment state (FindMy 0.9.x stateful FindMyAccessory)
+     * after a successful fetch. Targeted UPDATE so we don't risk clobbering other
+     * columns if the in-memory copy is stale.
+     */
+    @Query("UPDATE OwnedBeacons SET accessory_json = :accessoryJson WHERE id = :beaconId")
+    void updateAccessoryJson(String beaconId, String accessoryJson);
+
     @Delete
     void delete(OwnedBeacon ownedBeaconWithId);
 }

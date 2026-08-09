@@ -17,12 +17,14 @@
         android:background="@color/md_theme_background"
         tools:context=".InformationActivity">
 
+        <!-- One vertical column rather than a bottom-pinned block overlapping a full-height
+             one. The contributor area takes weight, so it uses whatever room is left over and
+             scrolls only once its rows no longer fit - which is also why the buttons below it
+             can never be pushed off screen as contributors are added. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:paddingTop="0dp"
-            tools:layout_editor_absoluteY="70dp">
+            android:orientation="vertical">
 
             <include
                 android:id="@+id/information_top_toolbar"
@@ -41,7 +43,6 @@
                     android:id="@+id/appTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:fontFamily="@font/nunito_bold"
                     android:paddingBottom="20dp"
                     android:text="@string/app_name"
@@ -53,7 +54,6 @@
                     android:id="@+id/appVersion"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:fontFamily="@font/nunito_bold"
                     android:text="@string/version_x"
                     android:textAlignment="center"
@@ -63,26 +63,34 @@
                     android:id="@+id/appAbout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:text="@string/free_opensource_software_by"
                     android:textAlignment="center"
                     android:textSize="14sp" />
 
             </LinearLayout>
-        </LinearLayout>
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="40dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent">
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/contributors_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:paddingLeft="24dp"
+                android:paddingTop="12dp"
+                android:paddingRight="24dp"
+                android:scrollbars="none">
+
+                <dev.wander.android.opentagviewer.ui.widget.FlowLayout
+                    android:id="@+id/contributors_flow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+            </androidx.core.widget.NestedScrollView>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="40dp">
 
                 <Button
                     android:id="@+id/button3"
@@ -91,7 +99,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:layout_marginBottom="2dp"
-                    android:layout_weight="1"
                     android:backgroundTint="@color/md_theme_surfaceContainerHigh"
                     android:onClick="onClickWiki"
                     android:paddingTop="9dp"
@@ -99,8 +106,8 @@
                     android:text="@string/app_wiki"
                     android:textColor="@color/md_theme_outlineVariant_mediumContrast"
                     android:textSize="18sp"
-                    app:iconSize="22dp"
                     app:icon="@drawable/help_center_24px"
+                    app:iconSize="22dp"
                     app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
 
                 <Button
@@ -108,7 +115,6 @@
                     style="@style/Widget.Material3.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginTop="2dp"
                     android:layout_marginBottom="2dp"
                     android:backgroundTint="@color/md_theme_surfaceContainerHigh"
@@ -118,32 +124,13 @@
                     android:text="@string/github"
                     android:textColor="@color/md_theme_outlineVariant_mediumContrast"
                     android:textSize="18sp"
-                    app:iconSize="22dp"
                     app:icon="@drawable/github_24"
-                    app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
-
-                <Button
-                    android:id="@+id/button"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="2dp"
-                    android:layout_weight="1"
-                    android:backgroundTint="@color/md_theme_surfaceContainerHigh"
-                    android:onClick="onClickDeveloperWebsite"
-                    android:paddingTop="9dp"
-                    android:paddingBottom="9dp"
-                    android:text="@string/developer_website"
-                    android:textColor="@color/md_theme_outlineVariant_mediumContrast"
-                    android:textSize="18sp"
                     app:iconSize="22dp"
-                    app:icon="@drawable/link_horizontal_24"
                     app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
 
             </LinearLayout>
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+        </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

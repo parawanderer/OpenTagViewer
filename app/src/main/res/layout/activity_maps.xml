@@ -9,22 +9,26 @@
     android:layout_height="match_parent"
     android:elevation="8dp">
 
-    <fragment
+    <FrameLayout
         android:id="@+id/map"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context=".MapsActivity"
-        map:backgroundColor="@color/md_theme_background"
-        />
+        android:background="@color/md_theme_background"
+        tools:context=".MapsActivity" />
 
+    <!-- clipChildren/clipToPadding are both off so the cards' 8dp elevation shadow can draw
+         outside the content box. MapsActivity pads the bottom of this view by the navigation
+         bar inset, and with the default clipToPadding="true" that padding would slice the
+         shadow off along a hard edge. -->
     <HorizontalScrollView
         android:id="@+id/tags_scrollable_area"
         android:layout_width="match_parent"
-        android:layout_height="240dp"
+        android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentBottom="true"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:scrollbarAlwaysDrawHorizontalTrack="false"
         android:scrollbarAlwaysDrawVerticalTrack="false"
         android:scrollbars="none"
@@ -33,7 +37,7 @@
         <LinearLayout
             android:id="@+id/tags_scroll_container"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:orientation="horizontal"
@@ -70,14 +74,47 @@
 
     </LinearLayout>
 
+    <!-- Shown only once a fetch has been running long enough to look like a hang. A tag with
+         no key alignment record makes the first fetch search its entire history, which is
+         minutes of sequential requests with nothing to show for it on screen. Placed to the
+         left of the menu button so the two never overlap. -->
+    <TextView
+        android:id="@+id/long_fetch_banner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="45dp"
+        android:layout_toLeftOf="@id/more_dropdown_top_right"
+        android:background="@drawable/layout_rounded"
+        android:backgroundTint="@color/md_theme_background"
+        android:elevation="8dp"
+        android:fontFamily="@font/nunito_medium"
+        android:paddingLeft="14dp"
+        android:paddingTop="10dp"
+        android:paddingRight="14dp"
+        android:paddingBottom="10dp"
+        android:text="@string/resolving_tags_banner"
+        android:textColor="@color/md_theme_onBackground"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- Anchored above the tag cards. Note that MapsActivity must hide tags_scrollable_area
+         with INVISIBLE rather than GONE: RelativeLayout ignores layout_above when its anchor
+         is GONE, and with no other vertical rule these buttons would fall back to the top of
+         the screen, landing under the status bar. Adding layout_alignParentBottom as a
+         fallback does not work either - it is resolved after layout_above and wins, putting
+         the buttons behind the cards whenever tags are present. -->
     <LinearLayout
         android:id="@+id/buttons_bottom_right"
         android:layout_width="wrap_content"
         android:layout_height="70dp"
+        android:layout_above="@id/tags_scrollable_area"
         android:layout_alignParentRight="true"
-        android:layout_alignParentBottom="true"
         android:layout_marginRight="10dp"
-        android:layout_marginBottom="240dp"
+        android:layout_marginBottom="8dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:orientation="horizontal"

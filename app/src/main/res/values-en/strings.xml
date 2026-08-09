@@ -15,9 +15,8 @@
     <string name="do_ring">Ring</string>
     <string name="more">More</string>
     <string name="version_x">Version %1$s</string>
-    <string name="free_opensource_software_by">Free, Open-Source Software by Shane B.</string>
+    <string name="free_opensource_software_by">Free, Open-Source Software by:</string>
     <string name="github">Github</string>
-    <string name="developer_website">Developer Website</string>
     <string name="anisette_server_url">Anisette Server URL</string>
     <string name="url_to_an_anisette_server">URL to an <a href="">Anisette</a> server</string>
     <string name="this_is_not_a_valid_url">This is not a valid URL</string>
@@ -31,7 +30,7 @@
     <string name="anisette_server_at_x_could_not_be_reached">Anisette server at %1$s could not be reached!</string>
     <string name="login_failed_x">Login failed: %1$s</string>
     <string name="email_or_phone_number">Email or Phone Number</string>
-    <string name="password">password</string>
+    <string name="password">Password</string>
     <string name="apple_account">Apple Account</string>
     <string name="login">Login</string>
     <string name="welcome">Welcome !</string>
@@ -92,4 +91,26 @@
     <string name="failed_to_request_code_please_try_again">Failed to request code. Please try again.</string>
     <string name="lang_ko">Korean (한국어)</string>
     <string name="lang_ja">Japanese (日本語)</string>
+    <string name="amap_api_key_explanation">AMap requires each user to supply their own API key. Register one at lbs.amap.com, choosing "Android SDK" as the platform, and paste it here.</string>
+    <string name="amap_copy_registration_details">Copy package name and SHA1</string>
+    <string name="amap_registration_details_copied">Copied. Paste these into the AMap console when creating your key.</string>
+    <string name="amap_key_required">AMap needs your own API key. Enter one to use this provider.</string>
+    <string name="amap_key_saved">AMap API key saved.</string>
+    <string name="amap_key_cleared">AMap API key removed.</string>
+    <string name="amap_how_to_get_a_key">How to get a key</string>
+    <string name="lang_zh_cn">Chinese, Simplified (简体中文)</string>
+    <string name="lang_zh_tw">Chinese, Traditional (繁體中文)</string>
+    <string name="no_devices_imported_yet">No devices yet</string>
+    <string name="import_a_zip_exported_from_a_mac">Import a zip exported from a Mac to get started.</string>
+    <string name="import_devices">Import Devices</string>
+    <string name="error_occurred_while_removing_the_device">An error occurred while removing the device</string>
+    <string name="how_do_i_get_the_zip"><u>How do I get the zip?</u></string>
+    <string name="map_provider">Map Provider</string>
+    <string name="map_provider_google">Google Maps</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
+    <string name="maps_api_key_missing_title">Google Maps API key missing</string>
+    <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
+    <string name="resolving_tags_banner">Locating your tags for the first time. This can take a few minutes — please keep the app open.</string>
+    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). This can take a few minutes — please keep the app open.</string>
 </resources>

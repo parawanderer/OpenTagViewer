@@ -1,7 +1,6 @@
 package dev.wander.android.opentagviewer.python;
 
 import android.util.Log;
-import android.util.Pair;
 
 import com.chaquo.python.Kwarg;
 import com.chaquo.python.PyObject;
@@ -13,7 +12,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.concurrent.locks.ReentrantLock;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import io.reactivex.rxjava3.core.Observable;
@@ -37,81 +36,122 @@ public class PythonAppleService {
         return INSTANCE;
     }
 
+    /**
+     * Serialises all calls into Python.
+     * <br>
+     * FindMy.py's synchronous AppleAccount wraps an async one and drives it with a single
+     * asyncio event loop. RxJava schedules our fetches on a thread pool, and the periodic
+     * refresh in MapsActivity fires every 60 seconds regardless of whether the previous
+     * fetch has finished. Two fetches overlapping means two threads calling
+     * run_until_complete on the same loop, which fails with
+     * "RuntimeError: This event loop is already running" and then keeps failing.
+     * <br>
+     * A fetch that takes longer than the refresh interval is entirely normal for an
+     * accessory with no alignment yet, so this is not a rare race.
+     * <br>
+     * Serialising alone is not enough: the periodic refresh would still queue up behind a
+     * slow fetch, one entry per minute, and then fire the whole stale backlog at once when
+     * it finally drained. Callers on the periodic path should check {@link #isBusy()} and
+     * skip their turn instead - a refresh that is minutes late has no value.
+     */
+    private static final ReentrantLock PYTHON_LOCK = new ReentrantLock();
+
+    /**
+     * Whether a call into Python is currently in progress.
+     * <br>
+     * Advisory only. A caller that acts on this can still be beaten to the lock, which is
+     * harmless: it just waits, exactly as it did before.
+     */
+    public static boolean isBusy() {
+        return PYTHON_LOCK.isLocked();
+    }
+
     private PythonAppleService(PythonAppleAccount account) {
         this.account = account;
     }
 
-    public Observable<Map<String, List<BeaconLocationReport>>> getLastReports(final Map<String, String> beaconIdToPList, final int hoursToGoBack) {
+    public Observable<FetchResult> getLastReports(final List<AccessoryRequest> requests, final int hoursToGoBack) {
         return Observable.fromCallable(() -> {
-            if (beaconIdToPList.isEmpty()) {
-                // if there's no items being requested, just return none immediately:
-                return Collections.<String, List<BeaconLocationReport>>emptyMap();
+            if (requests.isEmpty()) {
+                return emptyResult();
             }
 
-            var py = Python.getInstance();
-            var module = py.getModule(MODULE_MAIN);
+            PYTHON_LOCK.lock();
+            try {
+                var py = Python.getInstance();
+                var module = py.getModule(MODULE_MAIN);
 
-            var asListOfPairs = beaconIdToPList.entrySet().stream()
-                    .map(kvp -> Pair.create(kvp.getKey(), kvp.getValue()))
-                    .collect(Collectors.toList());
+                var returned = module.callAttr(
+                        "getLastReports",
+                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("idToAccessoryData", requests),
+                        new Kwarg("hoursBack", hoursToGoBack)
+                );
 
-            var returned = module.callAttr(
-                    "getLastReports",
-                    new Kwarg("account", this.account.getAccountObj()),
-                    new Kwarg("idToPList", asListOfPairs),
-                    new Kwarg("hoursBack", hoursToGoBack)
-            );
+                if (returned == null) {
+                    Log.e(TAG, "python call to getLastReports resulted in error (check python logs for details)");
+                    throw new PythonAppleFindMyException("Error while retrieving last reports for account via python!");
+                }
 
-            // extract to result list...
-            if (returned == null) {
-                Log.e(TAG, "python call to getLastReports resulted in error (check python logs for details)");
-                throw new PythonAppleFindMyException("Error while retrieving last reports for account via python!");
+                return mapResults(returned);
+            } finally {
+                PYTHON_LOCK.unlock();
             }
-
-            return mapResults(returned);
-
         }).subscribeOn(Schedulers.io());
     }
 
-    public Observable<Map<String, List<BeaconLocationReport>>> getReportsBetween(final Map<String, String> beaconIdToPList, final long startTimeUnixMS, final long endTimeUnixMS) {
+    public Observable<FetchResult> getReportsBetween(final List<AccessoryRequest> requests, final long startTimeUnixMS, final long endTimeUnixMS) {
         return Observable.fromCallable(() -> {
-            if (beaconIdToPList.isEmpty()) {
-                // if there's no items being requested, just return none immediately:
-                return Collections.<String, List<BeaconLocationReport>>emptyMap();
+            if (requests.isEmpty()) {
+                return emptyResult();
             }
 
-            var py = Python.getInstance();
-            var module = py.getModule(MODULE_MAIN);
+            PYTHON_LOCK.lock();
+            try {
+                var py = Python.getInstance();
+                var module = py.getModule(MODULE_MAIN);
 
-            var asListOfPairs = beaconIdToPList.entrySet().stream()
-                    .map(kvp -> Pair.create(kvp.getKey(), kvp.getValue()))
-                    .collect(Collectors.toList());
+                var returned = module.callAttr(
+                        "getReports",
+                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("idToAccessoryData", requests),
+                        new Kwarg("unixStartMs", startTimeUnixMS),
+                        new Kwarg("unixEndMs", endTimeUnixMS)
+                );
 
-            var returned = module.callAttr(
-                    "getReports",
-                    new Kwarg("account", this.account.getAccountObj()),
-                    new Kwarg("idToPList", asListOfPairs),
-                    new Kwarg("unixStartMs", startTimeUnixMS),
-                    new Kwarg("unixEndMs", endTimeUnixMS)
-            );
+                if (returned == null) {
+                    Log.e(TAG, "python call to getReports resulted in error (check python logs for details)");
+                    throw new PythonAppleFindMyException("Error while retrieving time ranged reports for account via python!");
+                }
 
-            // extract to result list...
-            if (returned == null) {
-                Log.e(TAG, "python call to getReports resulted in error (check python logs for details)");
-                throw new PythonAppleFindMyException("Error while retrieving time ranged reports for account via python!");
+                return mapResults(returned);
+            } finally {
+                PYTHON_LOCK.unlock();
             }
-
-            return mapResults(returned);
         }).subscribeOn(Schedulers.io());
     }
 
+    private static FetchResult emptyResult() {
+        return new FetchResult(Collections.emptyMap(), Collections.emptyMap());
+    }
 
-    private static Map<String, List<BeaconLocationReport>> mapResults(final PyObject locationReportsResult) {
+    /**
+     * Python returns a dict shaped:
+     *   { beaconId: { "reports": [reportDict, ...], "updatedAccessoryJson": "<json>" } }
+     *
+     * We split it back into two parallel maps so callers can persist the updated
+     * accessory JSON via the OwnedBeaconDao (Phase 3) while consuming reports as before.
+     */
+    private static FetchResult mapResults(final PyObject locationReportsResult) {
         Map<String, List<BeaconLocationReport>> results = new HashMap<>();
+        Map<String, String> updatedAccessoryJson = new HashMap<>();
 
         var mapBeaconIdToResult = locationReportsResult.asMap();
         for (var key : mapBeaconIdToResult.keySet()) {
-            var locationReportList = mapBeaconIdToResult.get(key).asList();
+            var perBeacon = mapBeaconIdToResult.get(key).asMap();
+
+            var locationReportList = perBeacon.get("reports").asList();
+            var updatedAccessory = perBeacon.get("updatedAccessoryJson");
 
             List<BeaconLocationReport> reports = new LinkedList<>();
             final int numReports = locationReportList.size();
@@ -142,9 +182,13 @@ public class PythonAppleService {
             }
             reports.sort(Comparator.comparingLong(BeaconLocationReport::getTimestamp));
 
-            results.put(key.toString(), reports);
+            String beaconIdStr = key.toString();
+            results.put(beaconIdStr, reports);
+            if (updatedAccessory != null) {
+                updatedAccessoryJson.put(beaconIdStr, updatedAccessory.toString());
+            }
         }
 
-        return results;
+        return new FetchResult(results, updatedAccessoryJson);
     }
 }
