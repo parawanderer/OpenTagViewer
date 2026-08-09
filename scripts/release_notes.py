@@ -98,11 +98,13 @@ KINDS = {
         "prefix": "macos-exporter-v",
         "title": "OpenTagViewer MacOS AirTag Exporter v{version}",
         "version": _exporter_version,
+        "bump": 'python/main/wizard.py  ->  VERSION = "..."',
     },
     "android": {
         "prefix": "android-app-v",
         "title": "OpenTagViewer Android App v{version}",
         "version": _android_version,
+        "bump": 'app/build.gradle.kts  ->  versionName = "..."  (and versionCode)',
     },
 }
 
@@ -226,6 +228,27 @@ def latest_release(prefix: str) -> dict:
     return published_releases(prefix)[0]
 
 
+def check_version_is_new(tag: str, existing_tags: list[str], bump_hint: str) -> None:
+    """
+    Refuse to release a version that already exists.
+
+    The version is read from the source, so if nobody bumped it the computed tag is the one
+    already released - and the script would otherwise offer to create a draft on top of a
+    published release, with notes describing changes that release does not contain.
+    """
+    if tag in existing_tags:
+        raise ReleaseError(
+            f"{tag} has already been released.\n"
+            f"\n"
+            f"The version comes from the source, so this means it has not been bumped yet:\n"
+            f"\n"
+            f"    {bump_hint}\n"
+            f"\n"
+            f"Bump it, commit it, and run this again. Releasing is two steps on purpose - the\n"
+            f"bump is a commit, and the tag only publishes it."
+        )
+
+
 def pick_superseded(releases: list[dict]) -> dict:
     """
     The release a demotion should collapse: the second newest, not the newest.
@@ -260,6 +283,10 @@ def command_draft(args) -> int:
 
     changes = Path(args.changes_file).read_text(encoding="utf-8") if args.changes_file \
         else args.changes
+
+    # Drafts count: a half-prepared release still occupies the tag.
+    raw = _gh("release", "list", "--limit", "100", "--json", "tagName")
+    check_version_is_new(tag, [r["tagName"] for r in json.loads(raw)], kind["bump"])
 
     previous = latest_release(kind["prefix"])
     body = build_new_body(release_body(previous["tagName"]), changes)
