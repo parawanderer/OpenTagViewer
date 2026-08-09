@@ -55,6 +55,28 @@ AVATAR_DIR = ASSETS / "contributors"
 # Avatars render in a small circle. 144px covers xxxhdpi without bloating the APK.
 AVATAR_SIZE_PX = 144
 
+# Accounts to leave off the in-app credits, even though GitHub counts them as contributors.
+#
+# `Co-Authored-By` trailers make GitHub attribute commits to the co-author, so an AI assistant
+# used heavily on this project ranks second by commit count - above every human contributor
+# except the maintainer. The trailers are accurate and stay in the history, where anyone
+# looking at the repository can see them. The Information page inside the app is a credits
+# screen for the people who chose to work on this, and listing a tool there would push them
+# down a list they are the point of.
+#
+# Most AI tooling commits as a `[bot]` account and is already filtered by `type == "Bot"`.
+# What has to be named here is the handful that are ordinary user accounts.
+#
+# Only `claude` has actually appeared in this repository's stats; the others are pre-emptive,
+# and that is the risk with a deny-list - excluding a login that turns out to belong to a real
+# person would drop them from the credits silently. So every exclusion is printed when it
+# happens, and the weekly PR diff is where an unexpected one would show up.
+EXCLUDED_LOGINS = {
+    "claude",       # Claude Code, via Co-Authored-By trailers
+    "cursoragent",  # Cursor's background agent
+    "copilot",      # GitHub Copilot's coding agent, when it commits as a user
+}
+
 # A week of work counts half as much once it is this old.
 HALF_LIFE_WEEKS = 52.0
 
@@ -137,6 +159,27 @@ def download_avatar(login: str, avatar_url: str) -> str | None:
     return filename
 
 
+def is_creditable(author: dict, commits: int) -> bool:
+    """
+    Whether this contributor belongs on the in-app credits page.
+
+    Anonymous entries have no author object at all, and bots (dependabot and friends) are not
+    people to credit. Excluded logins are the awkward case: ordinary user accounts that are
+    tools rather than contributors, so nothing in the API distinguishes them.
+    """
+    login = author.get("login")
+
+    if not login or author.get("type") == "Bot":
+        return False
+
+    if login.lower() in EXCLUDED_LOGINS:
+        print(f"  excluding {login} ({commits} commits): listed in EXCLUDED_LOGINS",
+              file=sys.stderr)
+        return False
+
+    return True
+
+
 def main() -> int:
     print(f"Fetching contributors for {REPO} ...")
 
@@ -159,9 +202,7 @@ def main() -> int:
         author = entry.get("author") or {}
         login = author.get("login")
 
-        # Anonymous entries have no author object at all, and bots (dependabot and friends)
-        # are not people to credit.
-        if not login or author.get("type") == "Bot":
+        if not is_creditable(author, entry.get("total", 0)):
             continue
 
         ranked.append({
