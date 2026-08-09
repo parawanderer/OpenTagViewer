@@ -44,8 +44,8 @@ from pathlib import Path
 # start on 14 cannot be used by anyone.
 DEFAULT_MAX_SUPPORTED = "14.0"
 
-MINOS = re.compile(r"^\s*minos\s+([0-9]+(?:\.[0-9]+)*)\s*$", re.MULTILINE)
-VERSION_MIN = re.compile(r"^\s*version\s+([0-9]+(?:\.[0-9]+)*)\s*$", re.MULTILINE)
+CMD = re.compile(r"^cmd\s+(\S+)$")
+FIELD = re.compile(r"^(\S+)\s+([0-9]+(?:\.[0-9]+)*)$")
 
 
 def parse_version(text: str) -> tuple[int, ...]:
@@ -56,15 +56,39 @@ def format_version(version: tuple[int, ...]) -> str:
     return ".".join(str(part) for part in version)
 
 
+# Which field carries the minimum OS, per load command. Nothing else counts.
+MINIMUM_FIELDS = {
+    "LC_BUILD_VERSION": "minos",
+    "LC_VERSION_MIN_MACOSX": "version",
+}
+
+
 def minimum_versions(otool_output: str) -> list[tuple[int, ...]]:
-    """Every minimum-macOS declaration in `otool -l` output, in either encoding."""
-    found = MINOS.findall(otool_output)
+    """
+    Every minimum-macOS declaration in `otool -l` output, in either encoding.
 
-    # LC_VERSION_MIN_MACOSX also has a `version` line; LC_BUILD_VERSION has `sdk` instead, so
-    # the two do not collide.
-    found += VERSION_MIN.findall(otool_output)
+    Load commands have to be tracked rather than pattern-matched line by line, because several
+    of them carry a field that looks like a version. `LC_SOURCE_VERSION` in particular holds
+    values such as `1230.1`, and reading that as a macOS requirement failed a perfectly good
+    Apple Silicon build - claiming it needed "macOS 1230.1" - after the binary had already been
+    built. Only the field belonging to the right command means anything.
+    """
+    versions = []
+    command = None
 
-    return [parse_version(value) for value in found]
+    for line in otool_output.splitlines():
+        stripped = line.strip()
+
+        match = CMD.match(stripped)
+        if match:
+            command = match.group(1)
+            continue
+
+        field = FIELD.match(stripped)
+        if field and MINIMUM_FIELDS.get(command or "") == field.group(1):
+            versions.append(parse_version(field.group(2)))
+
+    return versions
 
 
 def highest_requirement(requirements: dict[Path, tuple[int, ...]]) -> tuple[Path, tuple[int, ...]] | None:
