@@ -103,6 +103,7 @@ import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
 import dev.wander.android.opentagviewer.util.rx.BeaconLocationHistory;
 import dev.wander.android.opentagviewer.util.rx.LongFetchBannerState;
+import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -126,10 +127,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
-
-    private static final float MARKER_ZINDEX_DEFAULT = 0.0f;
-
-    private static final float MARKER_ZINDEX_TOP = 10.0f;
 
     private IMapProvider mapProvider;
     private GoogleMap map; // 保留用于向后兼容，逐步迁移
@@ -159,8 +156,20 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private final Map<String, String> currentMarkers = new ConcurrentHashMap<>(); // 存储markerId
 
-    /** The beacon currently raised above the others, so it can be lowered again. */
-    private String lastFocusedBeaconId = null;
+    /** Keeps the selected tag's marker above the overlapping ones. See MarkerFocusTest. */
+    private final MarkerFocus markerFocus = new MarkerFocus(new MarkerFocus.Markers() {
+        @Override
+        public String markerIdFor(String beaconId) {
+            return MapsActivity.this.currentMarkers.get(beaconId);
+        }
+
+        @Override
+        public void setZIndex(String markerId, float zIndex) {
+            if (MapsActivity.this.mapProvider != null) {
+                MapsActivity.this.mapProvider.setMarkerZIndex(markerId, zIndex);
+            }
+        }
+    });
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
@@ -1046,7 +1055,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 // Every refresh removes and re-adds the markers, so the selected one has to be
                 // built raised. Setting it only on selection would let the next refresh drop
                 // it back underneath the pile without the user touching anything.
-                .zIndex(beaconId.equals(this.lastFocusedBeaconId) ? MARKER_ZINDEX_TOP : MARKER_ZINDEX_DEFAULT)
+                .zIndex(this.markerFocus.zIndexFor(beaconId))
                 .build();
         
         String markerId = this.mapProvider.addMarker(marker);
@@ -1098,7 +1107,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
-            this.bringMarkerToFront(beaconId);
+            this.markerFocus.focus(beaconId);
 
             if (zoom != null) {
                 this.mapProvider.animateCamera(lat, lon, zoom, null);
@@ -1111,40 +1120,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
         }
-    }
-
-    /**
-     * Raises the selected beacon's marker above the others, lowering the previous one.
-     * <br>
-     * Tags kept together - a wallet, keys and a bag by the front door - resolve to positions
-     * metres apart, which at any zoom short of the closest is a single pile of markers. Without
-     * this the map draws whichever one it likes on top and selecting a card appears to do
-     * nothing, because the camera moves to a marker that stays hidden underneath another.
-     * <br>
-     * This existed before the map provider abstraction, as Marker.setZIndex on the Google
-     * marker directly, and was dropped when markers moved behind IMapProvider - MapPolyline
-     * kept its zIndex, MapMarker never gained one.
-     */
-    private void bringMarkerToFront(final String beaconId) {
-        if (this.mapProvider == null) {
-            return;
-        }
-
-        if (this.lastFocusedBeaconId != null && !this.lastFocusedBeaconId.equals(beaconId)) {
-            final String previousMarkerId = this.currentMarkers.get(this.lastFocusedBeaconId);
-            if (previousMarkerId != null) {
-                this.mapProvider.setMarkerZIndex(previousMarkerId, MARKER_ZINDEX_DEFAULT);
-            }
-        }
-
-        final String markerId = this.currentMarkers.get(beaconId);
-        if (markerId == null) {
-            // The card can be selected before the marker exists, on the first draw.
-            return;
-        }
-
-        this.mapProvider.setMarkerZIndex(markerId, MARKER_ZINDEX_TOP);
-        this.lastFocusedBeaconId = beaconId;
     }
 
     private synchronized void updateBeaconCards() {
@@ -1480,8 +1455,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     public boolean onMarkerClick(String markerId) {
         // 查找对应的beaconId
         Optional<String> beaconIdForMarker = Optional.ofNullable(markerId);
-        
+
         if (beaconIdForMarker.isPresent()) {
+            // Tapping a marker raises it as well, not only selecting its card. Without this,
+            // tapping the one visible marker in a pile scrolls to its card but leaves the
+            // marker underneath whichever one is drawn on top - so the tap looks ignored.
+            this.markerFocus.focus(beaconIdForMarker.get());
             this.tagListSwiperHelper.navigateToCard(beaconIdForMarker.get());
         } else {
             Log.w(TAG, "Clicked on a marker that could not be associated back to any beaconId!");
