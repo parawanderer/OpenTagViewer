@@ -57,6 +57,51 @@ def test_a_file_with_no_version_command_reports_nothing():
     assert checker.minimum_versions("Load command 0\n      cmd LC_SEGMENT_64\n") == []
 
 
+# Trimmed from a real Apple Silicon build. Three other load commands here carry something
+# that looks like a version, and one of them is LC_SOURCE_VERSION holding 1230.1.
+REALISTIC = """\
+Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform 1
+    minos 11.0
+      sdk 15.0
+   ntools 1
+Load command 10
+      cmd LC_SOURCE_VERSION
+  cmdsize 16
+  version 1230.1
+Load command 11
+          cmd LC_LOAD_DYLIB
+      cmdsize 56
+         name /usr/lib/libSystem.B.dylib (offset 24)
+   time stamp 2 Thu Jan  1 01:00:02 1970
+      current version 1345.120.2
+compatibility version 1.0.0
+Load command 12
+      cmd LC_UUID
+  cmdsize 24
+"""
+
+
+def test_only_the_field_belonging_to_the_right_command_counts():
+    """
+    The bug this replaced: any line matching `version <number>` was taken as a macOS
+    requirement, so LC_SOURCE_VERSION's 1230.1 was read as "needs macOS 1230.1". That failed a
+    perfectly good Apple Silicon build after it had already been compiled, and left the
+    release with only the Intel binary attached.
+    """
+    assert checker.minimum_versions(REALISTIC) == [(11, 0)]
+
+
+def test_a_dylibs_current_version_is_not_a_macos_requirement():
+    assert (1345, 120, 2) not in checker.minimum_versions(REALISTIC)
+
+
+def test_the_source_version_is_not_a_macos_requirement():
+    assert (1230, 1) not in checker.minimum_versions(REALISTIC)
+
+
 def test_a_fat_binary_reports_every_slice():
     """A universal binary carries one load command per architecture."""
     both = BUILD_VERSION + BUILD_VERSION.replace("minos 11.0", "minos 12.0")
