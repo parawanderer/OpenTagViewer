@@ -29,31 +29,24 @@ jobs:
       && startsWith(github.event.release.tag_name, 'android-app-v')
 
     steps:
-      - name: Extract Version from Tag
-        id: extract_version
-        run: |
-          # GITHUB_REF for tags is like 'refs/tags/android-app-v1.0.3.1'
-          FULL_TAG_NAME="${{ github.ref }}"
-
-          # Remove 'refs/tags/' prefix to get 'android-app-v1.0.3.1'
-          TAG_WITHOUT_PREFIX="${FULL_TAG_NAME##refs/tags/}"
-
-          # Find the index of '-v'
-          # This will be 'android-app-' part, then we add 2 to skip '-v'
-          START_INDEX=$(( $(echo "$TAG_WITHOUT_PREFIX" | awk -F'-v' '{print length($1)}') + 2 ))
-
-          # Extract everything from '-v' onwards
-          # Using cut or substring if available, or just awk
-          VERSION_STRING=$(echo "$TAG_WITHOUT_PREFIX" | cut -c "$START_INDEX"-)
-
-          # Output the extracted version as a step output
-          echo "Extracted version: $VERSION_STRING"
-
-          # !! this is reused below
-          echo "APP_VERSION=$VERSION_STRING" >> $GITHUB_OUTPUT
-
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # Nothing rewrites versionName from the tag: it is what the app reports about itself in
+      # Settings and in bug reports, and it is baked into the APK. So a tag that disagrees
+      # with app/build.gradle.kts publishes an APK calling itself the old version, under a
+      # release page claiming the new one, and nothing anywhere says so.
+      #
+      # This replaces parsing the tag by hand. The version now comes from the source and the
+      # tag only has to agree with it, which is the same arrangement the macOS exporter has
+      # used since scripts/release_version.py was introduced. It runs before the Gradle build,
+      # so a mismatch costs seconds rather than a full signed build.
+      - name: Check the release tag matches the version in the source
+        id: extract_version
+        run: |
+          APP_VERSION="$(python3 scripts/release_version.py --kind android --tag "${{ github.ref }}")"
+          echo "Tag and source agree on version: $APP_VERSION"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
       # Set Current Date As Env Variable
       - name: Set current date as env variable

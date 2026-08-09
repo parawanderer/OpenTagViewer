@@ -34,7 +34,7 @@ from main.utils import MACOS_VER
 # The single source of truth for the exporter's version: it appears in the window title and
 # is stamped into every export as `via: OpenTagViewer.app:<version>`. Releases are tagged
 # macos-exporter-v<this>, and CI refuses to publish a release whose tag disagrees - see
-# scripts/exporter_version.py and CONTRIBUTING.md -> Releasing the macOS exporter.
+# scripts/release_version.py and CONTRIBUTING.md -> Releasing the macOS exporter.
 VERSION = "1.0.5"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
