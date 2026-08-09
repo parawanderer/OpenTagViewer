@@ -46,7 +46,6 @@ import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
 
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
@@ -159,7 +158,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
 
     private final Map<String, String> currentMarkers = new ConcurrentHashMap<>(); // 存储markerId
-    private Marker lastFocusedMarker = null; // 保留用于向后兼容（仅Google Maps）
+
+    /** The beacon currently raised above the others, so it can be lowered again. */
+    private String lastFocusedBeaconId = null;
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
@@ -448,8 +449,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 PythonAppleService.isBusy());
 
         if (!decision.shouldRefresh()) {
-            Log.d(TAG, String.format("Skipping the scheduled refresh: %s (%d ms since the last fetch)",
-                    decision.reason(), this.refreshPolicy.millisSinceLastFetch(now)));
+            Log.d(TAG, String.format("Skipping the scheduled refresh: %s (%s)",
+                    decision.reason(), this.refreshPolicy.describeTimeSinceLastFetch(now)));
             return;
         }
 
@@ -625,6 +626,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             .doOnNext(this::addBeaconToCurrent)
             ))
             .observeOn(AndroidSchedulers.mainThread())
+            // An import is a first fetch too. Without this the periodic refresh stays disabled
+            // for the rest of the session whenever the app started with nothing stored, which
+            // is exactly the case where someone has just imported their first zip.
+            .doFinally(() -> this.initialFetchComplete = true)
             .subscribe(() -> {
                 this.showLastDeviceLocations();
                 Log.i(TAG, "Finished visualising new location reports!");
@@ -867,14 +872,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
         .subscribeOn(Schedulers.computation())
         .observeOn(AndroidSchedulers.mainThread())
+        // On termination rather than on a result. With no beacons stored - a first run, or
+        // before any import - this stream completes without ever emitting, so setting the flag
+        // in onNext left it false forever and the periodic refresh never ran again.
+        .doFinally(() -> this.initialFetchComplete = true)
         .subscribe(lastReports -> {
-            this.initialFetchComplete = true;
             //Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
             TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
             this.showLastDeviceLocations();
             Log.i(TAG, "Successfully retrieved latest reports!");
         }, error -> {
-            this.initialFetchComplete = true;
             Log.e(TAG, "Error while restoring account and trying to get latest beacons", error);
             TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
 
@@ -1036,6 +1043,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .latitude(lastLocation.getLatitude())
                 .longitude(lastLocation.getLongitude())
                 .icon(iconBitmap)
+                // Every refresh removes and re-adds the markers, so the selected one has to be
+                // built raised. Setting it only on selection would let the next refresh drop
+                // it back underneath the pile without the user touching anything.
+                .zIndex(beaconId.equals(this.lastFocusedBeaconId) ? MARKER_ZINDEX_TOP : MARKER_ZINDEX_DEFAULT)
                 .build();
         
         String markerId = this.mapProvider.addMarker(marker);
@@ -1087,6 +1098,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
+            this.bringMarkerToFront(beaconId);
+
             if (zoom != null) {
                 this.mapProvider.animateCamera(lat, lon, zoom, null);
             } else {
@@ -1098,6 +1111,40 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
         }
+    }
+
+    /**
+     * Raises the selected beacon's marker above the others, lowering the previous one.
+     * <br>
+     * Tags kept together - a wallet, keys and a bag by the front door - resolve to positions
+     * metres apart, which at any zoom short of the closest is a single pile of markers. Without
+     * this the map draws whichever one it likes on top and selecting a card appears to do
+     * nothing, because the camera moves to a marker that stays hidden underneath another.
+     * <br>
+     * This existed before the map provider abstraction, as Marker.setZIndex on the Google
+     * marker directly, and was dropped when markers moved behind IMapProvider - MapPolyline
+     * kept its zIndex, MapMarker never gained one.
+     */
+    private void bringMarkerToFront(final String beaconId) {
+        if (this.mapProvider == null) {
+            return;
+        }
+
+        if (this.lastFocusedBeaconId != null && !this.lastFocusedBeaconId.equals(beaconId)) {
+            final String previousMarkerId = this.currentMarkers.get(this.lastFocusedBeaconId);
+            if (previousMarkerId != null) {
+                this.mapProvider.setMarkerZIndex(previousMarkerId, MARKER_ZINDEX_DEFAULT);
+            }
+        }
+
+        final String markerId = this.currentMarkers.get(beaconId);
+        if (markerId == null) {
+            // The card can be selected before the marker exists, on the first draw.
+            return;
+        }
+
+        this.mapProvider.setMarkerZIndex(markerId, MARKER_ZINDEX_TOP);
+        this.lastFocusedBeaconId = beaconId;
     }
 
     private synchronized void updateBeaconCards() {

@@ -108,8 +108,26 @@ public final class RefreshPolicy {
         return this.lastFetchAt;
     }
 
+    /** False until the first successful fetch. Distinguishes "never" from "a long time ago". */
+    public boolean hasEverFetched() {
+        return this.lastFetchAt > 0L;
+    }
+
     public long millisSinceLastFetch(final long now) {
         return now - this.lastFetchAt;
+    }
+
+    /**
+     * How long since the last fetch, for logging.
+     * <br>
+     * Says so plainly when there has not been one, rather than reporting the interval since
+     * the epoch - which reads as a 56-year-old fetch and sends the reader looking for a clock
+     * bug that is not there.
+     */
+    public String describeTimeSinceLastFetch(final long now) {
+        return this.hasEverFetched()
+                ? this.millisSinceLastFetch(now) + " ms since the last fetch"
+                : "no successful fetch yet";
     }
 
     private static final long ONE_HOUR_MS = 1000L * 60L * 60L;
