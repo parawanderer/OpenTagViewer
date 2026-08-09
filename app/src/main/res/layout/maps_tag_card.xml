@@ -7,12 +7,15 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
+        <!-- match_parent so every card fills the uniform height MapsActivity forces on it;
+             with wrap_content the shorter cards would keep their own height and the white
+             panel would stop short of the card below it. -->
         <LinearLayout
             android:id="@+id/tag_item_container"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_marginLeft="4dp"
             android:layout_marginRight="4dp"
             android:background="@drawable/layout_rounded"
@@ -25,6 +28,7 @@
                 android:id="@+id/tag_item_top_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:minHeight="96dp"
                 android:orientation="horizontal"
                 android:paddingLeft="15dp"
@@ -32,11 +36,16 @@
                 android:paddingRight="15dp"
                 android:paddingBottom="8dp">
 
+                <!-- layout_weight="1" here is load-bearing, not decoration. The sibling text
+                     column is match_parent, so this row always measures 102dp over budget; the
+                     1:1 weight split takes 51dp off each, leaving this column 51dp wide. Setting
+                     weight to 0 gives it the full 102dp and shoves the text column right by 51dp,
+                     narrowing it by the same amount. -->
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="102dp"
                     android:layout_height="72dp"
-                    android:layout_gravity="top"
-                    android:layout_weight="0">
+                    android:layout_gravity="center"
+                    android:layout_weight="1">
 
                     <TextView
                         android:id="@+id/device_icon_emoji"
