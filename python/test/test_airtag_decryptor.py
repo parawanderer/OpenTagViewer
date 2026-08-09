@@ -1,21 +1,23 @@
 from dataclasses import dataclass
-import time
 import os
+import re
 import shutil
+import time
 import uuid
-import pytest
 from unittest.mock import Mock
 
 import plistlib
+import pytest
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
-import pytest
 
 from test.unittestutils import DIRNAME, skip_unless_macos_le14, skip_unless_unix
 
 from main.airtag_decryptor import (
     AbstractSubprocessRunner,
+    KEY_ALIGNMENT_RECORDS,
     KeyStoreKeyNotFoundException,
+    WHITELISTED_DIRS,
     decrypt_folder,
     decrypt_plist,
     dump_plist,
@@ -82,7 +84,7 @@ attributes:
 """
 
 
-def _create_plist(plistData: dict, key: bytes | None = None) -> bytes:
+def _create_plist(plistData: dict, key: bytes | None = None) -> tuple[bytes, bytes]:
     if key is None:
         key = get_random_bytes(16)
 
@@ -396,6 +398,104 @@ def test_decrypt_folder():
 
         assert os.path.exists(item2_path)
         assert os.path.isfile(item2_path)
+
+    finally:
+        if os.path.exists(base_path):
+            shutil.rmtree(base_path)
+
+        if os.path.exists(tmp_output_to):
+            shutil.rmtree(tmp_output_to)
+
+
+# ---------------------------------------------------------------------------------------
+# KeyAlignmentRecords
+#
+# These records are what stop a freshly imported tag searching its entire key history on the
+# first fetch (see issue #30). They were originally left out of WHITELISTED_DIRS, so exports
+# never carried them and nothing failed - imports were just enormously more expensive than
+# they needed to be. The tests below pin both halves of that: that the folder is exported at
+# all, and that it lands at the exact path the Android importer looks for.
+# ---------------------------------------------------------------------------------------
+
+# Must stay in step with FILE_TYPE.KEY_ALIGNMENT_RECORD in
+# app/src/main/java/.../util/parse/AppleZipImporterUtil.java. If this test and that matcher
+# ever disagree, exports silently lose their alignment records again.
+ANDROID_KEY_ALIGNMENT_MATCHER = re.compile(
+    r"^KeyAlignmentRecords/"
+    r"([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})/"
+    r"([0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})\.plist$"
+)
+
+
+def _uppercase_uuid4() -> str:
+    return str(uuid.uuid4()).upper()
+
+
+def test_key_alignment_records_are_exported():
+    assert KEY_ALIGNMENT_RECORDS in WHITELISTED_DIRS
+
+
+def test_make_output_path_keeps_the_key_alignment_nesting():
+    # macOS stores these as KeyAlignmentRecords/<accessory>/<record>.record. The accessory id
+    # only exists as the parent directory name - unlike naming records, the file itself has no
+    # "associatedBeacon" field - so flattening the path would lose the association entirely.
+    input_root = "/Users/someone/Library/com.apple.icloud.searchpartyd"
+    accessory_id = _uppercase_uuid4()
+    record_id = _uppercase_uuid4()
+
+    result = make_output_path(
+        "/Users/someone/export",
+        f"{input_root}/{KEY_ALIGNMENT_RECORDS}/{accessory_id}/{record_id}.record",
+        input_root
+    )
+
+    rel_path = os.path.relpath(result, "/Users/someone/export").replace(os.sep, "/")
+
+    assert rel_path == f"{KEY_ALIGNMENT_RECORDS}/{accessory_id}/{record_id}.plist"
+
+    match = ANDROID_KEY_ALIGNMENT_MATCHER.match(rel_path)
+    assert match is not None, f"the Android importer would skip {rel_path}"
+    assert match.group(1) == accessory_id
+
+
+def test_decrypt_folder_writes_key_alignment_records():
+    alignment = {
+        "lastIndexObserved": 4321,
+        "lastIndexObservationDate": "2026-08-01T12:00:00Z",
+    }
+    key = get_random_bytes(16)
+
+    accessory_id = _uppercase_uuid4()
+    record_id = _uppercase_uuid4()
+
+    base_path = os.path.join(DIRNAME, f"resources/{_uppercase_uuid4()}")
+    record_path = os.path.join(
+        base_path, KEY_ALIGNMENT_RECORDS, accessory_id, f"{record_id}.record")
+    tmp_output_to = _create_tmp_out_folder()
+
+    try:
+        os.makedirs(os.path.dirname(record_path), exist_ok=True)
+        with open(record_path, 'wb') as f:
+            f.write(_create_plist(alignment, key)[0])
+
+        # test target:
+        decrypt_folder(
+            base_path,
+            KEY_ALIGNMENT_RECORDS,
+            key,
+            tmp_output_to
+        )
+
+        expected = os.path.join(
+            tmp_output_to, KEY_ALIGNMENT_RECORDS, accessory_id, f"{record_id}.plist")
+
+        assert os.path.isfile(expected), (
+            f"expected a decrypted alignment record at {expected}")
+
+        with open(expected, 'rb') as f:
+            written = plistlib.load(f)
+
+        assert written["lastIndexObserved"] == 4321
 
     finally:
         if os.path.exists(base_path):
