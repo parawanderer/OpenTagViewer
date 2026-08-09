@@ -18,7 +18,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 
 <br>
 
-> [!WARNING]  
+> [!WARNING]
 > This project is not afilliated with Apple Inc. or Android/Google LLC in any capacity
 
 
@@ -61,7 +61,12 @@ See [📖 wiki](https://github.com/parawanderer/OpenTagViewer/wiki) for more det
 
 Contributions/MRs are more than welcome.
 
-Plenty of things can be improved in this project as it was mostly a "hackathony" thing I tried to throw together ASAP and make presentable for layusers.
+This started as a "hackathony" thing thrown together ASAP and made presentable for layusers,
+and plenty can still be improved.
+
+There are tests: Android unit and instrumented tests, tests for the Python bridge that talks
+to Apple, and tests for the macOS export wizard. CI runs all of them, including the
+instrumented tests on an emulator it provisions itself. New useful test contributions are welcome!
 
 📋 **[CONTRIBUTING.md](./CONTRIBUTING.md)** covers getting set up — the JDK, the SDK, the Maps
 API key, the git hook — and how to run every test suite: the Android unit and instrumented
