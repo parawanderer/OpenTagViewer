@@ -195,6 +195,32 @@ def test_demoting_a_body_with_no_description_is_an_error():
         release_notes.demote_body("### Changes\n\n- Something")
 
 
+# --- refusing to release a version that already exists ----------------------------------
+
+def test_releasing_an_unbumped_version_is_refused():
+    """
+    The version is read from the source, so forgetting to bump it computes the tag that is
+    already released - and without this the script would offer to draft a release on top of a
+    published one, with notes describing changes it does not contain.
+    """
+    with pytest.raises(release_notes.ReleaseError, match="has already been released"):
+        release_notes.check_version_is_new(
+            "android-app-v1.0.4",
+            ["android-app-v1.0.4", "android-app-v1.0.3"],
+            'app/build.gradle.kts  ->  versionName')
+
+
+def test_the_refusal_says_where_to_bump_the_version():
+    with pytest.raises(release_notes.ReleaseError, match="app/build.gradle.kts"):
+        release_notes.check_version_is_new(
+            "android-app-v1.0.4", ["android-app-v1.0.4"], 'app/build.gradle.kts  ->  versionName')
+
+
+def test_a_bumped_version_is_allowed():
+    release_notes.check_version_is_new(
+        "android-app-v1.0.5", ["android-app-v1.0.4", "android-app-v1.0.3"], "hint")
+
+
 # --- choosing which release to collapse -------------------------------------------------
 
 def _release(tag, created):
