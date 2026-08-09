@@ -251,29 +251,41 @@ def test_a_first_ever_release_has_nothing_to_supersede():
 
 # --- versions come from the source ------------------------------------------------------
 
-def test_the_exporter_version_is_read_from_the_wizard():
+def test_the_exporter_version_comes_from_the_module_that_gates_the_release():
     """
-    Not from the tag, and not typed in. The same number is stamped into every export as
-    `via: OpenTagViewer.app:<version>`, so the release must agree with it.
+    Not from the tag, and not typed in - and specifically read by release_version.py, the same
+    module CI uses to fail a release whose tag disagrees. Two readers could drift apart, and
+    the result would be a release page describing one version while the build inside it
+    reports another.
     """
-    import exporter_version
+    import release_version
 
-    assert release_notes.KINDS["exporter"]["version"]() == exporter_version.read_version()[0]
-
-
-def test_the_android_version_is_read_from_the_gradle_build():
-    version = release_notes.KINDS["android"]["version"]()
-
-    assert version
-    assert version[0].isdigit(), f"{version!r} does not look like a version"
+    assert release_notes._version("exporter") == release_version.read_version()[0]
 
 
-def test_the_tag_prefixes_match_what_the_release_workflow_filters_on():
+def test_the_android_version_comes_from_the_same_place_too():
+    import release_version
+
+    assert release_notes._version("android") == release_version.read_gradle_version()[0]
+
+
+@pytest.mark.parametrize("kind,workflow_name", [
+    ("exporter", "macos-exporter-python.yml"),
+    ("android", "build-release.yml"),
+])
+def test_the_tag_prefixes_match_what_the_release_workflows_filter_on(kind, workflow_name):
     """
-    macos-exporter-python.yml only runs for tags starting 'macos-exporter-v'. A prefix typo
-    here would create a release that quietly never builds anything.
+    Each release workflow only runs for tags starting with its prefix. A prefix that did not
+    match would create a release that quietly never builds anything.
     """
     workflow = (Path(__file__).resolve().parents[2] / ".github" / "workflows"
-                / "macos-exporter-python.yml").read_text(encoding="utf-8")
+                / workflow_name).read_text(encoding="utf-8")
 
-    assert release_notes.KINDS["exporter"]["prefix"] in workflow
+    assert release_notes._prefix(kind) in workflow
+
+
+def test_every_kind_this_script_knows_is_one_release_version_knows():
+    """Otherwise a kind here would compute a tag with no prefix and no version to read."""
+    import release_version
+
+    assert set(release_notes.KINDS) == set(release_version.KINDS)

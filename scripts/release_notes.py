@@ -47,6 +47,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import release_version  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # A heading like "### Changes" or "### What Changed since Last Release". Both kinds of release
@@ -77,36 +81,35 @@ class ReleaseError(Exception):
 # Where each kind of release gets its version and its title
 # ---------------------------------------------------------------------------------------
 
-def _exporter_version() -> str:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import exporter_version
+def _version(kind: str) -> str:
+    """
+    The version the source declares, read by the same module CI checks the tag against.
 
-    return exporter_version.read_version()[0]
-
-
-def _android_version() -> str:
-    gradle = REPO_ROOT / "app" / "build.gradle.kts"
-    match = re.search(r'^\s*versionName\s*=\s*"([^"]+)"', gradle.read_text(encoding="utf-8"),
-                      re.MULTILINE)
-    if not match:
-        raise ReleaseError(f"Could not find versionName in {gradle}")
-    return match.group(1)
+    Delegated rather than re-implemented: release_version.py already knows where each version
+    lives and how to read it, and it is what fails a release whose tag disagrees. If this
+    script read the version its own way, the two could differ - and the failure would be a
+    release page describing one version while the build inside it reports another, which is
+    the exact problem release_version.py exists to prevent.
+    """
+    return release_version.KINDS[kind]["read"]()[0]
 
 
+# Only what a release *page* needs. The version and the tag prefix come from
+# release_version.py, so there is one place that decides what a release is called.
 KINDS = {
     "exporter": {
-        "prefix": "macos-exporter-v",
         "title": "OpenTagViewer MacOS AirTag Exporter v{version}",
-        "version": _exporter_version,
         "bump": 'python/main/wizard.py  ->  VERSION = "..."',
     },
     "android": {
-        "prefix": "android-app-v",
         "title": "OpenTagViewer Android App v{version}",
-        "version": _android_version,
         "bump": 'app/build.gradle.kts  ->  versionName = "..."  (and versionCode)',
     },
 }
+
+
+def _prefix(kind: str) -> str:
+    return release_version.KINDS[kind]["prefix"]
 
 
 # ---------------------------------------------------------------------------------------
@@ -277,8 +280,8 @@ def release_body(tag: str) -> str:
 
 def command_draft(args) -> int:
     kind = KINDS[args.kind]
-    version = args.version or kind["version"]()
-    tag = f"{kind['prefix']}{version}"
+    version = args.version or _version(args.kind)
+    tag = f"{_prefix(args.kind)}{version}"
     title = kind["title"].format(version=version)
 
     changes = Path(args.changes_file).read_text(encoding="utf-8") if args.changes_file \
@@ -288,7 +291,7 @@ def command_draft(args) -> int:
     raw = _gh("release", "list", "--limit", "100", "--json", "tagName")
     check_version_is_new(tag, [r["tagName"] for r in json.loads(raw)], kind["bump"])
 
-    previous = latest_release(kind["prefix"])
+    previous = latest_release(_prefix(args.kind))
     body = build_new_body(release_body(previous["tagName"]), changes)
 
     print(f"Previous release : {previous['tagName']}")
@@ -314,12 +317,10 @@ def command_draft(args) -> int:
 
 
 def command_demote(args) -> int:
-    kind = KINDS[args.kind]
-
     if args.tag:
         tag = args.tag
     else:
-        releases = published_releases(kind["prefix"])
+        releases = published_releases(_prefix(args.kind))
         superseded = pick_superseded(releases)
         tag = superseded["tagName"]
         print(f"Current release  : {releases[0]['tagName']}  (keeps its wrapper)")
