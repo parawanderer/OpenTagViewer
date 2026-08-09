@@ -577,6 +577,30 @@ def _serializeReports(reports):
     return items
 
 
+def _resultOrError(res: dict, failures: int, num_items: int) -> dict | None:
+    """
+    Decide whether a short result is an answer or a failure.
+
+    Java's `mapResults` only raises when this module returns None; a dict missing a beacon
+    reads as "that beacon has no reports". So swallowing every failure and returning a partial
+    dict told the history screen, with complete confidence, that a day it had failed to fetch
+    was a day the tag was not seen - no error state, and no Retry button, because as far as
+    Java was concerned the call succeeded.
+
+    A partial result is still worth returning: the accessories that did answer have fresh
+    reports and, more importantly, updated alignment worth persisting.
+    """
+    if num_items and failures == num_items:
+        print(f"Every accessory failed ({failures} of {num_items}); reporting an error rather "
+              f"than an empty result.")
+        return None
+
+    if failures:
+        print(f"WARNING: {failures} of {num_items} accessories failed; result is incomplete")
+
+    return res
+
+
 def getLastReports(
         account: AppleAccount,
         idToAccessoryData,
@@ -601,6 +625,7 @@ def getLastReports(
 
         now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
         start_ms = now_ms - (hoursBack * 60 * 60 * 1000)
+        failures = 0
 
         for i in range(0, num_items):
             req = idToAccessoryData.get(i)
@@ -619,6 +644,7 @@ def getLastReports(
             try:
                 reports = _fetchReportsForAccessory(account, airtag, start_dt, now_dt) or []
             except Exception:
+                failures += 1
                 print(f"Fetch failed for {beaconId}, continuing with the rest: "
                       f"{traceback.format_exc()}")
                 continue
@@ -635,7 +661,7 @@ def getLastReports(
                 "updatedAccessoryJson": json.dumps(airtag.to_json()),
             }
 
-        return res
+        return _resultOrError(res, failures, num_items)
 
     except Exception:
         err = traceback.format_exc()
@@ -660,6 +686,7 @@ def getReports(
 
         num_items = idToAccessoryData.size()
         print(f"getReports: num_items={num_items}, range=[{unixStartMs}, {unixEndMs}]")
+        failures = 0
 
         for i in range(0, num_items):
             req = idToAccessoryData.get(i)
@@ -675,6 +702,7 @@ def getReports(
             try:
                 reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
             except Exception:
+                failures += 1
                 print(f"Fetch failed for {beaconId}, continuing with the rest: "
                       f"{traceback.format_exc()}")
                 continue
@@ -690,7 +718,7 @@ def getReports(
                 "updatedAccessoryJson": updated_accessory_json,
             }
 
-        return res
+        return _resultOrError(res, failures, num_items)
 
     except Exception:
         err = traceback.format_exc()

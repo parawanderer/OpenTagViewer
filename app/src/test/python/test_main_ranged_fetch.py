@@ -291,6 +291,100 @@ def test_a_genuinely_empty_range_is_not_an_error():
 # the library contract this rests on
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# telling Java the difference between "nothing there" and "could not find out"
+# --------------------------------------------------------------------------
+
+class FakeRequest:
+    def __init__(self, beacon_id):
+        self._beacon_id = beacon_id
+
+    def getBeaconId(self):
+        return self._beacon_id
+
+    def getAccessoryJson(self):
+        return "{}"
+
+
+class FakeJavaList:
+    """Stands in for the List<AccessoryRequest> Java passes across the bridge."""
+
+    def __init__(self, items):
+        self._items = list(items)
+
+    def size(self):
+        return len(self._items)
+
+    def get(self, index):
+        return self._items[index]
+
+
+class StubAccessory:
+    def to_json(self):
+        return {}
+
+
+@pytest.fixture
+def stub_accessory(monkeypatch):
+    """from_json needs real accessory data; the tests here only care about failure handling."""
+    class StubFindMyAccessory:
+        @staticmethod
+        def from_json(_data):
+            return StubAccessory()
+
+    monkeypatch.setattr(main, "FindMyAccessory", StubFindMyAccessory)
+
+
+def test_getReports_reports_an_error_when_every_accessory_fails(monkeypatch, stub_accessory):
+    """
+    Java's mapResults only raises when this module returns None. A dict missing the beacon
+    reads as "no reports for that day", so the history screen showed a confident "0 reports"
+    for a day it had failed to fetch - with no error state and no Retry button, because as far
+    as Java was concerned the call had succeeded.
+    """
+    monkeypatch.setattr(main, "_fetchReportsInRange", _raise)
+
+    result = main.getReports(object(), FakeJavaList([FakeRequest("beacon-a")]), 0, 1)
+
+    assert result is None
+
+
+def test_getReports_still_returns_what_did_work(monkeypatch, stub_accessory):
+    """A partial result is worth keeping: those accessories have fresh reports and alignment."""
+    def fail_for_a(_account, _accessory, _start, _end):
+        if fail_for_a.calls == 0:
+            fail_for_a.calls += 1
+            raise TimeoutError("first one fails")
+        return []
+    fail_for_a.calls = 0
+
+    monkeypatch.setattr(main, "_fetchReportsInRange", fail_for_a)
+
+    result = main.getReports(
+        object(), FakeJavaList([FakeRequest("beacon-a"), FakeRequest("beacon-b")]), 0, 1)
+
+    assert result is not None
+    assert list(result) == ["beacon-b"]
+
+
+def test_getLastReports_reports_an_error_when_every_accessory_fails(monkeypatch, stub_accessory):
+    monkeypatch.setattr(main, "_fetchReportsForAccessory", _raise)
+
+    result = main.getLastReports(object(), FakeJavaList([FakeRequest("beacon-a")]), 24)
+
+    assert result is None
+
+
+def test_no_accessories_at_all_is_not_an_error():
+    """An empty request list is a valid, empty answer - not a failure."""
+    assert main.getReports(object(), FakeJavaList([]), 0, 1) == {}
+    assert main.getLastReports(object(), FakeJavaList([]), 24) == {}
+
+
+def _raise(*_args, **_kwargs):
+    raise TimeoutError("Apple timed out")
+
+
 def test_findmy_still_exposes_what_the_ranged_fetch_relies_on():
     """
     The approach rests on two pieces of the installed library. If either changes shape, fail
