@@ -257,6 +257,62 @@ python scripts/add_strings.py --check         # fail if any locale is missing on
 
 ---
 
+## Running the export wizard on a Mac
+
+Testing an export means a real Mac signed into iCloud, usually a VM. A fresh macOS install
+has **neither git nor python3** — both arrive with the Xcode Command Line Tools — so this is
+the whole thing from a bare machine, meant to be pasted into a new terminal as-is:
+
+```bash
+# 1. Command Line Tools. Opens a GUI installer and returns immediately, so wait for it.
+#    Tested with --version rather than `command -v`: a bare macOS ships stubs at
+#    /usr/bin/git and /usr/bin/python3 that exist only to trigger this installer, so
+#    "is it on PATH" answers yes long before either one can actually run.
+until git --version >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; do
+  xcode-select --install 2>/dev/null
+  echo "Click Install in the dialog that opened, then leave this running..."
+  sleep 20
+done
+
+# 2. The code. Swap the branch for whatever you are testing.
+git clone -b main --depth 1 https://github.com/parawanderer/OpenTagViewer.git
+cd OpenTagViewer/python
+
+# 3. Dependencies, isolated from the system Python.
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 4. Run it.
+PYTHONPATH=. python3 main/wizard.py
+```
+
+`PYTHONPATH=.` is not optional: `wizard.py` does `from main.airtag_decryptor import ...`, and
+running the file directly puts `python/main` on `sys.path` rather than `python/`, so the
+import fails. It is the same thing the CI workflow sets.
+
+Then check the export actually contains what it should:
+
+```bash
+unzip -l ~/Desktop/OpenTagViewer_export_*.zip | grep -iE "OPENTAGVIEWER.yml|KeyAlignmentRecords"
+```
+
+You want `version: 0.0.2` in the yml and `KeyAlignmentRecords/<uuid>/<uuid>.plist` entries.
+Without those the app has no key alignment and every tag's first fetch searches its entire
+history — see rule 6 in [AGENTS.md](./AGENTS.md).
+
+Three things that catch people out:
+
+- **macOS 15+ cannot extract the key automatically.** Keychain access was tightened; the
+  wizard exits with instructions and you have to pass `--key`. macOS 14 and below are fine,
+  which is why the VM guides target Sonoma.
+- **Use the system `python3`.** The wizard is tkinter, which the Command Line Tools build
+  includes. A Homebrew `python3` does not, unless you also install `python-tk`.
+- **The bundled 3.9 is enough to run the wizard**, but the test suite needs 3.10+.
+
+You do not need to build the `.app` to test a change — running from source exercises the
+same `airtag_decryptor.py`. The PyInstaller build only runs on release.
+
 ## Offline diagnostic scripts
 
 Not tests, but useful, and needing neither an Apple account nor network access.
