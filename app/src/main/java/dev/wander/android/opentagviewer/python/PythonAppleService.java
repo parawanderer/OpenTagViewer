@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import io.reactivex.rxjava3.core.Observable;
@@ -47,8 +48,23 @@ public class PythonAppleService {
      * <br>
      * A fetch that takes longer than the refresh interval is entirely normal for an
      * accessory with no alignment yet, so this is not a rare race.
+     * <br>
+     * Serialising alone is not enough: the periodic refresh would still queue up behind a
+     * slow fetch, one entry per minute, and then fire the whole stale backlog at once when
+     * it finally drained. Callers on the periodic path should check {@link #isBusy()} and
+     * skip their turn instead - a refresh that is minutes late has no value.
      */
-    private static final Object PYTHON_LOCK = new Object();
+    private static final ReentrantLock PYTHON_LOCK = new ReentrantLock();
+
+    /**
+     * Whether a call into Python is currently in progress.
+     * <br>
+     * Advisory only. A caller that acts on this can still be beaten to the lock, which is
+     * harmless: it just waits, exactly as it did before.
+     */
+    public static boolean isBusy() {
+        return PYTHON_LOCK.isLocked();
+    }
 
     private PythonAppleService(PythonAppleAccount account) {
         this.account = account;
@@ -60,23 +76,26 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            synchronized (PYTHON_LOCK) {
-            var py = Python.getInstance();
-            var module = py.getModule(MODULE_MAIN);
+            PYTHON_LOCK.lock();
+            try {
+                var py = Python.getInstance();
+                var module = py.getModule(MODULE_MAIN);
 
-            var returned = module.callAttr(
-                    "getLastReports",
-                    new Kwarg("account", this.account.getAccountObj()),
-                    new Kwarg("idToAccessoryData", requests),
-                    new Kwarg("hoursBack", hoursToGoBack)
-            );
+                var returned = module.callAttr(
+                        "getLastReports",
+                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("idToAccessoryData", requests),
+                        new Kwarg("hoursBack", hoursToGoBack)
+                );
 
-            if (returned == null) {
-                Log.e(TAG, "python call to getLastReports resulted in error (check python logs for details)");
-                throw new PythonAppleFindMyException("Error while retrieving last reports for account via python!");
-            }
+                if (returned == null) {
+                    Log.e(TAG, "python call to getLastReports resulted in error (check python logs for details)");
+                    throw new PythonAppleFindMyException("Error while retrieving last reports for account via python!");
+                }
 
-            return mapResults(returned);
+                return mapResults(returned);
+            } finally {
+                PYTHON_LOCK.unlock();
             }
         }).subscribeOn(Schedulers.io());
     }
@@ -87,24 +106,27 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            synchronized (PYTHON_LOCK) {
-            var py = Python.getInstance();
-            var module = py.getModule(MODULE_MAIN);
+            PYTHON_LOCK.lock();
+            try {
+                var py = Python.getInstance();
+                var module = py.getModule(MODULE_MAIN);
 
-            var returned = module.callAttr(
-                    "getReports",
-                    new Kwarg("account", this.account.getAccountObj()),
-                    new Kwarg("idToAccessoryData", requests),
-                    new Kwarg("unixStartMs", startTimeUnixMS),
-                    new Kwarg("unixEndMs", endTimeUnixMS)
-            );
+                var returned = module.callAttr(
+                        "getReports",
+                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("idToAccessoryData", requests),
+                        new Kwarg("unixStartMs", startTimeUnixMS),
+                        new Kwarg("unixEndMs", endTimeUnixMS)
+                );
 
-            if (returned == null) {
-                Log.e(TAG, "python call to getReports resulted in error (check python logs for details)");
-                throw new PythonAppleFindMyException("Error while retrieving time ranged reports for account via python!");
-            }
+                if (returned == null) {
+                    Log.e(TAG, "python call to getReports resulted in error (check python logs for details)");
+                    throw new PythonAppleFindMyException("Error while retrieving time ranged reports for account via python!");
+                }
 
-            return mapResults(returned);
+                return mapResults(returned);
+            } finally {
+                PYTHON_LOCK.unlock();
             }
         }).subscribeOn(Schedulers.io());
     }
