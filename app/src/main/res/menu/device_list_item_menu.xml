@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press menu for a row in the My Devices list. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_remove_device"
+        android:icon="@drawable/delete_24px"
+        android:title="@string/remove_device" />
+
+</menu>

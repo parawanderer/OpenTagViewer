@@ -541,6 +541,11 @@ public class SettingsActivity extends AppCompatActivity {
         LinearLayout loginDataContainer = this.findViewById(R.id.login_info_container);
         loginDataContainer.setVisibility(VISIBLE);
 
+        // Swap the loading skeleton for the real thing. Both are sized alike, so this does not
+        // move anything below it.
+        this.findViewById(R.id.login_details_placeholder).setVisibility(GONE);
+        this.findViewById(R.id.login_details).setVisibility(VISIBLE);
+
         TextView firstnameLastnameText = this.findViewById(R.id.firstame_lastname_settings_block);
         final String userFirstNameLastName = userAuthData.getAccount().getInfo().getFirstName() + " " + userAuthData.getAccount().getInfo().getLastName();
         firstnameLastnameText.setText(userFirstNameLastName);

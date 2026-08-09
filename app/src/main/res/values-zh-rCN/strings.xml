@@ -15,9 +15,8 @@
     <string name="do_ring">响铃</string>
     <string name="more">更多</string>
     <string name="version_x">版本 %1$s</string>
-    <string name="free_opensource_software_by">由 Shane B. 开发的免费开源软件</string>
+    <string name="free_opensource_software_by">免费开源软件　开发者：</string>
     <string name="github">Github</string>
-    <string name="developer_website">开发者网站</string>
     <string name="anisette_server_url">Anisette 服务器 URL</string>
     <string name="url_to_an_anisette_server">输入 <a href="">Anisette</a> 服务器地址</string>
     <string name="this_is_not_a_valid_url">这不是有效的 URL</string>
@@ -105,4 +104,13 @@
     <string name="amap_key_saved">已保存高德地图 API Key。</string>
     <string name="amap_key_cleared">已移除高德地图 API Key。</string>
     <string name="amap_how_to_get_a_key">如何获取 Key</string>
+    <string name="no_devices_imported_yet">暂无设备</string>
+    <string name="import_a_zip_exported_from_a_mac">导入从 Mac 导出的 zip 文件即可开始。</string>
+    <string name="import_devices">导入设备</string>
+    <string name="error_occurred_while_removing_the_device">移除设备时出错</string>
+    <string name="how_do_i_get_the_zip"><u>如何获取 zip 文件？</u></string>
+    <string name="maps_api_key_missing_title">缺少 Google 地图 API Key</string>
+    <string name="maps_api_key_missing_message">此版本未包含 Google 地图 API Key，因此无法加载地图。请在 secrets.properties 中添加 MAPS_API_KEY 后重新构建，或在设置中选择其他地图提供商。</string>
+    <string name="resolving_tags_banner">正在首次定位你的标签。这可能需要几分钟，请保持应用开启。</string>
+    <string name="resolving_tags_banner_progress">正在定位你的标签（%1$d / %2$d）。这可能需要几分钟，请保持应用开启。</string>
 </resources>

@@ -15,9 +15,8 @@
     <string name="do_ring">Klingeln</string>
     <string name="more">Mehr</string>
     <string name="version_x">Version %1$s</string>
-    <string name="free_opensource_software_by">Freie, Open-Source Software von Shane B.</string>
+    <string name="free_opensource_software_by">Freie, Open-Source Software von:</string>
     <string name="github">Github</string>
-    <string name="developer_website">Entwickler-Website</string>
     <string name="anisette_server_url">Anisette Server-URL</string>
     <string name="url_to_an_anisette_server">URL für einen <a href="">Anisette</a> Server</string>
     <string name="this_is_not_a_valid_url">Dies ist keine gültige URL</string>
@@ -101,4 +100,17 @@
     <string name="amap_how_to_get_a_key">Schlüssel anfordern</string>
     <string name="lang_zh_cn">Chinesisch, vereinfacht (简体中文)</string>
     <string name="lang_zh_tw">Chinesisch, traditionell (繁體中文)</string>
+    <string name="no_devices_imported_yet">Noch keine Geräte</string>
+    <string name="import_a_zip_exported_from_a_mac">Importieren Sie ein auf einem Mac exportiertes ZIP-Archiv, um zu beginnen.</string>
+    <string name="import_devices">Geräte importieren</string>
+    <string name="error_occurred_while_removing_the_device">Beim Entfernen des Geräts ist ein Fehler aufgetreten</string>
+    <string name="how_do_i_get_the_zip"><u>Wie erhalte ich die ZIP-Datei?</u></string>
+    <string name="map_provider">Kartenanbieter</string>
+    <string name="map_provider_google">Google Maps</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">Bitte melden Sie sich erneut an – die FindMy-Bibliothek wurde aktualisiert.</string>
+    <string name="maps_api_key_missing_title">Google Maps API-Schlüssel fehlt</string>
+    <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
+    <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
+    <string name="resolving_tags_banner_progress">Ihre Tags werden geortet (%1$d von %2$d). Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
 </resources>
