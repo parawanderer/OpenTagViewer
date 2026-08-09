@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any
 import json
+import time
 import traceback
 from datetime import datetime, timezone
 from io import BytesIO
@@ -324,6 +325,12 @@ _MAX_KEYS_PER_REQUEST = 255
 # Apple - the account-flagging risk from issue #30, arriving through a different door.
 _MAX_REQUESTS_PER_RANGE_FETCH = 8
 
+# Attempts per request. Apple's endpoint times out often enough to see it by hand, and for a
+# single day the range is one request - so one timeout meant a whole day of history came back
+# empty. Two attempts, not more: this is a retry against a rate-sensitive endpoint.
+_RANGE_FETCH_ATTEMPTS = 2
+_RANGE_FETCH_RETRY_DELAY_SECONDS = 1
+
 
 def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
     """Width of the key-index range a history fetch would search, or 0 if unknown."""
@@ -423,8 +430,24 @@ def _fetchReportsInRange(account: AppleAccount, accessory: FindMyAccessory, star
     chunks = _chunk(indexed_keys, _MAX_KEYS_PER_REQUEST)
 
     reports = []
+    failed = 0
     for chunk in chunks:
-        reports.extend(_fetchChunkAndAlign(account, accessory, chunk, index_by_key))
+        try:
+            reports.extend(_fetchChunkAndAlign(account, accessory, chunk, index_by_key))
+        except _ChunkFetchError:
+            failed += 1
+
+    if failed == len(chunks):
+        # Every request failed, so we know nothing about this range. Returning an empty list
+        # would be indistinguishable from "Apple has no reports here", and the history screen
+        # would show a confident, wrong "0 reports" for the day. Raising lets the caller skip
+        # the accessory instead of reporting an absence it cannot vouch for.
+        raise RuntimeError(
+            f"Every request in the ranged fetch failed ({failed} of {len(chunks)}); "
+            f"refusing to report an empty range")
+
+    if failed:
+        print(f"WARNING: {failed} of {len(chunks)} requests failed; this range is incomplete")
 
     print(f"Ranged fetch searched {len(indexed_keys)} keys in {len(chunks)} request(s)")
     return reports
@@ -481,20 +504,39 @@ def _keysForRange(accessory: FindMyAccessory, start, end):
     return indexed_keys
 
 
+class _ChunkFetchError(Exception):
+    """One request of a ranged fetch failed, after its retries."""
+
+
 def _fetchChunkAndAlign(account: AppleAccount, accessory: FindMyAccessory, chunk, index_by_key):
     """
     Fetch one request's worth of keys and feed what comes back into the accessory's alignment.
 
+    Retried once, because Apple's endpoint times out often enough to hit by hand. A day of
+    history is a single request, so one `aiohttp` timeout meant the whole day came back empty
+    and the screen said "0 reports" - which reads as "your tag was not seen", not "the network
+    failed".
+
     The alignment update is the part `_fetch_key_reports` cannot do for us: it is handed plain
     keys and has no idea which index each belongs to. We do, because `keys_between` said so.
+
+    @raise _ChunkFetchError if every attempt failed
     """
-    try:
-        found = account.fetch_location_history([key for _, key in chunk])
-    except Exception:
-        # One failed chunk should not lose the ones that worked.
-        print(f"A chunk of the ranged fetch failed, continuing with the rest: "
-              f"{traceback.format_exc()}")
-        return []
+    keys = [key for _, key in chunk]
+    found = None
+
+    for attempt in range(1, _RANGE_FETCH_ATTEMPTS + 1):
+        try:
+            found = account.fetch_location_history(keys)
+            break
+        except Exception:
+            print(f"Request {attempt} of {_RANGE_FETCH_ATTEMPTS} for a chunk of "
+                  f"{len(keys)} keys failed: {traceback.format_exc()}")
+            if attempt < _RANGE_FETCH_ATTEMPTS:
+                time.sleep(_RANGE_FETCH_RETRY_DELAY_SECONDS)
+    else:
+        raise _ChunkFetchError(f"all {_RANGE_FETCH_ATTEMPTS} attempts failed for a chunk of "
+                               f"{len(keys)} keys")
 
     reports = []
     for key, key_reports in (found or {}).items():

@@ -16,6 +16,8 @@ point at Apple - nothing here touches the network.
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 import main
 
 
@@ -71,13 +73,20 @@ class FakeAccessory:
 
 
 class FakeAccount:
-    """Records every batch of keys it is asked for, and answers from a per-index map."""
+    """
+    Records every batch of keys it is asked for, and answers from a per-index map.
 
-    def __init__(self, reports_by_index=None, failing_batches=(), on_fetch_location=None):
+    Failures are keyed by the chunk's first index rather than by call number, so a retry of a
+    doomed chunk fails again - otherwise a retry test would pass by accident.
+    """
+
+    def __init__(self, reports_by_index=None, doomed_chunks=(), fail_first_calls=0,
+                 on_fetch_location=None):
         self.requested_batches = []
         self.fetch_location_calls = 0
         self._reports_by_index = reports_by_index or {}
-        self._failing_batches = set(failing_batches)
+        self._doomed_chunks = set(doomed_chunks)
+        self._fail_first_calls = fail_first_calls
         self._on_fetch_location = on_fetch_location
 
     def fetch_location(self, accessory):
@@ -91,11 +100,13 @@ class FakeAccount:
             "the ranged fetch must pass a list of keys - passing the accessory itself is "
             "exactly what returned the latest reports regardless of the range asked for"
         )
-        batch_number = len(self.requested_batches)
         self.requested_batches.append(list(keys))
 
-        if batch_number in self._failing_batches:
-            raise RuntimeError("Apple said no")
+        if len(self.requested_batches) <= self._fail_first_calls:
+            raise TimeoutError("transient")
+
+        if keys and keys[0].index in self._doomed_chunks:
+            raise TimeoutError("this chunk always fails")
 
         return {key: self._reports_by_index.get(key.index, []) for key in keys}
 
@@ -215,16 +226,65 @@ def test_caps_how_many_requests_it_will_make():
     assert searched[-1] == 9_999
 
 
-def test_survives_one_failing_batch():
+def test_survives_one_failing_batch(monkeypatch):
+    monkeypatch.setattr(main, "_RANGE_FETCH_RETRY_DELAY_SECONDS", 0)
     accessory = FakeAccessory(indices=range(0, 600))
     account = FakeAccount(
         reports_by_index={5: [FakeReport(1)], 400: [FakeReport(2)]},
-        failing_batches=[0])
+        doomed_chunks=[0])
 
     reports = main._fetchReportsInRange(account, accessory, _at(0), _at(599))
 
     # The first batch is lost; a short result beats none.
     assert [report.timestamp for report in reports] == [2]
+
+
+def test_retries_a_request_that_times_out(monkeypatch):
+    """
+    Apple's endpoint times out often enough to hit by hand, and a single day of history is a
+    single request - so without a retry, one timeout emptied a whole day.
+    """
+    monkeypatch.setattr(main, "_RANGE_FETCH_RETRY_DELAY_SECONDS", 0)
+    accessory = FakeAccessory(indices=range(0, 10))
+    account = FakeAccount(reports_by_index={5: [FakeReport(1)]}, fail_first_calls=1)
+
+    reports = main._fetchReportsInRange(account, accessory, _at(0), _at(9))
+
+    assert len(account.requested_batches) == 2, "the failed request should have been retried"
+    assert [report.timestamp for report in reports] == [1]
+
+
+def test_gives_up_after_the_retry_rather_than_looping(monkeypatch):
+    monkeypatch.setattr(main, "_RANGE_FETCH_RETRY_DELAY_SECONDS", 0)
+    accessory = FakeAccessory(indices=range(0, 10))
+    account = FakeAccount(doomed_chunks=[0])
+
+    with pytest.raises(RuntimeError):
+        main._fetchReportsInRange(account, accessory, _at(0), _at(9))
+
+    assert len(account.requested_batches) == main._RANGE_FETCH_ATTEMPTS
+
+
+def test_a_range_whose_every_request_failed_is_an_error_not_an_empty_day(monkeypatch):
+    """
+    The bug this fixes: one timed-out request returned [], the day rendered as "0 reports",
+    and nothing distinguished that from a tag genuinely not being seen. An absence we cannot
+    vouch for has to be an error, so the caller can skip the accessory instead.
+    """
+    monkeypatch.setattr(main, "_RANGE_FETCH_RETRY_DELAY_SECONDS", 0)
+    accessory = FakeAccessory(indices=range(0, 99))
+    account = FakeAccount(doomed_chunks=[0])
+
+    with pytest.raises(RuntimeError, match="refusing to report an empty range"):
+        main._fetchReportsInRange(account, accessory, _at(0), _at(98))
+
+
+def test_a_genuinely_empty_range_is_not_an_error():
+    """The other side of it: Apple answering "nothing here" is a real, reportable answer."""
+    accessory = FakeAccessory(indices=range(0, 99))
+    account = FakeAccount(reports_by_index={})
+
+    assert main._fetchReportsInRange(account, accessory, _at(0), _at(98)) == []
 
 
 # --------------------------------------------------------------------------
