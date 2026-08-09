@@ -102,6 +102,9 @@ import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
 import dev.wander.android.opentagviewer.util.parse.AppleZipImporterUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
+import dev.wander.android.opentagviewer.util.rx.BeaconLocationHistory;
+import dev.wander.android.opentagviewer.util.rx.LongFetchBannerState;
+import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
@@ -122,8 +125,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final int HOURS_TO_GO_BACK_24H = 24;
 
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
-
-    private static final long ONE_HOUR_IN_MS = 1000 * 60 * 60; // 1 HOUR
 
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
 
@@ -154,7 +155,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
 
-    private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
+    /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
+    private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
 
     private final Map<String, String> currentMarkers = new ConcurrentHashMap<>(); // 存储markerId
     private Marker lastFocusedMarker = null; // 保留用于向后兼容（仅Google Maps）
@@ -162,7 +164,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
     private boolean initialFetchComplete = false;
-    private long last24HHistoryFetchAt = 0L;
+
+    /** When a refresh is allowed, and how much history it should ask for. See RefreshPolicyTest. */
+    private final RefreshPolicy refreshPolicy = new RefreshPolicy(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
 
     private TagListSwiperHelper tagListSwiperHelper = null;
 
@@ -181,9 +185,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private final Runnable showLongFetchBanner = () -> this.setLongFetchBannerVisible(true);
 
     /** All three are only ever touched on the main looper, so they need no synchronisation. */
-    private int fetchesInFlight = 0;
-    private int fetchProgressDone = 0;
-    private int fetchProgressTotal = 0;
+    /** Banner bookkeeping. Touched only from the banner handler. See LongFetchBannerStateTest. */
+    private final LongFetchBannerState bannerState = new LongFetchBannerState();
 
     private Optional<UserMapCameraPosition> lastCameraPositionOnLoad;
 
@@ -436,38 +439,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private void refreshIfAllowed() {
-        if (!this.isAppleServiceInitialised()) {
-            Log.d(TAG, "AppleService was not initialised yet, so we can't refresh");
-            return;
-        }
-
-        if (!this.initialFetchComplete) {
-            Log.d(TAG, "Skipping refresh due to not having fully initialised yet");
-            return;
-        }
-
-        if (PythonAppleService.isBusy()) {
-            // A first fetch for an accessory with no key alignment can run for minutes, so
-            // this tick would otherwise block on the lock rather than be skipped, and the
-            // backlog would grow by one every minute until the fetch finished.
-            Log.d(TAG, "Skipping scheduled refresh: a fetch is still in progress");
-            return;
-        }
-
         final long now = System.currentTimeMillis();
-        if (now < this.last24HHistoryFetchAt + WAIT_BEFORE_REFETCH) {
-            Log.d(TAG, String.format(
-                    "We will not re-fetch Beacon history as less than %d ms (actual: %d ms) have passed since the last history fetch",
-                    WAIT_BEFORE_REFETCH,
-                    (now - this.last24HHistoryFetchAt)
-            ));
+
+        final RefreshPolicy.Decision decision = this.refreshPolicy.decide(
+                now,
+                this.isAppleServiceInitialised(),
+                this.initialFetchComplete,
+                PythonAppleService.isBusy());
+
+        if (!decision.shouldRefresh()) {
+            Log.d(TAG, String.format("Skipping the scheduled refresh: %s (%d ms since the last fetch)",
+                    decision.reason(), this.refreshPolicy.millisSinceLastFetch(now)));
             return;
         }
 
         Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
         this.fetchAndUpdateCurrentBeacons();
         Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
-        //Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
     }
 
     public void onClickMoreSettings(View view)
@@ -554,12 +542,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             return;
         }
 
-        final List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-        if (locations.isEmpty()) {
+        final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+        if (maybeLast.isEmpty()) {
             Log.w(TAG, "Can't navigate to a beacon that has no locations!");
             return;
         }
-        final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+        final BeaconLocationReport lastLocation = maybeLast.get();
         Uri uri = Uri.parse(String.format(Locale.ROOT, "geo:%.7f,%.7f?q=%.7f,%.7f", lastLocation.getLatitude(), lastLocation.getLongitude(), lastLocation.getLatitude(), lastLocation.getLongitude()));
         Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
         mapIntent.setPackage("com.google.android.apps.maps");
@@ -935,30 +923,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private synchronized void addBeaconLocationsToCurrent(final Map<String, List<BeaconLocationReport>> newItems) {
-        for (var key: newItems.keySet()) {
-            if (this.beaconLocations.containsKey(key)) {
+        newItems.forEach((beaconId, reports) -> {
+            final int before = this.beaconLocations.sizeOf(beaconId);
+            final int after = this.beaconLocations.merge(beaconId, reports);
 
-                var newMergedList = BeaconCombinerUtil.combineAndSort(
-                        key,
-                        Objects.requireNonNull(this.beaconLocations.get(key)),
-                        Objects.requireNonNull(newItems.get(key))
-                );
-
-                Log.d(TAG, String.format(
-                        "Merged location history for beaconId=%s, which had %d items of location history, with %d new items of locationHistory to get a total of %d items of locationHistory",
-                        key,
-                        Objects.requireNonNull(this.beaconLocations.get(key)).size(),
-                        Objects.requireNonNull(newItems.get(key)).size(),
-                        newMergedList.size()
-                ));
-
-                // we need to merge and re-sort...
-                this.beaconLocations.put(key, newMergedList);
-            } else {
-                Log.d(TAG, "Adding new location for beaconId=" + key);
-                this.beaconLocations.put(key, newItems.get(key));
-            }
-        }
+            Log.d(TAG, String.format(
+                    "Location history for beaconId=%s: %d held + %d fetched = %d after de-duplication",
+                    beaconId, before, reports.size(), after));
+        });
     }
 
     private Completable updateBeaconGeocodings() {
@@ -973,19 +945,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         for (BeaconData beaconData : this.beacons.values()) {
             final String beaconId = beaconData.getInfo().getBeaconId();
 
-            if (!this.beaconLocations.containsKey(beaconId)) {
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
                 Log.d(TAG, "Can't update geocoding for beacon=" + beaconId + " because it contained no locations");
                 continue;
             }
 
-            List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-
-            if (locations.isEmpty()) {
-                Log.d(TAG, "Did not reverse geocode the last location for beaconId=" + beaconId + " because it had no known locations");
-                continue;
-            }
-
-            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            BeaconLocationReport lastLocation = maybeLast.get();
             final Double lastLat = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.latitude).orElse(null);
             final Double lastLon = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.longitude).orElse(null);
             if (lastLat != null && lastLat == lastLocation.getLatitude() && lastLon != null && lastLon == lastLocation.getLongitude()) {
@@ -1022,20 +988,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
 
-            if (!this.beaconLocations.containsKey(beaconId)) {
-                Log.d(TAG, "No location was currently know for beacon with id " + beaconId + ". It is being skipped.");
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
+                Log.d(TAG, "No location is currently known for beaconId=" + beaconId + ", so it cannot be drawn. Skipping.");
                 continue;
             }
 
-            List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-
-            if (locations.isEmpty()) {
-                Log.d(TAG, "Did not get any location reports for beacon device with id " + beacon.getBeaconId() + ". This device will not be shown in the UI.");
-                continue;
-            }
-
-            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
-            this.showBeaconOnMap(beacon, lastLocation);
+            this.showBeaconOnMap(beacon, maybeLast.get());
         }
         this.updateBeaconCards();
     }
@@ -1116,13 +1075,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             }
             
             // 从beaconLocations获取位置信息
-            List<BeaconLocationReport> locations = this.beaconLocations.get(beaconId);
-            if (locations == null || locations.isEmpty()) {
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
                 Log.w(TAG, "No locations found for beaconId=" + beaconId);
                 return;
             }
-            
-            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+
+            BeaconLocationReport lastLocation = maybeLast.get();
             double lat = lastLocation.getLatitude();
             double lon = lastLocation.getLongitude();
 
@@ -1147,7 +1106,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // remove all beacons that had cards that are now gone
         for (var beaconId : this.dynamicCardsForTag.keySet()) {
-            if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.containsKey(beaconId)) {
+            if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.isDrawable(beaconId)) {
                 Log.i(TAG, "Cleaning up view for beaconId=" + beaconId + " which did not have any locations associated with itself anymore");
                 View view = this.dynamicCardsForTag.get(beaconId);
                 cardsContainer.removeView(view);
@@ -1160,16 +1119,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         for (final BeaconData beaconData : this.beacons.values()) {
             final BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
-            if (!this.beaconLocations.containsKey(beaconId)) {
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
                 Log.w(TAG, "Found a beacon (" + beaconId + ") without locations! We can't draw such a beacon. Skipping...");
                 continue;
             }
-            var locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-            if (locations.isEmpty()) {
-                Log.w(TAG, "Fond a beacon (" + beaconId + ") with no location history items! We can't draw such a beacon. Skipping...");
-                continue;
-            }
-            final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            final BeaconLocationReport lastLocation = maybeLast.get();
             final List<Address> locationInfo = beaconData.getGeocoding();
 
             FrameLayout v;
@@ -1286,18 +1241,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist) {
+        // Captured once and reused below: recording the finish time instead would leave a gap
+        // in history the width of the fetch, which for an unaligned tag is minutes.
         final long now = System.currentTimeMillis();
-
-        final int hoursToGoBack = (int) Math.min(
-                Math.ceil(((double)now - (double)this.last24HHistoryFetchAt)/(double)ONE_HOUR_IN_MS),
-                HOURS_TO_GO_BACK_24H
-        );
+        final int hoursToGoBack = this.refreshPolicy.hoursToGoBack(now);
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
-                .doOnNext(reports -> this.last24HHistoryFetchAt = now) // on success, update this time.
+                .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
                 .doFinally(this::markFetchFinished);
     }
 
@@ -1364,10 +1317,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private void markFetchStarted() {
         this.longFetchBannerHandler.post(() -> {
-            if (this.fetchesInFlight++ == 0) {
-                // Clear the previous run's counts so a stale "3 of 5" cannot flash up.
-                this.fetchProgressDone = 0;
-                this.fetchProgressTotal = 0;
+            if (this.bannerState.fetchStarted()) {
                 this.longFetchBannerHandler.postDelayed(
                         this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
             }
@@ -1376,8 +1326,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private void markFetchFinished() {
         this.longFetchBannerHandler.post(() -> {
-            this.fetchesInFlight = Math.max(0, this.fetchesInFlight - 1);
-            if (this.fetchesInFlight > 0) {
+            if (!this.bannerState.fetchFinished()) {
                 return;
             }
             this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
@@ -1388,8 +1337,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     /** Records how far through the batch we are, so the banner can say so. */
     private void setLongFetchProgress(int done, int total) {
         this.longFetchBannerHandler.post(() -> {
-            this.fetchProgressDone = done;
-            this.fetchProgressTotal = total;
+            this.bannerState.setProgress(done, total);
 
             TextView banner = this.findViewById(R.id.long_fetch_banner);
             if (banner != null && banner.getVisibility() == VISIBLE) {
@@ -1399,14 +1347,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private String longFetchBannerText() {
-        if (this.fetchProgressTotal <= 1) {
-            // "1 of 1" tells the user nothing they cannot already see.
+        if (!this.bannerState.hasCount()) {
             return this.getString(R.string.resolving_tags_banner);
         }
         return this.getString(
                 R.string.resolving_tags_banner_progress,
-                Math.min(this.fetchProgressDone + 1, this.fetchProgressTotal),
-                this.fetchProgressTotal);
+                this.bannerState.displayedPosition(),
+                this.bannerState.total());
     }
 
     private void setLongFetchBannerVisible(boolean visible) {
