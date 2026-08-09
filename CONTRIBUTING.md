@@ -223,6 +223,21 @@ python -m pytest scripts/test -v
 `scripts/add_strings.py` gates CI's translation check, so a bug in it would report green
 while protecting nothing.
 
+### Which Python each tree targets
+
+There are three, and they are not the same:
+
+| Tree | Version | Why |
+| --- | --- | --- |
+| `python/` (export wizard) | **3.9+** | 3.9 is what the Xcode Command Line Tools install, so it is what someone running the wizard from source on a stock Mac gets. Tested across 3.9–3.13 in CI |
+| `app/src/main/python/` | **3.12** | Pinned by the `chaquopy { }` block; it only ever runs inside the app |
+| `scripts/` | **3.12** | Developer tooling, run on a dev machine. Not tested below 3.12 — do not assume it works on 3.9 |
+
+Only `python/` has a floor worth respecting, and it is a real constraint rather than a
+preference: a module-level `tuple[int, int] | None` annotation is evaluated at import, so
+3.10-only syntax there means the wizard dies before it starts on a stock Mac. Hence
+`from __future__ import annotations` in those files, and 3.9 in the CI matrix.
+
 ### Type checking
 
 **pyright, not mypy.** The editors used here run Pylance, which is pyright; mypy's defaults
