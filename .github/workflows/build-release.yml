@@ -83,6 +83,11 @@ jobs:
       - name: Validate checked-in stub wheels
         run: python3 scripts/validate_stub_wheels.py app/libs/unicorn-2.1.1-py3-none-any.whl
 
+      # A release is the worst time to discover a locale is missing a string, since the
+      # fallback is silent: those users simply get English.
+      - name: Check every locale has every string
+        run: python3 scripts/add_strings.py --check
+
       - name: Run gradle tests
         run: ./gradlew test
 

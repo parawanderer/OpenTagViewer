@@ -20,6 +20,8 @@ __pycache__/
 app/release
 .coverage
 .pytest_cache
+.mypy_cache
 .venv
+tmp/
 # Local Claude Code settings
 .claude/settings.local.json

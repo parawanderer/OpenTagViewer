@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#
+# Fast checks that catch the mistakes which are silent otherwise.
+#
+# Deliberately excludes anything slow. Builds, instrumented tests and the emulator belong in
+# CI: a pre-commit hook that takes a minute gets bypassed with --no-verify within a day, and
+# a hook people routinely bypass is worse than no hook, because it creates the impression of
+# a safety net that is not there.
+#
+# Install once per clone (hooks are not versioned, so this cannot be automatic):
+#
+#     git config core.hooksPath .githooks
+#
+# Skip deliberately when you need to: git commit --no-verify
+#
+set -uo pipefail
+
+# Repo root, so the hook works from any subdirectory.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+failed=0
+
+say() { printf '\n[pre-commit] %s\n' "$*"; }
+
+python_bin() {
+    if command -v python >/dev/null 2>&1; then printf 'python'
+    elif command -v python3 >/dev/null 2>&1; then printf 'python3'
+    else printf ''
+    fi
+}
+
+PYTHON="$(python_bin)"
+if [[ -z "$PYTHON" ]]; then
+    say "No python on PATH; skipping checks."
+    exit 0
+fi
+
+staged() {
+    git diff --cached --name-only --diff-filter=ACMR
+}
+
+# ---------------------------------------------------------------------------------------
+# Translations.
+#
+# A string missing from one locale changes nothing observable: the build passes and the app
+# reads correctly to anyone who speaks the language it was written in. It surfaces as a user
+# reporting English text in an otherwise translated app, which is why it is worth catching
+# at the point the string is added rather than weeks later.
+# ---------------------------------------------------------------------------------------
+if staged | grep -q "app/src/main/res/values.*/strings.xml"; then
+    say "strings.xml changed - checking every locale has every string"
+    if ! "$PYTHON" scripts/add_strings.py --check; then
+        printf '\n  Fix with: python scripts/add_strings.py --fill <file.json>\n'
+        printf '  See .claude/skills/add-strings/SKILL.md or AGENTS.md\n'
+        failed=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------------------
+# Python: lint and type-check only what is being committed, so the hook stays quick.
+# ---------------------------------------------------------------------------------------
+# Scoped to the same trees CI type-checks. python/ (the macOS wizard) has pre-existing
+# pyright errors and is excluded there too; a hook stricter than CI would block commits on
+# debt the author did not create, and the first thing anyone learns from that is --no-verify.
+changed_python="$(staged | grep -E '^(scripts|app/src/main/python)/.*\.py$' || true)"
+
+if [[ -n "$changed_python" ]]; then
+    if "$PYTHON" -m flake8 --version >/dev/null 2>&1; then
+        say "Linting changed Python with flake8"
+        # shellcheck disable=SC2086
+        "$PYTHON" -m flake8 $changed_python || failed=1
+    fi
+
+    if "$PYTHON" -m pyright --version >/dev/null 2>&1; then
+        say "Type-checking changed Python with pyright"
+        # shellcheck disable=SC2086
+        "$PYTHON" -m pyright $changed_python || failed=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------------------
+# Secrets. secrets.properties holds a real Google Maps key and is gitignored; committing it
+# would publish the key, and a published key cannot be unpublished, only rotated.
+# ---------------------------------------------------------------------------------------
+if staged | grep -qx "secrets.properties"; then
+    say "REFUSING: secrets.properties is staged. It holds a real API key and is gitignored."
+    failed=1
+fi
+
+if (( failed )); then
+    printf '\n[pre-commit] Checks failed. Commit with --no-verify to override.\n\n'
+    exit 1
+fi
+
+exit 0
