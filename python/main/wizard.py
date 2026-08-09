@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import datetime
 import tempfile
@@ -14,6 +16,7 @@ from tkinter import messagebox
 
 from main.airtag_decryptor import (
     BEACON_NAMING_RECORD,
+    KEY_ALIGNMENT_RECORDS,
     KEYCHAIN_LABEL,
     INPUT_PATH,
     MASTER_BEACONS,
@@ -28,7 +31,11 @@ from main.utils import MACOS_VER
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
 
-VERSION = "1.0.4"
+# The single source of truth for the exporter's version: it appears in the window title and
+# is stamped into every export as `via: OpenTagViewer.app:<version>`. Releases are tagged
+# macos-exporter-v<this>, and CI refuses to publish a release whose tag disagrees - see
+# scripts/exporter_version.py and CONTRIBUTING.md -> Releasing the macOS exporter.
+VERSION = "1.0.5"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
@@ -37,7 +44,7 @@ GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
 GITHUB_EXPORT_AIRTAGS_WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
 
 EXPORT_METADATA_FILENAME = "OPENTAGVIEWER.yml"
-EXPORT_METADATA_VERSION = "0.0.1"
+EXPORT_METADATA_VERSION = "0.0.2"
 EXPORT_METADATA_VIA_NAME = f"OpenTagViewer.app:{VERSION}"
 
 
@@ -53,11 +60,14 @@ class BeaconData:
             owned_beacon: PListFileInfo,
             beacon_naming_record: PListFileInfo = None,
             beacon_name: str = None,
-            beacon_emoji: str = None):
+            beacon_emoji: str = None,
+            key_alignment_record: PListFileInfo = None):
         self.owned_beacon = owned_beacon
         self.beacon_naming_record = beacon_naming_record
         self.beacon_name = beacon_name
         self.beacon_emoji = beacon_emoji
+        # Optional: macOS does not always have one, and older macOS versions predate it.
+        self.key_alignment_record = key_alignment_record
 
 
 class WizardApp(tk.Tk):
@@ -132,9 +142,14 @@ class WizardApp(tk.Tk):
             self.quit()
             raise Exception("User does not want to give password access to keystore!")
 
-    def _read_all_plists(self, beacon_store_key: bytearray) -> tuple[list[PListFileInfo], list[PListFileInfo]]:
-        owned_beacons: list[PListFileInfo]
-        beacon_naming_records: list[PListFileInfo]
+    def _read_all_plists(
+            self,
+            beacon_store_key: bytearray
+    ) -> tuple[list[PListFileInfo], list[PListFileInfo], list[PListFileInfo]]:
+        owned_beacons: list[PListFileInfo] = []
+        beacon_naming_records: list[PListFileInfo] = []
+        key_alignment_records: list[PListFileInfo] = []
+
         for path, folders, _ in os.walk(INPUT_PATH):
             for foldername in folders:
 
@@ -152,9 +167,11 @@ class WizardApp(tk.Tk):
                     owned_beacons = plists
                 elif foldername == BEACON_NAMING_RECORD:
                     beacon_naming_records = plists
+                elif foldername == KEY_ALIGNMENT_RECORDS:
+                    key_alignment_records = plists
             break
 
-        return (owned_beacons, beacon_naming_records)
+        return (owned_beacons, beacon_naming_records, key_alignment_records)
 
     def _create_beacon_data_map(self) -> dict[str, BeaconData]:
         # get key: prompts password entry
@@ -168,7 +185,7 @@ class WizardApp(tk.Tk):
             raise Exception(f"Failure to authenticate for '{KEYCHAIN_LABEL}' access!")
 
         # get needed files
-        owned_beacons, beacon_naming_records = self._read_all_plists(beacon_store_key)
+        owned_beacons, beacon_naming_records, key_alignment_records = self._read_all_plists(beacon_store_key)
         # map them by beaconId
         m: dict[str, BeaconData] = {}
 
@@ -198,6 +215,17 @@ class WizardApp(tk.Tk):
             m[beacon_id].beacon_naming_record = beacon_naming_record
             m[beacon_id].beacon_name = beacon_naming_record.data.get("name", "")
             m[beacon_id].beacon_emoji = beacon_naming_record.data.get("emoji", None)
+
+        # join them with their KeyAlignmentRecords.
+        # Layout is KeyAlignmentRecords/<accessory-uuid>/<record-uuid>.record, so unlike
+        # naming records - which carry an "associatedBeacon" field - the beacon id comes
+        # from the parent directory name.
+        for key_alignment_record in key_alignment_records:
+            beacon_id: str = os.path.basename(os.path.dirname(key_alignment_record.filepath))
+            if beacon_id not in m:
+                # Alignment data for a beacon we are not exporting; nothing to do.
+                continue
+            m[beacon_id].key_alignment_record = key_alignment_record
 
         # cleanup any bad ones:
         for beacon_id in list(m.keys()):
@@ -282,6 +310,20 @@ class WizardApp(tk.Tk):
                 )
                 print(f"Now dumping '{beacon.owned_beacon.filepath}' to {output_file2}...")
                 dump_plist(beacon.owned_beacon.data, output_file2)
+
+                # Optional: macOS does not always have one, and it is absent entirely on
+                # versions that predate key alignment. Without it FindMy.py starts an
+                # accessory at index 0 from its pairing date, making the first fetch after
+                # import search the tag's whole lifetime of keys.
+                if beacon.key_alignment_record is not None:
+                    output_file3: str = make_output_path(
+                        tmpdirname,
+                        beacon.key_alignment_record.filepath,
+                        INPUT_PATH,
+                        rename_legacy=True
+                    )
+                    print(f"Now dumping '{beacon.key_alignment_record.filepath}' to {output_file3}...")
+                    dump_plist(beacon.key_alignment_record.data, output_file3)
 
             # We need to make an export metadata file in the root dir...
             export_metadata = {

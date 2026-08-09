@@ -80,8 +80,28 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > ${{ env.main_project_module }}/${{ env.KEYSTORE_FILE }}
 
+      # No stub wheel to validate any more: it is generated from app/stubs/unicorn/ by
+      # generateUnicornStubWheel during the build, rather than being checked in.
+
+      # A release is the worst time to discover a locale is missing a string, since the
+      # fallback is silent: those users simply get English.
+      - name: Check every locale has every string
+        run: python3 scripts/add_strings.py --check
+
       - name: Run gradle tests
         run: ./gradlew test
+
+      # Covers app/src/main/python, the module Chaquopy packages into the APK.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Chaquopy bridge test dependencies
+        run: python -m pip install -r app/src/test/python/requirements.txt
+
+      - name: Run Chaquopy bridge tests
+        run: python -m pytest app/src/test/python -v
 
       - name: Build gradle project
         run: ./gradlew build -x lint

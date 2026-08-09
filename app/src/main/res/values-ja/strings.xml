@@ -15,9 +15,8 @@
     <string name="do_ring">リング</string>
     <string name="more">もっと見る</string>
     <string name="version_x">バージョン %1$s</string>
-    <string name="free_opensource_software_by">Shane Bによる無料でオープンソースのソフトウェア</string>
+    <string name="free_opensource_software_by">無料でオープンソースのソフトウェア　開発者:</string>
     <string name="github">Github</string>
-    <string name="developer_website">開発者サイト</string>
     <string name="anisette_server_url">AnisetteサーバーのURL</string>
     <string name="url_to_an_anisette_server"><a href="">Anisette</a>サーバーへのURL</string>
     <string name="this_is_not_a_valid_url">無効なURLです。</string>
@@ -92,4 +91,26 @@
     <string name="twofactor_failed_x_help_msg">二要素認証に失敗しました: %1$s \n別のAnisetteサーバーまたはApple アカウントを試してみませんか?</string>
     <string name="error_occurred_please_retry_submitting_your_2fa_code">エラーが発生しました。二要素認証コードの再送信をお試しください。</string>
     <string name="failed_to_request_code_please_try_again">コードを要求できませんでした。もう一度お試しください。</string>
+    <string name="amap_api_key_explanation">AMap を使うには、各ユーザーが自分の API キーを用意する必要があります。lbs.amap.com で「Android SDK」を選んで登録し、ここに貼り付けてください。</string>
+    <string name="amap_copy_registration_details">パッケージ名と SHA1 をコピー</string>
+    <string name="amap_registration_details_copied">コピーしました。キーを作成する際に AMap コンソールへ貼り付けてください。</string>
+    <string name="amap_key_required">AMap にはご自身の API キーが必要です。入力するとこの地図を利用できます。</string>
+    <string name="amap_key_saved">AMap の API キーを保存しました。</string>
+    <string name="amap_key_cleared">AMap の API キーを削除しました。</string>
+    <string name="amap_how_to_get_a_key">キーの取得方法</string>
+    <string name="lang_zh_cn">中国語 簡体字 (简体中文)</string>
+    <string name="lang_zh_tw">中国語 繁体字 (繁體中文)</string>
+    <string name="no_devices_imported_yet">デバイスがありません</string>
+    <string name="import_a_zip_exported_from_a_mac">Mac でエクスポートした zip ファイルをインポートして始めましょう。</string>
+    <string name="import_devices">デバイスをインポート</string>
+    <string name="error_occurred_while_removing_the_device">デバイスの削除中にエラーが発生しました</string>
+    <string name="how_do_i_get_the_zip"><u>zip ファイルの入手方法</u></string>
+    <string name="map_provider">地図プロバイダ</string>
+    <string name="map_provider_google">Google マップ</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">FindMy ライブラリが更新されました。もう一度サインインしてください。</string>
+    <string name="maps_api_key_missing_title">Google マップ API キーがありません</string>
+    <string name="maps_api_key_missing_message">このビルドには Google マップ API キーがないため、地図を読み込めません。secrets.properties に MAPS_API_KEY を追加してビルドし直すか、設定で別の地図プロバイダを選択してください。</string>
+    <string name="resolving_tags_banner">タグの位置を初めて特定しています。数分かかる場合があります。アプリを開いたままにしてください。</string>
+    <string name="resolving_tags_banner_progress">タグの位置を特定しています (%1$d/%2$d)。数分かかる場合があります。アプリを開いたままにしてください。</string>
 </resources>

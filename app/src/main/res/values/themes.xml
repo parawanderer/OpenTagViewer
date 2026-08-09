@@ -113,4 +113,11 @@
     <style name="Theme.OpenTagViewer.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:textSize">14sp</item>
     </style>
+
+    <!-- Rounds a ShapeableImageView into a circle. Used for contributor avatars, which
+         GitHub serves as squares. -->
+    <style name="ShapeAppearanceOverlay.OpenTagViewer.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
 </resources>

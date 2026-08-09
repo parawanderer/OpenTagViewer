@@ -4,6 +4,7 @@ import static android.Manifest.permission.ACCESS_COARSE_LOCATION;
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.view.View.GONE;
+import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.widget.Toast.LENGTH_LONG;
 import static android.widget.Toast.LENGTH_SHORT;
@@ -26,11 +27,12 @@ import android.location.Geocoder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
@@ -42,16 +44,16 @@ import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MapStyleOptions;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
+
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
+import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapMarker;
+import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -84,7 +86,9 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
+import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
+import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
@@ -97,6 +101,11 @@ import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
 import dev.wander.android.opentagviewer.util.parse.AppleZipImporterUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
+import dev.wander.android.opentagviewer.util.rx.BeaconLocationHistory;
+import dev.wander.android.opentagviewer.util.rx.LongFetchBannerState;
+import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
+import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
+import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -106,7 +115,7 @@ import lombok.Data;
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
  */
-public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, OnMapClickListener, GoogleMap.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMapReadyCallback, IMapProvider.OnMapClickListener, IMapProvider.OnMarkerClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
@@ -117,15 +126,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
-    private static final long ONE_HOUR_IN_MS = 1000 * 60 * 60; // 1 HOUR
-
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
 
-    private static final float MARKER_ZINDEX_DEFAULT = 0.0f;
-
-    private static final float MARKER_ZINDEX_TOP = 10.0f;
-
-    private GoogleMap map;
+    private IMapProvider mapProvider;
+    private GoogleMap map; // 保留用于向后兼容，逐步迁移
 
     private ActivityMapsBinding binding;
 
@@ -147,21 +151,52 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
 
-    private final Map<String, List<BeaconLocationReport>> beaconLocations = new ConcurrentHashMap<>();
+    /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
+    private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
 
-    private final Map<String, Marker> currentMarkers = new ConcurrentHashMap<>();
+    private final Map<String, String> currentMarkers = new ConcurrentHashMap<>(); // 存储markerId
 
-    private Marker lastFocusedMarker = null;
+    /** Keeps the selected tag's marker above the overlapping ones. See MarkerFocusTest. */
+    private final MarkerFocus markerFocus = new MarkerFocus(new MarkerFocus.Markers() {
+        @Override
+        public String markerIdFor(String beaconId) {
+            return MapsActivity.this.currentMarkers.get(beaconId);
+        }
+
+        @Override
+        public void setZIndex(String markerId, float zIndex) {
+            if (MapsActivity.this.mapProvider != null) {
+                MapsActivity.this.mapProvider.setMarkerZIndex(markerId, zIndex);
+            }
+        }
+    });
 
     private final Map<String, FrameLayout> dynamicCardsForTag = new ConcurrentHashMap<>();
 
     private boolean initialFetchComplete = false;
-    private long last24HHistoryFetchAt = 0L;
+
+    /** When a refresh is allowed, and how much history it should ask for. See RefreshPolicyTest. */
+    private final RefreshPolicy refreshPolicy = new RefreshPolicy(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
 
     private TagListSwiperHelper tagListSwiperHelper = null;
 
     private final Handler refreshSchedulerHandler = new Handler();
     private Runnable nextLocationRefreshTask = null;
+
+    /**
+     * How long a fetch may run before we tell the user it is still working.
+     * <br>
+     * Long enough that an ordinary refresh never flashes the banner, short enough that a
+     * first fetch does not sit there looking frozen.
+     */
+    private static final long SHOW_LONG_FETCH_BANNER_AFTER_MS = 6000L;
+
+    private final Handler longFetchBannerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable showLongFetchBanner = () -> this.setLongFetchBannerVisible(true);
+
+    /** All three are only ever touched on the main looper, so they need no synchronisation. */
+    /** Banner bookkeeping. Touched only from the banner handler. See LongFetchBannerStateTest. */
+    private final LongFetchBannerState bannerState = new LongFetchBannerState();
 
     private Optional<UserMapCameraPosition> lastCameraPositionOnLoad;
 
@@ -184,6 +219,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Intent data = result.getData();
                     if (data != null && data.getBooleanExtra("requestSendToLogin", false)) {
                         this.handleSendToLogin();
+                        return;
+                    }
+                    if (data != null && data.getBooleanExtra("mapProviderChanged", false)) {
+                        this.recreate();
                     }
                 }
             }
@@ -197,6 +236,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (data != null && data.getBooleanExtra("isDeviceListChanged", false)) {
                         this.handleDeviceListChanged();
                     }
+                    // The empty state on the device list offers to import, but the picker and
+                    // everything that runs after it live here, so it asks us to start it.
+                    if (data != null && data.getBooleanExtra("startImport", false)) {
+                        this.handleImport();
+                    }
                 }
             }
     );
@@ -207,8 +251,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (result.getResultCode() == RESULT_OK) {
                     Intent data = result.getData();
                     if (data != null && (
-                            data.getStringExtra("deviceWasRemoved") != null)
-                            || data.getStringExtra("deviceWasChanged") != null) {
+                            data.getStringExtra("deviceWasRemoved") != null
+                            || data.getStringExtra("deviceWasChanged") != null)) {
                         this.handleDeviceListChanged();
                     }
                 }
@@ -268,10 +312,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             .subscribe(pos -> {
                 Log.d(TAG, "Got previous camera position to reset us to: " + pos);
 
-                pos.ifPresent(userMapCameraPosition -> this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                        new LatLng(userMapCameraPosition.getLat(), userMapCameraPosition.getLon()),
-                        userMapCameraPosition.getZoom()
-                )));
+                pos.ifPresent(userMapCameraPosition -> {
+                    if (this.mapProvider != null) {
+                        this.mapProvider.moveCamera(
+                                userMapCameraPosition.getLat(),
+                                userMapCameraPosition.getLon(),
+                                userMapCameraPosition.getZoom()
+                        );
+                    }
+                });
 
             }, error -> Log.e(TAG, "Failed to get last camera position!", error));
 
@@ -279,10 +328,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         this.windowWidth = this.getResources().getDisplayMetrics().widthPixels;
 
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
+        // 根据用户设置创建地图提供商
+        String mapProviderType = this.userSettings.getMapProvider();
+        IMapProvider tempProvider = MapProviderFactory.create(mapProviderType);
+        
+        // 初始化地图（注意：this.mapProvider 仅在 onMapReady 后赋值，避免初始化竞态）
+        tempProvider.initialize(this, R.id.map, this);
     }
 
 
@@ -290,59 +341,68 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
      */
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        map = googleMap;
+    public void onMapReady(IMapProvider provider) {
+        this.mapProvider = provider;
 
-        map.setOnMapClickListener(this);
-        map.setOnMarkerClickListener(this);
-
-        map.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
-        // We don't want to use the default button. We have a custom button
-        map.getUiSettings().setMyLocationButtonEnabled(false);
-        map.getUiSettings().setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
-        map.getUiSettings().setCompassEnabled(false); // not needed due to no rotation being allowed
-        map.getUiSettings().setMapToolbarEnabled(false); // we have a custom button for this
-
-        if (this.userSettings.hasDarkThemeEnabled()) {
-            // DARK THEME map
-            map.setMapStyle(MapStyleOptions.loadRawResourceStyle(this.getApplicationContext(), R.raw.map_dark_style));
+        // 如果是Google Maps，保留向后兼容
+        if (provider instanceof GoogleMapProvider) {
+            this.map = ((GoogleMapProvider) provider).getGoogleMap();
         }
 
+        mapProvider.setOnMapClickListener(this);
+        mapProvider.setOnMarkerClickListener(this);
+
+        mapProvider.setPadding(0, 0, 0, GOOGLE_LOGO_PADDING_BOTTOM_PX);
+        // We don't want to use the default button. We have a custom button
+        mapProvider.setMyLocationButtonEnabled(false);
+        mapProvider.setRotateGesturesEnabled(false); // no rotation (mostly bc very annoying to reset)
+        mapProvider.setCompassEnabled(false); // not needed due to no rotation being allowed
+        mapProvider.setMapToolbarEnabled(false); // we have a custom button for this
+
+        mapProvider.setMapStyle(this.getPreferredMapStyle());
+
         this.enableMyLocation(false);
+
+        // 地图准备好后，刷新一次当前显示的信标位置
+        this.showLastDeviceLocations();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
 
-        if (this.map != null) {
-            var pos = this.map.getCameraPosition();
-            var async = this.userDataRepository.storeLastCameraPosition(
-                    UserMapCameraPosition.builder()
-                            .zoom(pos.zoom)
-                            .lat(pos.target.latitude)
-                            .lon(pos.target.longitude)
-                            .build()
-            ).subscribe(
-                    success -> Log.d(TAG, "Success storing last camera position!"),
-                    error -> Log.e(TAG, "Error storing last camera position!", error));
+        if (this.mapProvider != null) {
+            IMapProvider.CameraPosition pos = this.mapProvider.getCameraPosition();
+            if (pos != null) {
+                var async = this.userDataRepository.storeLastCameraPosition(
+                        UserMapCameraPosition.builder()
+                                .zoom(pos.getZoom())
+                                .lat(pos.getLatitude())
+                                .lon(pos.getLongitude())
+                                .build()
+                ).subscribe(
+                        success -> Log.d(TAG, "Success storing last camera position!"),
+                        error -> Log.e(TAG, "Error storing last camera position!", error));
+            }
 
             // cleanup location refresh task
             refreshSchedulerHandler.removeCallbacks(this.nextLocationRefreshTask);
             this.nextLocationRefreshTask = null;
         }
+
+        this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onPause();
+        }
     }
 
     @Override
-    public void onMapClick(LatLng point) {
-        Log.i(TAG, "tapped, point=" + point);
+    public void onMapClick(double latitude, double longitude) {
+        Log.i(TAG, "tapped, point=(" + latitude + ", " + longitude + ")");
         // TODO: hide UI elements when this occurs!
     }
 
@@ -350,10 +410,30 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onResume() {
         super.onResume();
 
+        this.userSettings = this.userSettingsRepo.getUserSettings();
+        if (this.mapProvider != null) {
+            this.mapProvider.setMapStyle(this.getPreferredMapStyle());
+        }
+
          // TODO: when a user changes their anisette URL in settings and returns here, this should be able to deal with querying the new URL
 
         this.refreshIfAllowed();
         this.reSchedulePeriodicTagLocationRefresher();
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        
+        // 调用高德地图的生命周期方法
+        if (this.mapProvider instanceof AMapProvider) {
+            ((AMapProvider) this.mapProvider).onDestroy();
+        }
     }
 
     private void reSchedulePeriodicTagLocationRefresher() {
@@ -369,30 +449,23 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void refreshIfAllowed() {
-        if (!this.isAppleServiceInitialised()) {
-            Log.d(TAG, "AppleService was not initialised yet, so we can't refresh");
-            return;
-        }
-
-        if (!this.initialFetchComplete) {
-            Log.d(TAG, "Skipping refresh due to not having fully initialised yet");
-            return;
-        }
-
         final long now = System.currentTimeMillis();
-        if (now < this.last24HHistoryFetchAt + WAIT_BEFORE_REFETCH) {
-            Log.d(TAG, String.format(
-                    "We will not re-fetch Beacon history as less than %d ms (actual: %d ms) have passed since the last history fetch",
-                    WAIT_BEFORE_REFETCH,
-                    (now - this.last24HHistoryFetchAt)
-            ));
+
+        final RefreshPolicy.Decision decision = this.refreshPolicy.decide(
+                now,
+                this.isAppleServiceInitialised(),
+                this.initialFetchComplete,
+                PythonAppleService.isBusy());
+
+        if (!decision.shouldRefresh()) {
+            Log.d(TAG, String.format("Skipping the scheduled refresh: %s (%s)",
+                    decision.reason(), this.refreshPolicy.describeTimeSinceLastFetch(now)));
             return;
         }
 
         Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
         this.fetchAndUpdateCurrentBeacons();
         Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
-        //Toast.makeText(this, "Performing automatic periodic refresh...", LENGTH_SHORT).show();
     }
 
     public void onClickMoreSettings(View view)
@@ -450,9 +523,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
 
                         Log.d(TAG, "Navigating to current user position on the map...");
-                        this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                                new LatLng(location.getLatitude(), location.getLongitude()),
-                                CAMERA_ON_MAP_INITIAL_ZOOM));
+                        if (this.mapProvider != null) {
+                            this.mapProvider.animateCamera(
+                                    location.getLatitude(),
+                                    location.getLongitude(),
+                                    CAMERA_ON_MAP_INITIAL_ZOOM,
+                                    null
+                            );
+                        }
                     });
 
         } else {
@@ -474,12 +552,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             return;
         }
 
-        final List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-        if (locations.isEmpty()) {
+        final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+        if (maybeLast.isEmpty()) {
             Log.w(TAG, "Can't navigate to a beacon that has no locations!");
             return;
         }
-        final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+        final BeaconLocationReport lastLocation = maybeLast.get();
         Uri uri = Uri.parse(String.format(Locale.ROOT, "geo:%.7f,%.7f?q=%.7f,%.7f", lastLocation.getLatitude(), lastLocation.getLongitude(), lastLocation.getLatitude(), lastLocation.getLongitude()));
         Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
         mapIntent.setPackage("com.google.android.apps.maps");
@@ -540,25 +618,27 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             LENGTH_LONG).show();
                 });
             })
-            .publish(storedBeacons ->
             /*
-             * Note: this is a bit of a fork-join: https://stackoverflow.com/questions/48015796/using-rxjava-to-fork-into-tasks-and-combine-results
-             * May be too much of an optimization, but I figured I might as well try out the extent
-             * of what you can do with these RXJava observables as far as multithreading goes...
+             * Fetching and parsing still run concurrently, but they are merged rather than
+             * zipped: zip completed as soon as the single-emission parse branch did, which
+             * cancelled every accessory after the first. See RxFlows#allThen for the full
+             * account. The two doOnNext handlers write to different maps, so their order
+             * relative to each other does not matter.
              */
-                Observable.zip(
-                        storedBeacons.flatMap(beacons ->
-                            this.fetchLastReports(beacons.getOwnedBeacons().stream()
-                                    .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
-                        )
-                        .doOnNext(this::addBeaconLocationsToCurrent),
-                        storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(beacons)))
-                        .doOnNext(this::addBeaconToCurrent),
-                        Pair::create
-                )
-            )
-            .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+            .flatMapCompletable(storedBeacons -> RxFlows.allThen(
+                    // Once, after every accessory has landed, rather than per accessory.
+                    this.updateBeaconGeocodings(),
+                    this.fetchLastReports(storedBeacons.getOwnedBeacons().stream()
+                            .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
+                            .doOnNext(this::addBeaconLocationsToCurrent),
+                    BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
+                            .doOnNext(this::addBeaconToCurrent)
+            ))
             .observeOn(AndroidSchedulers.mainThread())
+            // An import is a first fetch too. Without this the periodic refresh stays disabled
+            // for the rest of the session whenever the app started with nothing stored, which
+            // is exactly the case where someone has just imported their first zip.
+            .doFinally(() -> this.initialFetchComplete = true)
             .subscribe(() -> {
                 this.showLastDeviceLocations();
                 Log.i(TAG, "Finished visualising new location reports!");
@@ -660,14 +740,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Click location history event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
 
-        var pos = this.map.getCameraPosition();
+        IMapProvider.CameraPosition pos = this.mapProvider != null ? this.mapProvider.getCameraPosition() : null;
 
         Log.d(TAG, "Going to the history page for beaconId=" + beaconId);
         Intent viewHistoryIntent = new Intent(this, HistoryViewActivity.class);
         viewHistoryIntent.putExtra("beaconId", beaconId);
-        viewHistoryIntent.putExtra("lon", pos.target.longitude);
-        viewHistoryIntent.putExtra("lat", pos.target.latitude);
-        viewHistoryIntent.putExtra("zoom", pos.zoom);
+        if (pos != null) {
+            viewHistoryIntent.putExtra("lon", pos.getLongitude());
+            viewHistoryIntent.putExtra("lat", pos.getLatitude());
+            viewHistoryIntent.putExtra("zoom", pos.getZoom());
+        }
 
         startActivity(viewHistoryIntent);
     }
@@ -756,11 +838,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             this.sendToLogin();
             return;
         }
-        // else stay here & restore the account & get the user settings
-        var userSettings = userSettingsRepo.getUserSettings();
-
-        // Get Apple account
-        var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get(), userSettings.getAnisetteServerUrl())
+        // else stay here & restore the account.
+        // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
+        // so we no longer need to read userSettings.getAnisetteServerUrl() here.
+        var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get())
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;
@@ -800,19 +881,51 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
         .subscribeOn(Schedulers.computation())
         .observeOn(AndroidSchedulers.mainThread())
+        // On termination rather than on a result. With no beacons stored - a first run, or
+        // before any import - this stream completes without ever emitting, so setting the flag
+        // in onNext left it false forever and the periodic refresh never ran again.
+        .doFinally(() -> this.initialFetchComplete = true)
         .subscribe(lastReports -> {
-            this.initialFetchComplete = true;
             //Toast.makeText(this.getApplicationContext(), "Yay, got last reports!", LENGTH_SHORT).show();
             TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
             this.showLastDeviceLocations();
             Log.i(TAG, "Successfully retrieved latest reports!");
         }, error -> {
-            this.initialFetchComplete = true;
             Log.e(TAG, "Error while restoring account and trying to get latest beacons", error);
             TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
+
+            if (isAccountRestoreFailure(error)) {
+                // Most likely cause: a session blob saved by FindMy 0.7.6 that 0.9.x cannot
+                // restore. Wipe the bad blob and route the user back to login with a hint.
+                Log.w(TAG, "Account restore failed; clearing saved auth and prompting re-login");
+                handleAccountRestoreFailureOnUiThread();
+            }
             //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
             // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
+    }
+
+    private static boolean isAccountRestoreFailure(Throwable t) {
+        for (Throwable cur = t; cur != null; cur = cur.getCause()) {
+            if (cur instanceof PythonAccountLoginException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void handleAccountRestoreFailureOnUiThread() {
+        var disposable = this.userAuthRepo.clearUser()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(() -> {
+                    Toast.makeText(this, R.string.relogin_required_after_upgrade, LENGTH_LONG).show();
+                    this.finish();
+                    this.sendToLogin();
+                }, err -> {
+                    Log.e(TAG, "Failed to clear stale auth blob during restore-failure recovery", err);
+                    // Fall through silently — at worst the user has to log out manually.
+                });
     }
 
     private synchronized void addBeaconToCurrent(final List<BeaconInformation> newBeaconInformation) {
@@ -826,30 +939,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private synchronized void addBeaconLocationsToCurrent(final Map<String, List<BeaconLocationReport>> newItems) {
-        for (var key: newItems.keySet()) {
-            if (this.beaconLocations.containsKey(key)) {
+        newItems.forEach((beaconId, reports) -> {
+            final int before = this.beaconLocations.sizeOf(beaconId);
+            final int after = this.beaconLocations.merge(beaconId, reports);
 
-                var newMergedList = BeaconCombinerUtil.combineAndSort(
-                        key,
-                        Objects.requireNonNull(this.beaconLocations.get(key)),
-                        Objects.requireNonNull(newItems.get(key))
-                );
-
-                Log.d(TAG, String.format(
-                        "Merged location history for beaconId=%s, which had %d items of location history, with %d new items of locationHistory to get a total of %d items of locationHistory",
-                        key,
-                        Objects.requireNonNull(this.beaconLocations.get(key)).size(),
-                        Objects.requireNonNull(newItems.get(key)).size(),
-                        newMergedList.size()
-                ));
-
-                // we need to merge and re-sort...
-                this.beaconLocations.put(key, newMergedList);
-            } else {
-                Log.d(TAG, "Adding new location for beaconId=" + key);
-                this.beaconLocations.put(key, newItems.get(key));
-            }
-        }
+            Log.d(TAG, String.format(
+                    "Location history for beaconId=%s: %d held + %d fetched = %d after de-duplication",
+                    beaconId, before, reports.size(), after));
+        });
     }
 
     private Completable updateBeaconGeocodings() {
@@ -864,19 +961,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         for (BeaconData beaconData : this.beacons.values()) {
             final String beaconId = beaconData.getInfo().getBeaconId();
 
-            if (!this.beaconLocations.containsKey(beaconId)) {
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
                 Log.d(TAG, "Can't update geocoding for beacon=" + beaconId + " because it contained no locations");
                 continue;
             }
 
-            List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-
-            if (locations.isEmpty()) {
-                Log.d(TAG, "Did not reverse geocode the last location for beaconId=" + beaconId + " because it had no known locations");
-                continue;
-            }
-
-            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            BeaconLocationReport lastLocation = maybeLast.get();
             final Double lastLat = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.latitude).orElse(null);
             final Double lastLon = Optional.ofNullable(beaconData.getLastGeocodingLocation()).map(pos -> pos.longitude).orElse(null);
             if (lastLat != null && lastLat == lastLocation.getLatitude() && lastLon != null && lastLon == lastLocation.getLongitude()) {
@@ -913,45 +1004,41 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
 
-            if (!this.beaconLocations.containsKey(beaconId)) {
-                Log.d(TAG, "No location was currently know for beacon with id " + beaconId + ". It is being skipped.");
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
+                Log.d(TAG, "No location is currently known for beaconId=" + beaconId + ", so it cannot be drawn. Skipping.");
                 continue;
             }
 
-            List<BeaconLocationReport> locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-
-            if (locations.isEmpty()) {
-                Log.d(TAG, "Did not get any location reports for beacon device with id " + beacon.getBeaconId() + ". This device will not be shown in the UI.");
-                continue;
-            }
-
-            BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
-            this.showBeaconOnMap(beacon, lastLocation);
+            this.showBeaconOnMap(beacon, maybeLast.get());
         }
         this.updateBeaconCards();
     }
 
     private synchronized void showBeaconOnMap(final BeaconInformation beacon, final BeaconLocationReport lastLocation) {
         final String beaconId = beacon.getBeaconId();
-        final LatLng locationTag = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+        
+        if (this.mapProvider == null) {
+            Log.w(TAG, "Map provider is not ready yet, cannot show beacon");
+            return;
+        }
 
         if (this.currentMarkers.containsKey(beaconId)) {
-            // remove the old marker
-            Log.d(TAG, "Going to move the existing marker for beaconId=" + beaconId);
-            var marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
-            marker.setPosition(locationTag);
-            return;
+            // remove the old marker and add a new one
+            Log.d(TAG, "Going to replace the existing marker for beaconId=" + beaconId);
+            this.mapProvider.removeMarker(beaconId);
         }
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
-        BitmapDescriptor icon;
+        // 创建自定义标记图标
+        android.graphics.Bitmap iconBitmap;
         if (beacon.isEmojiFilled()) {
-            icon = VectorImageGeneratorUtil.makeMarker(
+            iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
                     getColor(R.color.md_theme_background));
         } else {
-            icon = VectorImageGeneratorUtil.makeMarker(
+            iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     R.drawable.apple,
                     getColor(R.color.md_theme_background),
@@ -959,24 +1046,35 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             );
         }
 
-        var markerOptions = new MarkerOptions()
-                .position(locationTag)
-                //.title(markerTitle)
-                .icon(icon);
-        Marker marker = this.map.addMarker(markerOptions);
+        // 使用抽象接口添加标记
+        MapMarker marker = MapMarker.builder()
+                .id(beaconId)
+                .latitude(lastLocation.getLatitude())
+                .longitude(lastLocation.getLongitude())
+                .icon(iconBitmap)
+                // Every refresh removes and re-adds the markers, so the selected one has to be
+                // built raised. Setting it only on selection would let the next refresh drop
+                // it back underneath the pile without the user touching anything.
+                .zIndex(this.markerFocus.zIndexFor(beaconId))
+                .build();
+        
+        String markerId = this.mapProvider.addMarker(marker);
+        this.currentMarkers.put(beaconId, markerId); // 存储markerId而不是Marker对象
 
-        this.currentMarkers.put(beaconId, marker);
         if (this.currentMarkers.size() == 1) {
             // for the first marker, navigate to it smoothly on the map!
-            // (we choose the first added marker here because it is the
-            // one that will become visible in the UI tag list at the
-            // bottom of the screen)
             this.goToBeaconOnMap(beaconId, CAMERA_ON_MAP_INITIAL_ZOOM);
         }
     }
 
     private void setupTagScrollArea() {
         HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
+
+        // The cards size themselves to their content now, so nothing absorbs the navigation bar
+        // any more. This used to be hidden by the area's fixed 240dp height, which held about
+        // 70dp of slack below the card.
+        WindowPaddingUtil.insertUIBottomPadding(scrollContainer);
+
         this.tagListSwiperHelper = new TagListSwiperHelper(
                 scrollContainer,
                 this.dynamicCardsForTag,
@@ -991,34 +1089,37 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void goToBeaconOnMap(final String beaconId, Float zoom) {
         try {
-            Marker marker = Objects.requireNonNull(this.currentMarkers.get(beaconId));
-            this.bringMarkerToTop(marker);
+            if (this.mapProvider == null) {
+                Log.w(TAG, "Map provider is not ready yet");
+                return;
+            }
+            
+            // 从beaconLocations获取位置信息
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
+                Log.w(TAG, "No locations found for beaconId=" + beaconId);
+                return;
+            }
 
-            var pos = marker.getPosition();
+            BeaconLocationReport lastLocation = maybeLast.get();
+            double lat = lastLocation.getLatitude();
+            double lon = lastLocation.getLongitude();
 
             Log.d(TAG, "Animating camera to position of marker for beaconId=" + beaconId + " after it was selected in the bottom tag list...");
 
+            this.markerFocus.focus(beaconId);
+
             if (zoom != null) {
-                this.map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, zoom));
+                this.mapProvider.animateCamera(lat, lon, zoom, null);
             } else {
-                this.map.animateCamera(CameraUpdateFactory.newLatLng(pos));
+                // 使用当前缩放级别
+                IMapProvider.CameraPosition currentPos = this.mapProvider.getCameraPosition();
+                float currentZoom = currentPos != null ? currentPos.getZoom() : CAMERA_ON_MAP_INITIAL_ZOOM;
+                this.mapProvider.animateCamera(lat, lon, currentZoom, null);
             }
         } catch (Exception e) {
             Log.e(TAG, "Failure when trying to navigate to marker on map on lock into card for beaconId=" + beaconId, e);
         }
-    }
-
-    private void bringMarkerToTop(Marker marker) {
-        if (this.lastFocusedMarker == marker) {
-            // do nothing
-            return;
-        }
-
-        if (this.lastFocusedMarker != null) {
-            this.lastFocusedMarker.setZIndex(MARKER_ZINDEX_DEFAULT);
-        }
-        marker.setZIndex(MARKER_ZINDEX_TOP);
-        this.lastFocusedMarker = marker;
     }
 
     private synchronized void updateBeaconCards() {
@@ -1027,7 +1128,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // remove all beacons that had cards that are now gone
         for (var beaconId : this.dynamicCardsForTag.keySet()) {
-            if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.containsKey(beaconId)) {
+            if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.isDrawable(beaconId)) {
                 Log.i(TAG, "Cleaning up view for beaconId=" + beaconId + " which did not have any locations associated with itself anymore");
                 View view = this.dynamicCardsForTag.get(beaconId);
                 cardsContainer.removeView(view);
@@ -1040,16 +1141,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         for (final BeaconData beaconData : this.beacons.values()) {
             final BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
-            if (!this.beaconLocations.containsKey(beaconId)) {
+            final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
+            if (maybeLast.isEmpty()) {
                 Log.w(TAG, "Found a beacon (" + beaconId + ") without locations! We can't draw such a beacon. Skipping...");
                 continue;
             }
-            var locations = Objects.requireNonNull(this.beaconLocations.get(beaconId));
-            if (locations.isEmpty()) {
-                Log.w(TAG, "Fond a beacon (" + beaconId + ") with no location history items! We can't draw such a beacon. Skipping...");
-                continue;
-            }
-            final BeaconLocationReport lastLocation = locations.get(locations.size() - 1);
+            final BeaconLocationReport lastLocation = maybeLast.get();
             final List<Address> locationInfo = beaconData.getGeocoding();
 
             FrameLayout v;
@@ -1067,6 +1164,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             assert v != null;
             var params = v.getLayoutParams();
             params.width = this.windowWidth != 0 ? (this.windowWidth - 80) : (this.getWindow().getDecorView().getWidth() - 80);
+
+            // Cards size themselves to their own content, so a two-line address made one card
+            // taller than its neighbours. Inflating with a null root drops the layout's own
+            // height, and the container hands out WRAP_CONTENT by default, so it has to be set
+            // here: MATCH_PARENT inside a wrap_content horizontal LinearLayout triggers
+            // forceUniformHeight, which measures every card to the height of the tallest.
+            params.height = ViewGroup.LayoutParams.MATCH_PARENT;
 
             v.setLayoutParams(params);
 
@@ -1109,7 +1213,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         ImageButton navigationButton = this.findViewById(R.id.button_navigate_to);
         if (this.dynamicCardsForTag.isEmpty()) {
-            scrollContainer.setVisibility(GONE); // HIDE PARENT CONTAINER (FOR NOW)
+            // INVISIBLE, not GONE. buttons_bottom_right is positioned with layout_above
+            // against this view, and RelativeLayout ignores layout_above when the anchor is
+            // GONE - the buttons would then fall back to the top of the screen and render
+            // under the status bar. Left INVISIBLE it still occupies its (zero, since it has
+            // no cards) height at the bottom, so the anchor keeps resolving.
+            scrollContainer.setVisibility(INVISIBLE);
             navigationButton.setVisibility(GONE);
         } else {
             scrollContainer.setVisibility(VISIBLE); // UNHIDE PARENT CONTAINER
@@ -1120,6 +1229,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void sendToLogin() {
         Intent intent = new Intent(this, AppleLoginActivity.class);
         startActivity(intent);
+    }
+
+    private IMapProvider.MapStyle getPreferredMapStyle() {
+        if (this.userSettings == null || this.userSettings.getUseDarkTheme() == null) {
+            return IMapProvider.MapStyle.FOLLOW_SYSTEM;
+        }
+        return this.userSettings.getUseDarkTheme()
+                ? IMapProvider.MapStyle.DARK
+                : IMapProvider.MapStyle.LIGHT;
     }
 
     private void fetchAndUpdateCurrentBeacons() {
@@ -1145,29 +1263,130 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist) {
+        // Captured once and reused below: recording the finish time instead would leave a gap
+        // in history the width of the fetch, which for an unaligned tag is minutes.
         final long now = System.currentTimeMillis();
-
-        final int hoursToGoBack = (int) Math.min(
-                Math.ceil(((double)now - (double)this.last24HHistoryFetchAt)/(double)ONE_HOUR_IN_MS),
-                HOURS_TO_GO_BACK_24H
-        );
+        final int hoursToGoBack = this.refreshPolicy.hoursToGoBack(now);
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
-                .doOnNext(reports -> this.last24HHistoryFetchAt = now) // on success, update this time.
-                .flatMap(this.beaconRepo::storeToLocationCache);
+        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+                .doOnSubscribe(__ -> this.markFetchStarted())
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
+                .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
+                .doFinally(this::markFetchFinished);
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist, final int hoursToGoBack) {
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(beaconIdToPlist, hoursToGoBack)
-                .flatMap(this.beaconRepo::storeToLocationCache);
+        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+                .doOnSubscribe(__ -> this.markFetchStarted())
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
+                .doFinally(this::markFetchFinished);
+    }
+
+    /**
+     * Fetches each accessory in its own call into Python, storing the result before moving on.
+     * <br>
+     * Handing Python the whole list meant it returned a single dict at the very end, so the
+     * updated key alignment for every accessory was written in one go. A tag with no alignment
+     * record takes minutes to resolve, and quitting part-way through discarded the work for
+     * all of them - including the ones that had already finished - so the next launch searched
+     * the same tens of thousands of key indices again. One call per accessory means each one
+     * is persisted as soon as it resolves.
+     * <br>
+     * It also lets the UI update per tag instead of all at once, and keeps a single failure
+     * from taking the rest of the batch with it.
+     * <br>
+     * Sequential on purpose: FindMy.py's synchronous account drives one asyncio event loop,
+     * and calls into Python are serialised anyway (see PythonAppleService).
+     * <br>
+     * The sequencing itself lives in {@link RxFlows#oneAtATime} so it can be tested without
+     * an Activity - see {@code RxFlowsTest}.
+     */
+    private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
+            final List<AccessoryRequest> requests, final int hoursToGoBack) {
+
+        return RxFlows.oneAtATime(
+                requests,
+                request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
+                        .flatMap(this.beaconRepo::storeFetchResult),
+                this::setLongFetchProgress,
+                (request, error) -> Log.e(TAG,
+                        "Failed to fetch reports for beaconId=" + request.getBeaconId()
+                                + "; continuing with the remaining accessories", error));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.appleService.getLastReports(Map.of(beaconId, pList), hoursToGoBack)
-                .flatMap(this.beaconRepo::storeToLocationCache);
+        return this.beaconRepo.toAccessoryRequests(Map.of(beaconId, pList))
+                .doOnSubscribe(__ -> this.markFetchStarted())
+                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
+                .flatMap(this.beaconRepo::storeFetchResult)
+                .doFinally(this::markFetchFinished);
+    }
+
+    /**
+     * Starts the clock on the "still working" banner.
+     * <br>
+     * A tag whose export carried no KeyAlignmentRecord starts at index 0 from its pairing
+     * date, so its first fetch searches the tag's whole life - tens of thousands of key
+     * indices, at roughly 290 per request. That is minutes of sequential requests during
+     * which nothing changes on screen, and it is indistinguishable from a hang.
+     * <br>
+     * It also matters that the user does not walk away: Python returns the updated
+     * alignment for every accessory in one dict at the end of the batch, so quitting
+     * part-way through discards the work for all of them and the next launch starts over.
+     */
+    private void markFetchStarted() {
+        this.longFetchBannerHandler.post(() -> {
+            if (this.bannerState.fetchStarted()) {
+                this.longFetchBannerHandler.postDelayed(
+                        this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
+            }
+        });
+    }
+
+    private void markFetchFinished() {
+        this.longFetchBannerHandler.post(() -> {
+            if (!this.bannerState.fetchFinished()) {
+                return;
+            }
+            this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
+            this.setLongFetchBannerVisible(false);
+        });
+    }
+
+    /** Records how far through the batch we are, so the banner can say so. */
+    private void setLongFetchProgress(int done, int total) {
+        this.longFetchBannerHandler.post(() -> {
+            this.bannerState.setProgress(done, total);
+
+            TextView banner = this.findViewById(R.id.long_fetch_banner);
+            if (banner != null && banner.getVisibility() == VISIBLE) {
+                banner.setText(this.longFetchBannerText());
+            }
+        });
+    }
+
+    private String longFetchBannerText() {
+        if (!this.bannerState.hasCount()) {
+            return this.getString(R.string.resolving_tags_banner);
+        }
+        return this.getString(
+                R.string.resolving_tags_banner_progress,
+                this.bannerState.displayedPosition(),
+                this.bannerState.total());
+    }
+
+    private void setLongFetchBannerVisible(boolean visible) {
+        TextView banner = this.findViewById(R.id.long_fetch_banner);
+        if (banner == null) {
+            return;
+        }
+        if (visible) {
+            banner.setText(this.longFetchBannerText());
+        }
+        banner.setVisibility(visible ? VISIBLE : GONE);
     }
 
     private boolean isAppleServiceInitialised() {
@@ -1179,7 +1398,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
             Log.i(TAG, "Enabling 'my location' related UI features...");
-            this.map.setMyLocationEnabled(true);
+            // 注意：抽象接口可能不支持setMyLocationEnabled，这里保留向后兼容
+            if (this.map != null) {
+                this.map.setMyLocationEnabled(true);
+            }
 
             // This UI button is only available if the user enables own location permissions.
             ImageButton button = findViewById(R.id.button_my_location);
@@ -1230,15 +1452,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public boolean onMarkerClick(@NonNull Marker marker) {
-        this.bringMarkerToTop(marker);
-
-        Optional<String> beaconIdForMarker = this.currentMarkers.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(marker))
-                .map(Map.Entry::getKey)
-                .findFirst();
+    public boolean onMarkerClick(String markerId) {
+        // 查找对应的beaconId
+        Optional<String> beaconIdForMarker = Optional.ofNullable(markerId);
 
         if (beaconIdForMarker.isPresent()) {
+            // Tapping a marker raises it as well, not only selecting its card. Without this,
+            // tapping the one visible marker in a pile scrolls to its card but leaves the
+            // marker underneath whichever one is drawn on top - so the tap looks ignored.
+            this.markerFocus.focus(beaconIdForMarker.get());
             this.tagListSwiperHelper.navigateToCard(beaconIdForMarker.get());
         } else {
             Log.w(TAG, "Clicked on a marker that could not be associated back to any beaconId!");

@@ -9,7 +9,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <include
@@ -21,8 +21,84 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/my_devices_list"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
+        <!-- Shown instead of the list when nothing has been imported. Without it this screen
+             is a dead end on first run: the only way to import is a menu on the map, which a
+             new user has no reason to open. -->
+        <LinearLayout
+            android:id="@+id/my_devices_empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/my_devices_empty_icon"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:alpha="0.4"
+                android:contentDescription="@null"
+                android:src="@drawable/devices_24px"
+                app:tint="@color/md_theme_outline" />
+
+            <TextView
+                android:id="@+id/my_devices_empty_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="@font/nunito_bold"
+                android:text="@string/no_devices_imported_yet"
+                android:textAlignment="center"
+                android:textColor="@color/md_theme_onSurfaceVariant"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/import_a_zip_exported_from_a_mac"
+                android:textAlignment="center"
+                android:textColor="@color/md_theme_outline"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/my_devices_empty_wiki_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="4dp"
+                android:text="@string/how_do_i_get_the_zip"
+                android:textAlignment="center"
+                android:textColor="@color/md_theme_primary"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/my_devices_empty_import_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="@color/md_theme_surfaceContainerHigh"
+                android:paddingLeft="20dp"
+                android:paddingTop="9dp"
+                android:paddingRight="20dp"
+                android:paddingBottom="9dp"
+                android:text="@string/import_devices"
+                android:textColor="@color/md_theme_outlineVariant_mediumContrast"
+                android:textSize="16sp"
+                app:iconSize="22dp"
+                app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </layout>

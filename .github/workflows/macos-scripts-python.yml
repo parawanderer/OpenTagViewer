@@ -24,7 +24,11 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        # 3.9 is what the Xcode Command Line Tools install, so it is the interpreter anyone
+        # running the wizard from source on a stock Mac actually gets. Dropping it means
+        # 3.10-only syntax can land and the wizard dies at import on a fresh machine, which
+        # is exactly how it broke once.
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - name: Checkout code
@@ -54,3 +58,12 @@ jobs:
       working-directory: ./python
       run: |
         pytest ./test
+
+    # The release check reads VERSION out of wizard.py by parsing the module, so a refactor
+    # that makes it unreadable - moving it into a class, computing it from parts - would
+    # otherwise only surface when a release failed. This is that same read, run whenever
+    # python/ changes.
+    - name: Check the exporter version is still readable
+      working-directory: .
+      run: |
+        python scripts/exporter_version.py --print

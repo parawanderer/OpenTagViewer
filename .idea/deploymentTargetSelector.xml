@@ -4,22 +4,16 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-05-27T17:14:41.357167100Z">
+        <DropdownSelection timestamp="2026-08-08T15:34:07.381760800Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\shaneb\.android\avd\Medium_Phone.avd" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=R5CY238765K" />
             </handle>
           </Target>
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="testEncodeData()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="testEncryptDecrypt()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="testEncryptDecrypt() (1)">
+      <SelectionState runConfigName="Tests in 'dev.wander.android.opentagviewer'">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>

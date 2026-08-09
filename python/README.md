@@ -150,7 +150,29 @@ pyinstaller \
 
 Zip up result (MacOS):
 ```shell
-APP_VERSION=1.0.5
+# Read from the source rather than typed, so the zip cannot end up named after a version the
+# app does not report. See "Versioning" below.
+APP_VERSION="$(python ../scripts/exporter_version.py --print)"
 cd ./dist
 zip -r OpenTagViewer-ExportWizardMacOS-$APP_VERSION.zip OpenTagViewer.app/ OpenTagViewer
 ```
+
+### Versioning
+
+`VERSION` in [`main/wizard.py`](./main/wizard.py) is the only place the exporter's version is
+written. It reaches the window title and every export it produces, as
+`via: OpenTagViewer.app:<version>` in `OPENTAGVIEWER.yml` — which is how a zip can be traced
+back to the exporter that built it afterwards.
+
+Nothing patches it at build time, so **bump it in a commit before tagging a release**.
+Releases are tagged `macos-exporter-v<version>`, and CI refuses to publish one whose tag
+disagrees with the source:
+
+```shell
+python ../scripts/exporter_version.py --print                     # what the source declares
+python ../scripts/exporter_version.py --tag macos-exporter-v1.0.6 # would this tag be accepted?
+```
+
+Not to be confused with `EXPORT_METADATA_VERSION`, a few lines below it: that is the version
+of the *export format* the Android app parses, and it changes only when the contents of the
+zip change. Full procedure: [CONTRIBUTING.md](../CONTRIBUTING.md#releasing-the-macos-exporter).

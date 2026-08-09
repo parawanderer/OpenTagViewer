@@ -123,7 +123,7 @@ public final class PythonAuthService {
         }).subscribeOn(Schedulers.computation());
     }
 
-    public static Observable<PythonAppleAccount> restoreAccount(final AppleUserData appleUserData, final String anisetteServerUrl) {
+    public static Observable<PythonAppleAccount> restoreAccount(final AppleUserData appleUserData) {
         return Observable.fromCallable(() -> {
             var data = AppCryptographyUtil.AppEncryptedData.fromFlattened(appleUserData.getData());
             var account = new AppCryptographyUtil().decrypt(data, KEYSTORE_ALIAS_ACCOUNT);
@@ -131,10 +131,11 @@ public final class PythonAuthService {
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
 
+            // FindMy 0.9.x embeds the anisette provider state inside the account JSON
+            // (see AccountStateMapping.anisette), so we no longer pass a server URL here.
             var returned = module.callAttr(
                     "getAccount",
-                    new Kwarg("serializedAccountData", new String(account, StandardCharsets.UTF_8)),
-                    new Kwarg("anisetteServerUrl", anisetteServerUrl)
+                    new Kwarg("serializedAccountData", new String(account, StandardCharsets.UTF_8))
             );
 
             if (returned == null) {

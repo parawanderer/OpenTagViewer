@@ -33,6 +33,7 @@ import com.google.android.material.progressindicator.CircularProgressIndicatorSp
 import com.google.android.material.progressindicator.IndeterminateDrawable;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
@@ -59,9 +60,12 @@ import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
+import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import lombok.Data;
@@ -94,6 +98,7 @@ public class SettingsActivity extends AppCompatActivity {
     private String editorSelectedLocateId = null;
 
     private String initialAnisetteUrl = null;
+    private boolean mapProviderChanged = false;
 
 
     @Override
@@ -132,6 +137,8 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setCurrentLanguage(Optional.ofNullable(this.currentSettings.getLanguage()).map(this::getPrettyLanguageName).orElse(this.getString(R.string.use_system_default)));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
         this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
+        this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
+        this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
 
         if (this.getSupportActionBar() != null) {
@@ -158,7 +165,17 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleEndActivity() {
+        if (this.mapProviderChanged) {
+            Intent data = new Intent();
+            data.putExtra("mapProviderChanged", true);
+            setResult(RESULT_OK, data);
+        }
         this.finish();
+    }
+
+    @Override
+    public void onBackPressed() {
+        this.handleEndActivity();
     }
 
     private void onDebugDataEnabledChange(CompoundButton buttonView, boolean isChecked) {
@@ -203,10 +220,108 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
+    private String getCurrentMapProviderUiString() {
+        String provider = this.currentSettings.getMapProvider();
+        if (provider == null || provider.isEmpty() || "google".equals(provider)) {
+            return this.getString(R.string.map_provider_google);
+        } else if ("amap".equals(provider)) {
+            return this.getString(R.string.map_provider_amap);
+        }
+        return this.getString(R.string.map_provider_google);
+    }
+    
+    private void onClickEditMapProvider() {
+        List<String> providerChoices = new ArrayList<>();
+        providerChoices.add(this.getString(R.string.map_provider_google));
+        providerChoices.add(this.getString(R.string.map_provider_amap));
+        
+        String currentProvider = this.currentSettings.getMapProvider();
+        int currentOption = 0; // 默认Google Maps
+        if ("amap".equals(currentProvider)) {
+            currentOption = 1;
+        }
+        
+        var builder = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.map_provider)
+                .setPositiveButton(R.string.accept, (dialog, which) -> {
+                    Log.d(TAG, "Selected new map provider option!");
+                    
+                    int checkedItemPosition = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
+                    
+                    if (checkedItemPosition != AdapterView.INVALID_POSITION) {
+                        String selectedProvider = checkedItemPosition == 0 ? "google" : "amap";
+                        Log.d(TAG, "Selected map provider: " + selectedProvider);
+
+                        // AMap ships with no key: they are issued per developer account and
+                        // bound to a package name and signing fingerprint, so each user
+                        // brings their own. Selecting it without one would leave a blank map
+                        // and no explanation, so gate the change on having a key and take
+                        // the user straight to entering one.
+                        if ("amap".equals(selectedProvider) && !this.currentSettings.hasAmapApiKey()) {
+                            Toast.makeText(this, R.string.amap_key_required, Toast.LENGTH_LONG).show();
+                            this.onClickEditAmapApiKey(selectedProvider);
+                            return;
+                        }
+
+                        this.updateMapProvider(selectedProvider);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .setSingleChoiceItems(providerChoices.toArray(new CharSequence[0]), currentOption, null);
+        
+        builder.show();
+    }
+    
+    /**
+     * Prompt for the user's own AMap API key.
+     *
+     * @param providerToApplyOnSuccess if non-null, the provider to switch to once a key has
+     *                                 been supplied. Lets the picker route the user here and
+     *                                 have their selection complete afterwards, rather than
+     *                                 silently dropping it.
+     */
+    private void onClickEditAmapApiKey(final String providerToApplyOnSuccess) {
+        AmapApiKeyDialog.show(this, this.currentSettings.getAmapApiKey(), enteredKey -> {
+            this.currentSettings.setAmapApiKey(enteredKey);
+            this.saveSettings();
+
+            if (enteredKey == null) {
+                // Without a key AMap cannot render anything, so fall back rather than
+                // leaving a provider selected that will only ever show a blank map.
+                Toast.makeText(this, R.string.amap_key_cleared, Toast.LENGTH_SHORT).show();
+                if ("amap".equals(this.currentSettings.getMapProvider())) {
+                    this.updateMapProvider("google");
+                }
+                return;
+            }
+
+            Toast.makeText(this, R.string.amap_key_saved, Toast.LENGTH_SHORT).show();
+            if (providerToApplyOnSuccess != null) {
+                this.updateMapProvider(providerToApplyOnSuccess);
+            }
+        });
+    }
+
+    private void updateMapProvider(String provider) {
+        final String currentProvider = this.currentSettings.getMapProvider();
+        this.mapProviderChanged = this.mapProviderChanged || !java.util.Objects.equals(currentProvider, provider);
+        this.currentSettings.setMapProvider(provider);
+        this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
+        this.saveSettings();
+        Log.i(TAG, "Updated map provider to: " + provider);
+    }
+    
     private void onClickEditLanguage() {
         View view = inflate(this, R.layout.language_input_dialog, null);
 
-        final String currentLocale = Locale.getDefault().getLanguage();
+        final String currentLocale = Optional.ofNullable(this.currentSettings.getLanguage())
+                .orElseGet(() -> {
+                    String appLocales = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+                    if (appLocales != null && !appLocales.isBlank()) {
+                        return appLocales.split(",")[0];
+                    }
+                    return Locale.getDefault().toLanguageTag();
+                });
         var availableLocales = LocaleConfigUtil.getAvailableLocales(this.getResources())
                 .toArray(new String[0]);
 
@@ -220,7 +335,8 @@ public class SettingsActivity extends AppCompatActivity {
                 .sorted().toArray(String[]::new));
 
         mappedLocales.entrySet().stream()
-                .filter(kvp -> kvp.getValue().equals(currentLocale))
+                .filter(kvp -> kvp.getValue().equalsIgnoreCase(currentLocale)
+                        || currentLocale.toLowerCase(Locale.ROOT).startsWith(kvp.getValue().toLowerCase(Locale.ROOT) + "-"))
                 .findFirst()
                 .map(Map.Entry::getKey)
                 .ifPresent(option -> languageDropdown.setText(option, false));
@@ -350,7 +466,14 @@ public class SettingsActivity extends AppCompatActivity {
         var finalUrl = Optional.ofNullable(this.currentSettings.getAnisetteServerUrl());
 
         if (!originalUrl.equals(finalUrl)) {
-            // we need to force a re-login, unfortunately
+            // A re-login is genuinely required, not just a limitation of how the account
+            // is serialized. Anisette supplies a machine identity (X-Apple-I-MD-M and
+            // friends) derived from that server's own ADI provisioning, and Apple binds
+            // the session to it, so a session established via one server is not valid
+            // when presented with another server's identity. Rewriting the stored
+            // provider would keep the app running but leave it failing auth against
+            // Apple, which is worse than an honest re-login. The dialog warns about this
+            // up front (see anisette_url_change_warning).
             this.performLogout();
         }
     }
@@ -418,6 +541,11 @@ public class SettingsActivity extends AppCompatActivity {
         LinearLayout loginDataContainer = this.findViewById(R.id.login_info_container);
         loginDataContainer.setVisibility(VISIBLE);
 
+        // Swap the loading skeleton for the real thing. Both are sized alike, so this does not
+        // move anything below it.
+        this.findViewById(R.id.login_details_placeholder).setVisibility(GONE);
+        this.findViewById(R.id.login_details).setVisibility(VISIBLE);
+
         TextView firstnameLastnameText = this.findViewById(R.id.firstame_lastname_settings_block);
         final String userFirstNameLastName = userAuthData.getAccount().getInfo().getFirstName() + " " + userAuthData.getAccount().getInfo().getLastName();
         firstnameLastnameText.setText(userFirstNameLastName);
@@ -471,7 +599,7 @@ public class SettingsActivity extends AppCompatActivity {
     private String getPrettyLanguageName(final String languageId) {
         var res = this.getResources();
         return res.getString(res.getIdentifier(
-                "lang_" + languageId,
+                LocaleConfigUtil.toLocaleLabelResourceName(languageId),
                 "string",
                 this.getPackageName()));
     }

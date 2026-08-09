@@ -1,5 +1,7 @@
 from enum import Enum
+from typing import Any
 import json
+import time
 import traceback
 from datetime import datetime, timezone
 from io import BytesIO
@@ -12,7 +14,7 @@ from findmy.reports import (
     AppleAccount,
     LoginState,
     SmsSecondFactorMethod,
-    TrustedDeviceSecondFactorMethod
+    TrustedDeviceSecondFactorMethod,
 )
 from findmy.reports.twofactor import (
     SyncSecondFactorMethod
@@ -25,7 +27,7 @@ class TwoFactorMethods(Enum):
     PHONE = 2
 
 
-def _toUnixEpochMs(dt: datetime) -> int:
+def _toUnixEpochMs(dt: datetime | None) -> int | None:
     """
     Convert datetime to unix epoch (milliseconds)
     """
@@ -59,7 +61,7 @@ def foo(arg: str):
     }
 
 
-def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
+def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict | None:
     """
     Extract some extra information from within the plist file `cloudKitMetadata` node
     (that is followed by a `<data>` element containing base64)
@@ -70,8 +72,10 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
 
     ### More info:
 
-    The most popular java plist parser, the google java [dd-plist](https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist) library,
-    [does not currently support the `NSKeyedArchiver` plist format](https://github.com/3breadt/dd-plist/issues/70) (at the time of writing).
+    The most popular java plist parser, the google java
+    [dd-plist](https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist) library,
+    [does not currently support the `NSKeyedArchiver` plist format](https://github.com/3breadt/dd-plist/issues/70)
+    (at the time of writing).
 
     However somebody has managed to create a parser in python: https://github.com/avibrazil/NSKeyedUnArchiver
 
@@ -79,7 +83,8 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
     we will extract it using python via this nice library and pass the needed data back to Java
 
     See:
-    - https://www.mac4n6.com/blog/2016/1/1/manual-analysis-of-nskeyedarchiver-formatted-plist-files-a-review-of-the-new-os-x-1011-recent-items
+    - https://www.mac4n6.com/blog/2016/1/1/
+      manual-analysis-of-nskeyedarchiver-formatted-plist-files-a-review-of-the-new-os-x-1011-recent-items
     - https://github.com/malmeloo/FindMy.py/issues/31#issuecomment-2628072362
     - https://github.com/3breadt/dd-plist/issues/70
 
@@ -90,9 +95,9 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
 
         # This is actually a pretty large object, but very little of the data seems useful to our app
 
-        RecordCtime: datetime = d_dict.get("RecordCtime", None)
-        RecordMtime: datetime = d_dict.get("RecordMtime", None)
-        ModifiedByDevice: str = d_dict.get("ModifiedByDevice", None)
+        RecordCtime: datetime | None = d_dict.get("RecordCtime", None)
+        RecordMtime: datetime | None = d_dict.get("RecordMtime", None)
+        ModifiedByDevice: str | None = d_dict.get("ModifiedByDevice", None)
 
         res = {
             "creationTime": _toUnixEpochMs(RecordCtime),
@@ -109,8 +114,11 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict:
         return None
 
 
-def _convertToJavaDictWrapper(method: SyncSecondFactorMethod):
-    return_obj = {
+def _convertToJavaDictWrapper(method: SyncSecondFactorMethod) -> dict[str, Any]:
+    # Deliberately heterogeneous: it carries the method object plus the ints and strings
+    # the Java side reads back out. Without the annotation the type is inferred from the
+    # first entry alone, and every later assignment looks like an error.
+    return_obj: dict[str, Any] = {
         "obj": method
     }
 
@@ -175,17 +183,68 @@ def loginSync(email: str, password: str, anisetteServerUrl: str) -> dict:
 
 
 def exportToString(account: AppleAccount) -> str:
-    return json.dumps(account.export())
+    """
+    Replaces the old account.export() pattern. In FindMy 0.9.x, AppleAccount uses to_json/from_json.
+    The returned dict (AccountStateMapping) embeds the anisette provider state, so the
+    server URL no longer needs to be supplied at restore time.
+    """
+    return json.dumps(account.to_json())
+
+
+# The only anisette provider that works on Android. `aniLocal` needs the unicorn CPU
+# emulator to run Apple's ADI blob, and Chaquopy cannot build unicorn's native code -
+# which is why app/stubs/unicorn exists at all.
+SUPPORTED_ANISETTE_TYPE = "aniRemote"
+
+
+def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
+    """
+    Check a stored account uses a provider we can actually run, before anything tries
+    to use it.
+
+    Without this the failure surfaces as a NotImplementedError raised from inside the
+    stub `unicorn` package, several layers down in anisette, at whatever unlucky moment
+    the provider is first exercised. Checking the serialized state up front turns that
+    into a clear message at the app boundary.
+
+    :returns: None if supported, otherwise a human-readable reason.
+    """
+    try:
+        data = json.loads(serializedAccountData)
+        anisette_type = (data.get("anisette") or {}).get("type")
+
+        if anisette_type == SUPPORTED_ANISETTE_TYPE:
+            return None
+        if anisette_type is None:
+            return "This saved login has no Anisette configuration and cannot be restored."
+        return (
+            f"This saved login uses an unsupported Anisette provider ({anisette_type}). "
+            "OpenTagViewer supports remote Anisette servers only on Android - local "
+            "Anisette needs a CPU emulator that cannot be built for this platform."
+        )
+    except Exception:
+        print(f"Could not inspect anisette configuration: {traceback.format_exc()}")
+        return "This saved login could not be read."
 
 
 def getAccount(
-        serializedAccountData: str, anisetteServerUrl: str) -> AppleAccount:
+        serializedAccountData: str,
+        anisetteServerUrl: str | None = None) -> AppleAccount | None:
+    """
+    Restore an AppleAccount via FindMy 0.9.x's `from_json`. The anisette provider is rebuilt
+    from the embedded state inside the JSON, so `anisetteServerUrl` is unused here. We accept
+    the parameter for now to keep the existing Java callsite compiling; it will be dropped
+    in Phase 2 when the Java bridge is updated.
+    """
     try:
+        unsupported = assertAnisetteIsSupported(serializedAccountData)
+        if unsupported:
+            print(f"Refusing to restore account: {unsupported}")
+            return None
+
         data = json.loads(serializedAccountData)
 
-        anisette = RemoteAnisetteProvider(anisetteServerUrl)
-        acc = AppleAccount(anisette)
-        acc.restore(data)
+        acc = AppleAccount.from_json(data)
 
         print(f"Login State: {acc.login_state}")
 
@@ -196,46 +255,413 @@ def getAccount(
         return None
 
 
+def convertPlistToJson(
+        plistXmlString: str,
+        alignmentPlistXmlString: str | None = None) -> str | None:
+    """
+    One-shot conversion from the legacy plist XML representation (still stored in
+    OwnedBeacon.content) to the JSON form that FindMy 0.9.x expects.
+
+    Used in two places (called from Java):
+    - During .zip import: convert once and store alongside the raw plist
+    - As a lazy backfill: when reading an OwnedBeacon row that predates the upgrade
+
+    `alignmentPlistXmlString` is the accessory's KeyAlignmentRecord, if the export
+    contained one (format 0.0.2 and later). It supplies the rolling-key index macOS last
+    observed, so fetching can start there. Without it the accessory starts at index 0 from
+    its pairing date and the first fetch searches the tag's entire history - tens of
+    thousands of keys for an older tag. Optional, because exports predating 0.0.2 have no
+    such record and must keep working.
+
+    Returns None on failure so Java can decide how to recover.
+    """
+    try:
+        fp = BytesIO(plistXmlString.encode('utf-8'))
+
+        # from_plist accepts bytes for the alignment record but not a file object,
+        # unlike its first parameter.
+        alignment_bytes = (
+            alignmentPlistXmlString.encode('utf-8') if alignmentPlistXmlString else None
+        )
+
+        accessory = FindMyAccessory.from_plist(fp, alignment_bytes)
+        return json.dumps(accessory.to_json())
+    except Exception:
+        print(f"convertPlistToJson failed: {traceback.format_exc()}")
+        return None
+
+
+def _filterReportsByTimeRange(reports, startMs, endMs):
+    """
+    Apple's network only ever returns ~7 days of history and 0.9.x removed the
+    user-facing time-range parameters from fetch_location_history. We filter
+    here so the Java side keeps the same time-window semantics it had before.
+    """
+    out = []
+    for r in reports:
+        ts_ms = _toUnixEpochMs(r.timestamp)
+        if ts_ms is None:
+            continue
+        if startMs is not None and ts_ms < startMs:
+            continue
+        if endMs is not None and ts_ms > endMs:
+            continue
+        out.append(r)
+    return out
+
+
+# Apple accepts at most ~290 hashed keys per request, and FindMy.py walks the key index
+# range one step at a time (15 minutes per step for an AirTag). Anything wider than this
+# is enough round trips to be worth avoiding.
+_ALIGNMENT_PROBE_THRESHOLD_INDICES = 2000
+
+# Apple rejects requests carrying much more than ~290 hashed keys, so a ranged fetch is split
+# into chunks below that with a little headroom.
+_MAX_KEYS_PER_REQUEST = 255
+
+# Ceiling on how many requests one ranged fetch may make. A single day is ~96 indices for an
+# AirTag, so roughly one request; the cap only bites when alignment is unknown and the key
+# range balloons. Without it, a history screen could quietly fire hundreds of requests at
+# Apple - the account-flagging risk from issue #30, arriving through a different door.
+_MAX_REQUESTS_PER_RANGE_FETCH = 8
+
+# Attempts per request. Apple's endpoint times out often enough to see it by hand, and for a
+# single day the range is one request - so one timeout meant a whole day of history came back
+# empty. Two attempts, not more: this is a retry against a rate-sensitive endpoint.
+_RANGE_FETCH_ATTEMPTS = 2
+_RANGE_FETCH_RETRY_DELAY_SECONDS = 1
+
+
+def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
+    """Width of the key-index range a history fetch would search, or 0 if unknown."""
+    try:
+        return accessory.get_max_index(end) - accessory.get_min_index(start)
+    except Exception:
+        print(f"Could not determine key index width: {traceback.format_exc()}")
+        return 0
+
+
+def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory, start, end):
+    """
+    Fetch reports for one accessory, avoiding a full-history key search when possible.
+
+    Without a key alignment record an accessory starts at index 0 from its pairing date,
+    so a history fetch searches the tag's entire life - measured at ~50,000 indices for an
+    18-month-old AirTag, which at ~290 keys per request is hundreds of round trips. That is
+    the account-flagging risk from issue #30.
+
+    When the window is that wide we ask for the latest location *instead of* the history,
+    not before it. `fetch_location` walks backwards from now and stops at the first hit, and
+    alignment is updated as a side effect of any successful fetch. So one call both returns
+    something useful and collapses the window for every fetch that follows.
+
+    Doing it as a probe *before* a history fetch was worse: for a tag with no recent reports
+    the probe traverses the whole range, finds nothing, narrows nothing, and then the history
+    fetch traverses it all over again - double the work, in the worst case rather than the
+    best. Replacing the call avoids that.
+    """
+    width = _isAlignmentWide(accessory, start, end)
+
+    if width > _ALIGNMENT_PROBE_THRESHOLD_INDICES:
+        print(f"Key search window is {width} indices wide; fetching latest location only, "
+              f"to establish alignment without searching the tag's whole history.")
+        latest = account.fetch_location(accessory)
+
+        narrowed = _isAlignmentWide(accessory, start, end)
+        if narrowed < width:
+            print(f"Key search window narrowed from {width} to {narrowed} indices; "
+                  f"subsequent fetches will search the narrow range.")
+        else:
+            # No report found anywhere in range. Nothing to align to, and a history fetch
+            # would search the same empty range again, so don't.
+            print("No reports found for this accessory; leaving alignment untouched and "
+                  "skipping the history fetch.")
+
+        return [latest] if latest is not None else []
+
+    return account.fetch_location_history(accessory)
+
+
+def _chunk(items, size):
+    """Split a list into consecutive chunks of at most `size`."""
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def _fetchReportsInRange(account: AppleAccount, accessory: FindMyAccessory, start, end):
+    """
+    Fetch the reports an accessory produced inside a specific time window.
+
+    `fetch_location_history(accessory)` cannot do this. For a rolling-key accessory it calls
+    `_fetch_accessory_reports(..., only_latest=True)`, which walks backwards from *now* and
+    returns as soon as the first batch of keys yields anything - roughly the last day, since
+    an AirTag steps its index every 15 minutes and Apple takes ~290 keys per request. It also
+    takes no date range at all: 0.9.x removed the range parameters that 0.7.6 had.
+
+    So asking for last Tuesday returned today's reports, which the caller then filtered away
+    to nothing. The history screen showed data for today and empty days behind it, for every
+    tag, with no error anywhere.
+
+    What the library does expose is the two halves needed to do it properly:
+
+      * `accessory.keys_between(start, end)` yields `(index, key)` for exactly the window,
+        both primary and secondary, already de-duplicated
+      * `fetch_location_history(list_of_keys)` batches plain keys into a single request and
+        decrypts what comes back
+
+    So we generate the window's keys ourselves, ask for those, and update the accessory's
+    alignment from each report - `keys_between` tells us which index a key belongs to, which
+    is the piece `_fetch_key_reports` cannot know and therefore does not do.
+
+    Ordering note: alignment is established *before* generating keys, not after. An accessory
+    with no alignment spans a huge index range, so `keys_between` would yield tens of
+    thousands of keys for a single day. One `fetch_location` collapses that first. This is the
+    opposite order to `_fetchReportsForAccessory`, and deliberately so: there, a probe was
+    wasted work because the caller only wanted the latest report anyway; here the range is the
+    whole point, so the probe pays for itself.
+    """
+    if not _alignBeforeRangedFetch(account, accessory, start, end):
+        return []
+
+    indexed_keys = _keysForRange(accessory, start, end)
+    if not indexed_keys:
+        return []
+
+    index_by_key = {key: index for index, key in indexed_keys}
+    chunks = _chunk(indexed_keys, _MAX_KEYS_PER_REQUEST)
+
+    reports = []
+    failed = 0
+    for chunk in chunks:
+        try:
+            reports.extend(_fetchChunkAndAlign(account, accessory, chunk, index_by_key))
+        except _ChunkFetchError:
+            failed += 1
+
+    if failed == len(chunks):
+        # Every request failed, so we know nothing about this range. Returning an empty list
+        # would be indistinguishable from "Apple has no reports here", and the history screen
+        # would show a confident, wrong "0 reports" for the day. Raising lets the caller skip
+        # the accessory instead of reporting an absence it cannot vouch for.
+        raise RuntimeError(
+            f"Every request in the ranged fetch failed ({failed} of {len(chunks)}); "
+            f"refusing to report an empty range")
+
+    if failed:
+        print(f"WARNING: {failed} of {len(chunks)} requests failed; this range is incomplete")
+
+    print(f"Ranged fetch searched {len(indexed_keys)} keys in {len(chunks)} request(s)")
+    return reports
+
+
+def _alignBeforeRangedFetch(account: AppleAccount, accessory: FindMyAccessory, start, end) -> bool:
+    """
+    Narrow the key index range before generating keys for it.
+
+    An accessory with no alignment spans its whole life, so `keys_between` would yield tens of
+    thousands of keys for a single day. One `fetch_location` collapses that.
+
+    @return whether the ranged fetch is worth doing at all
+    """
+    width = _isAlignmentWide(accessory, start, end)
+    if width <= _ALIGNMENT_PROBE_THRESHOLD_INDICES:
+        return True
+
+    print(f"Key search window is {width} indices wide; establishing alignment before "
+          f"fetching the requested range.")
+    account.fetch_location(accessory)
+
+    narrowed = _isAlignmentWide(accessory, start, end)
+    if narrowed >= width:
+        # Nothing was found anywhere, so there is nothing to align to and the ranged sweep
+        # would search the same empty range again.
+        print("No reports found for this accessory; skipping the ranged fetch.")
+        return False
+
+    print(f"Key search window narrowed from {width} to {narrowed} indices.")
+    return True
+
+
+def _keysForRange(accessory: FindMyAccessory, start, end):
+    """The `(index, key)` pairs covering a time window, capped at what one fetch may search."""
+    try:
+        indexed_keys = list(accessory.keys_between(start, end))
+    except Exception:
+        print(f"Could not generate keys for the requested range: {traceback.format_exc()}")
+        return []
+
+    if not indexed_keys:
+        print("No keys fall inside the requested range; nothing to fetch.")
+        return []
+
+    max_keys = _MAX_KEYS_PER_REQUEST * _MAX_REQUESTS_PER_RANGE_FETCH
+    if len(indexed_keys) > max_keys:
+        # keys_between yields ascending by index, so the tail is the most recent part of the
+        # window - the part most likely to still hold reports Apple has not dropped.
+        print(f"Requested range needs {len(indexed_keys)} keys, more than the {max_keys} this "
+              f"fetch is allowed; searching only the most recent part of the range.")
+        indexed_keys = indexed_keys[-max_keys:]
+
+    return indexed_keys
+
+
+class _ChunkFetchError(Exception):
+    """One request of a ranged fetch failed, after its retries."""
+
+
+def _fetchChunkAndAlign(account: AppleAccount, accessory: FindMyAccessory, chunk, index_by_key):
+    """
+    Fetch one request's worth of keys and feed what comes back into the accessory's alignment.
+
+    Retried once, because Apple's endpoint times out often enough to hit by hand. A day of
+    history is a single request, so one `aiohttp` timeout meant the whole day came back empty
+    and the screen said "0 reports" - which reads as "your tag was not seen", not "the network
+    failed".
+
+    The alignment update is the part `_fetch_key_reports` cannot do for us: it is handed plain
+    keys and has no idea which index each belongs to. We do, because `keys_between` said so.
+
+    @raise _ChunkFetchError if every attempt failed
+    """
+    keys = [key for _, key in chunk]
+    found = None
+
+    for attempt in range(1, _RANGE_FETCH_ATTEMPTS + 1):
+        try:
+            found = account.fetch_location_history(keys)
+            break
+        except Exception:
+            print(f"Request {attempt} of {_RANGE_FETCH_ATTEMPTS} for a chunk of "
+                  f"{len(keys)} keys failed: {traceback.format_exc()}")
+            if attempt < _RANGE_FETCH_ATTEMPTS:
+                time.sleep(_RANGE_FETCH_RETRY_DELAY_SECONDS)
+    else:
+        raise _ChunkFetchError(f"all {_RANGE_FETCH_ATTEMPTS} attempts failed for a chunk of "
+                               f"{len(keys)} keys")
+
+    reports = []
+    for key, key_reports in (found or {}).items():
+        for report in key_reports or []:
+            reports.append(report)
+            _updateAlignment(accessory, report, index_by_key.get(key))
+    return reports
+
+
+def _updateAlignment(accessory: FindMyAccessory, report, index):
+    if index is None:
+        return
+    try:
+        accessory.update_alignment(report.timestamp, index)
+    except Exception:
+        print(f"Could not update alignment: {traceback.format_exc()}")
+
+
+def _serializeReports(reports):
+    """
+    Map FindMy 0.9.x LocationReport objects to the dict shape Java's mapResults expects.
+    Note: `published_at` and `description` no longer exist on LocationReport in 0.9.x; we
+    fall back to `timestamp` and an empty string respectively. Java's BeaconLocationReport
+    can absorb that without changes.
+    """
+    items = []
+    for report in sorted(reports):
+        items.append({
+            "publishedAt": _toUnixEpochMs(report.timestamp),
+            "description": getattr(report, "description", "") or "",
+            "timestamp": _toUnixEpochMs(report.timestamp),
+            "confidence": report.confidence,
+            "latitude": report.latitude,
+            "longitude": report.longitude,
+            "horizontalAccuracy": report.horizontal_accuracy,
+            "status": report.status
+        })
+    return items
+
+
+def _resultOrError(res: dict, failures: int, num_items: int) -> dict | None:
+    """
+    Decide whether a short result is an answer or a failure.
+
+    Java's `mapResults` only raises when this module returns None; a dict missing a beacon
+    reads as "that beacon has no reports". So swallowing every failure and returning a partial
+    dict told the history screen, with complete confidence, that a day it had failed to fetch
+    was a day the tag was not seen - no error state, and no Retry button, because as far as
+    Java was concerned the call succeeded.
+
+    A partial result is still worth returning: the accessories that did answer have fresh
+    reports and, more importantly, updated alignment worth persisting.
+    """
+    if num_items and failures == num_items:
+        print(f"Every accessory failed ({failures} of {num_items}); reporting an error rather "
+              f"than an empty result.")
+        return None
+
+    if failures:
+        print(f"WARNING: {failures} of {num_items} accessories failed; result is incomplete")
+
+    return res
+
+
 def getLastReports(
         account: AppleAccount,
-        idToPList,
-        hoursBack: int) -> dict:
-    # JAVA typing: see https://chaquo.com/chaquopy/doc/current/python.html
-    # especially this: https://chaquo.com/chaquopy/doc/current/python.html#classes
+        idToAccessoryData,
+        hoursBack: int) -> dict | None:
+    """
+    Fetch the most recent reports for each beacon over the requested time window.
+
+    `idToAccessoryData` is a List<AccessoryRequest> from Java where each element exposes
+    getBeaconId() / getAccessoryJson() (the persisted FindMyAccessory JSON).
+
+    Each entry in the result dict carries:
+      - "reports": list of report dicts (same shape as before)
+      - "updatedAccessoryJson": JSON string of the accessory AFTER fetch — Java must
+        write this back to OwnedBeacon.accessory_json so the rolling key alignment
+        survives across calls (this is the issue #30 fix).
+    """
     try:
         res = {}
 
-        num_items = idToPList.size()
-        print(f"num_items is {num_items}")
+        num_items = idToAccessoryData.size()
+        print(f"getLastReports: num_items={num_items}, hoursBack={hoursBack}")
+
+        now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        start_ms = now_ms - (hoursBack * 60 * 60 * 1000)
+        failures = 0
 
         for i in range(0, num_items):
-            pair = idToPList.get(i)
-            beaconId = pair.first
-            plistContent = pair.second
+            req = idToAccessoryData.get(i)
+            beaconId = req.getBeaconId()
+            accessoryJson = req.getAccessoryJson()
 
             print(f"Fetching report for {beaconId} for the last {hoursBack} hours...")
-            fp = BytesIO(plistContent.encode('utf-8'))
-            airtag = FindMyAccessory.from_plist(fp)
 
-            reports = account.fetch_last_reports(airtag, hoursBack)
-            print(f"Got {len(reports)} reports for {beaconId}")
+            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
+            start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
+            now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
 
-            items = []
-            for report in sorted(reports):
-                items.append({
-                    "publishedAt": _toUnixEpochMs(report.published_at),
-                    "description": report.description,
-                    "timestamp": _toUnixEpochMs(report.timestamp),
-                    "confidence": report.confidence,
-                    "latitude": report.latitude,
-                    "longitude": report.longitude,
-                    "horizontalAccuracy": report.horizontal_accuracy,
-                    "status": report.status
-                })
+            # Per-accessory isolation. One beacon failing used to abort the whole call,
+            # which meant no beacon's updated alignment was persisted - so every later
+            # fetch started from the same wide range again and never converged.
+            try:
+                reports = _fetchReportsForAccessory(account, airtag, start_dt, now_dt) or []
+            except Exception:
+                failures += 1
+                print(f"Fetch failed for {beaconId}, continuing with the rest: "
+                      f"{traceback.format_exc()}")
+                continue
 
-            res[beaconId] = items
+            print(f"Got {len(reports)} raw reports for {beaconId}")
 
-        return res
+            filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
+            print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
+
+            res[beaconId] = {
+                "reports": _serializeReports(filtered),
+                # Always written, even when there were no reports: the alignment may still
+                # have moved, and persisting it is what stops the next fetch re-searching.
+                "updatedAccessoryJson": json.dumps(airtag.to_json()),
+            }
+
+        return _resultOrError(res, failures, num_items)
 
     except Exception:
         err = traceback.format_exc()
@@ -245,53 +671,54 @@ def getLastReports(
 
 def getReports(
         account: AppleAccount,
-        idToPList,
+        idToAccessoryData,
         unixStartMs: int,
-        unixEndMs: int) -> dict:
-    # JAVA typing: see https://chaquo.com/chaquopy/doc/current/python.html
-    # especially this: https://chaquo.com/chaquopy/doc/current/python.html#classes
+        unixEndMs: int) -> dict | None:
+    """
+    Time-range variant. Apple's network only retains ~7 days of history; ranges further
+    back than that will return empty (the local Room cache is already the canonical store
+    for older history via DailyHistoryFetchRecord).
+
+    Same input/output shape as `getLastReports`.
+    """
     try:
         res = {}
 
-        num_items = idToPList.size()
-        print(f"num_items is {num_items}")
+        num_items = idToAccessoryData.size()
+        print(f"getReports: num_items={num_items}, range=[{unixStartMs}, {unixEndMs}]")
+        failures = 0
 
         for i in range(0, num_items):
-            pair = idToPList.get(i)
-            beaconId = pair.first
-            plistContent = pair.second
+            req = idToAccessoryData.get(i)
+            beaconId = req.getBeaconId()
+            accessoryJson = req.getAccessoryJson()
 
             print(f"Fetching report for {beaconId} in time range {unixStartMs}-{unixEndMs}...")
-            fp = BytesIO(plistContent.encode('utf-8'))
-            airtag = FindMyAccessory.from_plist(fp)
 
-            start: datetime = datetime.fromtimestamp(
-                unixStartMs/1000,
-                tz=timezone.utc
-            )
-            end: datetime = datetime.fromtimestamp(
-                unixEndMs/1000,
-                tz=timezone.utc
-            )
-            reports = account.fetch_reports(airtag, start, end)
-            print(f"Got {len(reports)} reports for {beaconId} for time range {unixStartMs}-{unixEndMs}")
+            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
+            start_dt = datetime.fromtimestamp(unixStartMs / 1000, tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(unixEndMs / 1000, tz=timezone.utc)
 
-            items = []
-            for report in sorted(reports):
-                items.append({
-                    "publishedAt": _toUnixEpochMs(report.published_at),
-                    "description": report.description,
-                    "timestamp": _toUnixEpochMs(report.timestamp),
-                    "confidence": report.confidence,
-                    "latitude": report.latitude,
-                    "longitude": report.longitude,
-                    "horizontalAccuracy": report.horizontal_accuracy,
-                    "status": report.status
-                })
+            try:
+                reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
+            except Exception:
+                failures += 1
+                print(f"Fetch failed for {beaconId}, continuing with the rest: "
+                      f"{traceback.format_exc()}")
+                continue
+            print(f"Got {len(reports)} raw reports for {beaconId}")
 
-            res[beaconId] = items
+            filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)
+            print(f"  -> {len(filtered)} reports after filtering to requested range")
 
-        return res
+            updated_accessory_json = json.dumps(airtag.to_json())
+
+            res[beaconId] = {
+                "reports": _serializeReports(filtered),
+                "updatedAccessoryJson": updated_accessory_json,
+            }
+
+        return _resultOrError(res, failures, num_items)
 
     except Exception:
         err = traceback.format_exc()

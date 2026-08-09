@@ -1,0 +1,405 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "4059c5ff95bec440e4a41a8b6f45e8c3",
+    "entities": [
+      {
+        "tableName": "Import",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `version` TEXT, `imported_at` INTEGER NOT NULL, `exported_at` INTEGER NOT NULL, `source_user` TEXT, `via` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "importedAt",
+            "columnName": "imported_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exportedAt",
+            "columnName": "exported_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceUser",
+            "columnName": "source_user",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "exportedVia",
+            "columnName": "via",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "BeaconNamingRecord",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `import_id` INTEGER, `version` TEXT, `content` TEXT, `is_removed` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`import_id`) REFERENCES `Import`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importId",
+            "columnName": "import_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isRemoved",
+            "columnName": "is_removed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_BeaconNamingRecord_import_id",
+            "unique": false,
+            "columnNames": [
+              "import_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_BeaconNamingRecord_import_id` ON `${TABLE_NAME}` (`import_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Import",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "import_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "OwnedBeacons",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `import_id` INTEGER, `content` TEXT, `version` TEXT, `is_removed` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`import_id`) REFERENCES `Import`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importId",
+            "columnName": "import_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isRemoved",
+            "columnName": "is_removed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_OwnedBeacons_import_id",
+            "unique": false,
+            "columnNames": [
+              "import_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_OwnedBeacons_import_id` ON `${TABLE_NAME}` (`import_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Import",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "import_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "LocationReport",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`hash_id` TEXT NOT NULL, `beacon_id` TEXT NOT NULL, `published_at` INTEGER NOT NULL, `description` TEXT, `timestamp` INTEGER NOT NULL, `confidence` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `horizontal_accuracy` INTEGER NOT NULL, `status` INTEGER NOT NULL, `last_update` INTEGER NOT NULL, PRIMARY KEY(`hash_id`), FOREIGN KEY(`beacon_id`) REFERENCES `OwnedBeacons`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "hashId",
+            "columnName": "hash_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beaconId",
+            "columnName": "beacon_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publishedAt",
+            "columnName": "published_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "horizontalAccuracy",
+            "columnName": "horizontal_accuracy",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdate",
+            "columnName": "last_update",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "hash_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_LocationReport_hash_id_beacon_id_timestamp",
+            "unique": false,
+            "columnNames": [
+              "hash_id",
+              "beacon_id",
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_LocationReport_hash_id_beacon_id_timestamp` ON `${TABLE_NAME}` (`hash_id`, `beacon_id`, `timestamp`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "OwnedBeacons",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "beacon_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "DailyHistoryFetchRecord",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`day_start_time` INTEGER NOT NULL, `beacon_id` TEXT NOT NULL, `last_update` INTEGER NOT NULL, PRIMARY KEY(`day_start_time`, `beacon_id`), FOREIGN KEY(`beacon_id`) REFERENCES `OwnedBeacons`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "dayStartTime",
+            "columnName": "day_start_time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beaconId",
+            "columnName": "beacon_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdate",
+            "columnName": "last_update",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "day_start_time",
+            "beacon_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_DailyHistoryFetchRecord_beacon_id",
+            "unique": false,
+            "columnNames": [
+              "beacon_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_DailyHistoryFetchRecord_beacon_id` ON `${TABLE_NAME}` (`beacon_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "OwnedBeacons",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "beacon_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "UserBeaconOptions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`beacon_id` TEXT NOT NULL, `last_update` INTEGER NOT NULL, `ui_name` TEXT, `ui_emoji` TEXT, PRIMARY KEY(`beacon_id`), FOREIGN KEY(`beacon_id`) REFERENCES `OwnedBeacons`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "beaconId",
+            "columnName": "beacon_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdate",
+            "columnName": "last_update",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uiName",
+            "columnName": "ui_name",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uiEmoji",
+            "columnName": "ui_emoji",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "beacon_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": [
+          {
+            "table": "OwnedBeacons",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "beacon_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4059c5ff95bec440e4a41a8b6f45e8c3')"
+    ]
+  }
+}

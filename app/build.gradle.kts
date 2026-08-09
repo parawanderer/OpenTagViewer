@@ -8,8 +8,15 @@ plugins {
 secrets {
     // To add your Maps API key to this project:
     // 1. If the secrets.properties file does not exist, create it in the same folder as the local.properties file.
-    // 2. Add this line, where YOUR_API_KEY is your API key:
+    // 2. Add these lines, where YOUR_API_KEY is your API key:
     //        MAPS_API_KEY=YOUR_API_KEY
+    // 
+    // How to get Google Maps API Key:
+    //    - Visit: https://console.cloud.google.com/google/maps-apis/
+    //
+    // How to get AMap API Key (高德地图 API Key):
+    //    - Visit: https://console.amap.com/dev/key/app
+    //    - Guide: https://lbs.amap.com/api/android-sdk/guide/create-project/get-key
     propertiesFileName = "secrets.properties"
 
     // A properties file containing default secret values. This file can be
@@ -33,6 +40,23 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        // Export the Room schema as JSON on every build. These are committed (see
+        // app/schemas/) so schema changes show up as a reviewable diff, and so
+        // MigrationTestHelper can build an old database to migrate from.
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
+            }
+        }
+    }
+
+    // Makes the exported schemas readable by instrumented tests at runtime, which is
+    // how MigrationTestHelper creates a v1 database to run MIGRATION_1_2 against.
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs(files("$projectDir/schemas"))
+        }
     }
 
     signingConfigs {
@@ -46,6 +70,8 @@ android {
 
     buildTypes {
         release {
+            // Keeps the launcher name as-is for real installs.
+            manifestPlaceholders["appLabel"] = "@string/app_name"
             signingConfig = signingConfigs.getByName("release")
             isDebuggable = false
             isMinifyEnabled = false
@@ -56,6 +82,23 @@ android {
         }
         debug {
             isDebuggable = true
+
+            // Install debug builds alongside a release install rather than colliding with
+            // it. Without this, both share the applicationId but are signed with different
+            // keys, so installing a debug build over a real one fails with
+            // INSTALL_FAILED_UPDATE_INCOMPATIBLE and the only way forward is to uninstall -
+            // which permanently destroys the user's imported beacons and location history.
+            // allowBackup is false, so there is no backup to restore from either.
+            //
+            // Note: a Maps API key restricted to the release package name will not authorise
+            // this one. Add "dev.wander.android.opentagviewer.debug" (with the debug keystore
+            // SHA-1) to the key's restrictions if you need maps to render in debug builds.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+
+            // Distinct launcher name, otherwise a debug install sits next to a real one
+            // with an identical icon and label and there is no way to tell them apart.
+            manifestPlaceholders["appLabel"] = "OpenTagViewer (debug)"
         }
     }
     compileOptions {
@@ -71,10 +114,119 @@ android {
     androidResources {
         // generateLocaleConfig = true
     }
+
+    testOptions {
+        managedDevices {
+            localDevices {
+                // Gradle provisions, boots, and tears down this emulator itself.
+                //
+                // Running against an emulator you started by hand is unreliable: the Android
+                // Gradle Plugin holds its ADB connection inside the Gradle daemon and reuses
+                // it between invocations, so once the emulator's adb daemon goes stale the
+                // next run fails to install or hangs, with an error that has nothing to do
+                // with the code. A managed device is created fresh per run, so there is no
+                // connection left over to go stale. It is also what CI can run unattended.
+                //
+                // aosp-atd is a stripped-down image built for tests: no Play Services, and no
+                // Maps as a result. Fine here, because none of the instrumented tests start
+                // MapsActivity - they cover the database migrations, the repositories and the
+                // keystore. Anything that needs Maps has to move to a "google" image.
+                create("testEmulator") {
+                    device = "Pixel 6"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
+    }
 }
 
 lombok {
     version = libs.versions.lombokVersion.get()
+}
+
+// FindMy >= 0.9 depends on anisette, which depends on unicorn (a CPU emulator used only
+// for *local* Anisette). Chaquopy cannot build unicorn's native code for Android, so the
+// whole dependency tree fails to resolve without a stand-in. We build a pure-Python stub
+// wheel from the real sources in app/stubs/unicorn/ rather than checking in a prebuilt
+// .whl - a binary artifact impersonating a well-known dependency is hard to audit.
+val unicornStubWheel = layout.buildDirectory.file(
+    "generated/stub-wheels/unicorn-2.1.1-py3-none-any.whl"
+)
+
+/**
+ * Locate a usable Python 3 interpreter.
+ *
+ * On Windows, `python3` is usually a zero-byte Microsoft Store "App Execution Alias" that
+ * hangs indefinitely when run non-interactively instead of failing, so candidates are
+ * ordered per-platform and stub aliases are filtered out by inspecting the file rather
+ * than by executing it.
+ */
+fun resolvePythonExecutable(): String {
+    providers.gradleProperty("pythonExecutable").orNull?.let { return it }
+
+    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    val names = if (isWindows) listOf("python.exe", "python3.exe") else listOf("python3", "python")
+
+    val pathDirs = (System.getenv("PATH") ?: "").split(File.pathSeparator).filter { it.isNotBlank() }
+    for (name in names) {
+        for (dir in pathDirs) {
+            val candidate = File(dir, name)
+            if (!candidate.isFile || !candidate.canExecute()) continue
+            // Store aliases are zero-length reparse points; executing one blocks forever.
+            if (candidate.length() == 0L) continue
+            if (candidate.absolutePath.contains("WindowsApps", ignoreCase = true)) continue
+            return candidate.absolutePath
+        }
+    }
+
+    throw GradleException(
+        "No usable Python 3 interpreter found on PATH (looked for ${names.joinToString(", ")}). " +
+        "Chaquopy needs one to build the unicorn stub wheel. " +
+        "Install Python 3 or pass -PpythonExecutable=/path/to/python."
+    )
+}
+
+// A real task rather than configuration-time work: this used to run on every Gradle
+// invocation, including every IDE sync, which blocked them.
+val generateUnicornStubWheel by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds the pure-Python unicorn stub wheel that lets FindMy 0.9.x resolve."
+
+    val script = rootProject.file("scripts/build_unicorn_stub_wheel.py")
+
+    inputs.dir(layout.projectDirectory.dir("stubs/unicorn")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(script).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(unicornStubWheel)
+    outputs.cacheIf { true }
+
+    commandLine(resolvePythonExecutable(), script.absolutePath, unicornStubWheel.get().asFile.absolutePath)
+}
+
+// Chaquopy installs from the wheel path, so it must exist before pip runs.
+tasks.matching { it.name.contains("PythonRequirements") || it.name.contains("PythonReqs") }
+    .configureEach { dependsOn(generateUnicornStubWheel) }
+
+// Deliberately NOT wired into assembleDebug/assembleRelease.
+//
+// Its output is committed source, so running it on every build would either dirty the working
+// tree whenever somebody pushes a commit or changes their GitHub avatar, or make an offline
+// build fail. Refreshing it is a repository event, not a build event: the scheduled workflow
+// in .github/workflows/update-contributors.yml runs this and opens a PR when the list moves.
+// Run it by hand any time with ./gradlew updateContributors.
+val updateContributors by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Regenerates the contributor list and avatars bundled into the Information page."
+
+    val script = rootProject.file("scripts/fetch_contributors.py")
+
+    inputs.file(script).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(layout.projectDirectory.file("src/main/assets/contributors.json"))
+    outputs.dir(layout.projectDirectory.dir("src/main/assets/contributors"))
+    // Talks to the network, so its result is not reproducible from its inputs.
+    outputs.upToDateWhen { false }
+
+    commandLine(resolvePythonExecutable(), script.absolutePath)
 }
 
 chaquopy {
@@ -82,7 +234,8 @@ chaquopy {
         version = "3.12"
         pip {
             // SEE: https://chaquo.com/chaquopy/doc/current/android.html#android-requirements
-            install("FindMy==0.7.6")
+            install(unicornStubWheel.get().asFile.absolutePath)
+            install("FindMy==0.9.8")
             install("NSKeyedUnArchiver==1.5")
         }
     }
@@ -128,12 +281,18 @@ dependencies {
     implementation(libs.androidx.emoji.views.helper)
     implementation(libs.androidx.emoji.picker)
 
+    // 高德地图SDK - Android 3D地图 V9.8.3
+    // 参考文档：https://lbs.amap.com/api/android-sdk/gettingstarted
+    // 注意：3D地图SDK已包含定位功能，无需单独引入location SDK
+    implementation(libs.amap.map3d)
+
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)
     testCompileOnly(libs.projectlombok)
 
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.android.room.testing)
 
     annotationProcessor(libs.projectlombok)
     annotationProcessor(libs.android.room.compiler)

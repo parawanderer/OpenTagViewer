@@ -21,6 +21,8 @@ public final class UserSettingsDataStore {
     public static final Preferences.Key<Boolean> USE_DARK_THEME = PreferencesKeys.booleanKey("use_dark_theme");
 
     public static final Preferences.Key<Boolean> ENABLE_DEBUG_DATA = PreferencesKeys.booleanKey("enable_debug_data");
+    public static final Preferences.Key<String> MAP_PROVIDER = PreferencesKeys.stringKey("map_provider");
+    public static final Preferences.Key<String> AMAP_API_KEY = PreferencesKeys.stringKey("amap_api_key");
 
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (PREFERENCES_DATA_STORE == null) {
