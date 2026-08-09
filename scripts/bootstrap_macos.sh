@@ -115,7 +115,9 @@ else
     printf 'Most likely fix - python.org builds bundle their own Tcl/Tk:\n\n'
     printf '    curl -LO https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg\n'
     printf '    sudo installer -pkg python-3.12.7-macos11.pkg -target /\n'
-    printf '    rm -rf %s/python/.venv && bash %s\n\n' "$DEST" "$0"
+    # Carries the branch through. Without it the re-run silently lands on main, and an
+    # export from the wrong branch looks completely normal until you inspect the zip.
+    printf '    rm -rf %s/python/.venv && bash %s %s\n\n' "$DEST" "$0" "$BRANCH"
     printf 'Or skip the GUI entirely - the export does not need it:\n\n'
     printf '    cd %s/python\n' "$DEST"
     printf '    python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt\n'
@@ -164,7 +166,7 @@ fi
 # running the file directly puts python/main on sys.path rather than python/.
 # ---------------------------------------------------------------------------------------
 say "Starting the export wizard"
-echo "    Checkout: $DEST ($BRANCH)"
+echo "    Checkout: $DEST ($(git -C "$DEST" rev-parse --abbrev-ref HEAD))"
 echo "    Re-run later with: cd $DEST/python && . .venv/bin/activate && PYTHONPATH=. python3 main/wizard.py"
 echo
 
