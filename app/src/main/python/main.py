@@ -71,8 +71,10 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict | None:
 
     ### More info:
 
-    The most popular java plist parser, the google java [dd-plist](https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist) library,
-    [does not currently support the `NSKeyedArchiver` plist format](https://github.com/3breadt/dd-plist/issues/70) (at the time of writing).
+    The most popular java plist parser, the google java
+    [dd-plist](https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist) library,
+    [does not currently support the `NSKeyedArchiver` plist format](https://github.com/3breadt/dd-plist/issues/70)
+    (at the time of writing).
 
     However somebody has managed to create a parser in python: https://github.com/avibrazil/NSKeyedUnArchiver
 
@@ -80,7 +82,8 @@ def decodeBeaconNamingRecordCloudKitMetadata(cleanedBase64: str) -> dict | None:
     we will extract it using python via this nice library and pass the needed data back to Java
 
     See:
-    - https://www.mac4n6.com/blog/2016/1/1/manual-analysis-of-nskeyedarchiver-formatted-plist-files-a-review-of-the-new-os-x-1011-recent-items
+    - https://www.mac4n6.com/blog/2016/1/1/
+      manual-analysis-of-nskeyedarchiver-formatted-plist-files-a-review-of-the-new-os-x-1011-recent-items
     - https://github.com/malmeloo/FindMy.py/issues/31#issuecomment-2628072362
     - https://github.com/3breadt/dd-plist/issues/70
 
@@ -311,6 +314,16 @@ def _filterReportsByTimeRange(reports, startMs, endMs):
 # is enough round trips to be worth avoiding.
 _ALIGNMENT_PROBE_THRESHOLD_INDICES = 2000
 
+# Apple rejects requests carrying much more than ~290 hashed keys, so a ranged fetch is split
+# into chunks below that with a little headroom.
+_MAX_KEYS_PER_REQUEST = 255
+
+# Ceiling on how many requests one ranged fetch may make. A single day is ~96 indices for an
+# AirTag, so roughly one request; the cap only bites when alignment is unknown and the key
+# range balloons. Without it, a history screen could quietly fire hundreds of requests at
+# Apple - the account-flagging risk from issue #30, arriving through a different door.
+_MAX_REQUESTS_PER_RANGE_FETCH = 8
+
 
 def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
     """Width of the key-index range a history fetch would search, or 0 if unknown."""
@@ -354,12 +367,150 @@ def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory,
         else:
             # No report found anywhere in range. Nothing to align to, and a history fetch
             # would search the same empty range again, so don't.
-            print(f"No reports found for this accessory; leaving alignment untouched and "
-                  f"skipping the history fetch.")
+            print("No reports found for this accessory; leaving alignment untouched and "
+                  "skipping the history fetch.")
 
         return [latest] if latest is not None else []
 
     return account.fetch_location_history(accessory)
+
+
+def _chunk(items, size):
+    """Split a list into consecutive chunks of at most `size`."""
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def _fetchReportsInRange(account: AppleAccount, accessory: FindMyAccessory, start, end):
+    """
+    Fetch the reports an accessory produced inside a specific time window.
+
+    `fetch_location_history(accessory)` cannot do this. For a rolling-key accessory it calls
+    `_fetch_accessory_reports(..., only_latest=True)`, which walks backwards from *now* and
+    returns as soon as the first batch of keys yields anything - roughly the last day, since
+    an AirTag steps its index every 15 minutes and Apple takes ~290 keys per request. It also
+    takes no date range at all: 0.9.x removed the range parameters that 0.7.6 had.
+
+    So asking for last Tuesday returned today's reports, which the caller then filtered away
+    to nothing. The history screen showed data for today and empty days behind it, for every
+    tag, with no error anywhere.
+
+    What the library does expose is the two halves needed to do it properly:
+
+      * `accessory.keys_between(start, end)` yields `(index, key)` for exactly the window,
+        both primary and secondary, already de-duplicated
+      * `fetch_location_history(list_of_keys)` batches plain keys into a single request and
+        decrypts what comes back
+
+    So we generate the window's keys ourselves, ask for those, and update the accessory's
+    alignment from each report - `keys_between` tells us which index a key belongs to, which
+    is the piece `_fetch_key_reports` cannot know and therefore does not do.
+
+    Ordering note: alignment is established *before* generating keys, not after. An accessory
+    with no alignment spans a huge index range, so `keys_between` would yield tens of
+    thousands of keys for a single day. One `fetch_location` collapses that first. This is the
+    opposite order to `_fetchReportsForAccessory`, and deliberately so: there, a probe was
+    wasted work because the caller only wanted the latest report anyway; here the range is the
+    whole point, so the probe pays for itself.
+    """
+    if not _alignBeforeRangedFetch(account, accessory, start, end):
+        return []
+
+    indexed_keys = _keysForRange(accessory, start, end)
+    if not indexed_keys:
+        return []
+
+    index_by_key = {key: index for index, key in indexed_keys}
+    chunks = _chunk(indexed_keys, _MAX_KEYS_PER_REQUEST)
+
+    reports = []
+    for chunk in chunks:
+        reports.extend(_fetchChunkAndAlign(account, accessory, chunk, index_by_key))
+
+    print(f"Ranged fetch searched {len(indexed_keys)} keys in {len(chunks)} request(s)")
+    return reports
+
+
+def _alignBeforeRangedFetch(account: AppleAccount, accessory: FindMyAccessory, start, end) -> bool:
+    """
+    Narrow the key index range before generating keys for it.
+
+    An accessory with no alignment spans its whole life, so `keys_between` would yield tens of
+    thousands of keys for a single day. One `fetch_location` collapses that.
+
+    @return whether the ranged fetch is worth doing at all
+    """
+    width = _isAlignmentWide(accessory, start, end)
+    if width <= _ALIGNMENT_PROBE_THRESHOLD_INDICES:
+        return True
+
+    print(f"Key search window is {width} indices wide; establishing alignment before "
+          f"fetching the requested range.")
+    account.fetch_location(accessory)
+
+    narrowed = _isAlignmentWide(accessory, start, end)
+    if narrowed >= width:
+        # Nothing was found anywhere, so there is nothing to align to and the ranged sweep
+        # would search the same empty range again.
+        print("No reports found for this accessory; skipping the ranged fetch.")
+        return False
+
+    print(f"Key search window narrowed from {width} to {narrowed} indices.")
+    return True
+
+
+def _keysForRange(accessory: FindMyAccessory, start, end):
+    """The `(index, key)` pairs covering a time window, capped at what one fetch may search."""
+    try:
+        indexed_keys = list(accessory.keys_between(start, end))
+    except Exception:
+        print(f"Could not generate keys for the requested range: {traceback.format_exc()}")
+        return []
+
+    if not indexed_keys:
+        print("No keys fall inside the requested range; nothing to fetch.")
+        return []
+
+    max_keys = _MAX_KEYS_PER_REQUEST * _MAX_REQUESTS_PER_RANGE_FETCH
+    if len(indexed_keys) > max_keys:
+        # keys_between yields ascending by index, so the tail is the most recent part of the
+        # window - the part most likely to still hold reports Apple has not dropped.
+        print(f"Requested range needs {len(indexed_keys)} keys, more than the {max_keys} this "
+              f"fetch is allowed; searching only the most recent part of the range.")
+        indexed_keys = indexed_keys[-max_keys:]
+
+    return indexed_keys
+
+
+def _fetchChunkAndAlign(account: AppleAccount, accessory: FindMyAccessory, chunk, index_by_key):
+    """
+    Fetch one request's worth of keys and feed what comes back into the accessory's alignment.
+
+    The alignment update is the part `_fetch_key_reports` cannot do for us: it is handed plain
+    keys and has no idea which index each belongs to. We do, because `keys_between` said so.
+    """
+    try:
+        found = account.fetch_location_history([key for _, key in chunk])
+    except Exception:
+        # One failed chunk should not lose the ones that worked.
+        print(f"A chunk of the ranged fetch failed, continuing with the rest: "
+              f"{traceback.format_exc()}")
+        return []
+
+    reports = []
+    for key, key_reports in (found or {}).items():
+        for report in key_reports or []:
+            reports.append(report)
+            _updateAlignment(accessory, report, index_by_key.get(key))
+    return reports
+
+
+def _updateAlignment(accessory: FindMyAccessory, report, index):
+    if index is None:
+        return
+    try:
+        accessory.update_alignment(report.timestamp, index)
+    except Exception:
+        print(f"Could not update alignment: {traceback.format_exc()}")
 
 
 def _serializeReports(reports):
@@ -480,7 +631,7 @@ def getReports(
             end_dt = datetime.fromtimestamp(unixEndMs / 1000, tz=timezone.utc)
 
             try:
-                reports = _fetchReportsForAccessory(account, airtag, start_dt, end_dt) or []
+                reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
             except Exception:
                 print(f"Fetch failed for {beaconId}, continuing with the rest: "
                       f"{traceback.format_exc()}")
