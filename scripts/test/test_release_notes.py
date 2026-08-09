@@ -195,6 +195,34 @@ def test_demoting_a_body_with_no_description_is_an_error():
         release_notes.demote_body("### Changes\n\n- Something")
 
 
+# --- choosing which release to collapse -------------------------------------------------
+
+def _release(tag, created):
+    return {"tagName": tag, "createdAt": created, "isDraft": False}
+
+
+def test_demotion_targets_the_release_that_was_superseded_not_the_newest():
+    """
+    Demotion runs *after* the new release is published, so by then the newest release is the
+    one that must keep its wrapper. Defaulting to "newest" collapsed the release that had just
+    gone out, stripping its screenshot and feature list moments after publishing it.
+    """
+    releases = [
+        _release("macos-exporter-v1.0.5", "2026-08-09T18:00:00Z"),
+        _release("macos-exporter-v1.0.4", "2025-08-15T16:13:20Z"),
+        _release("macos-exporter-v1.0.3", "2025-07-19T16:42:17Z"),
+    ]
+
+    assert release_notes.pick_superseded(releases)["tagName"] == "macos-exporter-v1.0.4"
+
+
+def test_a_first_ever_release_has_nothing_to_supersede():
+    releases = [_release("macos-exporter-v1.0.0", "2025-03-20T20:34:47Z")]
+
+    with pytest.raises(release_notes.ReleaseError, match="nothing it supersedes"):
+        release_notes.pick_superseded(releases)
+
+
 # --- versions come from the source ------------------------------------------------------
 
 def test_the_exporter_version_is_read_from_the_wizard():
