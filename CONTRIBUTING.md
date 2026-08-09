@@ -229,8 +229,12 @@ while protecting nothing.
 are lenient enough to pass code Pylance flags.
 
 ```bash
+python -m pip install pyright pillow -r app/src/test/python/requirements.txt
 python -m pyright app/src/main/python scripts
 ```
+
+The installs matter: pyright reports an unresolved import as an error, so without `findmy`,
+`NSKeyedUnArchiver` and `pillow` present it fails while telling you nothing about your code.
 
 `python/` is not clean yet and is excluded from CI's pyright step.
 
