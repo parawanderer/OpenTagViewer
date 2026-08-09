@@ -260,8 +260,25 @@ python scripts/add_strings.py --check         # fail if any locale is missing on
 ## Running the export wizard on a Mac
 
 Testing an export means a real Mac signed into iCloud, usually a VM. A fresh macOS install
-has **neither git nor python3** — both arrive with the Xcode Command Line Tools — so this is
-the whole thing from a bare machine, meant to be pasted into a new terminal as-is:
+has **neither git nor python3** — both arrive with the Xcode Command Line Tools — so
+`scripts/bootstrap_macos.sh` does the lot: installs the tools, clones, creates a virtualenv,
+installs the dependencies and launches the wizard. It is safe to re-run.
+
+It cannot live in the clone you do not have yet, so fetch it with `curl`, which macOS does
+ship:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/parawanderer/OpenTagViewer/main/scripts/bootstrap_macos.sh
+less bootstrap_macos.sh          # read it before running it
+bash bootstrap_macos.sh          # or: bash bootstrap_macos.sh some-branch
+```
+
+Read it first rather than piping `curl` straight into `bash`. It is a hundred lines, and the
+people using this app are exactly the people who should not run unread code off the internet
+as a habit.
+
+<details>
+<summary>What it does, if you would rather do it by hand</summary>
 
 ```bash
 # 1. Command Line Tools. Opens a GUI installer and returns immediately, so wait for it.
@@ -286,6 +303,8 @@ pip install -r requirements.txt
 # 4. Run it.
 PYTHONPATH=. python3 main/wizard.py
 ```
+
+</details>
 
 `PYTHONPATH=.` is not optional: `wizard.py` does `from main.airtag_decryptor import ...`, and
 running the file directly puts `python/main` on `sys.path` rather than `python/`, so the
