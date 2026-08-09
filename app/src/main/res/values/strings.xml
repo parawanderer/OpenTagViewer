@@ -26,12 +26,11 @@
 
     <!-- Sync Preferences -->
     <string name="version_x">Version %1$s</string>
-    <string name="free_opensource_software_by">Free, Open-Source Software by Shane B.</string>
+    <string name="free_opensource_software_by">Free, Open-Source Software by:</string>
     <string name="app_website" translatable="false"><a href="https://wander.dev">wander.dev</a></string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="title_placeholder" translatable="false">Placeholder</string>
     <string name="github">Github</string>
-    <string name="developer_website">Developer Website</string>
     <string name="anisette_server_url">Anisette Server URL</string>
     <string name="url_to_an_anisette_server">Url to an <a href="">Anisette</a> server</string>
     <string name="this_is_not_a_valid_url">This is not a valid url</string>
@@ -139,4 +138,13 @@
     <string name="amap_key_saved">AMap API key saved.</string>
     <string name="amap_key_cleared">AMap API key removed.</string>
     <string name="amap_how_to_get_a_key">How to get a key</string>
+    <string name="resolving_tags_banner">Locating your tags for the first time. This can take a few minutes — please keep the app open.</string>
+    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). This can take a few minutes — please keep the app open.</string>
+    <string name="maps_api_key_missing_title">Google Maps API key missing</string>
+    <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
+    <string name="no_devices_imported_yet">No devices yet</string>
+    <string name="import_a_zip_exported_from_a_mac">Import a zip exported from a Mac to get started.</string>
+    <string name="import_devices">Import Devices</string>
+    <string name="error_occurred_while_removing_the_device">An error occurred while removing the device</string>
+    <string name="how_do_i_get_the_zip"><u>How do I get the zip?</u></string>
 </resources>

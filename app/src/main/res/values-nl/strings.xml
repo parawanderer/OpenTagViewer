@@ -15,9 +15,8 @@
     <string name="do_ring">Bellen</string>
     <string name="more">Meer</string>
     <string name="version_x">Versie %1$s</string>
-    <string name="free_opensource_software_by">Vrije, Open-Bron Software geschreven door Shane B.</string>
+    <string name="free_opensource_software_by">Vrije, Open-Bron Software geschreven door:</string>
     <string name="github">Github</string>
-    <string name="developer_website">Website Ontwikkelaar</string>
     <string name="anisette_server_url">Anisette Server-URL</string>
     <string name="url_to_an_anisette_server">URL voor een <a href="">Anisette</a> server</string>
     <string name="this_is_not_a_valid_url">Dit is niet een geldige URL</string>
@@ -101,4 +100,17 @@
     <string name="amap_how_to_get_a_key">Een sleutel aanvragen</string>
     <string name="lang_zh_cn">Chinees, vereenvoudigd (简体中文)</string>
     <string name="lang_zh_tw">Chinees, traditioneel (繁體中文)</string>
+    <string name="no_devices_imported_yet">Nog geen apparaten</string>
+    <string name="import_a_zip_exported_from_a_mac">Importeer een zip die op een Mac is geëxporteerd om te beginnen.</string>
+    <string name="import_devices">Apparaten importeren</string>
+    <string name="error_occurred_while_removing_the_device">Er is een fout opgetreden bij het verwijderen van het apparaat</string>
+    <string name="how_do_i_get_the_zip"><u>Hoe kom ik aan de zip?</u></string>
+    <string name="map_provider">Kaartaanbieder</string>
+    <string name="map_provider_google">Google Maps</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">Log opnieuw in — de FindMy-bibliotheek is bijgewerkt.</string>
+    <string name="maps_api_key_missing_title">Google Maps API-sleutel ontbreekt</string>
+    <string name="maps_api_key_missing_message">Deze build heeft geen Google Maps API-sleutel, dus de kaart wordt niet geladen. Voeg MAPS_API_KEY toe aan secrets.properties en bouw opnieuw, of kies een andere kaartaanbieder in de instellingen.</string>
+    <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Dit kan een paar minuten duren — houd de app open.</string>
+    <string name="resolving_tags_banner_progress">Je tags worden gelokaliseerd (%1$d van %2$d). Dit kan een paar minuten duren — houd de app open.</string>
 </resources>

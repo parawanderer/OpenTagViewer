@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import dev.wander.android.opentagviewer.R;
@@ -30,6 +31,12 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
     private final Map<String, BeaconLocationReport> locations;
     private final Resources resources;
     private final Consumer<BeaconInformation> onDeviceClickCallback;
+
+    /**
+     * Receives the pressed row along with its device, because the caller shows a menu anchored
+     * to that row and therefore needs the view, not just the data.
+     */
+    private final BiConsumer<View, BeaconInformation> onDeviceLongClickCallback;
 
     @Getter
     public static class ViewHolder extends RecyclerView.ViewHolder {
@@ -55,11 +62,13 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             @lombok.NonNull Resources resources,
             @lombok.NonNull List<BeaconInformation> beaconInfo,
             @lombok.NonNull Map<String, BeaconLocationReport> locations,
-            @lombok.NonNull Consumer<BeaconInformation> onDeviceClickCallback) {
+            @lombok.NonNull Consumer<BeaconInformation> onDeviceClickCallback,
+            @lombok.NonNull BiConsumer<View, BeaconInformation> onDeviceLongClickCallback) {
         this.resources = resources;
         this.beaconInfo = beaconInfo;
         this.locations = locations;
         this.onDeviceClickCallback = onDeviceClickCallback;
+        this.onDeviceLongClickCallback = onDeviceLongClickCallback;
     }
 
     // Create new views (invoked by the layout manager)
@@ -110,6 +119,12 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
 
         viewHolder.getContainer().setOnClickListener(v -> {
             this.onDeviceClickCallback.accept(beacon);
+        });
+
+        viewHolder.getContainer().setOnLongClickListener(v -> {
+            this.onDeviceLongClickCallback.accept(v, beacon);
+            // Consumed, so the row does not also fire its normal click.
+            return true;
         });
     }
 

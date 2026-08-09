@@ -15,9 +15,8 @@
     <string name="do_ring">Звенеть</string>
     <string name="more">Более</string>
     <string name="version_x">Версия %1$s</string>
-    <string name="free_opensource_software_by">Бесплатное программное обеспечение с открытым исходным кодом от Шейна Б.</string>
+    <string name="free_opensource_software_by">Бесплатное программное обеспечение с открытым исходным кодом от:</string>
     <string name="github">Гитхаб</string>
-    <string name="developer_website">Сайт Разработчика</string>
     <string name="anisette_server_url">URL-Адрес Сервера Anisette</string>
     <string name="url_to_an_anisette_server">URL-Адрес от «<a href="">Anisette</a>» Сервера</string>
     <string name="this_is_not_a_valid_url">Это недействительный URL</string>
@@ -101,4 +100,17 @@
     <string name="amap_how_to_get_a_key">Как получить ключ</string>
     <string name="lang_zh_cn">Китайский упрощённый (简体中文)</string>
     <string name="lang_zh_tw">Китайский традиционный (繁體中文)</string>
+    <string name="no_devices_imported_yet">Устройств пока нет</string>
+    <string name="import_a_zip_exported_from_a_mac">Импортируйте zip-архив, экспортированный на Mac, чтобы начать.</string>
+    <string name="import_devices">Импортировать устройства</string>
+    <string name="error_occurred_while_removing_the_device">Произошла ошибка при удалении устройства</string>
+    <string name="how_do_i_get_the_zip"><u>Как получить zip-архив?</u></string>
+    <string name="map_provider">Поставщик карт</string>
+    <string name="map_provider_google">Google Карты</string>
+    <string name="map_provider_amap">AMap (高德地图)</string>
+    <string name="relogin_required_after_upgrade">Пожалуйста, войдите снова — библиотека FindMy была обновлена.</string>
+    <string name="maps_api_key_missing_title">Отсутствует ключ API Google Карт</string>
+    <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
+    <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Это может занять несколько минут — не закрывайте приложение.</string>
+    <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Это может занять несколько минут — не закрывайте приложение.</string>
 </resources>
