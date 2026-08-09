@@ -449,9 +449,28 @@ So a release is two steps, in this order:
 git commit -am "Bump the macOS exporter to 1.0.6"
 git push origin main
 
-# 2. Tag that commit and publish the release
-gh release create macos-exporter-v1.0.6 --title "OpenTagViewer MacOS AirTag Exporter 1.0.6"
+# 2. Write the changes for this version, then create the release as a draft
+python scripts/release_notes.py draft --kind exporter --changes-file notes.md --dry-run
+python scripts/release_notes.py draft --kind exporter --changes-file notes.md
+
+# 3. Publish it from the GitHub UI, then collapse the release it replaced
+python scripts/release_notes.py demote --kind exporter
 ```
+
+`release_notes.py` exists because the release pages follow a convention that is easy to get
+half-right: only the newest release carries the full wrapper — description, screenshot,
+feature list, wiki link — and the one it replaces gets stripped back to its first line with
+its changes folded into a collapsed `<details>` block. The half that gets forgotten is the
+demotion, and nobody notices until two releases both look current.
+
+The wrapper is never stored in the script. It is read from the release being superseded and
+carried forward, which is what copying the previous body does by hand — so editing the wording
+on the latest release is enough to change it for the next one. The version comes from
+`VERSION`, and the tag from that, so neither can be typed wrong. `--kind android` does the
+same for the app releases.
+
+The draft is deliberate: the release workflow triggers on `published`, so nothing builds or
+ships until someone clicks the button.
 
 The tag must be `macos-exporter-v` followed by exactly what `VERSION` says. Before either
 build job starts, `test-release-version` runs:
