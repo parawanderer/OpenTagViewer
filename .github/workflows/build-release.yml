@@ -16,6 +16,12 @@ jobs:
     environment: 'Android Build Release'
     runs-on: ubuntu-latest
 
+    # The repository default is read-only, which is what turns a token that never arrives into
+    # a 403 at the very last step. Granting it here means the upload still works if the PAT is
+    # ever unset or expires - the action treats an empty token as unset and falls back to this.
+    permissions:
+      contents: write
+
     # Only run this for 'android-app-v<whatever>' tags!
     if: |
       github.event_name == 'release'
@@ -150,14 +156,20 @@ jobs:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) release generated
           path: ${{ env.main_project_module }}/build/outputs/apk/release/
 
+      # The token goes in `with:`, not `env:`. This action's `token` input defaults to
+      # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
+      # GITHUB_TOKEN" - so the default is always non-empty and an env var is ignored entirely.
+      # It then authenticates as the built-in token, whose contents permission is read-only
+      # here, and fails with 403 "Resource not accessible by integration" after the APK has
+      # already been built and signed. That is exactly how the 1.0.5 exporter release went out
+      # with no assets attached; this workflow had the same wiring and was never re-run.
       - name: Upload APK Release Asset to GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'release'
         with:
           files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
           name: ${{ env.app_name }} Android App ${{ steps.extract_version.outputs.APP_VERSION }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.ANDROID_BUILD_RELEASE_GITHUB_TOKEN }}
+          token: ${{ secrets.ANDROID_BUILD_RELEASE_GITHUB_TOKEN }}
 
       # Noted For Output [main_project_module]/build/outputs/bundle/release/
       # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
