@@ -30,7 +30,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -71,7 +70,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -104,6 +102,7 @@ import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
 import dev.wander.android.opentagviewer.util.parse.AppleZipImporterUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
+import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -621,24 +620,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             LENGTH_LONG).show();
                 });
             })
-            .publish(storedBeacons ->
             /*
-             * Note: this is a bit of a fork-join: https://stackoverflow.com/questions/48015796/using-rxjava-to-fork-into-tasks-and-combine-results
-             * May be too much of an optimization, but I figured I might as well try out the extent
-             * of what you can do with these RXJava observables as far as multithreading goes...
+             * Fetching and parsing still run concurrently, but they are merged rather than
+             * zipped: zip completed as soon as the single-emission parse branch did, which
+             * cancelled every accessory after the first. See RxFlows#allThen for the full
+             * account. The two doOnNext handlers write to different maps, so their order
+             * relative to each other does not matter.
              */
-                Observable.zip(
-                        storedBeacons.flatMap(beacons ->
-                            this.fetchLastReports(beacons.getOwnedBeacons().stream()
-                                    .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
-                        )
-                        .doOnNext(this::addBeaconLocationsToCurrent),
-                        storedBeacons.flatMap(beacons -> BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(beacons)))
-                        .doOnNext(this::addBeaconToCurrent),
-                        Pair::create
-                )
-            )
-            .flatMapCompletable((__) -> this.updateBeaconGeocodings())
+            .flatMapCompletable(storedBeacons -> RxFlows.allThen(
+                    // Once, after every accessory has landed, rather than per accessory.
+                    this.updateBeaconGeocodings(),
+                    this.fetchLastReports(storedBeacons.getOwnedBeacons().stream()
+                            .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
+                            .doOnNext(this::addBeaconLocationsToCurrent),
+                    BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
+                            .doOnNext(this::addBeaconToCurrent)
+            ))
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(() -> {
                 this.showLastDeviceLocations();
@@ -1326,24 +1323,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * from taking the rest of the batch with it.
      * <br>
      * Sequential on purpose: FindMy.py's synchronous account drives one asyncio event loop,
-     * and calls into Python are serialised anyway (see PythonAppleService). concatMap makes
-     * that explicit rather than leaving threads queued on a lock.
+     * and calls into Python are serialised anyway (see PythonAppleService).
+     * <br>
+     * The sequencing itself lives in {@link RxFlows#oneAtATime} so it can be tested without
+     * an Activity - see {@code RxFlowsTest}.
      */
     private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
             final List<AccessoryRequest> requests, final int hoursToGoBack) {
 
-        final int total = requests.size();
-        final AtomicInteger completed = new AtomicInteger(0);
-        this.setLongFetchProgress(0, total);
-
-        return Observable.fromIterable(requests)
-                .concatMap(request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
-                        .flatMap(this.beaconRepo::storeFetchResult)
-                        .doOnError(error -> Log.e(TAG,
-                                "Failed to fetch reports for beaconId=" + request.getBeaconId()
-                                        + "; continuing with the remaining accessories", error))
-                        .onErrorResumeNext(__ -> Observable.empty())
-                        .doOnComplete(() -> this.setLongFetchProgress(completed.incrementAndGet(), total)));
+        return RxFlows.oneAtATime(
+                requests,
+                request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
+                        .flatMap(this.beaconRepo::storeFetchResult),
+                this::setLongFetchProgress,
+                (request, error) -> Log.e(TAG,
+                        "Failed to fetch reports for beaconId=" + request.getBeaconId()
+                                + "; continuing with the remaining accessories", error));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
