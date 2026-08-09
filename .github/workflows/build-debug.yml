@@ -62,9 +62,10 @@ jobs:
       - name: Check every locale has every string
         run: python scripts/add_strings.py --check
 
-      # add_strings.py gates the check above, so a bug in it would report green while
-      # protecting nothing.
-      - name: Test the string tooling
+      # These scripts gate other checks - add_strings.py gates the step above, and
+      # exporter_version.py gates the exporter release - so a bug in one of them reports
+      # green while protecting nothing.
+      - name: Test the tooling in scripts/
         run: |
           python -m pip install pytest
           python -m pytest scripts/test -v

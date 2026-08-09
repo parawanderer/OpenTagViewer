@@ -93,6 +93,26 @@ new implementation — a third party added a MapLibre provider in ~80 lines beca
 When merging a contributor's changes, preserve authorship — cherry-pick, or set `--author`,
 rather than copying file contents into your own commit. Credit them in the PR description.
 
+### 9. Bump the exporter's `VERSION` before tagging a release
+
+`VERSION` in `python/main/wizard.py` is the only place the macOS exporter's version is
+written. It reaches the window title and, more importantly, every export it produces, as
+`via: OpenTagViewer.app:<version>` in `OPENTAGVIEWER.yml` — which is how anyone looking at a
+zip later works out which exporter built it.
+
+Nothing patches it at build time, and nothing should: the wizard also runs from source (the
+VM bootstrap, `python main/wizard.py`), and those exports stamp `via:` too, so a build-time
+patch would make two artifacts from one commit disagree.
+
+So releasing is two steps, in this order:
+
+1. Commit the `VERSION` bump to `main`
+2. Tag that commit `macos-exporter-v<the same version>` and publish the release
+
+`scripts/exporter_version.py --tag <tag>` enforces it, and runs in `test-release-version`
+before either build job. A tag that disagrees fails the release rather than shipping a build
+that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
+
 ---
 
 ## Building and testing

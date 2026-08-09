@@ -58,3 +58,12 @@ jobs:
       working-directory: ./python
       run: |
         pytest ./test
+
+    # The release check reads VERSION out of wizard.py by parsing the module, so a refactor
+    # that makes it unreadable - moving it into a class, computing it from parts - would
+    # otherwise only surface when a release failed. This is that same read, run whenever
+    # python/ changes.
+    - name: Check the exporter version is still readable
+      working-directory: .
+      run: |
+        python scripts/exporter_version.py --print
