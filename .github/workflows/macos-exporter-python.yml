@@ -98,6 +98,12 @@ jobs:
     runs-on: macos-14 # Apple Silicon
     environment: 'MacOS Exporter App CI'
 
+    # The repository default is read-only, which is what turned a missing token into a 403 at
+    # the very last step. Granting it here means the upload still works if the PAT is ever
+    # unset or expires - the action treats an empty token as unset and falls back to this one.
+    permissions:
+      contents: write
+
     # Only run this for 'macos-exporter-v<whatever>' tags!
     if: |
       github.event_name == 'release'
@@ -157,19 +163,30 @@ jobs:
         name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
         path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
 
+    # The token goes in `with:`, not `env:`. This action's `token` input defaults to
+    # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
+    # GITHUB_TOKEN" - so the default is always non-empty and the env var was ignored
+    # entirely. It authenticated as the built-in token, whose contents permission is read-only
+    # here, and failed with 403 "Resource not accessible by integration" after both binaries
+    # had already been built. The v1.0.5 release published with no assets attached.
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'release'
       with:
         files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
         name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions
+        token: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }}
 
   build-intel:
     needs: test-release-version
     runs-on: macos-13 # Intel
     environment: 'MacOS Exporter App CI'
+
+    # The repository default is read-only, which is what turned a missing token into a 403 at
+    # the very last step. Granting it here means the upload still works if the PAT is ever
+    # unset or expires - the action treats an empty token as unset and falls back to this one.
+    permissions:
+      contents: write
 
         # Only run this for 'macos-exporter-v<whatever>' tags!
     if: |
@@ -230,11 +247,16 @@ jobs:
         name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
         path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
 
+    # The token goes in `with:`, not `env:`. This action's `token` input defaults to
+    # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
+    # GITHUB_TOKEN" - so the default is always non-empty and the env var was ignored
+    # entirely. It authenticated as the built-in token, whose contents permission is read-only
+    # here, and failed with 403 "Resource not accessible by integration" after both binaries
+    # had already been built. The v1.0.5 release published with no assets attached.
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'release'
       with:
         files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
         name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }} # Provided by GitHub Actions
+        token: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }}
