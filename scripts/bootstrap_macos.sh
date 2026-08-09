@@ -85,9 +85,24 @@ say "Installing dependencies"
 python3 -m pip install --quiet --upgrade pip
 python3 -m pip install --quiet -r requirements.txt || die "Dependency install failed"
 
-# The wizard is a tkinter app. The Command Line Tools python3 includes it; a Homebrew one
-# does not without python-tk, and the failure otherwise is an ImportError at launch.
-python3 -c "import tkinter" 2>/dev/null || die "This python3 has no tkinter. Use the system python3, or install python-tk."
+# The wizard is a tkinter app, so check Tk can actually start rather than merely import.
+#
+# Importing tkinter succeeds in cases where creating a window does not: a Homebrew python3
+# without python-tk fails at import, but a Tk framework that refuses the OS version aborts
+# later, during Tk_Init, and the process dies with "Abort trap: 6" and no traceback. Seen on
+# a Docker-OSX VM whose SystemVersion.plist claimed 14.8.9 while the API Tk queries reported
+# 14.6, so Tk decided the OS was too old for itself.
+if ! python3 -c "import tkinter; tkinter.Tk().destroy()" >/dev/null 2>&1; then
+    tk_error="$(python3 -c "import tkinter; tkinter.Tk().destroy()" 2>&1 | tail -2)"
+
+    printf '\nThe GUI wizard cannot start on this machine:\n\n%s\n\n' "$tk_error"
+    printf 'The export does not need the GUI. Run the decryptor directly instead:\n\n'
+    printf '    cd %s/python && . .venv/bin/activate\n' "$DEST"
+    printf '    PYTHONPATH=. python3 main/airtag_decryptor.py -o ~/Desktop/otv_decrypted --rename-legacy\n\n'
+    printf 'That writes the decrypted OwnedBeacons, BeaconNamingRecord and KeyAlignmentRecords\n'
+    printf 'folders. See CONTRIBUTING.md for turning them into a zip the app can import.\n\n'
+    exit 1
+fi
 
 # macOS 15 tightened keychain access, so the BeaconStore key cannot be read automatically.
 # The wizard says so itself, but saying it up front saves a confusing detour.

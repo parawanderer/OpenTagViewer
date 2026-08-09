@@ -320,7 +320,48 @@ You want `version: 0.0.2` in the yml and `KeyAlignmentRecords/<uuid>/<uuid>.plis
 Without those the app has no key alignment and every tag's first fetch searches its entire
 history — see rule 6 in [AGENTS.md](./AGENTS.md).
 
-Three things that catch people out:
+### If the GUI will not start
+
+The wizard is tkinter, and Tk can fail to initialise even when `import tkinter` works — the
+process then dies with `Abort trap: 6` and no traceback. A Docker-OSX VM will do this if its
+`SystemVersion.plist` disagrees with the version the OS reports through the API Tk queries,
+so Tk concludes the OS is too old for itself.
+
+**The export does not need the GUI.** `airtag_decryptor.py` has its own CLI and imports no
+Tk, and it owns `WHITELISTED_DIRS` — the part that actually decides what gets exported:
+
+```bash
+cd ~/OpenTagViewer/python && . .venv/bin/activate
+PYTHONPATH=. python3 main/airtag_decryptor.py -o ~/Desktop/otv_decrypted --rename-legacy
+```
+
+That writes decrypted `OwnedBeacons/`, `BeaconNamingRecord/` and `KeyAlignmentRecords/`
+folders, prompting for your login password through the system keychain dialog. What it does
+not do is package them, since that is wizard code. To build a zip the app can import:
+
+```bash
+cd ~/Desktop/otv_decrypted
+
+cat > OPENTAGVIEWER.yml <<EOF
+exportTimestamp: $(python3 -c 'import time; print(int(time.time()*1000))')
+sourceUser: $USER
+version: 0.0.2
+via: manual-cli-export
+EOF
+
+zip -r ~/Desktop/OpenTagViewer_export_manual.zip \
+  OwnedBeacons BeaconNamingRecord KeyAlignmentRecords OPENTAGVIEWER.yml
+```
+
+The folders have to sit at the **root** of the zip — the importer matches `^OwnedBeacons/…`,
+so zipping the parent directory instead produces an archive where nothing matches and every
+file is skipped as unexpected.
+
+Unlike the wizard, this includes every decrypted beacon rather than only those with a
+matching naming record. The importer does its own inner join, so the import is equivalent,
+but it is the importer's join being tested rather than the wizard's.
+
+### Things that catch people out
 
 - **macOS 15+ cannot extract the key automatically.** Keychain access was tightened; the
   wizard exits with instructions and you have to pass `--key`. macOS 14 and below are fine,
