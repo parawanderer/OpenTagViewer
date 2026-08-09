@@ -208,19 +208,40 @@ def _gh(*args: str) -> str:
     return result.stdout
 
 
-def latest_release(prefix: str, include_drafts: bool = False) -> dict:
-    """The most recent release whose tag starts with `prefix`."""
+def published_releases(prefix: str) -> list[dict]:
+    """Published releases whose tag starts with `prefix`, newest first."""
     raw = _gh("release", "list", "--limit", "100", "--json",
               "tagName,name,createdAt,isDraft")
-    releases = [r for r in json.loads(raw) if r["tagName"].startswith(prefix)]
-
-    if not include_drafts:
-        releases = [r for r in releases if not r["isDraft"]]
+    releases = [r for r in json.loads(raw)
+                if r["tagName"].startswith(prefix) and not r["isDraft"]]
 
     if not releases:
         raise ReleaseError(f"No published release found with a tag starting '{prefix}'")
 
-    return max(releases, key=lambda r: r["createdAt"])
+    return sorted(releases, key=lambda r: r["createdAt"], reverse=True)
+
+
+def latest_release(prefix: str) -> dict:
+    """The most recent published release whose tag starts with `prefix`."""
+    return published_releases(prefix)[0]
+
+
+def pick_superseded(releases: list[dict]) -> dict:
+    """
+    The release a demotion should collapse: the second newest, not the newest.
+
+    Demotion runs *after* the new release is published, so by then the newest release is the
+    one that should keep its wrapper. Defaulting to "newest" collapsed the release that had
+    just gone out - stripping its screenshot and feature list moments after publishing it.
+
+    `releases` must be newest first.
+    """
+    if len(releases) < 2:
+        raise ReleaseError(
+            f"Only one published release exists ({releases[0]['tagName']}), so there is "
+            f"nothing it supersedes. Pass --tag explicitly if you meant to collapse it."
+        )
+    return releases[1]
 
 
 def release_body(tag: str) -> str:
@@ -267,7 +288,15 @@ def command_draft(args) -> int:
 
 def command_demote(args) -> int:
     kind = KINDS[args.kind]
-    tag = args.tag or latest_release(kind["prefix"])["tagName"]
+
+    if args.tag:
+        tag = args.tag
+    else:
+        releases = published_releases(kind["prefix"])
+        superseded = pick_superseded(releases)
+        tag = superseded["tagName"]
+        print(f"Current release  : {releases[0]['tagName']}  (keeps its wrapper)")
+        print(f"Collapsing       : {tag}")
 
     body = release_body(tag)
     if is_already_demoted(body):
@@ -314,7 +343,8 @@ def main(argv: list[str] | None = None) -> int:
 
     demote = sub.add_parser("demote", help="collapse the release that was just superseded")
     demote.add_argument("--kind", choices=sorted(KINDS), required=True)
-    demote.add_argument("--tag", help="which release to collapse (default: the newest published)")
+    demote.add_argument("--tag", help="which release to collapse "
+                                      "(default: the one the newest release superseded)")
     demote.add_argument("--dry-run", action="store_true")
     demote.add_argument("--yes", action="store_true", help="skip the confirmation")
     demote.set_defaults(func=command_demote)
