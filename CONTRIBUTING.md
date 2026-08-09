@@ -110,7 +110,7 @@ wizard).
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop wizard tests | `python/test/` | pytest | no |
-| String tooling tests | `scripts/test/` | pytest | no |
+| Tooling tests | `scripts/test/` | pytest | no |
 
 ### Run everything
 
@@ -172,8 +172,15 @@ Targeting a subset:
 
 ### Android unit tests
 
-Plain JVM, no Android framework. Be aware there is currently almost nothing here — the
-meaningful coverage is instrumented, so a green `test` run says very little.
+Plain JVM, no Android framework, so these are the fastest tests in the project — seconds, no
+emulator.
+
+Most of what lives here is in `util/rx/`: the stream compositions and decision logic behind
+the map, extracted out of `MapsActivity` precisely so it could be tested. They assert that a
+call *happens* rather than that a value looks right, because the failures in this area are
+silent — a stream disposed early, a marker that stops being raised, a fetch that returns
+nothing being indistinguishable from a fetch that failed. None of those throw, and none show
+up in logcat.
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -214,14 +221,21 @@ python -m pytest ./test
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
-### String tooling tests
+### Tooling tests
 
 ```bash
 python -m pytest scripts/test -v
 ```
 
-`scripts/add_strings.py` gates CI's translation check, so a bug in it would report green
-while protecting nothing.
+Most of `scripts/` is one-shot utilities where a failure is loud and immediate to whoever ran
+them, and tests would not earn their keep. These three are different, because each one guards
+something else and a bug in a guard reports green while protecting nothing:
+
+| Script | What it gates |
+| --- | --- |
+| `add_strings.py` | CI's translation check |
+| `exporter_version.py` | whether a release tag may disagree with the version in the source |
+| `release_notes.py` | the notes of a *published* release, so a parsing mistake is visible to everyone |
 
 ### Which Python each tree targets
 
