@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 
 import androidx.appcompat.app.AppCompatDelegate;
 import dev.wander.android.opentagviewer.R;
+import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
@@ -275,70 +276,72 @@ public class SharedMainSettingsManager {
     }
 
     /**
-     * Report how local Anisette is doing.
+     * Draw what local Anisette has to say for itself.
      *
-     * @param status     what to say
-     * @param detail     the failure, when there is one
-     * @param apkVersion the Apple Music build the app knows how to read, shown only when
-     *                   somebody has to go and find a copy of it themselves
+     * <p>Takes an already-computed {@link AnisetteStatus} rather than a source, because working
+     * one out blocks on downloads and Apple while this has to run on the main thread. That
+     * split is also what makes this testable by inflating a layout - no activity, no network.
+     *
+     * @param root        anything containing the status views; missing ones are skipped
+     * @param status      what to say
+     * @param apkVersion  the Apple Music build the app knows how to read, shown only when
+     *                    somebody has to go and find a copy of it themselves
+     * @param hasOwnApk   whether a file has already been supplied, which decides whether
+     *                    "go back to Apple's copy" is offered
      */
-    public void showLocalAnisetteStatus(final LOCAL_ANISETTE_STATUS status,
-                                        final String detail, final String apkVersion) {
-        TextView statusText = this.context.findViewById(R.id.anisetteLocalStatus);
-        ImageView okIcon = this.context.findViewById(R.id.anisetteLocalOkIcon);
-        ImageView errorIcon = this.context.findViewById(R.id.anisetteLocalErrorIcon);
-        View ownApk = this.context.findViewById(R.id.anisetteOwnApkContainer);
+    public static void applyLocalAnisetteStatus(final View root, final AnisetteStatus status,
+                                                final String apkVersion,
+                                                final boolean hasOwnApk) {
+        if (root == null) {
+            return;
+        }
+
+        final TextView statusText = root.findViewById(R.id.anisetteLocalStatus);
+        final ImageView okIcon = root.findViewById(R.id.anisetteLocalOkIcon);
+        final ImageView errorIcon = root.findViewById(R.id.anisetteLocalErrorIcon);
         if (statusText == null) {
             return;
         }
 
-        okIcon.setVisibility(status == LOCAL_ANISETTE_STATUS.READY ? VISIBLE : GONE);
-        errorIcon.setVisibility(status == LOCAL_ANISETTE_STATUS.UNAVAILABLE
-                || status == LOCAL_ANISETTE_STATUS.APPLE_CHANGED ? VISIBLE : GONE);
+        final AnisetteStatus.State state = status.state();
+        final boolean failed = state == AnisetteStatus.State.UNAVAILABLE
+                || state == AnisetteStatus.State.APPLE_CHANGED;
 
-        switch (status) {
-            case READY:
-                statusText.setText(R.string.anisette_local_status_ready);
-                break;
-            case UNAVAILABLE:
-            case APPLE_CHANGED:
-                statusText.setText(this.context.getString(
-                        R.string.anisette_local_status_unavailable, detail));
-                break;
-            case PENDING:
-            default:
-                statusText.setText(R.string.anisette_local_status_pending);
-                break;
+        if (okIcon != null) {
+            okIcon.setVisibility(state == AnisetteStatus.State.READY ? VISIBLE : GONE);
+        }
+        if (errorIcon != null) {
+            errorIcon.setVisibility(failed ? VISIBLE : GONE);
         }
 
-        // Only offered once the automatic route has actually failed: suggesting people go and
-        // find an APK while everything works would be an invitation to break it.
-        if (ownApk != null) {
-            final boolean needed = status == LOCAL_ANISETTE_STATUS.APPLE_CHANGED;
-            ownApk.setVisibility(needed ? VISIBLE : GONE);
-
-            TextView explanation = this.context.findViewById(R.id.anisetteOwnApkExplanation);
-            if (needed && explanation != null) {
-                explanation.setText(this.context.getString(
-                        R.string.anisette_local_needs_own_file, apkVersion));
-            }
-
-            View clear = this.context.findViewById(R.id.anisetteClearApkButton);
-            if (clear != null) {
-                clear.setVisibility(
-                        this.currentUserSettings.hasOwnAnisetteApk() ? VISIBLE : GONE);
-            }
+        if (state == AnisetteStatus.State.READY) {
+            statusText.setText(R.string.anisette_local_status_ready);
+        } else if (failed) {
+            statusText.setText(root.getContext().getString(
+                    R.string.anisette_local_status_unavailable, status.detail()));
+        } else {
+            statusText.setText(R.string.anisette_local_status_pending);
         }
-    }
 
-    public enum LOCAL_ANISETTE_STATUS {
-        /** Nothing has been set up yet, and nothing is wrong. */
-        PENDING,
-        READY,
-        /** Failed for an ordinary reason - no network, for instance. */
-        UNAVAILABLE,
-        /** Apple replaced the APK, so the user has to supply a copy themselves. */
-        APPLE_CHANGED
+        // Only offered once the automatic route has actually failed for the one reason that
+        // supplying a file would fix. Suggesting people go and find an APK while everything
+        // works would be an invitation to break it.
+        final View ownApk = root.findViewById(R.id.anisetteOwnApkContainer);
+        if (ownApk == null) {
+            return;
+        }
+        ownApk.setVisibility(status.needsOwnApk() ? VISIBLE : GONE);
+
+        final TextView explanation = root.findViewById(R.id.anisetteOwnApkExplanation);
+        if (status.needsOwnApk() && explanation != null) {
+            explanation.setText(root.getContext().getString(
+                    R.string.anisette_local_needs_own_file, apkVersion));
+        }
+
+        final View clear = root.findViewById(R.id.anisetteClearApkButton);
+        if (clear != null) {
+            clear.setVisibility(hasOwnApk ? VISIBLE : GONE);
+        }
     }
 
     public void setupAnisetteServerUrlField() {

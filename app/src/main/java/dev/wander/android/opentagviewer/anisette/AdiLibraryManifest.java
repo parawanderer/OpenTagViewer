@@ -33,6 +33,15 @@ public final class AdiLibraryManifest {
 
     private static final String ASSET = "adi-libraries.json";
 
+    /**
+     * Present in the message when a download does not match what is recorded.
+     *
+     * <p>Shared with {@link AnisetteStatus} rather than duplicated, because it is how "Apple
+     * shipped a new build" is told apart from ordinary failures, and that distinction decides
+     * whether the app offers to let somebody supply an APK by hand.
+     */
+    public static final String MISMATCH_MARKER = "does not match what is recorded";
+
     private final JsonNode root;
 
     private AdiLibraryManifest(JsonNode root) {
@@ -69,8 +78,10 @@ public final class AdiLibraryManifest {
 
         final long expectedSize = expected.path("size").asLong();
         if (library.length() != expectedSize) {
-            return String.format(Locale.ROOT, "%s is %d bytes, expected %d",
-                    library.getName(), library.length(), expectedSize);
+            // Carries the same marker as a hash mismatch: a different size is a different
+            // build just as surely, and leads to the same remedy.
+            return String.format(Locale.ROOT, "%s %s: is %d bytes, expected %d",
+                    library.getName(), MISMATCH_MARKER, library.length(), expectedSize);
         }
 
         final String actual;
@@ -82,9 +93,9 @@ public final class AdiLibraryManifest {
 
         final String expectedHash = expected.path("sha256").asText();
         if (!actual.equalsIgnoreCase(expectedHash)) {
-            return library.getName() + " hashes to " + actual + ", expected " + expectedHash
-                    + " - Apple has probably shipped a new Apple Music build (this manifest is "
-                    + "from " + apkVersion() + ")";
+            return library.getName() + " " + MISMATCH_MARKER + ": hashes to " + actual
+                    + ", expected " + expectedHash + " - Apple has probably shipped a new Apple "
+                    + "Music build (this manifest is from " + apkVersion() + ")";
         }
 
         Log.d(TAG, library.getName() + " matches the manifest");
