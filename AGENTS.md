@@ -207,11 +207,15 @@ Translations are read **from a JSON file, never from a command-line argument**. 
 a style preference: passing non-ASCII text through shell quoting has twice corrupted it here,
 once putting a literal `\&#8217;` on screen where a French apostrophe belonged.
 
-The tool refuses to write unless every locale is supplied, escapes apostrophes, quotes and
-ampersands for you, preserves the inline tags `<u>`, `<b>` and `<i>`, and re-parses each file
-afterwards so a malformed write fails immediately rather than at aapt time. Locales are
-discovered from `app/src/main/res/values-*/strings.xml`, so adding a locale directory makes
-it required with no change to the script.
+**Write the JSON exactly as the text should appear on screen, and do not escape anything.**
+The tool escapes apostrophes, quotes and ampersands for you, and preserves the inline tags
+`<u>`, `<b>` and `<i>`. A `'` you escape yourself arrives on screen as `\'`. This is settled —
+do not go and re-read the script to check it before every batch of strings.
+
+It also refuses to write unless every locale is supplied, and re-parses each file afterwards
+so a malformed write fails immediately rather than at aapt time. Locales are discovered from
+`app/src/main/res/values-*/strings.xml`, so adding a locale directory makes it required with
+no change to the script.
 
 `--check` is worth running before opening a PR; it found eight strings missing across seven
 locales the first time it was run. It also runs in CI, on every PR and every release.

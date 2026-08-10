@@ -171,4 +171,5 @@ This can now happen entirely on your phone instead. Switching means signing in o
     <string name="anisette_upgrade_later">Not now</string>
     <string name="anisette_upgrade_later_hint">You can switch later in Settings.</string>
     <string name="anisette_local_status_checking">Checking…</string>
+    <string name="anisette_login_needs_server">This device could not set up sign-in on its own, so a server has to do it this time. You can change this later in Settings.</string>
 </resources>
