@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">Wo du sie findest</string>
     <string name="anisette_learn_more">Über Anisette-Server</string>
     <string name="anisette_upgrade_title">Anmelden ohne Zwischenstelle</string>
-    <string name="anisette_upgrade_message">Die Anmeldung bei Apple läuft derzeit über einen öffentlichen Anisette-Server. Dessen Betreiber kann diesen Datenverkehr sehen, und OpenTagViewer kann sich nicht mehr anmelden, sobald dieser Server ausfällt.
-
-Das kann jetzt vollständig auf deinem Telefon geschehen. Beim Wechsel musst du dich einmal erneut anmelden, weil Apple das als neues Gerät ansieht.</string>
+    <string name="anisette_upgrade_message">Dein Telefon kann das jetzt selbst, statt über einen öffentlichen Anisette-Server zu gehen, der den Datenverkehr sieht und die Anmeldung mit sich reißt. Der Wechsel kostet eine Anmeldung.</string>
     <string name="anisette_upgrade_switch">Wechseln und anmelden</string>
     <string name="anisette_upgrade_later">Jetzt nicht</string>
     <string name="anisette_upgrade_later_hint">Du kannst später in den Einstellungen wechseln.</string>

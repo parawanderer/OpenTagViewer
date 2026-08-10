@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">Où le trouver</string>
     <string name="anisette_learn_more">À propos des serveurs Anisette</string>
     <string name="anisette_upgrade_title">Se connecter sans intermédiaire</string>
-    <string name="anisette_upgrade_message">La connexion à Apple passe actuellement par un serveur Anisette public. Son opérateur voit ce trafic, et OpenTagViewer ne peut plus se connecter dès que ce serveur est hors service.
-
-Cela peut désormais se faire entièrement sur votre téléphone. Le changement demande une nouvelle connexion, car Apple y voit un nouvel appareil.</string>
+    <string name="anisette_upgrade_message">Votre téléphone peut désormais le faire lui-même, au lieu de passer par un serveur Anisette public qui voit le trafic et emporte la connexion avec lui. Le changement coûte une connexion.</string>
     <string name="anisette_upgrade_switch">Changer et se connecter</string>
     <string name="anisette_upgrade_later">Pas maintenant</string>
     <string name="anisette_upgrade_later_hint">Vous pourrez changer plus tard dans les réglages.</string>

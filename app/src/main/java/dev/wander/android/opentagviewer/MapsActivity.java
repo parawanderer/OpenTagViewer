@@ -48,6 +48,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
@@ -839,6 +840,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.sendToLogin();
             return;
         }
+        // Somebody is signed in, which is the only moment this is worth raising: they can see
+        // what they already have, and what switching would cost them.
+        this.offerLocalAnisetteUpgradeIfDue();
+
         // else stay here & restore the account.
         // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
         // so we no longer need to read userSettings.getAnisetteServerUrl() here.
@@ -910,6 +915,38 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
             // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
+    }
+
+    /**
+     * Invite somebody updating from an older version to stop signing in through a server.
+     *
+     * <p>They were left on their server deliberately, because moving a session presents Apple
+     * with a different machine and costs a sign-in. That trade is theirs to make, so it is put
+     * to them once - see {@link AnisetteUpgradeDialog}, which decides whether there is anything
+     * to ask and records that it was asked.
+     *
+     * <p>Accepting saves first and signs out only once the save has landed. The other order
+     * looks the same right up until the write loses a race with the activity finishing, at
+     * which point they sign in again and arrive back on the server they just left.
+     */
+    private void offerLocalAnisetteUpgradeIfDue() {
+        this.runOnUiThread(() -> AnisetteUpgradeDialog.offerIfDue(this, this.userSettings,
+            accepted -> {
+                var saved = this.userSettingsRepo.storeUserSettings(this.userSettings);
+
+                var async = (accepted ? saved.andThen(this.userAuthRepo.clearUser()) : saved)
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(() -> {
+                            if (!accepted) {
+                                return;
+                            }
+                            Log.i(TAG, "switching to local Anisette; signing in again");
+                            this.finish();
+                            this.sendToLogin();
+                        }, error -> Log.e(TAG,
+                                "Failed to record the local Anisette choice", error));
+            }));
     }
 
     private static boolean isAccountRestoreFailure(Throwable t) {

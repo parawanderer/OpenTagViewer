@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">받는 곳 안내</string>
     <string name="anisette_learn_more">Anisette 서버 안내</string>
     <string name="anisette_upgrade_title">중개자 없이 로그인</string>
-    <string name="anisette_upgrade_message">현재 Apple 로그인은 공개 Anisette 서버를 거칩니다. 서버 운영자가 해당 통신을 볼 수 있고, 서버가 중단되면 OpenTagViewer도 로그인할 수 없습니다.
-
-이제 이 과정을 기기에서 모두 처리할 수 있습니다. 전환하면 Apple이 새 기기로 인식하므로 한 번 더 로그인해야 합니다.</string>
+    <string name="anisette_upgrade_message">이제 기기에서 직접 처리할 수 있습니다. 통신을 볼 수 있고 중단되면 로그인도 막히는 공개 Anisette 서버를 거치지 않아도 됩니다. 전환하려면 한 번 더 로그인해야 합니다.</string>
     <string name="anisette_upgrade_switch">전환 후 로그인</string>
     <string name="anisette_upgrade_later">나중에</string>
     <string name="anisette_upgrade_later_hint">설정에서 언제든 전환할 수 있습니다.</string>

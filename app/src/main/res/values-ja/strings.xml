@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">入手先について</string>
     <string name="anisette_learn_more">Anisette サーバーについて</string>
     <string name="anisette_upgrade_title">仲介なしでサインイン</string>
-    <string name="anisette_upgrade_message">現在、Apple へのサインインは公開 Anisette サーバーを経由しています。運営者はその通信を見ることができ、サーバーが停止すると OpenTagViewer もサインインできなくなります。
-
-これをすべてお使いの端末で行えるようになりました。切り替えると Apple には新しい端末として扱われるため、もう一度サインインが必要です。</string>
+    <string name="anisette_upgrade_message">この処理を端末だけで行えるようになりました。通信を見られ、停止すればサインインも止まる公開 Anisette サーバーは不要です。切り替えにはサインイン 1 回分かかります。</string>
     <string name="anisette_upgrade_switch">切り替えてサインイン</string>
     <string name="anisette_upgrade_later">後で</string>
     <string name="anisette_upgrade_later_hint">設定からいつでも切り替えられます。</string>
