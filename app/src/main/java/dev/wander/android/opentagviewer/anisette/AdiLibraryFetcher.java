@@ -27,8 +27,15 @@ import java.util.zip.InflaterInputStream;
  * come to roughly 11 MB rather than 142 MB.
  *
  * <p>This exists so the app never has to redistribute Apple's binaries - the same position
- * every public Anisette server is in. It lives in androidTest for now because it is only used
- * by the proof-of-concept; if the concept holds it moves to main.
+ * every public Anisette server is in.
+ *
+ * <p>What arrives is verified against {@code assets/adi-libraries.json} before anything is
+ * loaded from it. That file records the exact SHA-256 of each library, taken from Apple's own
+ * CDN when the stub symbol lists were generated. Apple serve one "latest" URL with no
+ * versioned variant, so the build cannot be pinned by asking for an old one - but what we are
+ * willing to execute can be, and that is the half that matters. A mismatch means Apple shipped
+ * a new build whose obfuscated symbols may have moved, and the right response is to fall back
+ * to a remote Anisette server rather than call into something we cannot vouch for.
  */
 public final class AdiLibraryFetcher {
     private static final String TAG = "AdiLibraryFetcher";

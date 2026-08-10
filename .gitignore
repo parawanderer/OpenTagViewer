@@ -29,3 +29,9 @@ tmp/
 # Cache for scripts/update_adi_stub_symbols.py - copies of Apple libraries, pulled from
 # their CDN so the stub symbol lists can be regenerated. Never committed.
 .adi-libs/
+
+# Per-developer Android Studio state: test-panel column widths and the device you happen
+# to deploy to. Churns on every run, and records the model name of whatever phone is plugged
+# in - none of which belongs to anybody else working on this.
+/.idea/androidTestResultsUserPreferences.xml
+/.idea/deploymentTargetSelector.xml

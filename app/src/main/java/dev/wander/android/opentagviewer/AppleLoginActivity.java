@@ -51,6 +51,7 @@ import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -328,7 +329,14 @@ public class AppleLoginActivity extends AppCompatActivity {
         final String password = Objects.requireNonNull(passwordInput.getText()).toString();
         final String anisetteServerUrl = Objects.requireNonNull(this.getUserSettings().getAnisetteServerUrl());
 
-        var async = PythonAuthService.pythonLogin(emailOrPhone, password, anisetteServerUrl)
+        // Produces Anisette on this device when it can, so the login is not relayed through a
+        // public Anisette server. It decides for itself whether it is usable, and the Python
+        // side falls back to anisetteServerUrl when it is not - so this can only improve on
+        // the previous behaviour, never break it.
+        final LocalAnisette localAnisette = new LocalAnisette(this);
+
+        var async = PythonAuthService.pythonLogin(
+                    emailOrPhone, password, anisetteServerUrl, localAnisette)
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(authResponse -> {
                 Log.i(TAG, "Got logged in with response ");

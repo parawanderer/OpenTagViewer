@@ -45,10 +45,18 @@ ROOT = "libstoreservicescore.so"
 #: The libraries we stand in for. Everything behind them becomes unreachable.
 STUBBED = ["libCoreFoundation.so", "libmediaplatform.so"]
 
+#: Libraries we take from Apple whole rather than standing in for. libc++_shared is here
+#: because its mangled names are __ndk1-namespaced and the NDK's own libc++ should not be
+#: assumed ABI-identical without checking.
+#:
+#: Anything libstoreservicescore imports from that is neither here nor in STUBBED is a
+#: dependency Apple has added, and needs a decision rather than a regenerated list.
+DOWNLOADED_WHOLE = ["libc++_shared.so"]
+
 #: What the app actually pulls from Apple at runtime. libCoreADI.so is not a DT_NEEDED of
 #: anything - libstoreservicescore opens it by path once ADILoadLibraryWithPath is called -
 #: so it has to be listed explicitly rather than discovered through the dependency graph.
-FETCHED_AT_RUNTIME = ["libc++_shared.so", "libstoreservicescore.so", "libCoreADI.so"]
+FETCHED_AT_RUNTIME = DOWNLOADED_WHOLE + ["libstoreservicescore.so", "libCoreADI.so"]
 
 #: Read by the app at runtime to verify what it downloaded before calling into any of it.
 MANIFEST = os.path.join(
@@ -368,9 +376,22 @@ def collect(cache: str) -> tuple[dict[str, dict[str, bool]], dict[str, bytes]]:
             merged[library].update(symbols)
             print(f"  {library}: {len(symbols)} symbols, {len(new)} new")
 
+        unexpected = {library: symbols for library, symbols in found.items()
+                      if library not in STUBBED and library not in DOWNLOADED_WHOLE}
+        if unexpected:
+            raise SystemExit(
+                f"{ROOT} now imports from libraries this app neither stubs nor downloads: "
+                + ", ".join(f"{name} ({len(syms)} symbols)"
+                            for name, syms in sorted(unexpected.items()))
+                + f".\nOn {abi}. Apple has added a dependency, and regenerating the symbol "
+                  "lists alone will not be enough - dlopen will fail with 'library not found' "
+                  "until it is either stubbed or downloaded. Decide which, then update "
+                  "STUBBED or DOWNLOADED_WHOLE here and the matching lists in "
+                  "AdiLibrary/LocalAnisette.")
+
         for library, symbols in sorted(found.items()):
-            if library not in STUBBED:
-                print(f"  ({library}: {len(symbols)} symbols, kept as Apple's)")
+            if library in DOWNLOADED_WHOLE:
+                print(f"  ({library}: {len(symbols)} symbols, downloaded from Apple)")
 
     return merged, last
 

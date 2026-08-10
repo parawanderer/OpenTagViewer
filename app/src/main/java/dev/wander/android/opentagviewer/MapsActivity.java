@@ -75,6 +75,7 @@ import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityMapsBinding;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
@@ -841,7 +842,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // else stay here & restore the account.
         // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
         // so we no longer need to read userSettings.getAnisetteServerUrl() here.
-        var asyncAppleService = PythonAuthService.restoreAccount(userAuth.get())
+        // Produce Anisette on this device where possible, rather than relaying every refresh
+        // through a public Anisette server. Falls back to the configured server by itself.
+        var asyncAppleService = PythonAuthService.restoreAccount(
+                    userAuth.get(), new LocalAnisette(this))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;
