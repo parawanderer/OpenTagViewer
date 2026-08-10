@@ -113,4 +113,27 @@
     <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
     <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Это может занять несколько минут — не закрывайте приложение.</string>
     <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Это может занять несколько минут — не закрывайте приложение.</string>
+    <string name="anisette_mode_title">Данные для входа</string>
+    <string name="anisette_mode_local">На этом устройстве</string>
+    <string name="anisette_mode_remote">Удалённый сервер</string>
+    <string name="anisette_mode_local_summary">Создаются на вашем телефоне. Никто посторонний не видит ваш вход, и чужой сбой ему не помешает.</string>
+    <string name="anisette_mode_remote_summary">Это делает публичный сервер Anisette. Его владелец видит этот трафик, а вход перестаёт работать, когда сервер недоступен.</string>
+    <string name="anisette_mode_change_warning">Потребуется войти заново. Apple связывает сессию с тем, что создало данные для входа, поэтому такая смена выглядит как новое устройство.</string>
+    <string name="anisette_local_status_ready">Готово</string>
+    <string name="anisette_local_status_pending">Настроится при следующем входе</string>
+    <string name="anisette_local_status_unavailable">Не работает: %1$s</string>
+    <string name="anisette_local_needs_own_file">Apple заменила нужный файл, поэтому автоматическая настройка больше невозможна. Вы можете сами предоставить копию %1$s или использовать удалённый сервер.</string>
+    <string name="anisette_choose_apk">Выбрать файл</string>
+    <string name="anisette_apk_in_use">Используется выбранный вами файл</string>
+    <string name="anisette_apk_use_apple_again">Вернуться к копии от Apple</string>
+    <string name="anisette_apk_rejected">Этот файл не является нужной версией (%1$s).</string>
+    <string name="anisette_where_to_get_apk">Где его найти</string>
+    <string name="anisette_learn_more">О серверах Anisette</string>
+    <string name="anisette_upgrade_title">Вход без посредника</string>
+    <string name="anisette_upgrade_message">Сейчас вход в Apple идёт через публичный сервер Anisette. Его владелец видит этот трафик, а OpenTagViewer не сможет войти, пока сервер недоступен.
+
+Теперь это может происходить полностью на вашем телефоне. При переходе потребуется войти ещё раз, поскольку Apple воспримет это как новое устройство.</string>
+    <string name="anisette_upgrade_switch">Переключить и войти</string>
+    <string name="anisette_upgrade_later">Не сейчас</string>
+    <string name="anisette_upgrade_later_hint">Переключиться можно позже в настройках.</string>
 </resources>

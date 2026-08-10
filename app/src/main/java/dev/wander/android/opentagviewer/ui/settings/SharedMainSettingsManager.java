@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -74,6 +75,9 @@ public class SharedMainSettingsManager {
 
     private final UserSettings currentUserSettings;
 
+    /** Told which Anisette mode was picked. Null when the screen does not offer the choice. */
+    private final Consumer<String> onAnisetteModeSelectedCallback;
+
     public SharedMainSettingsManager(
             @NonNull AppCompatActivity context,
             @NonNull Consumer<String> onLanguageSelected,
@@ -83,6 +87,20 @@ public class SharedMainSettingsManager {
             @NonNull UserSettings currentUserSettings,
             @NonNull Consumer<Boolean> onAnisetteUrlInputTyped
     ) {
+        this(context, onLanguageSelected, onMapProviderSelected, onNewAnisetteUrlSelected,
+                github, currentUserSettings, onAnisetteUrlInputTyped, null);
+    }
+
+    public SharedMainSettingsManager(
+            @NonNull AppCompatActivity context,
+            @NonNull Consumer<String> onLanguageSelected,
+            @NonNull Consumer<String> onMapProviderSelected,
+            @NonNull Consumer<String> onNewAnisetteUrlSelected,
+            @NonNull GithubRawUtilityFilesService github,
+            @NonNull UserSettings currentUserSettings,
+            @NonNull Consumer<Boolean> onAnisetteUrlInputTyped,
+            Consumer<String> onAnisetteModeSelected
+    ) {
         this.context = context;
         this.onLanguageSelectedCallback = onLanguageSelected;
         this.onMapProviderSelectedCallback = onMapProviderSelected;
@@ -90,6 +108,7 @@ public class SharedMainSettingsManager {
         this.github = github;
         this.currentUserSettings = currentUserSettings;
         this.onAnisetteUrlInputTyped = onAnisetteUrlInputTyped;
+        this.onAnisetteModeSelectedCallback = onAnisetteModeSelected;
     }
 
     public void setupProgressBars() {
@@ -179,6 +198,132 @@ public class SharedMainSettingsManager {
                 ? R.string.map_provider_amap
                 : R.string.map_provider_google;
         mapProviderDropdown.setText(this.context.getString(labelRes), false);
+    }
+
+    /**
+     * The choice between producing Anisette here and asking a server for it.
+     *
+     * @param hasExistingSession whether somebody is already signed in. Only used to work out
+     *                           what to show when nobody has chosen yet - an existing session
+     *                           stays on its server, because moving it would force a re-login.
+     */
+    public void setupAnisetteModeField(boolean hasExistingSession) {
+        AppAutoCompleteTextView dropdown = this.context.findViewById(R.id.anisetteModeSelectDropdown);
+        if (dropdown == null) {
+            return;
+        }
+
+        dropdown.setSimpleItems(new String[] {
+                this.context.getString(R.string.anisette_mode_local),
+                this.context.getString(R.string.anisette_mode_remote)
+        });
+
+        final String current = this.currentUserSettings.resolveAnisetteMode(hasExistingSession);
+        this.showAnisetteMode(current);
+
+        dropdown.setOnItemClickListener((parent, view, position, id) -> {
+            final String selected = position == 1
+                    ? UserSettings.ANISETTE_REMOTE : UserSettings.ANISETTE_LOCAL;
+            dropdown.setText(parent.getItemAtPosition(position).toString(), false);
+            dropdown.clearFocus();
+
+            if (this.onAnisetteModeSelectedCallback != null) {
+                this.onAnisetteModeSelectedCallback.accept(selected);
+            }
+        });
+    }
+
+    /**
+     * Show one mode's controls and hide the other's.
+     *
+     * <p>The remote server's URL and its test button are meaningless when Anisette is produced
+     * here, so they go away entirely rather than sitting there greyed out.
+     */
+    public void showAnisetteMode(final String mode) {
+        final boolean local = !UserSettings.ANISETTE_REMOTE.equals(mode);
+
+        AppAutoCompleteTextView dropdown = this.context.findViewById(R.id.anisetteModeSelectDropdown);
+        if (dropdown != null) {
+            dropdown.setText(this.context.getString(
+                    local ? R.string.anisette_mode_local : R.string.anisette_mode_remote), false);
+        }
+
+        View localSection = this.context.findViewById(R.id.anisetteLocalStatusContainer);
+        if (localSection != null) {
+            localSection.setVisibility(local ? VISIBLE : GONE);
+        }
+
+        View remoteSection = this.context.findViewById(R.id.anisetteRemoteSection);
+        if (remoteSection != null) {
+            remoteSection.setVisibility(local ? GONE : VISIBLE);
+        }
+    }
+
+    /**
+     * Report how local Anisette is doing.
+     *
+     * @param status     what to say
+     * @param detail     the failure, when there is one
+     * @param apkVersion the Apple Music build the app knows how to read, shown only when
+     *                   somebody has to go and find a copy of it themselves
+     */
+    public void showLocalAnisetteStatus(final LOCAL_ANISETTE_STATUS status,
+                                        final String detail, final String apkVersion) {
+        TextView statusText = this.context.findViewById(R.id.anisetteLocalStatus);
+        ImageView okIcon = this.context.findViewById(R.id.anisetteLocalOkIcon);
+        ImageView errorIcon = this.context.findViewById(R.id.anisetteLocalErrorIcon);
+        View ownApk = this.context.findViewById(R.id.anisetteOwnApkContainer);
+        if (statusText == null) {
+            return;
+        }
+
+        okIcon.setVisibility(status == LOCAL_ANISETTE_STATUS.READY ? VISIBLE : GONE);
+        errorIcon.setVisibility(status == LOCAL_ANISETTE_STATUS.UNAVAILABLE
+                || status == LOCAL_ANISETTE_STATUS.APPLE_CHANGED ? VISIBLE : GONE);
+
+        switch (status) {
+            case READY:
+                statusText.setText(R.string.anisette_local_status_ready);
+                break;
+            case UNAVAILABLE:
+            case APPLE_CHANGED:
+                statusText.setText(this.context.getString(
+                        R.string.anisette_local_status_unavailable, detail));
+                break;
+            case PENDING:
+            default:
+                statusText.setText(R.string.anisette_local_status_pending);
+                break;
+        }
+
+        // Only offered once the automatic route has actually failed: suggesting people go and
+        // find an APK while everything works would be an invitation to break it.
+        if (ownApk != null) {
+            final boolean needed = status == LOCAL_ANISETTE_STATUS.APPLE_CHANGED;
+            ownApk.setVisibility(needed ? VISIBLE : GONE);
+
+            TextView explanation = this.context.findViewById(R.id.anisetteOwnApkExplanation);
+            if (needed && explanation != null) {
+                explanation.setText(this.context.getString(
+                        R.string.anisette_local_needs_own_file, apkVersion));
+            }
+
+            View clear = this.context.findViewById(R.id.anisetteClearApkButton);
+            if (clear != null) {
+                clear.setVisibility(
+                        this.currentUserSettings.hasOwnAnisetteApk() ? VISIBLE : GONE);
+            }
+        }
+    }
+
+    public enum LOCAL_ANISETTE_STATUS {
+        /** Nothing has been set up yet, and nothing is wrong. */
+        PENDING,
+        READY,
+        /** Failed for an ordinary reason - no network, for instance. */
+        UNAVAILABLE,
+        /** Apple replaced the APK, so the user has to supply a copy themselves. */
+        APPLE_CHANGED
     }
 
     public void setupAnisetteServerUrlField() {

@@ -52,9 +52,25 @@
             android:layout_width="match_parent"
             android:layout_height="20dp" />
 
+        <!--
+            The Anisette server, which signing in no longer normally needs: Anisette is
+            produced on the device itself, and this screen is quieter for it.
+
+            Hidden rather than deleted, and revealed by AppleLoginActivity when local Anisette
+            cannot set itself up. Somebody signing in for the first time on a device where that
+            fails has no other way to reach this setting - Settings is behind a login - so
+            removing it outright would strand exactly the people who need it.
+        -->
+        <LinearLayout
+            android:id="@+id/anisetteRemoteSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             >
@@ -110,6 +126,8 @@
         </LinearLayout>
 
         <include layout="@layout/anisette_server_url_input" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
