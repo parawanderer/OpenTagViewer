@@ -51,6 +51,7 @@ import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
@@ -335,7 +336,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         // the previous behaviour, never break it.
         // Nobody is signed in on this screen, so an unchosen mode means local - there is no
         // existing session whose machine identity has to be preserved.
-        final LocalAnisette localAnisette = new LocalAnisette(this, this.getUserSettings(), false);
+        final AnisetteSource localAnisette = new LocalAnisette(this, this.getUserSettings(), false);
 
         var async = PythonAuthService.pythonLogin(
                     emailOrPhone, password, anisetteServerUrl, localAnisette)

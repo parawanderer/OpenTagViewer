@@ -31,7 +31,7 @@ import java.util.Map;
  * it from a background thread. It is safe to call {@link #ensureReady} repeatedly; the
  * expensive parts happen once.
  */
-public final class LocalAnisette {
+public final class LocalAnisette implements AnisetteSource {
     private static final String TAG = "LocalAnisette";
 
     private static final String PREFERENCES = "anisette-identity";
@@ -74,6 +74,7 @@ public final class LocalAnisette {
      * @return true if local Anisette can be used; false means fall back to a remote server,
      *         and {@link #unavailableReason()} says why
      */
+    @Override
     public synchronized boolean ensureReady() {
         if (this.adi != null) {
             return true;
@@ -189,6 +190,7 @@ public final class LocalAnisette {
     }
 
     /** Why local Anisette is not being used, or null if it is. */
+    @Override
     public synchronized String unavailableReason() {
         return this.unavailableReason;
     }
@@ -209,6 +211,7 @@ public final class LocalAnisette {
      * <p>Written on every successful login, not only local ones, so it cannot go stale when
      * somebody signs in again over a remote server.
      */
+    @Override
     public synchronized void recordSessionProvenance(boolean establishedLocally) {
         this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                 .edit()
@@ -235,6 +238,7 @@ public final class LocalAnisette {
      * <p>Calls {@link #ensureReady} rather than reading the field, so that asking the question
      * before anything has been loaded gives the right answer instead of a false alarm.
      */
+    @Override
     public synchronized boolean isChangingMachineIdentity() {
         return wasSessionEstablishedLocally() && !ensureReady();
     }
@@ -243,11 +247,13 @@ public final class LocalAnisette {
      * The one-time password, base64. Empty string if unavailable, matching what FindMy's own
      * providers return rather than throwing into the middle of a login.
      */
+    @Override
     public synchronized String otp() {
         return header("X-Apple-I-MD");
     }
 
     /** The machine identifier, base64. */
+    @Override
     public synchronized String machine() {
         return header("X-Apple-I-MD-M");
     }
@@ -288,6 +294,7 @@ public final class LocalAnisette {
     }
 
     /** Purely for diagnostics - the identity is not secret, but it is identifying. */
+    @Override
     public synchronized String describe() {
         if (this.identity == null) {
             return "not ready: " + this.unavailableReason;
