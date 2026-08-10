@@ -136,4 +136,5 @@ Dit kan nu volledig op je telefoon gebeuren. Overstappen betekent één keer opn
     <string name="anisette_upgrade_switch">Overstappen en aanmelden</string>
     <string name="anisette_upgrade_later">Niet nu</string>
     <string name="anisette_upgrade_later_hint">Je kunt later overstappen via Instellingen.</string>
+    <string name="anisette_local_status_checking">Controleren…</string>
 </resources>

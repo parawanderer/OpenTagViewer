@@ -136,4 +136,5 @@ Das kann jetzt vollständig auf deinem Telefon geschehen. Beim Wechsel musst du 
     <string name="anisette_upgrade_switch">Wechseln und anmelden</string>
     <string name="anisette_upgrade_later">Jetzt nicht</string>
     <string name="anisette_upgrade_later_hint">Du kannst später in den Einstellungen wechseln.</string>
+    <string name="anisette_local_status_checking">Wird geprüft …</string>
 </resources>

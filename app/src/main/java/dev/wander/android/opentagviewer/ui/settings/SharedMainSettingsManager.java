@@ -307,6 +307,8 @@ public class SharedMainSettingsManager {
         final boolean failed = state == AnisetteStatus.State.UNAVAILABLE
                 || state == AnisetteStatus.State.APPLE_CHANGED;
 
+        final boolean checking = state == AnisetteStatus.State.CHECKING;
+
         if (okIcon != null) {
             okIcon.setVisibility(state == AnisetteStatus.State.READY ? VISIBLE : GONE);
         }
@@ -314,11 +316,18 @@ public class SharedMainSettingsManager {
             errorIcon.setVisibility(failed ? VISIBLE : GONE);
         }
 
+        final View progress = root.findViewById(R.id.anisetteLocalProgress);
+        if (progress != null) {
+            progress.setVisibility(checking ? VISIBLE : GONE);
+        }
+
         if (state == AnisetteStatus.State.READY) {
             statusText.setText(R.string.anisette_local_status_ready);
         } else if (failed) {
             statusText.setText(root.getContext().getString(
                     R.string.anisette_local_status_unavailable, status.detail()));
+        } else if (checking) {
+            statusText.setText(R.string.anisette_local_status_checking);
         } else {
             statusText.setText(R.string.anisette_local_status_pending);
         }

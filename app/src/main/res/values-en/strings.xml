@@ -136,4 +136,5 @@ This can now happen entirely on your phone instead. Switching means signing in o
     <string name="anisette_upgrade_switch">Switch and sign in</string>
     <string name="anisette_upgrade_later">Not now</string>
     <string name="anisette_upgrade_later_hint">You can switch later in Settings.</string>
+    <string name="anisette_local_status_checking">Checking…</string>
 </resources>

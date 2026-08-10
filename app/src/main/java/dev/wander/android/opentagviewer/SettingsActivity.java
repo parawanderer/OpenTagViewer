@@ -438,12 +438,17 @@ public class SettingsActivity extends AppCompatActivity {
      * on their behalf for a status they are not reading.
      */
     private void loadLocalAnisetteStatus(final View view) {
-        SharedMainSettingsManager.applyLocalAnisetteStatus(
-                view, AnisetteStatus.pending(), "", this.currentSettings.hasOwnAnisetteApk());
-
         if (!this.currentSettings.usesLocalAnisette(true)) {
+            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                    view, AnisetteStatus.pending(), "",
+                    this.currentSettings.hasOwnAnisetteApk());
             return;
         }
+
+        // Spinner up front, because the answer can take a full connection timeout to arrive -
+        // the worst case being offline, which waits 30 seconds and then fails.
+        SharedMainSettingsManager.applyLocalAnisetteStatus(
+                view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
 
         var async = Observable.fromCallable(() -> {
                     final AnisetteSource source =

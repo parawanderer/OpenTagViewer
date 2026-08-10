@@ -31,6 +31,22 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <!--
+            Shown while the status is being worked out. Worth having: finding out can take a
+            full connection timeout when offline, and without this the screen looks stuck on
+            "sets itself up the next time you sign in".
+        -->
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/anisetteLocalProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorSize="18dp"
+            app:trackCornerRadius="2dp"
+            app:trackThickness="2dp" />
+
         <ImageView
             android:id="@+id/anisetteLocalOkIcon"
             android:layout_width="20dp"
