@@ -233,27 +233,42 @@ public class SharedMainSettingsManager {
         });
     }
 
+    /** Show one mode's controls and hide the other's, on this screen. */
+    public void showAnisetteMode(final String mode) {
+        applyAnisetteMode(this.context.findViewById(android.R.id.content), mode);
+    }
+
     /**
-     * Show one mode's controls and hide the other's.
+     * Show one mode's controls and hide the other's, anywhere they appear.
      *
      * <p>The remote server's URL and its test button are meaningless when Anisette is produced
      * here, so they go away entirely rather than sitting there greyed out.
+     *
+     * <p>Static and taking a root view because these controls live in two places - inline on
+     * the login screen, and inside a dialog in Settings - and because it makes the behaviour
+     * testable by inflating the layout, with no activity and no Anisette of any kind.
+     *
+     * @param root anything containing the controls; missing ones are skipped, so a screen that
+     *             shows only some of them is fine
      */
-    public void showAnisetteMode(final String mode) {
+    public static void applyAnisetteMode(final View root, final String mode) {
+        if (root == null) {
+            return;
+        }
         final boolean local = !UserSettings.ANISETTE_REMOTE.equals(mode);
 
-        AppAutoCompleteTextView dropdown = this.context.findViewById(R.id.anisetteModeSelectDropdown);
+        AppAutoCompleteTextView dropdown = root.findViewById(R.id.anisetteModeSelectDropdown);
         if (dropdown != null) {
-            dropdown.setText(this.context.getString(
+            dropdown.setText(root.getContext().getString(
                     local ? R.string.anisette_mode_local : R.string.anisette_mode_remote), false);
         }
 
-        View localSection = this.context.findViewById(R.id.anisetteLocalStatusContainer);
+        View localSection = root.findViewById(R.id.anisetteLocalStatusContainer);
         if (localSection != null) {
             localSection.setVisibility(local ? VISIBLE : GONE);
         }
 
-        View remoteSection = this.context.findViewById(R.id.anisetteRemoteSection);
+        View remoteSection = root.findViewById(R.id.anisetteRemoteSection);
         if (remoteSection != null) {
             remoteSection.setVisibility(local ? GONE : VISIBLE);
         }

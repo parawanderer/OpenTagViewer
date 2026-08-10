@@ -62,6 +62,7 @@ import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
+import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
@@ -137,7 +138,12 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setOnClickLanguage(this::onClickEditLanguage);
         this.binding.setCurrentLanguage(Optional.ofNullable(this.currentSettings.getLanguage()).map(this::getPrettyLanguageName).orElse(this.getString(R.string.use_system_default)));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
-        this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
+        // Anyone on this screen is signed in, so an unchosen mode means they came from a
+        // version that only had servers, and stay on theirs until they say otherwise.
+        this.binding.setCurrentAnisetteServerUrl(
+                this.currentSettings.usesLocalAnisette(true)
+                        ? this.getString(R.string.anisette_mode_local)
+                        : this.currentSettings.getAnisetteServerUrl());
         this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
@@ -385,14 +391,14 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         final String current = this.currentSettings.resolveAnisetteMode(true);
-        applyAnisetteMode(view, current);
+        SharedMainSettingsManager.applyAnisetteMode(view, current);
 
         modeDropdown.setOnItemClickListener((parent, v, position, id) -> {
             final String selected = position == 1
                     ? UserSettings.ANISETTE_REMOTE : UserSettings.ANISETTE_LOCAL;
             modeDropdown.setText(parent.getItemAtPosition(position).toString(), false);
             modeDropdown.clearFocus();
-            applyAnisetteMode(view, selected);
+            SharedMainSettingsManager.applyAnisetteMode(view, selected);
             this.pendingAnisetteMode = selected;
         });
 
@@ -404,28 +410,6 @@ public class SettingsActivity extends AppCompatActivity {
         final View whereToGetApk = view.findViewById(R.id.anisetteWhereToGetApkButton);
         if (whereToGetApk != null) {
             whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
-        }
-    }
-
-    /** Show one mode's controls and hide the other's. */
-    private static void applyAnisetteMode(final View view, final String mode) {
-        final boolean local = !UserSettings.ANISETTE_REMOTE.equals(mode);
-
-        final AppAutoCompleteTextView dropdown =
-                view.findViewById(R.id.anisetteModeSelectDropdown);
-        if (dropdown != null) {
-            dropdown.setText(view.getContext().getString(
-                    local ? R.string.anisette_mode_local : R.string.anisette_mode_remote), false);
-        }
-
-        final View localSection = view.findViewById(R.id.anisetteLocalStatusContainer);
-        if (localSection != null) {
-            localSection.setVisibility(local ? View.VISIBLE : View.GONE);
-        }
-
-        final View remoteSection = view.findViewById(R.id.anisetteRemoteSection);
-        if (remoteSection != null) {
-            remoteSection.setVisibility(local ? View.GONE : View.VISIBLE);
         }
     }
 
