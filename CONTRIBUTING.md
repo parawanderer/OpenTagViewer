@@ -128,6 +128,7 @@ wizard).
 | Android unit tests | `app/src/test/java/` | Gradle / JUnit | no |
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
 | Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
+| UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop wizard tests | `python/test/` | pytest | no |
 | String tooling tests | `scripts/test/` | pytest | no |
@@ -177,7 +178,17 @@ The device is defined in `testOptions { managedDevices { ... } }` in `app/build.
 and uses an `aosp-atd` image, which has **no Play Services** — a test that needs Maps would
 need a `google` image.
 
-**UI tests need this device specifically.** Espresso refuses to touch a window that lacks
+**Watching a UI flow happen.** These run too fast to follow. `slowMotion` pauses between
+steps — off by default, so CI is unaffected — and needs an emulator with a window, whose
+window keeps focus:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.slowMotion=1500 \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.AppleLoginFlowTest#signingInWithATextedCodeReachesTheMap
+```
+
+**UI tests otherwise need the managed device specifically.** Espresso refuses to touch a window that lacks
 focus, and a window inside a hand-started emulator only has focus while the emulator's window
 has focus on your desktop — so alt-tabbing away from a `connectedDebugAndroidTest` run makes
 every UI test fail with `RootViewWithoutFocusException`. The managed device is headless and

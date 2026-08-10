@@ -48,12 +48,13 @@ import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.python.AppleAuthService;
+import dev.wander.android.opentagviewer.python.LoginDependencies;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
-import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -109,6 +110,9 @@ public class AppleLoginActivity extends AppCompatActivity {
      * handle otherwise require Apple to have shipped a new build, or the network to be down.
      */
     private AnisetteSource localAnisette;
+
+    /** Signing in to Apple. Behind an interface so a test can drive this screen at all. */
+    private AppleAuthService authService;
 
     /**
      * What it last said. Starts as "nothing tried yet", which is the only honest thing to say
@@ -166,11 +170,11 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.anisetteServerTesterService = new AnisetteServerTesterService(cronet);
 
+        this.authService = LoginDependencies.authService();
+
         // Nobody is signed in on this screen, so an unchosen mode means local: there is no
         // existing session whose machine identity has to be preserved.
-        if (this.localAnisette == null) {
-            this.localAnisette = new LocalAnisette(this, this.getUserSettings(), false);
-        }
+        this.localAnisette = LoginDependencies.anisette(this, this.getUserSettings(), false);
 
         this.twoFactorEntryManager = new Apple2FACodeInputManager(this, this::on2FAAuthCodeFilled);
 
@@ -366,7 +370,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         // public Anisette server. It decides for itself whether it is usable, and the Python
         // side falls back to anisetteServerUrl when it is not - so this can only improve on
         // the previous behaviour, never break it.
-        var async = PythonAuthService.pythonLogin(
+        var async = this.authService.login(
                     emailOrPhone, password, anisetteServerUrl, this.localAnisette)
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(authResponse -> {
@@ -478,7 +482,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(chosenAuthMethod)
+        var async = this.authService.requestCode(chosenAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::show2FACodeEntryTextbox,
                 error -> {
@@ -499,7 +503,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(phoneAuthMethod)
+        var async = this.authService.requestCode(phoneAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::show2FACodeEntryTextbox,
                 error -> {
@@ -660,13 +664,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         var chosenAuthMethod = this.getUiState().getChosenAuthMethod();
 
-        var async = PythonAuthService.submitCode(
+        var async = this.authService.submitCode(
                 Objects.requireNonNull(chosenAuthMethod),
                 authCode
         ).observeOn(AndroidSchedulers.mainThread())
         .subscribe(() -> {
 
-            var nextAsync = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+            var nextAsync = this.authService.retrieveAuthData(this.getUiState().getAuthResponse())
                 .flatMapCompletable(userAuthRepo::storeUserAuth)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
@@ -708,7 +712,7 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void handleIsAlreadyLoggedIn() {
-        var async = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+        var async = this.authService.retrieveAuthData(this.getUiState().getAuthResponse())
             .observeOn(AndroidSchedulers.mainThread())
             .flatMapCompletable(userAuthRepo::storeUserAuth)
             .subscribe(() -> {
