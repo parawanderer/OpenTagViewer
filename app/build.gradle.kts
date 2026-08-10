@@ -40,6 +40,14 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+        externalNativeBuild {
+            cmake {
+                // Apple's ADI libraries are C, and their entry points are obfuscated names
+                // that move between APK builds, so they are dlopen'd and resolved at runtime
+                // rather than bound as JNI methods. See app/src/main/cpp/.
+                cppFlags += "-std=c++17"
+            }
+        }
 
         // Export the Room schema as JSON on every build. These are committed (see
         // app/schemas/) so schema changes show up as a reviewable diff, and so
@@ -50,6 +58,18 @@ android {
             }
         }
     }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    // NDK r27 is the first that aligns shared libraries to 16 KB pages by default, which
+    // Android 15 devices with 16 KB page sizes require. Pinning it keeps that guarantee from
+    // depending on whichever NDK a given machine happens to have installed.
+    ndkVersion = "27.0.12077973"
 
     // Makes the exported schemas readable by instrumented tests at runtime, which is
     // how MigrationTestHelper creates a v1 database to run MIGRATION_1_2 against.
