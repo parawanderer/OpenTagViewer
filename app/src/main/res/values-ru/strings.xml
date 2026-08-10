@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">Где его найти</string>
     <string name="anisette_learn_more">О серверах Anisette</string>
     <string name="anisette_upgrade_title">Вход без посредника</string>
-    <string name="anisette_upgrade_message">Сейчас вход в Apple идёт через публичный сервер Anisette. Его владелец видит этот трафик, а OpenTagViewer не сможет войти, пока сервер недоступен.
-
-Теперь это может происходить полностью на вашем телефоне. При переходе потребуется войти ещё раз, поскольку Apple воспримет это как новое устройство.</string>
+    <string name="anisette_upgrade_message">Теперь телефон может делать это сам, без публичного сервера Anisette, который видит трафик и уносит вход с собой. Переход стоит одного входа.</string>
     <string name="anisette_upgrade_switch">Переключить и войти</string>
     <string name="anisette_upgrade_later">Не сейчас</string>
     <string name="anisette_upgrade_later_hint">Переключиться можно позже в настройках.</string>

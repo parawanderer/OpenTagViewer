@@ -130,9 +130,7 @@
     <string name="anisette_where_to_get_apk">在哪里获取</string>
     <string name="anisette_learn_more">关于 Anisette 服务器</string>
     <string name="anisette_upgrade_title">无需中间人即可登录</string>
-    <string name="anisette_upgrade_message">目前登录 Apple 需经过公共 Anisette 服务器。其运营者可以看到这些流量，服务器中断时 OpenTagViewer 也无法登录。
-
-现在这一切都可以在您的手机上完成。切换需要重新登录一次，因为 Apple 会将其视为新设备。</string>
+    <string name="anisette_upgrade_message">现在您的手机可以自行完成，无需经过能看到流量、一旦中断登录也随之中断的公共 Anisette 服务器。切换需要重新登录一次。</string>
     <string name="anisette_upgrade_switch">切换并登录</string>
     <string name="anisette_upgrade_later">以后再说</string>
     <string name="anisette_upgrade_later_hint">您可以稍后在“设置”中切换。</string>

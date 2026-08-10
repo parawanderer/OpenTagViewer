@@ -164,9 +164,7 @@
     <string name="anisette_where_to_get_apk">Where to find it</string>
     <string name="anisette_learn_more">About Anisette servers</string>
     <string name="anisette_upgrade_title">Sign in without a middleman</string>
-    <string name="anisette_upgrade_message">Signing in to Apple currently goes through a public Anisette server. Its operator can see that traffic, and OpenTagViewer stops being able to sign in whenever their server is down.
-
-This can now happen entirely on your phone instead. Switching means signing in one more time, because Apple treats it as a new device.</string>
+    <string name="anisette_upgrade_message">Your phone can now do this itself, instead of going through a public Anisette server that sees the traffic and takes sign-in down with it. Switching costs one sign-in.</string>
     <string name="anisette_upgrade_switch">Switch and sign in</string>
     <string name="anisette_upgrade_later">Not now</string>
     <string name="anisette_upgrade_later_hint">You can switch later in Settings.</string>
