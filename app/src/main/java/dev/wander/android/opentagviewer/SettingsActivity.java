@@ -47,6 +47,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
+import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.databinding.ActivitySettingsBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
@@ -70,6 +74,8 @@ import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -402,6 +408,8 @@ public class SettingsActivity extends AppCompatActivity {
             this.pendingAnisetteMode = selected;
         });
 
+        this.loadLocalAnisetteStatus(view);
+
         final View learnMore = view.findViewById(R.id.anisetteLearnMoreButton);
         if (learnMore != null) {
             learnMore.setOnClickListener(v -> this.openConfiguredLink("anisetteWikiPage"));
@@ -411,6 +419,54 @@ public class SettingsActivity extends AppCompatActivity {
         if (whereToGetApk != null) {
             whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
         }
+    }
+
+    /**
+     * Find out how local Anisette is doing, and say so.
+     *
+     * <p>Off the main thread, because finding out means downloading Apple's libraries,
+     * hashing them and possibly provisioning with Apple. The dialog shows "sets itself up the
+     * next time you sign in" until an answer arrives, which is true while it is being worked
+     * out and stays true if nothing ever comes back.
+     *
+     * <p><b>This can do the setup rather than merely observe it.</b> There is no way to know
+     * whether something will work without trying it, and a status that said "unknown" would be
+     * worth nothing on the one screen built to answer the question. Opening these settings is
+     * a reasonable moment for it: somebody is looking at it, and the result explains itself.
+     *
+     * <p>Only attempted in local mode. Somebody using a server should not have 3 MB downloaded
+     * on their behalf for a status they are not reading.
+     */
+    private void loadLocalAnisetteStatus(final View view) {
+        SharedMainSettingsManager.applyLocalAnisetteStatus(
+                view, AnisetteStatus.pending(), "", this.currentSettings.hasOwnAnisetteApk());
+
+        if (!this.currentSettings.usesLocalAnisette(true)) {
+            return;
+        }
+
+        var async = Observable.fromCallable(() -> {
+                    final AnisetteSource source =
+                            new LocalAnisette(this, this.currentSettings, true);
+                    final AnisetteStatus status = AnisetteStatus.of(source);
+
+                    // Read here rather than on the main thread: it opens an asset.
+                    String version = "";
+                    try {
+                        version = AdiLibraryManifest.load(this).apkVersion();
+                    } catch (final Exception e) {
+                        Log.w(TAG, "could not read the ADI manifest for its version", e);
+                    }
+                    return Pair.create(status, version);
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        result -> SharedMainSettingsManager.applyLocalAnisetteStatus(
+                                view, result.first, result.second,
+                                this.currentSettings.hasOwnAnisetteApk()),
+                        error -> Log.w(TAG, "could not determine the local Anisette status",
+                                error));
     }
 
     /** Open one of the reference links in app.properties, or do nothing if it is not set. */
