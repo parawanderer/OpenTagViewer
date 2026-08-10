@@ -25,3 +25,7 @@ app/release
 tmp/
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Cache for scripts/update_adi_stub_symbols.py - copies of Apple libraries, pulled from
+# their CDN so the stub symbol lists can be regenerated. Never committed.
+.adi-libs/

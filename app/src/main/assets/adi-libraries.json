@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "What the app downloads at runtime to run Apple's ADI (Anisette) libraries, and the exact bytes it expects. Apple's libraries are never redistributed by this project - they are fetched from Apple's own CDN.",
+    "Regenerate with: python scripts/update_adi_stub_symbols.py",
+    "A mismatch at runtime means Apple shipped a new build. The symbol names may have moved with it, so the app must fall back to a remote Anisette server rather than call into libraries it cannot vouch for."
+  ],
+  "url": "https://apps.mzstatic.com/content/android-apple-music-apk/applemusic.apk",
+  "apk": {
+    "version": "4.9.6.1447",
+    "etag": "\"21820f71c9a0420d0680d27827b0eeb4\"",
+    "lastModified": "Tue, 15 Apr 2025 18:26:03 GMT",
+    "contentLength": 142139820
+  },
+  "libraries": {
+    "arm64-v8a": {
+      "libc++_shared.so": {
+        "size": 1026616,
+        "sha256": "2981f55b366ba392dc2b48a062879be5952d0908cf5f53307fe0bee4ac368097"
+      },
+      "libstoreservicescore.so": {
+        "size": 2388480,
+        "sha256": "bd335e6963ba5ae2f5babca613435ad56d2660a9aee37df35f876c458d105ce4"
+      },
+      "libCoreADI.so": {
+        "size": 1792592,
+        "sha256": "9d5b557cf3faf88c34c394ab2cd7fc1a3b4acf3aed51f28cd0bc093858107c22"
+      }
+    },
+    "x86_64": {
+      "libc++_shared.so": {
+        "size": 1045960,
+        "sha256": "a99d873af281891da0f8c2370eebbb0c17878fe2471946f1b378b9193ad953e0"
+      },
+      "libstoreservicescore.so": {
+        "size": 2391768,
+        "sha256": "d8be230df34c0044758d43e33a8dabd3236b9a4258c4d48cb366911224d52f68"
+      },
+      "libCoreADI.so": {
+        "size": 1596128,
+        "sha256": "ece4ffa6bbe4239e8f0d4714da57e62ce5e3c581d19553a83d78ac897783b905"
+      }
+    }
+  }
+}

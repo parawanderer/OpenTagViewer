@@ -89,27 +89,6 @@ public class NativeAdiLoadTest {
      */
     private static final String CORE_ADI = "libCoreADI.so";
 
-    /**
-     * The eleven ADI entry points by their obfuscated symbol names, from Dadoum/Provision
-     * lib/provision/adi.d. These names are not stable across APK builds, so anything shipping
-     * this has to fail legibly when one goes missing rather than crash.
-     */
-    private static final List<String> ADI_SYMBOLS = Arrays.asList(
-            "kq56gsgHG6",   // ADILoadLibraryWithPath
-            "Sph98paBcz",   // ADISetAndroidID
-            "nf92ngaK92",   // ADISetProvisioningPath
-            "p435tmhbla",   // ADIProvisioningErase
-            "tn46gtiuhw",   // ADISynchronize
-            "fy34trz2st",   // ADIProvisioningDestroy
-            "uv5t6nhkui",   // ADIProvisioningEnd
-            "rsegvyrt87",   // ADIProvisioningStart
-            "aslgmuibau",   // ADIGetLoginCode
-            "jk24uiwqrg",   // ADIDispose
-            "qi864985u0"    // ADIOTPRequest
-    );
-
-    private static final String LOAD_LIBRARY_WITH_PATH = "kq56gsgHG6";
-
     private static File libraryDir;
 
     /** Handle for libstoreservicescore.so, shared between the ordered tests. */
@@ -177,11 +156,11 @@ public class NativeAdiLoadTest {
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
         final StringBuilder missing = new StringBuilder();
-        for (final String symbol : ADI_SYMBOLS) {
-            if (NativeAdiProbe.resolve(storeServicesCore, symbol) == 0) {
-                missing.append("\n  ").append(symbol);
+        for (final AdiFunction function : AdiFunction.values()) {
+            if (NativeAdiProbe.resolve(storeServicesCore, function.symbol()) == 0) {
+                missing.append("\n  ").append(function);
             } else {
-                Log.i(TAG, "resolved " + symbol);
+                Log.i(TAG, "resolved " + function);
             }
         }
 
@@ -200,8 +179,9 @@ public class NativeAdiLoadTest {
         assumeThePoCWasAskedFor();
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
-        final long function = NativeAdiProbe.resolve(storeServicesCore, LOAD_LIBRARY_WITH_PATH);
-        Assume.assumeTrue("ADILoadLibraryWithPath did not resolve", function != 0);
+        final long function = NativeAdiProbe.resolve(
+                storeServicesCore, AdiFunction.LOAD_LIBRARY_WITH_PATH.symbol());
+        Assume.assumeTrue(AdiFunction.LOAD_LIBRARY_WITH_PATH + " did not resolve", function != 0);
 
         final int result = NativeAdiProbe.loadLibraryWithPath(
                 function, libraryDir.getAbsolutePath());
