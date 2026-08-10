@@ -72,4 +72,12 @@ public final class NativeAdi {
 
     /** ADIProvisioningDestroy. Abandons a session that will not be completed. */
     public static native int provisioningDestroy(long function, int session);
+
+    /**
+     * ADIOTPRequest. The per-login one-time password, once the machine is provisioned.
+     *
+     * @param out receives the ADI error code in element 0
+     * @return {@code {machineIdentifier, oneTimePassword}} - in that order - or null on error
+     */
+    public static native byte[][] otpRequest(long function, long dispose, long dsId, int[] out);
 }

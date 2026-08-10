@@ -46,7 +46,14 @@ public enum AdiFunction {
     /** {@code int(void *ptr)} - frees anything ADI allocated on our behalf. */
     DISPOSE("ADIDispose", "jk24uiwqrg"),
 
-    /** {@code int(ulong, ubyte**, uint*, ubyte**, uint*)} - the one-time password per login. */
+    /**
+     * {@code int(ulong dsId, ubyte **mid, uint *midLength, ubyte **otp, uint *otpLength)} -
+     * the one-time password, produced fresh for every login.
+     *
+     * <p>Note the order: the <b>machine identifier comes first</b>, then the one-time
+     * password. Both are {@code ubyte**}, so wiring them the wrong way round compiles and
+     * runs, and simply produces headers Apple rejects.
+     */
     OTP_REQUEST("ADIOTPRequest", "qi864985u0");
 
     private final String appleName;
