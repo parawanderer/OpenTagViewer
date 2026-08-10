@@ -67,12 +67,18 @@
                 app:onClick="@{onClickLanguage}"
                 />
 
+            <!--
+                Titled for what it now controls rather than for the server it used to be:
+                signing in normally involves no server at all. The subtitle carries whichever
+                is in use, so the common case reads "On this device" instead of a URL that no
+                longer means anything.
+            -->
             <include
                 android:id="@+id/setting_app_anisette_server"
                 layout="@layout/settings_item_clickable"
                 app:icon="@{@drawable/host_24px}"
                 app:sectionSubtitle="@{currentAnisetteServerUrl}"
-                app:title="@{@string/anisette_server_url}"
+                app:title="@{@string/anisette_mode_title}"
                 app:onClick="@{onClickAnisetteServerUrl}"
                 />
 

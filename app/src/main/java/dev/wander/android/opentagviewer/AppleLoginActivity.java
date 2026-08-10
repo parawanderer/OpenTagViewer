@@ -333,7 +333,9 @@ public class AppleLoginActivity extends AppCompatActivity {
         // public Anisette server. It decides for itself whether it is usable, and the Python
         // side falls back to anisetteServerUrl when it is not - so this can only improve on
         // the previous behaviour, never break it.
-        final LocalAnisette localAnisette = new LocalAnisette(this);
+        // Nobody is signed in on this screen, so an unchosen mode means local - there is no
+        // existing session whose machine identity has to be preserved.
+        final LocalAnisette localAnisette = new LocalAnisette(this, this.getUserSettings(), false);
 
         var async = PythonAuthService.pythonLogin(
                     emailOrPhone, password, anisetteServerUrl, localAnisette)
