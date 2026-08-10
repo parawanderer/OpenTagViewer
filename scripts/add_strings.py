@@ -26,6 +26,15 @@ of refusing because it already exists elsewhere:
 
     python scripts/add_strings.py --fill path/to/missing_strings.json
 
+Rewording strings that already exist. Print what is currently there, in the same format the
+other modes read, edit it, then feed it back:
+
+    python scripts/add_strings.py --show anisette_upgrade_message > reword.json
+    python scripts/add_strings.py --replace reword.json
+
+--replace refuses unless the string is already defined in every locale, so a mistyped name
+fails instead of silently doing nothing.
+
 Listing the locales it found:
 
     python scripts/add_strings.py --locales
@@ -59,6 +68,7 @@ other angle bracket is escaped.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import sys
@@ -258,6 +268,139 @@ def add_strings(spec: dict, locales: list[str], fill: bool = False) -> int:
     return 0
 
 
+def inner_markup(element: ElementTree.Element) -> str:
+    """The contents of a <string>, with XML entities decoded and inline tags kept.
+
+    `element.text` alone stops at the first child, so a string containing <u> would come back
+    truncated at it.
+    """
+    parts = [element.text or ""]
+
+    for child in element:
+        parts.append(f"<{child.tag}>{inner_markup(child)}</{child.tag}>")
+        parts.append(child.tail or "")
+
+    return "".join(parts)
+
+
+def show_strings(names: list[str], locales: list[str]) -> int:
+    """Print the current text of some strings, in the input format the other modes take.
+
+    Rewording means starting from what is already there, in ten languages. Reading that out of
+    ten files by hand is where the wrong locale gets edited, or where an escape sequence is
+    copied into the JSON and then escaped a second time on the way back in.
+    """
+    spec: dict[str, dict[str, str]] = {}
+    missing: list[str] = []
+
+    for name in names:
+        translations: dict[str, str] = {}
+
+        for locale in locales:
+            path = strings_file(locale)
+            if not path.is_file():
+                continue
+
+            for element in ElementTree.parse(path).getroot().iter("string"):
+                if element.get("name") != name:
+                    continue
+                # The parser decodes &amp; and friends, but \' and \" are Android's own
+                # escapes and mean nothing to XML, so they arrive with the backslash still on.
+                translations[locale] = (inner_markup(element)
+                                        .replace("\\'", "'").replace('\\"', '"'))
+
+        if translations:
+            spec[name] = translations
+        else:
+            missing.append(name)
+
+    for name in missing:
+        print(f"No string named {name} in any locale", file=sys.stderr)
+
+    if spec:
+        print(json.dumps(spec, indent=2, ensure_ascii=False))
+
+    return 1 if missing else 0
+
+
+def rewrite_one_locale(spec: dict, locale: str) -> tuple[str, int]:
+    """One locale's file contents with the given strings reworded, and how many changed."""
+    content = strings_file(locale).read_text(encoding="utf-8")
+    replaced = 0
+
+    for name, translations in spec.items():
+        if translations.get("translatable", True) is False and locale != DEFAULT_LOCALE:
+            continue
+
+        text = escape(translations[locale])
+        # DOTALL because a message can span lines, and non-greedy so that two strings in one
+        # file cannot be swallowed as a single match.
+        pattern = re.compile(
+            rf'(<string name="{re.escape(name)}"[^>]*>).*?(</string>)', re.DOTALL)
+
+        # A function replacement, so re does not process backslash escapes in what it returns
+        # - the escaped text goes in verbatim. Passing a string here instead would turn every
+        # \' the escaper produced into something else.
+        content, count = pattern.subn(
+            lambda match: match.group(1) + text + match.group(2), content)
+        replaced += count
+
+    return content, replaced
+
+
+def missing_everywhere(spec: dict, locales: list[str]) -> list[str]:
+    """Strings that cannot be replaced because they are not there to replace."""
+    problems: list[str] = []
+
+    for locale in locales:
+        present = existing_names(strings_file(locale))
+        for name in spec:
+            if name not in present:
+                problems.append(
+                    f"{name}: not defined in"
+                    f" {strings_file(locale).relative_to(REPO_ROOT)}."
+                    " Nothing to replace - did you mean to add it?")
+
+    return problems
+
+
+def replace_strings(spec: dict, locales: list[str]) -> int:
+    """Reword strings that already exist, in every locale at once.
+
+    Adding is not the only thing that has to happen ten times. Rewording shipped copy by hand
+    means ten near-identical edits with the same escaping traps, and the failure mode is worse
+    than for a new string: the ones you miss keep the old wording and still pass --check, so
+    nothing complains and the app quietly says two different things in two languages.
+
+    Refuses to write unless the string already exists everywhere, which is what makes this
+    distinct from adding - a typo in the name would otherwise silently do nothing.
+    """
+    problems = validate_spec(spec, locales) + missing_everywhere(spec, locales)
+
+    if problems:
+        print("Refusing to write:\n", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 1
+
+    for locale in locales:
+        path = strings_file(locale)
+        content, replaced = rewrite_one_locale(spec, locale)
+
+        path.write_text(content, encoding="utf-8")
+
+        try:
+            ElementTree.parse(path)
+        except ElementTree.ParseError as error:
+            print(f"{path} is no longer valid XML after writing: {error}", file=sys.stderr)
+            return 1
+
+        print(f"  {path.relative_to(REPO_ROOT)}: ~{replaced}")
+
+    print(f"\nDone. {len(spec)} string(s) reworded across {len(locales)} locale(s).")
+    return 0
+
+
 def check(locales: list[str]) -> int:
     default_path = strings_file(DEFAULT_LOCALE)
     if not default_path.is_file():
@@ -315,7 +458,20 @@ def load_spec(path: Path) -> dict | None:
     return spec
 
 
+def use_utf8_output() -> None:
+    """Windows consoles still default to cp1252, which cannot encode most of what this prints
+    - Japanese, Korean, Cyrillic. Without this, printing a translation is a
+    UnicodeEncodeError rather than a translation, and redirecting to a file writes mojibake."""
+    for stream in (sys.stdout, sys.stderr):
+        # Guarded because these are only TextIOWrapper when attached to a real stream - under
+        # pytest's capture, or any redirect, they are something else without reconfigure().
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str]) -> int:
+    use_utf8_output()
+
     locales = discover_locales()
 
     if not locales or DEFAULT_LOCALE not in locales:
@@ -331,8 +487,11 @@ def main(argv: list[str]) -> int:
     if argv == ["--check"]:
         return check(locales)
 
-    fill = len(argv) == 2 and argv[0] == "--fill"
-    if fill:
+    if len(argv) >= 2 and argv[0] == "--show":
+        return show_strings(argv[1:], locales)
+
+    mode = argv[0] if len(argv) == 2 and argv[0] in ("--fill", "--replace") else None
+    if mode:
         argv = argv[1:]
 
     if len(argv) != 1 or argv[0].startswith("-"):
@@ -343,7 +502,10 @@ def main(argv: list[str]) -> int:
     if spec is None:
         return 2
 
-    return add_strings(spec, locales, fill=fill)
+    if mode == "--replace":
+        return replace_strings(spec, locales)
+
+    return add_strings(spec, locales, fill=mode == "--fill")
 
 
 if __name__ == "__main__":

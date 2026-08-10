@@ -136,6 +136,12 @@ android {
     }
 
     testOptions {
+        // Espresso waits for a window to hold focus and stop laying out before it will touch
+        // it, and a running animation never satisfies that - it fails with
+        // RootViewWithoutFocusException after ten seconds rather than with anything about the
+        // test. Turning them off is the documented requirement for Espresso, not a workaround.
+        animationsDisabled = true
+
         managedDevices {
             localDevices {
                 // Gradle provisions, boots, and tears down this emulator itself.

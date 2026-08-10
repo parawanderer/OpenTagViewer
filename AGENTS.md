@@ -159,7 +159,7 @@ See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup and every test suite. Sho
 Gradle provisions the emulator, runs the tests, and destroys it:
 
 ```bash
-./gradlew :app:testEmulatorDebugAndroidTest    # 24 tests, well under two minutes
+./gradlew :app:testEmulatorDebugAndroidTest    # 72 tests, about 20 seconds
 ```
 
 Use this rather than `connectedDebugAndroidTest`. The Android Gradle Plugin holds its ADB
@@ -170,15 +170,21 @@ has nothing to do with the code. Recovering from that needs *both* an emulator r
 bridge. A managed device is created fresh per run, so nothing survives to go stale. It is
 also the only form of this that CI can run unattended.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - The `aosp-atd` image carries no Play Services, so **a test that touches Maps will not run
   on it** — that device would need a `google` image. Nothing today does.
+- **Espresso only works on the managed device.** A guest window has focus only while the
+  emulator's own window has focus on the host desktop, so against a hand-started emulator any
+  UI test fails with `RootViewWithoutFocusException` the moment you alt-tab away. There is
+  nothing to fix in the test when that happens — run it on the managed device.
 - `./gradlew testDebugUnitTest` is close to meaningless: there is exactly one JVM test and it
   asserts `2 + 2 == 4`. Everything real is instrumented. Do not report "tests pass" off it.
 
-`scripts/run_instrumented_tests.sh` remains as a fallback for running against an emulator you
-already have open; it pins `ANDROID_SERIAL` so a run cannot install to a physical phone.
+`scripts/run_instrumented_tests.sh` wraps the same task with retries, and only retries when a
+run failed *before* any test reported — a suite that ran and failed is reported as-is rather
+than repeated. `GRADLE_TASK=:app:connectedDebugAndroidTest` switches it to a hand-started
+emulator, where it pins `ANDROID_SERIAL` so a run cannot install to a physical phone.
 
 Python must be on `PATH` — the build shells out to it to generate the unicorn stub wheel.
 
@@ -196,12 +202,27 @@ for those users — the build succeeds, and it looks fine in whichever language 
 the helper rather than editing ten files:
 
 ```bash
-python scripts/add_strings.py                # prints full usage and the input format
-python scripts/add_strings.py --locales      # which locales exist, discovered from the tree
-python scripts/add_strings.py new.json       # add strings to every locale
+python scripts/add_strings.py                 # prints full usage and the input format
+python scripts/add_strings.py --locales       # which locales exist, discovered from the tree
+python scripts/add_strings.py new.json        # add strings to every locale
 python scripts/add_strings.py --fill new.json # add only where missing, for back-filling
-python scripts/add_strings.py --check        # fail if any locale is missing a string
+python scripts/add_strings.py --show <name>…  # print current text, in the input format
+python scripts/add_strings.py --replace r.json # reword strings that already exist
+python scripts/add_strings.py --check         # fail if any locale is missing a string
 ```
+
+**Rewording an existing string goes through `--show` and `--replace`, never ten hand edits.**
+
+```bash
+python scripts/add_strings.py --show anisette_upgrade_message > reword.json
+# edit reword.json
+python scripts/add_strings.py --replace reword.json
+```
+
+Two reasons this is the rule. A missed locale keeps the old wording and still passes
+`--check`, so nothing complains and the app says two different things in two languages. And
+the intermediate JSON puts all ten translations in one reviewable diff, instead of ten
+separate edits nobody reads to the end.
 
 Translations are read **from a JSON file, never from a command-line argument**. That is not
 a style preference: passing non-ASCII text through shell quoting has twice corrupted it here,

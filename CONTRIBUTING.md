@@ -177,9 +177,17 @@ The device is defined in `testOptions { managedDevices { ... } }` in `app/build.
 and uses an `aosp-atd` image, which has **no Play Services** — a test that needs Maps would
 need a `google` image.
 
-To run against a device you already have, `scripts/run_instrumented_tests.sh` pins
-`ANDROID_SERIAL` so a run cannot install to a physical phone, and restarts the emulator and
-the Gradle daemon if a run wedges.
+**UI tests need this device specifically.** Espresso refuses to touch a window that lacks
+focus, and a window inside a hand-started emulator only has focus while the emulator's window
+has focus on your desktop — so alt-tabbing away from a `connectedDebugAndroidTest` run makes
+every UI test fail with `RootViewWithoutFocusException`. The managed device is headless and
+has no such notion.
+
+`scripts/run_instrumented_tests.sh` runs the same task with retries, and retries only when a
+run failed *before* any test reported — a suite that ran and failed is reported as-is instead
+of being run a second time. Set `GRADLE_TASK=:app:connectedDebugAndroidTest` to point it at an
+emulator you already have open; it then pins `ANDROID_SERIAL` so a run cannot install to a
+physical phone, and restarts the emulator and the Gradle daemon if a run wedges.
 
 Report: `app/build/reports/androidTests/managedDevice/debug/allDevices/index.html`
 
@@ -487,8 +495,9 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 
-The instrumented job needs KVM on the runner; the workflow enables it before starting the
-emulator.
+The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
+`:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
+emulator definition in CI to keep in step with `app/build.gradle.kts`.
 
 ---
 
