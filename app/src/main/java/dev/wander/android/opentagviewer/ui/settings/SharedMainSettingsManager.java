@@ -276,6 +276,56 @@ public class SharedMainSettingsManager {
     }
 
     /**
+     * On the sign-in screen: show the Anisette server field only when signing in needs it.
+     *
+     * <p>Signing in normally needs no server at all now, so the field is hidden and the screen
+     * is quieter for it. But Settings is behind a login, and local Anisette can fail on a
+     * device that has never signed in - so somebody in that position would have no way to
+     * reach the one setting that would get them in. Hiding it is therefore conditional on it
+     * being unnecessary, and the condition is re-evaluated rather than assumed.
+     *
+     * <p>Hidden while the answer is still coming and once the answer is yes; shown for
+     * everything else, including {@code PENDING}. Erring towards showing is deliberate: an
+     * unnecessary field costs a moment's confusion, which the explanation above it covers,
+     * while a missing one strands somebody with no way out of the screen.
+     *
+     * @param root            anything containing the section; missing views are skipped
+     * @param status          what local Anisette had to say, from a background thread
+     * @param remoteWasChosen whether a server is being used because somebody asked for one.
+     *                        Decides only whether the field is explained - it appears either
+     *                        way, but telling somebody their device could not manage when they
+     *                        chose the server themselves would be wrong and alarming
+     */
+    public static void applyLoginAnisetteFallback(final View root, final AnisetteStatus status,
+                                                  final boolean remoteWasChosen) {
+        if (root == null) {
+            return;
+        }
+
+        final View remoteSection = root.findViewById(R.id.anisetteRemoteSection);
+        if (remoteSection == null) {
+            return;
+        }
+
+        final AnisetteStatus.State state = status.state();
+        final boolean signInNeedsAServer = state != AnisetteStatus.State.READY
+                && state != AnisetteStatus.State.CHECKING;
+
+        remoteSection.setVisibility(signInNeedsAServer ? VISIBLE : GONE);
+
+        // Only explained when it appeared unbidden. PENDING means nothing has been tried yet,
+        // so there is nothing to explain either.
+        final boolean explain = signInNeedsAServer
+                && !remoteWasChosen
+                && state != AnisetteStatus.State.PENDING;
+
+        final View reason = root.findViewById(R.id.anisetteLoginFallbackReason);
+        if (reason != null) {
+            reason.setVisibility(explain ? VISIBLE : GONE);
+        }
+    }
+
+    /**
      * Draw what local Anisette has to say for itself.
      *
      * <p>Takes an already-computed {@link AnisetteStatus} rather than a source, because working

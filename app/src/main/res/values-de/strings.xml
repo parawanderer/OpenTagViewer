@@ -137,4 +137,5 @@ Das kann jetzt vollständig auf deinem Telefon geschehen. Beim Wechsel musst du 
     <string name="anisette_upgrade_later">Jetzt nicht</string>
     <string name="anisette_upgrade_later_hint">Du kannst später in den Einstellungen wechseln.</string>
     <string name="anisette_local_status_checking">Wird geprüft …</string>
+    <string name="anisette_login_needs_server">Dieses Gerät konnte die Anmeldung nicht selbst einrichten, daher übernimmt das diesmal ein Server. Du kannst das später in den Einstellungen ändern.</string>
 </resources>

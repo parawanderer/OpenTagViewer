@@ -68,6 +68,21 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+        <!--
+            Why this section came back, for somebody who never asked to see it. Without a
+            reason attached, a server URL appearing out of nowhere on the sign-in screen reads
+            as the app being broken rather than as it working around something.
+        -->
+        <TextView
+            android:id="@+id/anisetteLoginFallbackReason"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/anisette_login_needs_server"
+            android:textColor="@color/md_theme_outline"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
