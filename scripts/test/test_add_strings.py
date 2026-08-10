@@ -208,3 +208,112 @@ def test_written_files_are_still_valid_xml(res: Path):
 
     # The whole point of escaping: aapt would reject this file otherwise.
     ElementTree.parse(res / "values" / "strings.xml")
+
+
+# ---------------------------------------------------------------------------------------
+# --show and --replace
+#
+# Rewording shipped copy has a failure mode that adding does not: a locale you miss keeps
+# the old wording and still passes --check, so nothing complains and the app says two
+# different things in two languages.
+# ---------------------------------------------------------------------------------------
+
+def test_show_round_trips_through_replace(res: Path, capsys: pytest.CaptureFixture):
+    import json
+
+    # Both kinds of escaping in one string: an XML entity, and Android's own backslash.
+    escaped = '<string name="hi">Tom &amp; Jerry' + "\\'" + 's</string>'
+    make_locale(res, "values", with_strings(escaped))
+    make_locale(res, "values-de", with_strings('<string name="hi">Hallo</string>'))
+
+    assert add_strings.show_strings(["hi"], ["default", "de"]) == 0
+
+    shown = json.loads(capsys.readouterr().out)
+    # Decoded, not raw: what comes out has to be editable and feedable straight back in,
+    # without anybody escaping it a second time on the way.
+    assert shown["hi"]["default"] == "Tom & Jerry's"
+
+    # Feeding it straight back has to reproduce the file byte for byte, or every round trip
+    # would add another layer of escaping to a string nobody meant to change.
+    assert add_strings.replace_strings(shown, ["default", "de"]) == 0
+    assert (res / "values" / "strings.xml").read_text(encoding="utf-8") == with_strings(escaped)
+
+
+def test_show_keeps_inline_tags(res: Path, capsys: pytest.CaptureFixture):
+    import json
+
+    make_locale(res, "values", with_strings('<string name="hi">see <u>this</u> now</string>'))
+
+    add_strings.show_strings(["hi"], ["default"])
+
+    # element.text alone would stop at the <u> and silently truncate the string.
+    assert json.loads(capsys.readouterr().out)["hi"]["default"] == "see <u>this</u> now"
+
+
+def test_replace_rewrites_every_locale(res: Path):
+    make_locale(res, "values", with_strings('<string name="hi">old</string>'))
+    make_locale(res, "values-de", with_strings('<string name="hi">alt</string>'))
+
+    result = add_strings.replace_strings(
+        {"hi": {"default": "new", "de": "neu"}}, ["default", "de"])
+
+    assert result == 0
+    assert ">new<" in (res / "values" / "strings.xml").read_text(encoding="utf-8")
+    assert ">neu<" in (res / "values-de" / "strings.xml").read_text(encoding="utf-8")
+
+
+def test_replace_leaves_other_strings_alone(res: Path):
+    make_locale(res, "values", with_strings(
+        '<string name="before">keep</string>',
+        '<string name="hi">old</string>',
+        '<string name="after">keep too</string>'))
+
+    add_strings.replace_strings({"hi": {"default": "new"}}, ["default"])
+
+    content = (res / "values" / "strings.xml").read_text(encoding="utf-8")
+    assert ">keep<" in content and ">keep too<" in content and ">new<" in content
+
+
+def test_replace_refuses_a_string_that_does_not_exist(res: Path):
+    make_locale(res, "values", with_strings('<string name="hi">old</string>'))
+
+    # A mistyped name has to fail rather than quietly rewrite nothing.
+    assert add_strings.replace_strings({"hlo": {"default": "new"}}, ["default"]) == 1
+    assert ">old<" in (res / "values" / "strings.xml").read_text(encoding="utf-8")
+
+
+def test_replace_refuses_when_one_locale_lacks_the_string(res: Path):
+    make_locale(res, "values", with_strings('<string name="hi">old</string>'))
+    make_locale(res, "values-de")
+
+    # Half a reword is the failure this mode exists to prevent.
+    assert add_strings.replace_strings(
+        {"hi": {"default": "new", "de": "neu"}}, ["default", "de"]) == 1
+    assert ">old<" in (res / "values" / "strings.xml").read_text(encoding="utf-8")
+
+
+def test_replace_escapes_what_it_writes(res: Path):
+    make_locale(res, "values", with_strings('<string name="hi">old</string>'))
+
+    add_strings.replace_strings({"hi": {"default": "Tom & Jerry's"}}, ["default"])
+
+    content = (res / "values" / "strings.xml").read_text(encoding="utf-8")
+    # One backslash before the apostrophe, not two: re.sub with a function replacement does
+    # not reprocess escapes, so doubling them here would put a literal "\" on screen.
+    assert '<string name="hi">Tom &amp; Jerry' + "\\'" + 's</string>' in content
+
+
+def test_replace_handles_a_multiline_string(res: Path):
+    make_locale(res, "values",
+                with_strings('<string name="hi">first line\n\nsecond line</string>'))
+
+    assert add_strings.replace_strings({"hi": {"default": "one line"}}, ["default"]) == 0
+
+    content = (res / "values" / "strings.xml").read_text(encoding="utf-8")
+    assert ">one line<" in content and "second line" not in content
+
+
+def test_show_reports_a_name_that_exists_nowhere(res: Path):
+    make_locale(res, "values", with_strings('<string name="hi">old</string>'))
+
+    assert add_strings.show_strings(["nope"], ["default"]) == 1
