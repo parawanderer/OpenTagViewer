@@ -318,6 +318,10 @@ dependencies {
 
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    // Lets a test assert which screen the app moved to, and stop it actually going there.
+    // MapsActivity is the end of the sign-in flow and needs Play Services, which the aosp-atd
+    // managed device does not have.
+    androidTestImplementation(libs.espresso.intents)
     androidTestImplementation(libs.android.room.testing)
 
     annotationProcessor(libs.projectlombok)

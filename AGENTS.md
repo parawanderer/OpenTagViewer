@@ -181,6 +181,35 @@ Three consequences worth knowing:
 - `./gradlew testDebugUnitTest` is close to meaningless: there is exactly one JVM test and it
   asserts `2 + 2 == 4`. Everything real is instrumented. Do not report "tests pass" off it.
 
+### Showing a UI test to a person
+
+A UI test runs at machine speed — a whole sign-in is over in about three seconds and looks
+like a flicker. **When someone asks to watch a flow, do not just run it: it will be over
+before they look up.** Run it in slow motion, on a device with a window:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.slowMotion=1500 \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.AppleLoginFlowTest#signingInWithATextedCodeReachesTheMap
+```
+
+Four prerequisites, and it silently does nothing useful without them:
+
+1. **`connectedDebugAndroidTest`, not the managed device.** The managed device is headless —
+   there is nothing to see. This is the one case where it is the wrong task.
+2. **An emulator with a window must already be running**, and `ANDROID_SERIAL` pinned to it so
+   the run cannot install onto a physical phone. Ask the user to start it rather than starting
+   one yourself; they may already have one, and two emulators fight over `emulator-5554`.
+3. **Its window must keep focus on the host desktop.** Espresso will not touch an unfocused
+   window, so clicking away mid-run fails the test with `RootViewWithoutFocusException`. Say
+   so before starting.
+4. **`slowMotion` is a number of milliseconds** and defaults to off, so a normal run and CI are
+   unaffected. 1000–1500 is comfortable to follow. See `TestPace`, and call
+   `TestPace.afterAStep()` after each visible step in any new UI test.
+
+Pick a single `#method` rather than a class. A whole class replays the same screens over and
+over, which is longer without showing more.
+
 `scripts/run_instrumented_tests.sh` wraps the same task with retries, and only retries when a
 run failed *before* any test reported — a suite that ran and failed is reported as-is rather
 than repeated. `GRADLE_TASK=:app:connectedDebugAndroidTest` switches it to a hand-started
