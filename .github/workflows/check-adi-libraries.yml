@@ -1,0 +1,111 @@
+name: Check Apple's ADI libraries
+
+# Running Anisette in-app depends on two things staying true about an APK that Apple controls
+# and can replace without telling anyone:
+#
+#   1. The eleven ADI entry points are still exported under the obfuscated names in
+#      AdiFunction.java. If they move, Anisette breaks at runtime for everyone.
+#   2. libstoreservicescore.so still imports only the symbols our generated stubs provide. If
+#      it gains one, dlopen fails outright.
+#
+# Neither shows up in a build or a unit test, because both depend on a file downloaded at
+# runtime. So this checks them on a schedule and opens an issue when they drift.
+#
+# Deliberately NOT a pull request check. Apple re-obfuscating their APK is not a reason to
+# block somebody's unrelated PR, and this depends on an external service that can be slow or
+# down. It is a notification, not a gate.
+
+on:
+  schedule:
+    # Weekly. As of writing, the APK had not changed since April 2025 - this does not need to
+    # be eager, it needs to not be forgotten.
+    - cron: '0 5 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compare against Apple's current APK
+        id: check
+        run: |
+          set +e
+          python scripts/update_adi_stub_symbols.py --check > report.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+
+      - name: Open an issue if anything drifted
+        if: steps.check.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # One open issue at a time. Re-running weekly against an unfixed drift should not
+          # produce a pile of identical issues.
+          existing=$(gh issue list --state open --label adi-drift --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open for this. Adding a comment instead."
+            gh issue comment "$existing" --body-file - <<EOF
+          Still drifting as of $(date -u +%Y-%m-%d).
+
+          \`\`\`
+          $(cat report.txt)
+          \`\`\`
+          EOF
+            exit 0
+          fi
+
+          gh label create adi-drift --color B60205 \
+            --description "Apple's ADI libraries no longer match what is checked in" \
+            2>/dev/null || true
+
+          gh issue create \
+            --title "Apple's ADI libraries have drifted from what is checked in" \
+            --label adi-drift \
+            --body-file - <<EOF
+          The scheduled check in \`.github/workflows/check-adi-libraries.yml\` found that
+          Apple's Apple Music APK no longer matches what this repository was built against.
+
+          \`\`\`
+          $(cat report.txt)
+          \`\`\`
+
+          **Why this matters.** The app downloads Apple's ADI libraries at runtime to produce
+          Anisette data locally, instead of sending every login to a public Anisette server.
+          Their symbol names are obfuscated and differ between APK builds, so a new build can
+          break loading entirely, or - worse - leave a stubbed function being called and
+          silently return the wrong answer.
+
+          Anisette should fall back to a remote server on its own when the runtime hash check
+          fails, so this is not expected to be user-visible. It does mean local Anisette stops
+          working until it is fixed.
+
+          **To fix**, from a checkout:
+
+          \`\`\`
+          python scripts/update_adi_stub_symbols.py
+          \`\`\`
+
+          Then re-run the instrumented proof of concept against the regenerated lists before
+          committing, since a new build is exactly when the stubbing assumption is most likely
+          to have broken:
+
+          \`\`\`
+          ./gradlew :app:testEmulatorDebugAndroidTest \\
+            -Pandroid.testInstrumentationRunnerArguments.adiPoc=true \\
+            -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.poc.StubbedAdiLoadTest
+          \`\`\`
+
+          Watch logcat for the tag \`adi-stub\`. Anything logged there is a function ADI now
+          calls that we only pretend to implement.
+          EOF
