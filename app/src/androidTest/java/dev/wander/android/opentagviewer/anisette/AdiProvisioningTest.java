@@ -20,6 +20,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The provisioning round trip, end to end, against Apple's real servers.
@@ -114,7 +115,51 @@ public class AdiProvisioningTest {
 
             assertNotEquals("ADI should have persisted something to its provisioning path",
                     0, provisioningDir.list() == null ? 0 : provisioningDir.list().length);
+
+            assertAnisetteHeadersAreUsable(adi, identity);
         }
+    }
+
+    /**
+     * The payoff: with the machine provisioned, the headers a login needs are produced here
+     * rather than fetched from somebody else's server.
+     */
+    private static void assertAnisetteHeadersAreUsable(AdiLibrary adi, AdiDeviceIdentity identity)
+            throws Exception {
+        final AnisetteHeaders anisette = new AnisetteHeaders(adi, identity);
+
+        final Map<String, String> first = anisette.generate(AdiProvisioning.ANONYMOUS_DS_ID);
+        Log.i(TAG, "anisette headers: " + AnisetteHeaders.toJson(first));
+
+        for (final String required : Arrays.asList(
+                "X-Apple-I-MD", "X-Apple-I-MD-M", "X-Apple-I-MD-RINFO", "X-Apple-I-MD-LU",
+                "X-Apple-I-Client-Time", "X-Mme-Device-Id", "X-MMe-Client-Info")) {
+            final String value = first.get(required);
+            assertTrue(required + " is missing or empty", value != null && !value.isEmpty());
+        }
+
+        // How often does the password actually change? It is not per call, and not per second.
+        // Sampled rather than assumed, because the answer decides whether these can be cached
+        // for a login or have to be produced per request.
+        final String original = first.get("X-Apple-I-MD");
+        long changedAfterMs = -1;
+
+        for (int elapsed = 2; elapsed <= 40 && changedAfterMs < 0; elapsed += 2) {
+            Thread.sleep(2_000);
+            final String now = anisette.generate(AdiProvisioning.ANONYMOUS_DS_ID)
+                    .get("X-Apple-I-MD");
+            if (!original.equals(now)) {
+                changedAfterMs = elapsed * 1000L;
+            }
+        }
+        Log.i(TAG, "X-Apple-I-MD rotation: " + (changedAfterMs < 0
+                ? "unchanged after 40s" : "changed within " + changedAfterMs + "ms"));
+
+        final Map<String, String> second = anisette.generate(AdiProvisioning.ANONYMOUS_DS_ID);
+
+        // The machine identifier, by contrast, identifies this machine and should not move.
+        assertEquals("X-Apple-I-MD-M should be stable for the same machine",
+                first.get("X-Apple-I-MD-M"), second.get("X-Apple-I-MD-M"));
     }
 
     private static void assumeThePoCWasAskedFor() {

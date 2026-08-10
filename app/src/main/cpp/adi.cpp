@@ -229,4 +229,59 @@ Java_dev_wander_android_opentagviewer_anisette_NativeAdi_provisioningEnd(
     return result;
 }
 
+/**
+ * ADIOTPRequest: {@code int(ulong, ubyte**, uint*, ubyte**, uint*)}.
+ *
+ * The one-time password, produced fresh for every login once the machine is provisioned. ADI
+ * allocates both outputs, so both are copied out and handed back to ADIDispose here.
+ *
+ * Beware the order: the machine identifier is the first pair, the password the second. Both
+ * are ubyte**, so getting it backwards is silent.
+ *
+ * @return {machineIdentifier, oneTimePassword}, or null if ADI returned an error
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_dev_wander_android_opentagviewer_anisette_NativeAdi_otpRequest(
+        JNIEnv *env, jclass, jlong function, jlong dispose, jlong ds_id, jintArray out) {
+    unsigned char *machine_id = nullptr;
+    unsigned int machine_id_length = 0;
+    unsigned char *otp = nullptr;
+    unsigned int otp_length = 0;
+
+    using OtpRequest = int (*)(unsigned long long, unsigned char **, unsigned int *,
+                               unsigned char **, unsigned int *);
+    const int result = reinterpret_cast<OtpRequest>(function)(
+            static_cast<unsigned long long>(ds_id),
+            &machine_id, &machine_id_length,
+            &otp, &otp_length);
+
+    env->SetIntArrayRegion(out, 0, 1, &result);
+
+    if (result != 0 || machine_id == nullptr || otp == nullptr) {
+        LOGE("ADIOTPRequest returned %d", result);
+        return nullptr;
+    }
+
+    jbyteArray machine_id_copy = env->NewByteArray(static_cast<jsize>(machine_id_length));
+    env->SetByteArrayRegion(machine_id_copy, 0, static_cast<jsize>(machine_id_length),
+                            reinterpret_cast<const jbyte *>(machine_id));
+
+    jbyteArray otp_copy = env->NewByteArray(static_cast<jsize>(otp_length));
+    env->SetByteArrayRegion(otp_copy, 0, static_cast<jsize>(otp_length),
+                            reinterpret_cast<const jbyte *>(otp));
+
+    using Dispose = int (*)(void *);
+    reinterpret_cast<Dispose>(dispose)(machine_id);
+    reinterpret_cast<Dispose>(dispose)(otp);
+
+    jobjectArray pair = env->NewObjectArray(
+            2, env->FindClass("[B"), nullptr);
+    env->SetObjectArrayElement(pair, 0, machine_id_copy);
+    env->SetObjectArrayElement(pair, 1, otp_copy);
+
+    LOGI("ADIOTPRequest ok: %u byte machine id, %u byte password",
+         machine_id_length, otp_length);
+    return pair;
+}
+
 }  // extern "C"

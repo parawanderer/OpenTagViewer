@@ -169,6 +169,25 @@ public final class AdiLibrary implements AutoCloseable {
     }
 
     /**
+     * The one-time password for a login, produced offline now that the machine is provisioned.
+     *
+     * @return {@code {machineIdentifier, oneTimePassword}}, in that order
+     */
+    public byte[][] requestOtp(long dsId) throws AdiUnavailableException {
+        final int[] out = new int[1];
+        final byte[][] result = NativeAdi.otpRequest(
+                address(AdiFunction.OTP_REQUEST), address(AdiFunction.DISPOSE), dsId, out);
+
+        if (result == null) {
+            check(AdiFunction.OTP_REQUEST, out[0] == 0 ? -1 : out[0]);
+            throw new AdiUnavailableException(
+                    AdiFunction.OTP_REQUEST.appleName() + " returned no data despite reporting "
+                    + "success, which should not happen");
+        }
+        return result;
+    }
+
+    /**
      * Nothing to release: the libraries stay mapped for the life of the process, which is what
      * we want - ADI holds state and reloading it would throw that away. Present so callers can
      * use try-with-resources without having to know that.
