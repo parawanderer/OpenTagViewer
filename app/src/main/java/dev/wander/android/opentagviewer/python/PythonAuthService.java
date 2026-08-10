@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.repo.model.AppleUserData;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
@@ -38,7 +39,7 @@ public final class PythonAuthService {
      */
     public static Observable<PythonAuthResponse> pythonLogin(
             final String email, final String password, final String anisetteServerUrl,
-            final LocalAnisette localAnisette) {
+            final AnisetteSource localAnisette) {
         return Observable.fromCallable(() -> {
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
@@ -140,7 +141,7 @@ public final class PythonAuthService {
      *                      login where the account was first created.
      */
     public static Observable<PythonAppleAccount> restoreAccount(
-            final AppleUserData appleUserData, final LocalAnisette localAnisette) {
+            final AppleUserData appleUserData, final AnisetteSource localAnisette) {
         return Observable.fromCallable(() -> {
             var data = AppCryptographyUtil.AppEncryptedData.fromFlattened(appleUserData.getData());
             var account = new AppCryptographyUtil().decrypt(data, KEYSTORE_ALIAS_ACCOUNT);
