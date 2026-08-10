@@ -57,12 +57,25 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
 
 ### 4. Respect the Anisette constraints
 
-- **Remote only.** `anisette` needs `unicorn`, a CPU emulator Chaquopy cannot build for
-  Android. `app/stubs/unicorn/` is a stand-in that makes the dependency tree resolve; every
-  method raises. Local Anisette does not work, and the stub is not a step toward it.
-- **Sessions are bound to one server's machine identity.** Changing Anisette server requires
-  a re-login. That is inherent to how Apple binds the session, not a bug to work around —
-  rewriting the stored provider would leave the app running but silently failing auth.
+- **FindMy's own local provider still does not work.** `anisette` needs `unicorn`, a CPU
+  emulator Chaquopy cannot build for Android. `app/stubs/unicorn/` is a stand-in that makes
+  the dependency tree resolve; every method raises. The stub is not a step toward enabling
+  `aniLocal`, and never will be.
+- **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
+  loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
+  back to a remote server when it cannot. That is unrelated to `aniLocal` and needs no
+  emulator — the libraries are native Android code. See `CONTRIBUTING.md` for how to run its
+  tests.
+- **Sessions are bound to one machine identity.** Local and remote Anisette present different
+  ones, as do two different servers. Changing it requires a re-login. That is inherent to how
+  Apple binds the session, not a bug to work around.
+- **So a fallback must say so.** Accounts are deliberately serialized as `aniRemote` even
+  when established locally, because the ADI state lives in app storage and not in the account
+  — this keeps exported logins restorable anywhere. The cost is that a locally-established
+  session can end up continuing against a server, and Apple will see a different machine.
+  `LocalAnisette.recordSessionProvenance` records which kind established the session so that
+  this is reported rather than presenting as auth that silently stops working. Never remove
+  that warning to make a log quieter.
 
 ### 5. Never bundle an AMap API key
 
@@ -112,6 +125,24 @@ So releasing is two steps, in this order:
 `scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`
 before either build job. A tag that disagrees fails the release rather than shipping a build
 that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
+
+### 10. Update the docs that index what you added
+
+Some files list things rather than describe them, so they go stale silently — nothing fails,
+the list is just quietly wrong, and the next person trusts it.
+
+If you add or change one of these, update its index in the same commit:
+
+| You added | Update |
+| --- | --- |
+| A workflow in `.github/workflows/` | the CI table in [CONTRIBUTING.md](./CONTRIBUTING.md#continuous-integration) |
+| A test suite, or one that needs opting into | the test table and its section in `CONTRIBUTING.md` |
+| A script in `scripts/` that people run by hand | the section of `CONTRIBUTING.md` covering that workflow |
+| A constraint that would take someone an afternoon to rediscover | a rule here |
+
+The test for whether it belongs here rather than in a comment: would somebody hit it *before*
+reading the code that explains it? Anisette's machine-identity binding is the example — it
+presents as auth failing for no reason, hours away from the code responsible.
 
 ---
 

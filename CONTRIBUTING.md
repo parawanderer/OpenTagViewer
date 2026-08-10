@@ -485,6 +485,7 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 | `macos-scripts-python.yml` | `python/**` changes | Wizard tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, wizard tests, the PyInstaller build for both architectures |
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
+| `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 
 The instrumented job needs KVM on the runner; the workflow enables it before starting the
 emulator.
