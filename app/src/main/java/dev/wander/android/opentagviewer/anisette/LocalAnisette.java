@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
+import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,14 +47,25 @@ public final class LocalAnisette {
 
     private final Context context;
     private final String abi;
+    private final UserSettings settings;
+    private final boolean hasExistingSession;
 
     private AdiLibrary adi;
     private AdiDeviceIdentity identity;
     private String unavailableReason;
 
-    public LocalAnisette(Context context) {
+    /**
+     * @param settings           consulted for which kind of Anisette the user wants, and for
+     *                           an Apple Music APK they supplied themselves
+     * @param hasExistingSession whether somebody is already signed in. Only decides what to do
+     *                           when nobody has chosen a mode: an existing session stays on
+     *                           its server, because moving it would force a re-login.
+     */
+    public LocalAnisette(Context context, UserSettings settings, boolean hasExistingSession) {
         this.context = context.getApplicationContext();
         this.abi = Build.SUPPORTED_ABIS[0];
+        this.settings = settings;
+        this.hasExistingSession = hasExistingSession;
     }
 
     /**
@@ -64,6 +77,14 @@ public final class LocalAnisette {
     public synchronized boolean ensureReady() {
         if (this.adi != null) {
             return true;
+        }
+
+        // Someone asking for a remote server gets a remote server. Checked before anything
+        // else so that choosing remote costs no download and no provisioning, and so that a
+        // machine which cannot run this at all is not made to find out repeatedly.
+        if (!this.settings.usesLocalAnisette(this.hasExistingSession)) {
+            this.unavailableReason = "a remote Anisette server is selected in Settings";
+            return false;
         }
 
         try {

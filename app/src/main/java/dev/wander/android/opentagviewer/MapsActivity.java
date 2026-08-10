@@ -845,7 +845,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // Produce Anisette on this device where possible, rather than relaying every refresh
         // through a public Anisette server. Falls back to the configured server by itself.
         var asyncAppleService = PythonAuthService.restoreAccount(
-                    userAuth.get(), new LocalAnisette(this))
+                    userAuth.get(),
+                    // Somebody is signed in here, so an unchosen mode keeps them on whatever
+                    // already works: switching would present Apple with a different machine.
+                    new LocalAnisette(this, this.userSettings, true))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;

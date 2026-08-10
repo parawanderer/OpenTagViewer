@@ -6,6 +6,7 @@ import static android.view.View.inflate;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
@@ -362,8 +363,98 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
+    /**
+     * The choice between producing sign-in data here and asking a server for it, plus whatever
+     * the local side currently has to say for itself.
+     *
+     * <p>Anyone reaching this screen is already signed in, so an unchosen mode means they have
+     * been carried over from a version that only had servers: they stay on theirs until they
+     * say otherwise, because moving a live session onto a different machine identity forces a
+     * re-login. That is what the warning in this dialog is about.
+     */
+    private void setupAnisetteModeControls(final View view) {
+        final AppAutoCompleteTextView modeDropdown =
+                view.findViewById(R.id.anisetteModeSelectDropdown);
+        if (modeDropdown == null) {
+            return;
+        }
+
+        modeDropdown.setSimpleItems(new String[] {
+                this.getString(R.string.anisette_mode_local),
+                this.getString(R.string.anisette_mode_remote)
+        });
+
+        final String current = this.currentSettings.resolveAnisetteMode(true);
+        applyAnisetteMode(view, current);
+
+        modeDropdown.setOnItemClickListener((parent, v, position, id) -> {
+            final String selected = position == 1
+                    ? UserSettings.ANISETTE_REMOTE : UserSettings.ANISETTE_LOCAL;
+            modeDropdown.setText(parent.getItemAtPosition(position).toString(), false);
+            modeDropdown.clearFocus();
+            applyAnisetteMode(view, selected);
+            this.pendingAnisetteMode = selected;
+        });
+
+        final View learnMore = view.findViewById(R.id.anisetteLearnMoreButton);
+        if (learnMore != null) {
+            learnMore.setOnClickListener(v -> this.openConfiguredLink("anisetteWikiPage"));
+        }
+
+        final View whereToGetApk = view.findViewById(R.id.anisetteWhereToGetApkButton);
+        if (whereToGetApk != null) {
+            whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
+        }
+    }
+
+    /** Show one mode's controls and hide the other's. */
+    private static void applyAnisetteMode(final View view, final String mode) {
+        final boolean local = !UserSettings.ANISETTE_REMOTE.equals(mode);
+
+        final AppAutoCompleteTextView dropdown =
+                view.findViewById(R.id.anisetteModeSelectDropdown);
+        if (dropdown != null) {
+            dropdown.setText(view.getContext().getString(
+                    local ? R.string.anisette_mode_local : R.string.anisette_mode_remote), false);
+        }
+
+        final View localSection = view.findViewById(R.id.anisetteLocalStatusContainer);
+        if (localSection != null) {
+            localSection.setVisibility(local ? View.VISIBLE : View.GONE);
+        }
+
+        final View remoteSection = view.findViewById(R.id.anisetteRemoteSection);
+        if (remoteSection != null) {
+            remoteSection.setVisibility(local ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /** Open one of the reference links in app.properties, or do nothing if it is not set. */
+    private void openConfiguredLink(final String property) {
+        final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        if (properties == null) {
+            return;
+        }
+
+        final String url = properties.getProperty(property);
+        if (url == null || url.isBlank()) {
+            Log.w(TAG, "No " + property + " configured in app.properties");
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            this.startActivity(intent);
+        }
+    }
+
+    /** Set while the dialog is open; only meaningful until it is confirmed or dismissed. */
+    private String pendingAnisetteMode = null;
+
     private void onClickEditAnisetteServerUrl() {
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
+
+        this.setupAnisetteModeControls(view);
 
         CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(view.getContext(), /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
         final IndeterminateDrawable<CircularProgressIndicatorSpec> progressIndicatorDrawable = IndeterminateDrawable.createCircularDrawable(view.getContext(), spec);
@@ -458,14 +549,30 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleAnisetteUrlChangeSave(final String validNewAnisetteUrl) {
+        final String originalMode = this.currentSettings.resolveAnisetteMode(true);
+        final boolean modeChanged = this.pendingAnisetteMode != null
+                && !this.pendingAnisetteMode.equals(originalMode);
+
+        if (this.pendingAnisetteMode != null) {
+            this.currentSettings.setAnisetteMode(this.pendingAnisetteMode);
+            // Choosing for themselves answers the question the upgrade prompt would ask, so
+            // it should not then go on to ask it.
+            this.currentSettings.setAnisetteUpgradeOffered(true);
+        }
+
         this.currentSettings.setAnisetteServerUrl(validNewAnisetteUrl);
-        this.binding.setCurrentAnisetteServerUrl(validNewAnisetteUrl);
+        this.binding.setCurrentAnisetteServerUrl(
+                this.currentSettings.usesLocalAnisette(true)
+                        ? this.getString(R.string.anisette_mode_local)
+                        : validNewAnisetteUrl);
         this.saveSettings();
 
         var originalUrl = Optional.ofNullable(this.initialAnisetteUrl);
         var finalUrl = Optional.ofNullable(this.currentSettings.getAnisetteServerUrl());
 
-        if (!originalUrl.equals(finalUrl)) {
+        // Changing the mode binds the session to a different machine identity just as surely
+        // as changing the server does, so it takes the same path.
+        if (modeChanged || !originalUrl.equals(finalUrl)) {
             // A re-login is genuinely required, not just a limitation of how the account
             // is serialized. Anisette supplies a machine identity (X-Apple-I-MD-M and
             // friends) derived from that server's own ADI provisioning, and Apple binds
