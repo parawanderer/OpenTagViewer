@@ -14,6 +14,15 @@ public final class AnisetteStatus {
     public enum State {
         /** Nothing set up yet, and nothing wrong - it prepares itself when first needed. */
         PENDING,
+        /**
+         * Being worked out right now.
+         *
+         * <p>Distinct from PENDING, which says nothing is happening. Finding out can take up
+         * to a connection timeout - the worst case being offline, where it waits the full 30
+         * seconds before failing - and showing "sets itself up next time you sign in" for that
+         * long reads as the screen having hung.
+         */
+        CHECKING,
         READY,
         /** Failed for an ordinary reason: no network, or a remote server was chosen. */
         UNAVAILABLE,
@@ -36,6 +45,11 @@ public final class AnisetteStatus {
 
     public static AnisetteStatus pending() {
         return new AnisetteStatus(State.PENDING, null);
+    }
+
+    /** Being worked out. Show this while {@link #of(AnisetteSource)} is running. */
+    public static AnisetteStatus checking() {
+        return new AnisetteStatus(State.CHECKING, null);
     }
 
     /**

@@ -117,6 +117,43 @@ public class AnisetteModeLayoutTest {
     }
 
     /**
+     * While the answer is being fetched, something has to say so.
+     *
+     * <p>Finding out can take a full connection timeout - offline waits 30 seconds and then
+     * fails - and the alternative wording, "sets itself up the next time you sign in", would
+     * sit there the whole time reading as a screen that has hung.
+     */
+    @Test
+    public void checkingShowsASpinnerAndNeitherOutcome() {
+        applyStatus(AnisetteStatus.checking());
+
+        assertEquals(View.VISIBLE, section(R.id.anisetteLocalProgress).getVisibility());
+        assertEquals("no verdict has been reached yet",
+                View.GONE, section(R.id.anisetteLocalOkIcon).getVisibility());
+        assertEquals(View.GONE, section(R.id.anisetteLocalErrorIcon).getVisibility());
+    }
+
+    /** The spinner has to stop. A permanent one is worse than none. */
+    @Test
+    public void theSpinnerGoesAwayOnceThereIsAnAnswer() {
+        applyStatus(AnisetteStatus.checking());
+        applyStatus(AnisetteStatus.of(FakeAnisetteSource.ready()));
+
+        assertEquals(View.GONE, section(R.id.anisetteLocalProgress).getVisibility());
+        assertEquals(View.VISIBLE, section(R.id.anisetteLocalOkIcon).getVisibility());
+    }
+
+    /** Including when the answer is a failure, which is when it is most likely to be missed. */
+    @Test
+    public void theSpinnerGoesAwayOnFailureToo() {
+        applyStatus(AnisetteStatus.checking());
+        applyStatus(AnisetteStatus.of(FakeAnisetteSource.unavailable("no network")));
+
+        assertEquals(View.GONE, section(R.id.anisetteLocalProgress).getVisibility());
+        assertEquals(View.VISIBLE, section(R.id.anisetteLocalErrorIcon).getVisibility());
+    }
+
+    /**
      * A working local Anisette says so, and offers nothing else.
      */
     @Test
