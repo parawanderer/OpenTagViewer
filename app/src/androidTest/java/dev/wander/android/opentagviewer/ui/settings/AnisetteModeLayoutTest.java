@@ -3,10 +3,12 @@ package dev.wander.android.opentagviewer.ui.settings;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -16,6 +18,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.R;
+import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 
 /**
@@ -110,6 +114,78 @@ public class AnisetteModeLayoutTest {
 
         assertEquals("supplying your own APK should not be offered by default",
                 View.GONE, section(R.id.anisetteOwnApkContainer).getVisibility());
+    }
+
+    /**
+     * A working local Anisette says so, and offers nothing else.
+     */
+    @Test
+    public void aReadyStatusOffersNoEscapeHatch() {
+        applyStatus(AnisetteStatus.of(FakeAnisetteSource.ready()));
+
+        assertEquals(View.VISIBLE, section(R.id.anisetteLocalOkIcon).getVisibility());
+        assertEquals(View.GONE, section(R.id.anisetteLocalErrorIcon).getVisibility());
+        assertEquals("nothing has gone wrong, so do not invite anybody to change it",
+                View.GONE, section(R.id.anisetteOwnApkContainer).getVisibility());
+    }
+
+    /**
+     * An ordinary failure shows the reason but still does not offer the APK controls -
+     * supplying a file does not fix a missing network, and suggesting it would send people
+     * off to do something pointless and risky.
+     */
+    @Test
+    public void anOrdinaryFailureShowsTheReasonWithoutOfferingTheApkControls() {
+        applyStatus(AnisetteStatus.of(
+                FakeAnisetteSource.unavailable("Unable to resolve host apps.mzstatic.com")));
+
+        assertEquals(View.VISIBLE, section(R.id.anisetteLocalErrorIcon).getVisibility());
+        assertEquals(View.GONE, section(R.id.anisetteLocalOkIcon).getVisibility());
+        assertEquals(View.GONE, section(R.id.anisetteOwnApkContainer).getVisibility());
+
+        final TextView status = (TextView) section(R.id.anisetteLocalStatus);
+        assertTrue("the reason should be shown, not swallowed",
+                status.getText().toString().contains("apps.mzstatic.com"));
+    }
+
+    /**
+     * The one state that reveals the APK controls, and the reason the fake exists: it depends
+     * on Apple shipping a new build, which they last did in April 2025.
+     */
+    @Test
+    public void appleChangingTheLibrariesRevealsTheApkControls() {
+        applyStatus(AnisetteStatus.of(
+                FakeAnisetteSource.appleChangedTheLibraries("4.9.6.1447")));
+
+        assertEquals("this is the only state where supplying a file helps",
+                View.VISIBLE, section(R.id.anisetteOwnApkContainer).getVisibility());
+
+        final TextView explanation = (TextView) section(R.id.anisetteOwnApkExplanation);
+        assertTrue("somebody has to know which version to go and find",
+                explanation.getText().toString().contains("4.9.6.1447"));
+    }
+
+    /** "Go back to Apple's copy" only makes sense once a file has actually been supplied. */
+    @Test
+    public void revertingToApplesCopyIsOfferedOnlyWhenAFileWasSupplied() {
+        final AnisetteStatus changed = AnisetteStatus.of(
+                FakeAnisetteSource.appleChangedTheLibraries("4.9.6.1447"));
+
+        applyStatus(changed, false);
+        assertEquals(View.GONE, section(R.id.anisetteClearApkButton).getVisibility());
+
+        applyStatus(changed, true);
+        assertEquals(View.VISIBLE, section(R.id.anisetteClearApkButton).getVisibility());
+    }
+
+    private void applyStatus(final AnisetteStatus status) {
+        applyStatus(status, false);
+    }
+
+    private void applyStatus(final AnisetteStatus status, final boolean hasOwnApk) {
+        getInstrumentation().runOnMainSync(() ->
+                SharedMainSettingsManager.applyLocalAnisetteStatus(
+                        this.dialog, status, "Apple Music 4.9.6.1447", hasOwnApk));
     }
 
     /**

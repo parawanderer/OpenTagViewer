@@ -45,10 +45,12 @@ public final class FakeAnisetteSource implements AnisetteSource {
      * time they did was April 2025.
      */
     public static FakeAnisetteSource appleChangedTheLibraries(String expectedVersion) {
+        // Uses the real marker rather than an invented message, so that a change to how this
+        // is detected breaks the test instead of quietly making it test nothing.
         return new FakeAnisetteSource(false,
-                "libstoreservicescore.so does not match the manifest - Apple has probably "
-                        + "shipped a new Apple Music build (this manifest is from "
-                        + expectedVersion + ")",
+                "libstoreservicescore.so " + AdiLibraryManifest.MISMATCH_MARKER
+                        + ": Apple has probably shipped a new Apple Music build (this manifest "
+                        + "is from " + expectedVersion + ")",
                 false);
     }
 
