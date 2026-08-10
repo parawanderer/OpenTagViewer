@@ -37,7 +37,7 @@ import java.util.Map;
  *
  * <pre>
  * ./gradlew :app:testEmulatorDebugAndroidTest \
- *     -Pandroid.testInstrumentationRunnerArguments.adiPoc=true \
+ *     -Pandroid.testInstrumentationRunnerArguments.anisetteLiveTests=true \
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.anisette.AdiProvisioningTest
  * </pre>
  */
@@ -45,7 +45,13 @@ import java.util.Map;
 public class AdiProvisioningTest {
     private static final String TAG = "AdiProvisioningTest";
 
-    private static final String POC_ENABLED_ARG = "adiPoc";
+    /**
+     * Opt-in for tests that talk to Apple. Not because this is experimental - it is not - but
+     * because these reach a third party's servers. This one in particular provisions a new
+     * machine identity with Apple on every run, which is not something to do automatically on
+     * every build, and it cannot pass without a network connection.
+     */
+    private static final String LIVE_TESTS_ARG = "anisetteLiveTests";
 
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
@@ -60,7 +66,11 @@ public class AdiProvisioningTest {
 
     @BeforeClass
     public static void loadAdi() throws Exception {
-        assumeThePoCWasAskedFor();
+        // Returns rather than raising: an Assume here skips the class, which the runner
+        // reports as a failed run rather than skipped tests. See NativeAdiLoadTest.
+        if (!liveTestsWereAskedFor()) {
+            return;
+        }
 
         final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         final String abi = Build.SUPPORTED_ABIS[0];
@@ -86,7 +96,7 @@ public class AdiProvisioningTest {
      */
     @Test
     public void aMachineCanBeProvisionedFromScratch() throws Exception {
-        assumeThePoCWasAskedFor();
+        assumeLiveTestsWereAskedFor();
 
         final AdiDeviceIdentity identity = AdiDeviceIdentity.generate();
         Log.i(TAG, "provisioning as " + identity.uniqueDeviceIdentifier()
@@ -162,11 +172,15 @@ public class AdiProvisioningTest {
                 first.get("X-Apple-I-MD-M"), second.get("X-Apple-I-MD-M"));
     }
 
-    private static void assumeThePoCWasAskedFor() {
-        final String value = InstrumentationRegistry.getArguments().getString(POC_ENABLED_ARG);
+    private static boolean liveTestsWereAskedFor() {
+        return "true".equals(
+                InstrumentationRegistry.getArguments().getString(LIVE_TESTS_ARG));
+    }
+
+    private static void assumeLiveTestsWereAskedFor() {
         Assume.assumeTrue(
-                "skipped: pass -Pandroid.testInstrumentationRunnerArguments." + POC_ENABLED_ARG
-                        + "=true to run the Anisette proof of concept",
-                "true".equals(value));
+                "skipped: pass -Pandroid.testInstrumentationRunnerArguments." + LIVE_TESTS_ARG
+                        + "=true these tests talk to Apple",
+                liveTestsWereAskedFor());
     }
 }

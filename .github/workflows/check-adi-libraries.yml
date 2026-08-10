@@ -102,7 +102,7 @@ jobs:
 
           \`\`\`
           ./gradlew :app:testEmulatorDebugAndroidTest \\
-            -Pandroid.testInstrumentationRunnerArguments.adiPoc=true \\
+            -Pandroid.testInstrumentationRunnerArguments.anisetteLiveTests=true \\
             -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.anisette.StubbedAdiLoadTest
           \`\`\`
 

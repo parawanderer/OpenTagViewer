@@ -21,11 +21,10 @@ import org.junit.runners.MethodSorters;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
- * The same thing {@link NativeAdiLoadTest} proves, but without Apple's CoreFoundation,
- * mediaplatform, ICU, curl, libxml2, libdispatch or BlocksRuntime.
- *
  * <p>libstoreservicescore.so imports symbols from only three libraries - libc++_shared (141),
  * libmediaplatform (125) and libCoreFoundation (93). The other seven are in the dependency
  * closure purely because those two depend on them, and ICU alone is 14.6 MB.
@@ -35,21 +34,24 @@ import java.util.List;
  * (see app/src/main/cpp/stubs/) and downloads three libraries instead of twelve.
  *
  * <pre>
- * NativeAdiLoadTest    12 libraries   12.6 MB downloaded   ~28 MB on disk
- * this                  3 libraries    ~2.9 MB downloaded   ~5.2 MB on disk
+ * following DT_NEEDED   12 libraries   12.6 MB downloaded   ~28 MB on disk
+ * stubbing               3 libraries    ~2.9 MB downloaded   ~5.2 MB on disk
  * </pre>
  *
  * <p>Whether that is sound depends on ADI never actually <em>calling</em> into those two
- * libraries. Every stub logs its own name under the tag {@code adi-stub} and returns zero, so
- * a passing run with no {@code adi-stub} output means nothing was reached, and a passing run
- * with some output tells us exactly which symbols need implementing for real.
+ * libraries. Every stub reports itself under the tag {@code adi-stub}: symbols known to be
+ * called harmlessly log at INFO (see {@code libmediaplatform.expected}), and anything else
+ * logs at ERROR and counts against the session. So a run whose only {@code adi-stub} output is
+ * INFO is a clean one, and an ERROR names exactly which symbol needs implementing for real.
+ *
+ * <p>This is how the app loads ADI.
  */
 @RunWith(AndroidJUnit4.class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class StubbedAdiLoadTest {
     private static final String TAG = "StubbedAdiLoadTest";
 
-    private static final String POC_ENABLED_ARG = "adiPoc";
+    private static final String LIVE_TESTS_ARG = "anisetteLiveTests";
 
     /**
      * Apple libraries we still need. libc++_shared stays real because its mangled names are
@@ -84,14 +86,16 @@ public class StubbedAdiLoadTest {
 
     @BeforeClass
     public static void downloadOnlyWhatIsNeeded() throws Exception {
-        assumeThePoCWasAskedFor();
+        // Returns rather than raising: an Assume here skips the class, which the runner
+        // reports as a failed run rather than skipped tests.
+        if (!liveTestsWereAskedFor()) {
+            return;
+        }
 
         final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         final String abi = Build.SUPPORTED_ABIS[0];
 
-        // A separate directory from NativeAdiLoadTest's, so neither test can pass because the
-        // other one left a library lying around.
-        libraryDir = new File(context.getFilesDir(), "adi-poc-stubbed/" + abi);
+        libraryDir = new File(context.getFilesDir(), "adi-test-stubbed/" + abi);
         nativeLibraryDir = new File(context.getApplicationInfo().nativeLibraryDir);
 
         final java.util.List<String> everything = new java.util.ArrayList<>(FROM_APPLE);
@@ -103,10 +107,37 @@ public class StubbedAdiLoadTest {
                 + nativeLibraryDir);
     }
 
+    /**
+     * Nothing beyond the three libraries was fetched.
+     *
+     * <p>This is the assertion that keeps the download small. Stubbing is what stops
+     * DT_NEEDED dragging in ICU, curl, libxml2, libdispatch and BlocksRuntime - about 20 MB,
+     * 14.6 MB of it ICU alone - and if that ever regresses, nothing else here would notice:
+     * every other test would still pass, just after downloading five times as much.
+     *
+     * <p>Asserted as an exact set rather than a list of things to avoid, so that a dependency
+     * Apple adds in a future build is caught too.
+     */
+    @Test
+    public void step0_onlyTheThreeNeededLibrariesAreDownloaded() {
+        assumeLiveTestsWereAskedFor();
+
+        final Set<String> expected = new TreeSet<>(FROM_APPLE);
+        expected.add(CORE_ADI);
+
+        final String[] present = libraryDir.list();
+        assertTrue("nothing was downloaded to " + libraryDir, present != null);
+
+        final Set<String> actual = new TreeSet<>(Arrays.asList(present));
+        assertEquals("the set of downloaded libraries has changed - if this grew, DT_NEEDED is "
+                        + "being followed again and the download is back to ~12.6 MB",
+                expected, actual);
+    }
+
     /** Ours first, so the SONAMEs are already taken by the time Apple's library asks. */
     @Test
     public void step1_stubsStandInForApplesLibraries() {
-        assumeThePoCWasAskedFor();
+        assumeLiveTestsWereAskedFor();
 
         for (final String name : STUBS) {
             try {
@@ -131,7 +162,7 @@ public class StubbedAdiLoadTest {
 
     @Test
     public void step2_theAdiEntryPointsStillResolve() {
-        assumeThePoCWasAskedFor();
+        assumeLiveTestsWereAskedFor();
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
         for (final AdiFunction function : AdiFunction.values()) {
@@ -146,7 +177,7 @@ public class StubbedAdiLoadTest {
      */
     @Test
     public void step3_adiInitialisesWithoutApplesDependencies() {
-        assumeThePoCWasAskedFor();
+        assumeLiveTestsWereAskedFor();
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
         final long function = NativeAdi.resolve(
@@ -172,11 +203,15 @@ public class StubbedAdiLoadTest {
         return handle[0];
     }
 
-    private static void assumeThePoCWasAskedFor() {
-        final String value = InstrumentationRegistry.getArguments().getString(POC_ENABLED_ARG);
+    private static boolean liveTestsWereAskedFor() {
+        return "true".equals(
+                InstrumentationRegistry.getArguments().getString(LIVE_TESTS_ARG));
+    }
+
+    private static void assumeLiveTestsWereAskedFor() {
         Assume.assumeTrue(
-                "skipped: pass -Pandroid.testInstrumentationRunnerArguments." + POC_ENABLED_ARG
-                        + "=true to run the Anisette proof of concept",
-                "true".equals(value));
+                "skipped: pass -Pandroid.testInstrumentationRunnerArguments." + LIVE_TESTS_ARG
+                        + "=true these tests talk to Apple",
+                liveTestsWereAskedFor());
     }
 }
