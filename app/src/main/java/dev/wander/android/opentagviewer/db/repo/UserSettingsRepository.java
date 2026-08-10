@@ -1,6 +1,9 @@
 package dev.wander.android.opentagviewer.db.repo;
 
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.AMAP_API_KEY;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_APK_URI;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_MODE;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_UPGRADE_OFFERED;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_SERVER_URL;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ENABLE_DEBUG_DATA;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
@@ -32,6 +35,9 @@ public class UserSettingsRepository {
                 Boolean enableDebugData = settings.get(ENABLE_DEBUG_DATA);
                 String mapProvider = settings.get(MAP_PROVIDER);
                 String amapApiKey = settings.get(AMAP_API_KEY);
+                String anisetteMode = settings.get(ANISETTE_MODE);
+                String anisetteApkUri = settings.get(ANISETTE_APK_URI);
+                Boolean anisetteUpgradeOffered = settings.get(ANISETTE_UPGRADE_OFFERED);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
@@ -40,6 +46,9 @@ public class UserSettingsRepository {
                         .enableDebugData(enableDebugData)
                         .mapProvider(mapProvider)
                         .amapApiKey(amapApiKey)
+                        .anisetteMode(anisetteMode)
+                        .anisetteApkUri(anisetteApkUri)
+                        .anisetteUpgradeOffered(anisetteUpgradeOffered)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -59,6 +68,15 @@ public class UserSettingsRepository {
             // Null would throw; an empty string reads back as "no key supplied".
             mutablePreferences.set(AMAP_API_KEY,
                     userSettings.getAmapApiKey() == null ? "" : userSettings.getAmapApiKey());
+            // An empty string means "not chosen", which is not the same as either mode - see
+            // UserSettings.anisetteMode. Writing "local" here for somebody who never chose
+            // would move an existing session onto a different machine identity.
+            mutablePreferences.set(ANISETTE_MODE,
+                    userSettings.getAnisetteMode() == null ? "" : userSettings.getAnisetteMode());
+            mutablePreferences.set(ANISETTE_APK_URI,
+                    userSettings.getAnisetteApkUri() == null ? "" : userSettings.getAnisetteApkUri());
+            mutablePreferences.set(ANISETTE_UPGRADE_OFFERED,
+                    userSettings.getAnisetteUpgradeOffered() == Boolean.TRUE);
 
             return Single.just(mutablePreferences);
         }).subscribeOn(Schedulers.io())

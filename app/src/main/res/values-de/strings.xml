@@ -113,4 +113,27 @@
     <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
     <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
     <string name="resolving_tags_banner_progress">Ihre Tags werden geortet (%1$d von %2$d). Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
+    <string name="anisette_mode_title">Anmeldedaten</string>
+    <string name="anisette_mode_local">Auf diesem Gerät</string>
+    <string name="anisette_mode_remote">Externer Server</string>
+    <string name="anisette_mode_local_summary">Wird auf deinem Telefon erzeugt. Niemand sonst erfährt etwas über deine Anmeldung, und kein fremder Ausfall kann sie verhindern.</string>
+    <string name="anisette_mode_remote_summary">Ein öffentlicher Anisette-Server übernimmt das. Dessen Betreiber kann diesen Datenverkehr sehen, und die Anmeldung funktioniert nicht mehr, sobald der Server ausfällt.</string>
+    <string name="anisette_mode_change_warning">Du musst dich erneut anmelden. Apple bindet eine Sitzung an das, was ihre Anmeldedaten erzeugt hat - eine Änderung sieht daher wie ein neues Gerät aus.</string>
+    <string name="anisette_local_status_ready">Bereit</string>
+    <string name="anisette_local_status_pending">Richtet sich bei der nächsten Anmeldung selbst ein</string>
+    <string name="anisette_local_status_unavailable">Funktioniert nicht: %1$s</string>
+    <string name="anisette_local_needs_own_file">Apple hat die benötigte Datei ersetzt, daher kann sich das nicht mehr selbst einrichten. Du kannst selbst eine Kopie von %1$s bereitstellen oder stattdessen einen externen Server verwenden.</string>
+    <string name="anisette_choose_apk">Datei auswählen</string>
+    <string name="anisette_apk_in_use">Die von dir gewählte Datei wird verwendet</string>
+    <string name="anisette_apk_use_apple_again">Wieder Apples Kopie verwenden</string>
+    <string name="anisette_apk_rejected">Diese Datei ist nicht die benötigte Version (%1$s).</string>
+    <string name="anisette_where_to_get_apk">Wo du sie findest</string>
+    <string name="anisette_learn_more">Über Anisette-Server</string>
+    <string name="anisette_upgrade_title">Anmelden ohne Zwischenstelle</string>
+    <string name="anisette_upgrade_message">Die Anmeldung bei Apple läuft derzeit über einen öffentlichen Anisette-Server. Dessen Betreiber kann diesen Datenverkehr sehen, und OpenTagViewer kann sich nicht mehr anmelden, sobald dieser Server ausfällt.
+
+Das kann jetzt vollständig auf deinem Telefon geschehen. Beim Wechsel musst du dich einmal erneut anmelden, weil Apple das als neues Gerät ansieht.</string>
+    <string name="anisette_upgrade_switch">Wechseln und anmelden</string>
+    <string name="anisette_upgrade_later">Jetzt nicht</string>
+    <string name="anisette_upgrade_later_hint">Du kannst später in den Einstellungen wechseln.</string>
 </resources>

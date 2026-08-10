@@ -147,4 +147,27 @@
     <string name="import_devices">Import Devices</string>
     <string name="error_occurred_while_removing_the_device">An error occurred while removing the device</string>
     <string name="how_do_i_get_the_zip"><u>How do I get the zip?</u></string>
+    <string name="anisette_mode_title">Sign-in data</string>
+    <string name="anisette_mode_local">On this device</string>
+    <string name="anisette_mode_remote">Remote server</string>
+    <string name="anisette_mode_local_summary">Produced on your phone. Nothing about signing in reaches anyone else, and no outage elsewhere can stop it.</string>
+    <string name="anisette_mode_remote_summary">A public Anisette server does it for you. Its operator can see that traffic, and sign-in stops working when their server does.</string>
+    <string name="anisette_mode_change_warning">You will have to sign in again. Apple ties a session to whatever produced its sign-in data, so changing this looks like a new device.</string>
+    <string name="anisette_local_status_ready">Ready</string>
+    <string name="anisette_local_status_pending">Sets itself up the next time you sign in</string>
+    <string name="anisette_local_status_unavailable">Not working: %1$s</string>
+    <string name="anisette_local_needs_own_file">Apple has replaced the file this needs, so it can no longer set itself up. You can supply a copy of %1$s yourself, or use a remote server instead.</string>
+    <string name="anisette_choose_apk">Choose a file</string>
+    <string name="anisette_apk_in_use">Using the file you chose</string>
+    <string name="anisette_apk_use_apple_again">Go back to Apple\'s copy</string>
+    <string name="anisette_apk_rejected">That file is not the version this needs (%1$s).</string>
+    <string name="anisette_where_to_get_apk">Where to find it</string>
+    <string name="anisette_learn_more">About Anisette servers</string>
+    <string name="anisette_upgrade_title">Sign in without a middleman</string>
+    <string name="anisette_upgrade_message">Signing in to Apple currently goes through a public Anisette server. Its operator can see that traffic, and OpenTagViewer stops being able to sign in whenever their server is down.
+
+This can now happen entirely on your phone instead. Switching means signing in one more time, because Apple treats it as a new device.</string>
+    <string name="anisette_upgrade_switch">Switch and sign in</string>
+    <string name="anisette_upgrade_later">Not now</string>
+    <string name="anisette_upgrade_later_hint">You can switch later in Settings.</string>
 </resources>

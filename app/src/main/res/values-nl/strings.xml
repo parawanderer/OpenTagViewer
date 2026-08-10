@@ -113,4 +113,27 @@
     <string name="maps_api_key_missing_message">Deze build heeft geen Google Maps API-sleutel, dus de kaart wordt niet geladen. Voeg MAPS_API_KEY toe aan secrets.properties en bouw opnieuw, of kies een andere kaartaanbieder in de instellingen.</string>
     <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Dit kan een paar minuten duren — houd de app open.</string>
     <string name="resolving_tags_banner_progress">Je tags worden gelokaliseerd (%1$d van %2$d). Dit kan een paar minuten duren — houd de app open.</string>
+    <string name="anisette_mode_title">Aanmeldgegevens</string>
+    <string name="anisette_mode_local">Op dit apparaat</string>
+    <string name="anisette_mode_remote">Externe server</string>
+    <string name="anisette_mode_local_summary">Wordt op je telefoon aangemaakt. Niemand anders ziet iets van je aanmelding, en een storing elders kan het niet blokkeren.</string>
+    <string name="anisette_mode_remote_summary">Een openbare Anisette-server doet dit voor je. De beheerder ervan kan dat verkeer zien, en aanmelden werkt niet meer zodra die server uitvalt.</string>
+    <string name="anisette_mode_change_warning">Je moet opnieuw inloggen. Apple koppelt een sessie aan wat de aanmeldgegevens heeft gemaakt, dus deze wijziging lijkt op een nieuw apparaat.</string>
+    <string name="anisette_local_status_ready">Gereed</string>
+    <string name="anisette_local_status_pending">Stelt zichzelf in bij de volgende keer aanmelden</string>
+    <string name="anisette_local_status_unavailable">Werkt niet: %1$s</string>
+    <string name="anisette_local_needs_own_file">Apple heeft het benodigde bestand vervangen, dus dit kan zichzelf niet meer instellen. Je kunt zelf een kopie van %1$s aanleveren, of een externe server gebruiken.</string>
+    <string name="anisette_choose_apk">Bestand kiezen</string>
+    <string name="anisette_apk_in_use">Gebruikt het bestand dat je hebt gekozen</string>
+    <string name="anisette_apk_use_apple_again">Terug naar de kopie van Apple</string>
+    <string name="anisette_apk_rejected">Dat bestand is niet de benodigde versie (%1$s).</string>
+    <string name="anisette_where_to_get_apk">Waar je het vindt</string>
+    <string name="anisette_learn_more">Over Anisette-servers</string>
+    <string name="anisette_upgrade_title">Aanmelden zonder tussenpersoon</string>
+    <string name="anisette_upgrade_message">Aanmelden bij Apple gaat nu via een openbare Anisette-server. De beheerder daarvan kan dat verkeer zien, en OpenTagViewer kan niet meer aanmelden zodra die server plat ligt.
+
+Dit kan nu volledig op je telefoon gebeuren. Overstappen betekent één keer opnieuw aanmelden, omdat Apple het als een nieuw apparaat ziet.</string>
+    <string name="anisette_upgrade_switch">Overstappen en aanmelden</string>
+    <string name="anisette_upgrade_later">Niet nu</string>
+    <string name="anisette_upgrade_later_hint">Je kunt later overstappen via Instellingen.</string>
 </resources>
