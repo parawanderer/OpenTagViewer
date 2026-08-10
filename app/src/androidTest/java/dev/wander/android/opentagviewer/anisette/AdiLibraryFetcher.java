@@ -1,4 +1,4 @@
-package dev.wander.android.opentagviewer.poc;
+package dev.wander.android.opentagviewer.anisette;
 
 import android.util.Log;
 

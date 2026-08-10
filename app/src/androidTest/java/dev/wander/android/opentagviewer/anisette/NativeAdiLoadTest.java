@@ -1,4 +1,4 @@
-package dev.wander.android.opentagviewer.poc;
+package dev.wander.android.opentagviewer.anisette;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -46,7 +46,7 @@ import java.util.List;
  * <pre>
  * ./gradlew :app:testEmulatorDebugAndroidTest \
  *     -Pandroid.testInstrumentationRunnerArguments.adiPoc=true \
- *     -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.poc.NativeAdiLoadTest
+ *     -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.anisette.NativeAdiLoadTest
  * </pre>
  */
 @RunWith(AndroidJUnit4.class)
@@ -119,7 +119,7 @@ public class NativeAdiLoadTest {
             assertTrue(library + " was not downloaded", library.isFile());
 
             final long[] handle = new long[1];
-            final String error = NativeAdiProbe.open(library.getAbsolutePath(), handle);
+            final String error = NativeAdi.open(library.getAbsolutePath(), handle);
 
             if (error != null) {
                 fail("dlopen(" + name + ") failed: " + error + "\n  => " + diagnose(error));
@@ -157,7 +157,7 @@ public class NativeAdiLoadTest {
 
         final StringBuilder missing = new StringBuilder();
         for (final AdiFunction function : AdiFunction.values()) {
-            if (NativeAdiProbe.resolve(storeServicesCore, function.symbol()) == 0) {
+            if (NativeAdi.resolve(storeServicesCore, function.symbol()) == 0) {
                 missing.append("\n  ").append(function);
             } else {
                 Log.i(TAG, "resolved " + function);
@@ -179,11 +179,11 @@ public class NativeAdiLoadTest {
         assumeThePoCWasAskedFor();
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
-        final long function = NativeAdiProbe.resolve(
+        final long function = NativeAdi.resolve(
                 storeServicesCore, AdiFunction.LOAD_LIBRARY_WITH_PATH.symbol());
         Assume.assumeTrue(AdiFunction.LOAD_LIBRARY_WITH_PATH + " did not resolve", function != 0);
 
-        final int result = NativeAdiProbe.loadLibraryWithPath(
+        final int result = NativeAdi.callWithPath(
                 function, libraryDir.getAbsolutePath());
 
         Log.i(TAG, "ADILoadLibraryWithPath returned " + result);

@@ -1,4 +1,4 @@
-package dev.wander.android.opentagviewer.poc;
+package dev.wander.android.opentagviewer.anisette;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -136,7 +136,7 @@ public class StubbedAdiLoadTest {
 
         for (final AdiFunction function : AdiFunction.values()) {
             assertTrue(function + " did not resolve",
-                    NativeAdiProbe.resolve(storeServicesCore, function.symbol()) != 0);
+                    NativeAdi.resolve(storeServicesCore, function.symbol()) != 0);
         }
     }
 
@@ -149,11 +149,11 @@ public class StubbedAdiLoadTest {
         assumeThePoCWasAskedFor();
         Assume.assumeTrue("libstoreservicescore.so did not load", storeServicesCore != 0);
 
-        final long function = NativeAdiProbe.resolve(
+        final long function = NativeAdi.resolve(
                 storeServicesCore, AdiFunction.LOAD_LIBRARY_WITH_PATH.symbol());
         Assume.assumeTrue(AdiFunction.LOAD_LIBRARY_WITH_PATH + " did not resolve", function != 0);
 
-        final int result = NativeAdiProbe.loadLibraryWithPath(
+        final int result = NativeAdi.callWithPath(
                 function, libraryDir.getAbsolutePath());
 
         Log.i(TAG, "ADILoadLibraryWithPath returned " + result
@@ -163,7 +163,7 @@ public class StubbedAdiLoadTest {
 
     private static long open(File library) {
         final long[] handle = new long[1];
-        final String error = NativeAdiProbe.open(library.getAbsolutePath(), handle);
+        final String error = NativeAdi.open(library.getAbsolutePath(), handle);
         if (error != null) {
             fail("dlopen(" + library.getName() + ") failed: " + error
                     + "\n  => if this names a missing symbol, the stub lists in "

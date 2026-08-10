@@ -1,4 +1,4 @@
-package dev.wander.android.opentagviewer.poc;
+package dev.wander.android.opentagviewer.anisette;
 
 /**
  * The ADI entry points exported by Apple's {@code libstoreservicescore.so}, and the obfuscated

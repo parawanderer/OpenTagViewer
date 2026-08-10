@@ -384,7 +384,7 @@ def missing_adi_functions(store_services_core: bytes) -> list[str]:
     source = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "app", "src", "main", "java", "dev", "wander", "android", "opentagviewer",
-        "poc", "AdiFunction.java")
+        "anisette", "AdiFunction.java")
 
     with open(source, encoding="utf-8") as handle:
         declared = re.findall(r'\(\s*"(ADI\w+)"\s*,\s*"(\w+)"\s*\)', handle.read())
