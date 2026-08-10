@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project("opentagviewer")
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        adi_probe.cpp)
+        adi.cpp)
 
 # dlopen/dlsym are in libc on Android, so there is no libdl to link explicitly.
 target_link_libraries(${CMAKE_PROJECT_NAME}
@@ -40,15 +40,25 @@ function(add_apple_stub library)
     set(symbols "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}.symbols")
     set(generated "${CMAKE_CURRENT_BINARY_DIR}/lib${library}_stub.c")
 
+    # Optional: symbols ADI is known to call harmlessly, which log at INFO rather than raising
+    # the alarm. A library without one treats every call as unexpected.
+    set(expected "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}.expected")
+
+    set(inputs "${symbols}" "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake")
+    if (EXISTS "${expected}")
+        list(APPEND inputs "${expected}")
+    endif ()
+
     add_custom_command(
             OUTPUT "${generated}"
             COMMAND ${CMAKE_COMMAND}
             -DSYMBOLS=${symbols}
+            -DEXPECTED=${expected}
             -DOUTPUT=${generated}
             -DLIBRARY=lib${library}.so
             -DSAFE=${library}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake"
-            DEPENDS "${symbols}" "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake"
+            DEPENDS ${inputs}
             COMMENT "Generating lib${library}.so stub from lib${library}.symbols"
             VERBATIM)
 

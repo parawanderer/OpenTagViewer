@@ -7,4 +7,31 @@
         If they want to be more secure they can set up HTTPS on their custom server.
     -->
     <base-config cleartextTrafficPermitted="true" />
+
+    <!--
+        Apple's Grand Slam endpoints, used to provision Anisette locally instead of sending
+        every login through a public Anisette server.
+
+        These present a chain rooted at the original "Apple Root CA", which Android does not
+        ship in its trust store, so the handshake fails with "Unacceptable certificate" against
+        the defaults. The reference implementation everyone else runs
+        (Dadoum/Provision) solves this by turning certificate verification off entirely. We do
+        not: this is an authentication flow, and disabling verification would make it
+        interceptable by anything on the network path.
+
+        Instead the one missing root is added, and only for these hosts. The certificate is
+        Apple's own, published at https://www.apple.com/appleca/, SHA-256
+        b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024, and stored as PEM
+        text rather than a binary .cer so it can be reviewed in a diff.
+
+        "system" is kept alongside it so the usual roots still apply - this adds a trust
+        anchor, it does not replace them.
+    -->
+    <domain-config>
+        <domain includeSubdomains="false">gsa.apple.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/apple_root_ca" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>

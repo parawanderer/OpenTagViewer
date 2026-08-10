@@ -13,6 +13,13 @@
 # answers. Functions that return structs by value would not be handled correctly; if any turn
 # out to be called, they need writing by hand.
 
+# Run with cmake -P, which does not inherit the project's policies. Without this, IN_LIST is
+# treated as a plain argument rather than an operator (CMP0057) and the expected-symbol lookup
+# fails to parse.
+cmake_minimum_required(VERSION 3.22)
+
+set(LIBRARY_BASE "lib${SAFE}")
+
 if (NOT DEFINED SYMBOLS OR NOT DEFINED OUTPUT OR NOT DEFINED LIBRARY OR NOT DEFINED SAFE)
     message(FATAL_ERROR
             "generate_stub.cmake needs -DSYMBOLS, -DOUTPUT, -DLIBRARY and -DSAFE "
@@ -41,6 +48,15 @@ set(body
         "\n"
         "static atomic_int calls = 0\;\n"
         "\n"
+        "// Known to be called, and known to be harmless - see ${LIBRARY_BASE}.expected for the\n"
+        "// evidence behind each one. Logged, but not counted against the session, because an\n"
+        "// alarm that fires on every successful run is one nobody reads.\n"
+        "static void stub_called_expected(const char *name) {\n"
+        "    __android_log_print(ANDROID_LOG_INFO, \"adi-stub\",\n"
+        "        \"%s was called and returned 0, which is expected here \"\n"
+        "        \"(see app/src/main/cpp/stubs/${LIBRARY_BASE}.expected)\", name)\;\n"
+        "}\n"
+        "\n"
         "static void stub_called(const char *name) {\n"
         "    atomic_fetch_add(&calls, 1)\;\n"
         "    __android_log_print(ANDROID_LOG_ERROR, \"adi-stub\",\n"
@@ -61,9 +77,23 @@ set(body
         "int ${SAFE}_adi_stub_calls(void) { return atomic_load(&calls)\; }\n"
         "\n")
 
+# Symbols ADI is known to call harmlessly. Optional - a library with no .expected file simply
+# treats every call as unexpected, which is the right default for one we have not observed.
+set(expected_symbols "")
+if (EXISTS "${EXPECTED}")
+    file(STRINGS "${EXPECTED}" expected_lines)
+    foreach (expected_line IN LISTS expected_lines)
+        if (NOT expected_line MATCHES "^#" AND NOT expected_line STREQUAL "")
+            string(SUBSTRING "${expected_line}" 2 -1 expected_name)
+            list(APPEND expected_symbols "${expected_name}")
+        endif ()
+    endforeach ()
+endif ()
+
 set(index 0)
 set(functions 0)
 set(objects 0)
+set(expected_count 0)
 
 foreach (line IN LISTS lines)
     # Skip comments and blanks.
@@ -75,10 +105,16 @@ foreach (line IN LISTS lines)
     string(SUBSTRING "${line}" 2 -1 name)
 
     if (kind STREQUAL "F")
+        set(reporter "stub_called")
+        if ("${name}" IN_LIST expected_symbols)
+            set(reporter "stub_called_expected")
+            math(EXPR expected_count "${expected_count} + 1")
+        endif ()
+
         # The asm label has to be on a declaration that precedes the definition.
         list(APPEND body
                 "extern long stub_${index}(void) __asm__(\"${name}\")\;\n"
-                "long stub_${index}(void) { stub_called(\"${name}\")\; return 0\; }\n")
+                "long stub_${index}(void) { ${reporter}(\"${name}\")\; return 0\; }\n")
         math(EXPR functions "${functions} + 1")
     else ()
         # Size is a guess - these are things like kCFTypeArrayCallBacks, which are read by
@@ -95,4 +131,5 @@ endforeach ()
 string(JOIN "" contents ${body})
 file(WRITE "${OUTPUT}" "${contents}")
 
-message(STATUS "${LIBRARY}: generated ${functions} function stubs and ${objects} data stubs")
+message(STATUS "${LIBRARY}: generated ${functions} function stubs and ${objects} data stubs "
+        "(${expected_count} known to be called harmlessly)")

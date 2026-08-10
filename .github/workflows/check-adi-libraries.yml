@@ -103,7 +103,7 @@ jobs:
           \`\`\`
           ./gradlew :app:testEmulatorDebugAndroidTest \\
             -Pandroid.testInstrumentationRunnerArguments.adiPoc=true \\
-            -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.poc.StubbedAdiLoadTest
+            -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.anisette.StubbedAdiLoadTest
           \`\`\`
 
           Watch logcat for the tag \`adi-stub\`. Anything logged there is a function ADI now
