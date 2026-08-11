@@ -131,7 +131,7 @@ wizard).
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop wizard tests | `python/test/` | pytest | no |
-| String tooling tests | `scripts/test/` | pytest | no |
+| Tooling tests | `scripts/test/` | pytest | no |
 
 ### Run everything
 
@@ -253,8 +253,15 @@ python scripts/update_adi_stub_symbols.py --check   # what CI runs weekly
 
 ### Android unit tests
 
-Plain JVM, no Android framework. Be aware there is currently almost nothing here — the
-meaningful coverage is instrumented, so a green `test` run says very little.
+Plain JVM, no Android framework, so these are the fastest tests in the project — seconds, no
+emulator.
+
+Most of what lives here is in `util/rx/`: the stream compositions and decision logic behind
+the map, extracted out of `MapsActivity` precisely so it could be tested. They assert that a
+call *happens* rather than that a value looks right, because the failures in this area are
+silent — a stream disposed early, a marker that stops being raised, a fetch that returns
+nothing being indistinguishable from a fetch that failed. None of those throw, and none show
+up in logcat.
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -295,17 +302,21 @@ python -m pytest ./test
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
-### Translation string tooling tests
-
-These tests cover the utility script that is primarily designed to let AI coding agents add
-translations easily without running into encoding errors or forgetting some keys:
+### Tooling tests
 
 ```bash
 python -m pytest scripts/test -v
 ```
 
-`scripts/add_strings.py` gates CI's translation check, so a bug in it would report green
-while protecting nothing.
+Most of `scripts/` is one-shot utilities where a failure is loud and immediate to whoever ran
+them, and tests would not earn their keep. These three are different, because each one guards
+something else and a bug in a guard reports green while protecting nothing:
+
+| Script | What it gates |
+| --- | --- |
+| `add_strings.py` | CI's translation check |
+| `exporter_version.py` | whether a release tag may disagree with the version in the source |
+| `release_notes.py` | the notes of a *published* release, so a parsing mistake is visible to everyone |
 
 ### Which Python each tree targets
 
@@ -540,9 +551,28 @@ So a release is two steps, in this order:
 git commit -am "Bump the macOS exporter to 1.0.6"
 git push origin main
 
-# 2. Tag that commit and publish the release
-gh release create macos-exporter-v1.0.6 --title "OpenTagViewer MacOS AirTag Exporter 1.0.6"
+# 2. Write the changes for this version, then create the release as a draft
+python scripts/release_notes.py draft --kind exporter --changes-file notes.md --dry-run
+python scripts/release_notes.py draft --kind exporter --changes-file notes.md
+
+# 3. Publish it from the GitHub UI, then collapse the release it replaced
+python scripts/release_notes.py demote --kind exporter
 ```
+
+`release_notes.py` exists because the release pages follow a convention that is easy to get
+half-right: only the newest release carries the full wrapper — description, screenshot,
+feature list, wiki link — and the one it replaces gets stripped back to its first line with
+its changes folded into a collapsed `<details>` block. The half that gets forgotten is the
+demotion, and nobody notices until two releases both look current.
+
+The wrapper is never stored in the script. It is read from the release being superseded and
+carried forward, which is what copying the previous body does by hand — so editing the wording
+on the latest release is enough to change it for the next one. The version comes from
+`VERSION`, and the tag from that, so neither can be typed wrong. `--kind android` does the
+same for the app releases.
+
+The draft is deliberate: the release workflow triggers on `published`, so nothing builds or
+ships until someone clicks the button.
 
 The tag must be `macos-exporter-v` followed by exactly what `VERSION` says. Before either
 build job starts, `test-release-version` runs:
