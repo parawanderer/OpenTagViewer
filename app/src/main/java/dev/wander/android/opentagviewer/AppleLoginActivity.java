@@ -49,7 +49,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.AppleAuthService;
-import dev.wander.android.opentagviewer.python.LoginDependencies;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
@@ -168,13 +168,13 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this::onAnisetteUrlInputTyped
         );
 
-        this.anisetteServerTesterService = LoginDependencies.serverTester(cronet);
+        this.anisetteServerTesterService = AppDependencies.serverTester(cronet);
 
-        this.authService = LoginDependencies.authService();
+        this.authService = AppDependencies.authService();
 
         // Nobody is signed in on this screen, so an unchosen mode means local: there is no
         // existing session whose machine identity has to be preserved.
-        this.localAnisette = LoginDependencies.anisette(this, this.getUserSettings(), false);
+        this.localAnisette = AppDependencies.anisette(this, this.getUserSettings(), false);
 
         this.twoFactorEntryManager = new Apple2FACodeInputManager(this, this::on2FAAuthCodeFilled);
 
