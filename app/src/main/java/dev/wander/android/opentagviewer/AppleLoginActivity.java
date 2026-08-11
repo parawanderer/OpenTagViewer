@@ -860,10 +860,47 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void sendToMapActivity() {
+        this.recordHowThisSessionWasEstablished();
+
         this.model.resetUiState();
         this.finish();
         Intent intent = new Intent(this, MapsActivity.class);
         startActivity(intent);
+    }
+
+    /**
+     * Write down what actually produced this session, now that there is one.
+     *
+     * <p>Without this, a brand-new sign-in leaves the mode unchosen - and "signed in with no
+     * mode chosen" is exactly how somebody updating from an older version looks. So a person
+     * who had just signed in using Anisette from their own phone was offered the chance to
+     * switch to Anisette from their own phone, at the price of signing in again. It also left
+     * Settings with nothing to show under "Anisette Provider", because the only thing it had
+     * to show was a server URL that a local sign-in never sets.
+     *
+     * <p>This does not defeat the null-is-meaningful rule in {@link UserSettings}: null still
+     * means nobody has decided, and someone who updated from a version without any of this
+     * never ran this code, so they keep it and still get asked once.
+     *
+     * <p>Also records provenance on the source itself, which is what lets a later fall-back to
+     * a server report itself rather than presenting as auth failing for no reason.
+     */
+    private void recordHowThisSessionWasEstablished() {
+        // What was handed to Python, rather than asking again: ensureReady() blocks, and this
+        // runs on the main thread at the end of a sign-in.
+        final boolean establishedLocally =
+                this.localAnisetteStatus.state() == AnisetteStatus.State.READY;
+
+        if (this.localAnisette != null) {
+            this.localAnisette.recordSessionProvenance(establishedLocally);
+        }
+
+        this.getUserSettings().setAnisetteMode(establishedLocally
+                ? UserSettings.ANISETTE_LOCAL : UserSettings.ANISETTE_REMOTE);
+        this.saveSettings();
+
+        Log.i(TAG, "session established with "
+                + (establishedLocally ? "local" : "remote") + " Anisette");
     }
 
     private LoginActivityState getUiState() {

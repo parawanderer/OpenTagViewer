@@ -150,12 +150,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setOnClickLanguage(this::onClickEditLanguage);
         this.binding.setCurrentLanguage(Optional.ofNullable(this.currentSettings.getLanguage()).map(this::getPrettyLanguageName).orElse(this.getString(R.string.use_system_default)));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
-        // Anyone on this screen is signed in, so an unchosen mode means they came from a
-        // version that only had servers, and stay on theirs until they say otherwise.
-        this.binding.setCurrentAnisetteServerUrl(
-                this.currentSettings.usesLocalAnisette(true)
-                        ? this.getString(R.string.anisette_mode_local)
-                        : this.currentSettings.getAnisetteServerUrl());
+        this.binding.setCurrentAnisetteServerUrl(this.getAnisetteProviderSummary());
         this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
@@ -404,6 +399,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         final String current = this.currentSettings.resolveAnisetteMode(true);
         SharedMainSettingsManager.applyAnisetteMode(view, current);
+        // Nothing has changed yet, so there is nothing to warn about yet.
+        SharedMainSettingsManager.applyChangeWarning(view, false);
 
         modeDropdown.setOnItemClickListener((parent, v, position, id) -> {
             final String selected = position == 1
@@ -412,6 +409,9 @@ public class SettingsActivity extends AppCompatActivity {
             modeDropdown.clearFocus();
             SharedMainSettingsManager.applyAnisetteMode(view, selected);
             this.pendingAnisetteMode = selected;
+            // Warn about the re-sign-in only once they have actually picked something else,
+            // and take it back if they pick their original mode again.
+            SharedMainSettingsManager.applyChangeWarning(view, !selected.equals(current));
         });
 
         this.loadLocalAnisetteStatus(view);
@@ -594,6 +594,26 @@ public class SettingsActivity extends AppCompatActivity {
                                 error));
     }
 
+    /**
+     * What the Anisette row says underneath its title.
+     *
+     * <p>Never blank. It used to be the stored server URL, which is null for anybody who has
+     * only ever signed in with Anisette from their own device - they never visit the step that
+     * sets it - so the row sat there with a heading and nothing under it. Falling back to the
+     * mode's own name says something true in every case.
+     */
+    private String getAnisetteProviderSummary() {
+        // Anyone on this screen is signed in, so an unchosen mode means they came from a
+        // version that only had servers, and stay on theirs until they say otherwise.
+        if (this.currentSettings.usesLocalAnisette(true)) {
+            return this.getString(R.string.anisette_mode_local);
+        }
+
+        final String url = this.currentSettings.getAnisetteServerUrl();
+        return url == null || url.isBlank()
+                ? this.getString(R.string.anisette_mode_remote) : url;
+    }
+
     /** Open one of the reference links in app.properties, or do nothing if it is not set. */
     private void openConfiguredLink(final String property) {
         final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
@@ -730,10 +750,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         this.currentSettings.setAnisetteServerUrl(validNewAnisetteUrl);
-        this.binding.setCurrentAnisetteServerUrl(
-                this.currentSettings.usesLocalAnisette(true)
-                        ? this.getString(R.string.anisette_mode_local)
-                        : validNewAnisetteUrl);
+        this.binding.setCurrentAnisetteServerUrl(this.getAnisetteProviderSummary());
         this.saveSettings();
 
         var originalUrl = Optional.ofNullable(this.initialAnisetteUrl);

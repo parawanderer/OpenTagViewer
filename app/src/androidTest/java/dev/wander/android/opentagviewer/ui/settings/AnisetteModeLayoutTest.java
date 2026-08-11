@@ -215,6 +215,45 @@ public class AnisetteModeLayoutTest {
         assertEquals(View.VISIBLE, section(R.id.anisetteClearApkButton).getVisibility());
     }
 
+    /**
+     * The re-sign-in warning waits until there is a change to warn about.
+     *
+     * <p>It used to be visible the moment the dialog opened, announcing the consequence of
+     * something nobody had done - on a screen most people open to look rather than to edit. A
+     * warning that is always on is one nobody reads by the time it means something.
+     */
+    @Test
+    public void theReSignInWarningIsNotShownUntilSomethingChanges() {
+        applyChangeWarning(false);
+
+        assertEquals("nothing has been changed yet",
+                View.GONE, section(R.id.anisetteChangeWarningContainer).getVisibility());
+    }
+
+    /** And appears as soon as there is. */
+    @Test
+    public void changingTheModeWarnsAboutTheReSignIn() {
+        applyChangeWarning(true);
+
+        assertEquals(View.VISIBLE,
+                section(R.id.anisetteChangeWarningContainer).getVisibility());
+    }
+
+    /** Changing back is not a change, so the warning goes away again. */
+    @Test
+    public void goingBackToTheOriginalModeTakesTheWarningAway() {
+        applyChangeWarning(true);
+        applyChangeWarning(false);
+
+        assertEquals(View.GONE,
+                section(R.id.anisetteChangeWarningContainer).getVisibility());
+    }
+
+    private void applyChangeWarning(final boolean changing) {
+        getInstrumentation().runOnMainSync(
+                () -> SharedMainSettingsManager.applyChangeWarning(this.dialog, changing));
+    }
+
     private void applyStatus(final AnisetteStatus status) {
         applyStatus(status, false);
     }

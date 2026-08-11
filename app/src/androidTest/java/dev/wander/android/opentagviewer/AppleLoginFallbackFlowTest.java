@@ -14,6 +14,7 @@ import static org.hamcrest.Matchers.not;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -180,7 +181,29 @@ public class AppleLoginFallbackFlowTest {
         onView(withId(R.id.anisetteRemoteSection)).check(matches(not(isDisplayed())));
     }
 
+    /**
+     * A sign-in that went through a server is recorded as one.
+     *
+     * <p>The mirror of the local case, and written for the same reason: the stored mode decides
+     * what Settings shows and whether the upgrade prompt applies. Recording this as local would
+     * tell somebody their sign-in never leaves the device, when it just did.
+     */
+    @Test
+    public void aSignInThroughAServerIsRecordedAsRemote() {
+        launch();
+        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(click()));
+        signIn();
+
+        eventually(() -> assertEquals(UserSettings.ANISETTE_REMOTE,
+                storedSettings().getAnisetteMode()));
+    }
+
     // ------------------------------------------------------------------------------------
+
+    private static UserSettings storedSettings() {
+        return new UserSettingsRepository(UserSettingsDataStore.getInstance(
+                getInstrumentation().getTargetContext())).getUserSettings();
+    }
 
     private void launch() {
         this.scenario = ActivityScenario.launch(AppleLoginActivity.class);

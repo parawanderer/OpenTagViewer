@@ -52,11 +52,13 @@
         -->
         <FrameLayout
             android:layout_width="match_parent"
+            android:id="@+id/anisetteChangeWarningContainer"
             android:layout_height="match_parent"
             android:layout_marginTop="10dp"
             android:background="@drawable/layout_rounded_less"
             android:backgroundTint="@color/md_theme_errorContainer"
-            android:padding="10dp">
+            android:padding="10dp"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/anisette_url_change_warning"

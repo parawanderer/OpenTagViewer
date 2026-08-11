@@ -326,6 +326,26 @@ public class SharedMainSettingsManager {
     }
 
     /**
+     * Warn about the re-sign-in, but only once there is something to warn about.
+     *
+     * <p>It used to be on from the moment the dialog opened, so it announced the consequence
+     * of a change nobody had made - on a screen most people open to look rather than to edit.
+     * A warning that is always there is one nobody reads by the time it matters.
+     *
+     * @param changing whether the mode or the server actually differs from what is stored
+     */
+    public static void applyChangeWarning(final View root, final boolean changing) {
+        if (root == null) {
+            return;
+        }
+
+        final View warning = root.findViewById(R.id.anisetteChangeWarningContainer);
+        if (warning != null) {
+            warning.setVisibility(changing ? VISIBLE : GONE);
+        }
+    }
+
+    /**
      * Say why a chosen APK was refused, or clear a previous refusal.
      *
      * <p>Shown in the dialog rather than as a toast. The reason names the library whose hash
