@@ -95,6 +95,21 @@
             android:textColor="@color/md_theme_outline"
             android:textSize="13sp" />
 
+        <!--
+            Why a chosen file was refused. Here rather than in a toast: the reason names the
+            library that did not match, which is two lines of text, and Android truncates a
+            toast at two lines and then takes it away. Somebody deciding whether to go and find
+            a different copy needs to be able to read it twice.
+        -->
+        <TextView
+            android:id="@+id/anisetteApkRejection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/md_theme_error"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

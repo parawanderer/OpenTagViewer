@@ -474,6 +474,7 @@ public class SettingsActivity extends AppCompatActivity {
     private void importAnisetteApk(final Uri apk) {
         final View view = this.anisetteDialogView;
         if (view != null) {
+            SharedMainSettingsManager.applyApkRejection(view, null);
             SharedMainSettingsManager.applyLocalAnisetteStatus(
                     view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
         }
@@ -488,9 +489,13 @@ public class SettingsActivity extends AppCompatActivity {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(problem -> {
                     if (problem.isPresent()) {
-                        Toast.makeText(this, this.getString(
-                                R.string.anisette_apk_rejected, problem.get()),
-                                Toast.LENGTH_LONG).show();
+                        // The status has to be put back, not merely left. The spinner was
+                        // turned on for this import, and returning without restoring it left
+                        // the dialog saying "Checking..." for ever after a refused file.
+                        if (view != null) {
+                            SharedMainSettingsManager.applyApkRejection(view, problem.get());
+                            this.loadLocalAnisetteStatus(view);
+                        }
                         return;
                     }
 
@@ -514,6 +519,8 @@ public class SettingsActivity extends AppCompatActivity {
      * network for files that are already there.
      */
     private void forgetTheSuppliedApk(final View view) {
+        SharedMainSettingsManager.applyApkRejection(view, null);
+
         var async = Observable.fromCallable(() -> {
                     final String abi = Build.SUPPORTED_ABIS[0];
                     final File directory = LocalAnisette.libraryDirectory(this, abi);
