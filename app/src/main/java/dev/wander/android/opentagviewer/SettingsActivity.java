@@ -64,6 +64,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -564,7 +565,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         var async = Observable.fromCallable(() -> {
                     final AnisetteSource source =
-                            new LocalAnisette(this, this.currentSettings, true);
+                            AppDependencies.anisette(this, this.currentSettings, true);
                     final AnisetteStatus status = AnisetteStatus.of(source);
 
                     // Read here rather than on the main thread: it opens an asset.

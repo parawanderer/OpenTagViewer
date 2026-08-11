@@ -38,7 +38,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
-import dev.wander.android.opentagviewer.python.LoginDependencies;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.service.web.FakeAnisetteServerTester;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
@@ -75,9 +75,9 @@ public class AppleLoginFallbackFlowTest {
         this.apple = FakeAppleAuthService.signsInImmediately();
         this.server = FakeAnisetteServerTester.thatIsUp();
 
-        LoginDependencies.replaceAuthService(this.apple);
-        LoginDependencies.replaceServerTester(this.server);
-        LoginDependencies.replaceAnisette(settings ->
+        AppDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceServerTester(this.server);
+        AppDependencies.replaceAnisette(settings ->
                 FakeAnisetteSource.unavailable("Unable to resolve host apps.mzstatic.com"));
 
         Intents.init();
@@ -91,7 +91,7 @@ public class AppleLoginFallbackFlowTest {
             this.scenario.close();
         }
         Intents.release();
-        LoginDependencies.reset();
+        AppDependencies.reset();
 
         getInstrumentation().waitForIdleSync();
         signEverybodyOut();
@@ -157,7 +157,7 @@ public class AppleLoginFallbackFlowTest {
      */
     @Test
     public void aWorkingDeviceIsNeverTakenThroughTheServerStep() {
-        LoginDependencies.replaceAnisette(settings -> FakeAnisetteSource.ready());
+        AppDependencies.replaceAnisette(settings -> FakeAnisetteSource.ready());
 
         launch();
 

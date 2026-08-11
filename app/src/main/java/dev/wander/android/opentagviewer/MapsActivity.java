@@ -89,6 +89,7 @@ import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
@@ -853,7 +854,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     userAuth.get(),
                     // Somebody is signed in here, so an unchosen mode keeps them on whatever
                     // already works: switching would present Apple with a different machine.
-                    new LocalAnisette(this, this.userSettings, true))
+                    AppDependencies.anisette(this, this.userSettings, true))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
                 return this.appleService;

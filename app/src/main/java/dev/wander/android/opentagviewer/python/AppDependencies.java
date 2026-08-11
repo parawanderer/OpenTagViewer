@@ -30,9 +30,9 @@ import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
  * this codebase for one screen. Production never calls the setters; they are for tests, and
  * {@link #reset()} in a teardown puts the real ones back.
  */
-public final class LoginDependencies {
+public final class AppDependencies {
 
-    private LoginDependencies() {}
+    private AppDependencies() {}
 
     private static AppleAuthService authService = new PythonAppleAuthService();
 

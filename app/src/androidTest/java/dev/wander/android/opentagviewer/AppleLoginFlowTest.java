@@ -36,7 +36,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
-import dev.wander.android.opentagviewer.python.LoginDependencies;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
@@ -53,7 +53,7 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
  * <p>What is real here is everything that has ever broken: the activity, its layouts, its view
  * model, the page transitions, the code-entry behaviour, and the encrypted store the session
  * ends up in. Only Apple and Anisette are substituted, through
- * {@link LoginDependencies}.
+ * {@link AppDependencies}.
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
@@ -71,10 +71,10 @@ public class AppleLoginFlowTest {
         signEverybodyOut();
 
         this.apple = FakeAppleAuthService.wantsTwoFactor();
-        LoginDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceAuthService(this.apple);
         // Ready, so the screen never downloads Apple's ADI libraries or asks a server about
         // anything. The states where it is not ready have their own tests.
-        LoginDependencies.replaceAnisette(settings -> FakeAnisetteSource.ready());
+        AppDependencies.replaceAnisette(settings -> FakeAnisetteSource.ready());
 
         Intents.init();
         // The map is the end of this flow and the point of reaching it, but it needs Play
@@ -94,7 +94,7 @@ public class AppleLoginFlowTest {
             this.scenario.close();
         }
         Intents.release();
-        LoginDependencies.reset();
+        AppDependencies.reset();
 
         // Cleared on the way out as well as on the way in. Most of these tests finish a
         // sign-in, which stores a session, and the next test's screen would then redirect
@@ -197,7 +197,7 @@ public class AppleLoginFlowTest {
     @Test
     public void anAccountThatNeedsNoSecondFactorGoesStraightToTheMap() {
         this.apple = FakeAppleAuthService.signsInImmediately();
-        LoginDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceAuthService(this.apple);
 
         launch();
         signIn();
@@ -216,7 +216,7 @@ public class AppleLoginFlowTest {
     @Test
     public void awrongPasswordLeavesThemAbleToTryAgain() {
         this.apple = FakeAppleAuthService.rejectsTheSignIn("Bad password");
-        LoginDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceAuthService(this.apple);
 
         launch();
         signIn();
@@ -230,7 +230,7 @@ public class AppleLoginFlowTest {
     @Test
     public void aWrongCodeIsReportedAndTheBoxesComeBack() {
         this.apple = FakeAppleAuthService.wantsTwoFactor().thatRejectsTheCode("Wrong code");
-        LoginDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceAuthService(this.apple);
 
         launch();
         signIn();
@@ -251,7 +251,7 @@ public class AppleLoginFlowTest {
     @Test
     public void anAccountWithNoPhoneNumbersOffersOnlyTheTrustedDevice() {
         this.apple = FakeAppleAuthService.wantsTwoFactorFromATrustedDeviceOnly();
-        LoginDependencies.replaceAuthService(this.apple);
+        AppDependencies.replaceAuthService(this.apple);
 
         launch();
         signIn();
@@ -270,7 +270,7 @@ public class AppleLoginFlowTest {
     @Test
     public void theSignInUsesLocalAnisetteAndStillCarriesAFallbackServer() {
         final var fakeAnisette = FakeAnisetteSource.ready();
-        LoginDependencies.replaceAnisette(settings -> fakeAnisette);
+        AppDependencies.replaceAnisette(settings -> fakeAnisette);
 
         launch();
         signIn();
