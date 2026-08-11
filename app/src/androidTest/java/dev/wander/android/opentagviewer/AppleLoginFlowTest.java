@@ -34,7 +34,10 @@ import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
+import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
+import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
@@ -117,6 +120,11 @@ public class AppleLoginFlowTest {
      * could therefore see an empty store that is about to be written to, so this insists on
      * seeing it empty a few times running before believing it.
      */
+    private static UserSettings storedSettings() {
+        return new UserSettingsRepository(UserSettingsDataStore.getInstance(
+                getInstrumentation().getTargetContext())).getUserSettings();
+    }
+
     private static void signEverybodyOut() {
         final UserAuthRepository auth = new UserAuthRepository(
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
@@ -197,6 +205,30 @@ public class AppleLoginFlowTest {
         assertEquals("the code belongs to the number Apple texted",
                 FakeAppleAuthService.PHONE_TWO,
                 ((AuthMethodPhone) apple.codeSubmittedAgainst()).getPhoneNumber());
+    }
+
+    /**
+     * A fresh sign-in records that it was local, and is therefore never offered the upgrade.
+     *
+     * <p>This is the bug that shipped to an emulator and looked like the app being broken.
+     * Nothing wrote the mode when a session was created, so a brand-new user was left "signed
+     * in with no mode chosen" - which is exactly how somebody updating from an older version
+     * looks. They were then offered the chance to switch to Anisette from their own phone,
+     * having just signed in using Anisette from their own phone, at the price of signing in
+     * again. Settings had nothing to show under the provider row for the same reason.
+     */
+    @Test
+    public void aFreshSignInIsRecordedAsLocalAndIsNotOfferedAnUpgrade() {
+        this.apple = FakeAppleAuthService.signsInImmediately();
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        eventually(() -> assertEquals("the mode has to be written down once there is a session",
+                UserSettings.ANISETTE_LOCAL, storedSettings().getAnisetteMode()));
+        assertFalse("nobody should be offered an upgrade to what they just signed in with",
+                storedSettings().shouldOfferLocalAnisette(true));
     }
 
     /** Somebody already trusted skips the second factor entirely. */

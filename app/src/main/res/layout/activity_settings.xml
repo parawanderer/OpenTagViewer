@@ -78,7 +78,7 @@
                 layout="@layout/settings_item_clickable"
                 app:icon="@{@drawable/host_24px}"
                 app:sectionSubtitle="@{currentAnisetteServerUrl}"
-                app:title="@{@string/anisette_mode_title}"
+                app:title="@{@string/anisette_provider}"
                 app:onClick="@{onClickAnisetteServerUrl}"
                 />
 
