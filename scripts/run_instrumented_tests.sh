@@ -2,12 +2,28 @@
 #
 # Run the instrumented tests on an emulator, and recover from a wedged one.
 #
+# By default this runs on the Gradle managed device, which Gradle provisions and tears down
+# itself. Two reasons that is the default rather than connectedAndroidTest against an emulator
+# you started by hand:
+#
+#   - Espresso will not touch a window that lacks focus, and a guest window only has focus
+#     while the emulator's own window has focus on the host desktop. So clicking anything in a
+#     UI test fails with RootViewWithoutFocusException the moment you alt-tab away from it.
+#   - The wedged-bridge problem below does not arise, because there is no connection left over
+#     between runs to go stale.
+#
+# GRADLE_TASK=:app:connectedDebugAndroidTest still works, and everything below is for it.
+#
 # The Android Gradle Plugin talks to devices over a long-lived ADB bridge that the Gradle
 # daemon holds across invocations. When the emulator's adb daemon dies or goes stale, that
 # handle is not reconnected: the next run fails to install, or hangs outright, with an error
 # that has nothing to do with the code under test. Restarting the emulator fixes it, but only
 # if the Gradle daemon is also stopped - otherwise it hands out the same dead bridge again.
 # That is the whole reason this script exists.
+#
+# Retries are only for that. Once tests have actually run and reported, a failure is a failure:
+# the emulator is left alone and the run stops, rather than repeating the whole suite and a
+# two-minute emulator restart to reach the same answer.
 #
 # It pins ANDROID_SERIAL to an emulator so a run can never install to a physical phone.
 #
@@ -31,7 +47,15 @@ SERIAL="${SERIAL:-emulator-5554}"
 ATTEMPTS="${ATTEMPTS:-2}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-900}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-300}"
-GRADLE_TASK="${GRADLE_TASK:-:app:connectedDebugAndroidTest}"
+GRADLE_TASK="${GRADLE_TASK:-:app:testEmulatorDebugAndroidTest}"
+
+# A managed device is provisioned, booted and torn down by Gradle itself, so none of the
+# emulator handling below applies to it - and must not run, or it would kill an emulator that
+# has nothing to do with the run.
+case "$GRADLE_TASK" in
+    *testEmulator*) MANAGED_DEVICE=1 ;;
+    *)              MANAGED_DEVICE=0 ;;
+esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -169,6 +193,9 @@ reset_toolchain() {
 }
 
 ensure_emulator() {
+    if (( MANAGED_DEVICE )); then
+        return 0
+    fi
     if timeout 20 "$ADB" devices 2>/dev/null | grep -q "^${SERIAL}[[:space:]]*device$" && emulator_is_booted; then
         return 0
     fi
@@ -182,6 +209,20 @@ ensure_emulator() {
 
 # Pinned so a run can never install onto a physical device that happens to be plugged in.
 export ANDROID_SERIAL="$SERIAL"
+
+RESULTS_DIR="app/build/outputs/androidTest-results"
+
+# Did this attempt actually get as far as running tests?
+#
+# This is what separates "the code is broken" from "the toolchain is broken". A wedged bridge
+# fails during install, before any test executes, and leaves no fresh results behind; a real
+# failure leaves a report. Retrying the first is the point of this script. Retrying the second
+# runs the whole suite a second time to reach the same answer, and restarts a perfectly healthy
+# emulator on the way - which is slower than the test run itself.
+tests_actually_ran() {
+    local since="$1"
+    [[ -n "$(find "$RESULTS_DIR" -name '*.xml' -newer "$since" 2>/dev/null)" ]]
+}
 
 run_tests() {
     log "Running $GRADLE_TASK on $SERIAL (timeout ${RUN_TIMEOUT}s)"
@@ -203,33 +244,47 @@ for (( attempt = 1; attempt <= ATTEMPTS; attempt++ )); do
         break
     fi
 
+    # A file to compare result timestamps against, so "fresh" means "from this attempt".
+    started_at="$(mktemp)"
+
     run_tests
     status=$?
 
     if (( status == 0 )); then
         log "Instrumented tests passed"
+        rm -f "$started_at"
         overall=0
         break
     fi
 
     if (( status == 124 )); then
         warn "Run exceeded ${RUN_TIMEOUT}s and was killed - treating the emulator as wedged"
+    elif tests_actually_ran "$started_at"; then
+        # The device was healthy enough to install, launch and report. Nothing about the
+        # emulator is going to change the answer, so do not spend another full run and an
+        # emulator restart arriving at it again.
+        warn "Tests ran and failed - this is a test failure, not a wedged emulator"
+        rm -f "$started_at"
+        break
     else
-        warn "Run failed with exit code $status"
+        warn "Run failed with exit code $status before any test reported"
     fi
 
-    # A genuine test failure is worth reporting as-is; a wedged toolchain is worth retrying.
-    # We cannot reliably tell them apart from the exit code alone, so retry either way and let
-    # the second run's report be the answer. A real failure simply fails twice.
+    rm -f "$started_at"
+
     if (( attempt < ATTEMPTS )); then
-        warn "Restarting the emulator and trying again"
-        stop_emulator
-        reset_toolchain
+        if (( MANAGED_DEVICE )); then
+            warn "Retrying (Gradle owns this device, so there is nothing here to restart)"
+        else
+            warn "Restarting the emulator and trying again"
+            stop_emulator
+            reset_toolchain
+        fi
     fi
 done
 
 if (( overall != 0 )); then
-    warn "Instrumented tests did not pass after $ATTEMPTS attempt(s)"
+    warn "Instrumented tests did not pass"
     warn "Report: app/build/reports/androidTests/connected/debug/index.html"
 fi
 

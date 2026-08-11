@@ -130,17 +130,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # The same Gradle managed device developers run locally, rather than a second emulator
+      # defined only here. Gradle provisions and tears it down itself, so there is no action to
+      # keep in step with the AVD in app/build.gradle.kts - and "it passed locally" means it
+      # passed on this device.
       - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          ram-size: 4096M
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew connectedDebugAndroidTest --console=plain
+        run: ./gradlew :app:testEmulatorDebugAndroidTest --console=plain
 
       - name: Upload test reports
         if: always()

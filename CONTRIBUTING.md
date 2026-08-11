@@ -26,6 +26,9 @@ the [command line tools](https://developer.android.com/studio#command-tools), an
 
 ### Clone and configure
 
+<details>
+<summary>How to clone and initially configure the project...</summary>
+
 ```bash
 git clone https://github.com/parawanderer/OpenTagViewer.git
 cd OpenTagViewer
@@ -46,7 +49,12 @@ supplies a placeholder so a fresh clone still compiles.
 If you would rather not deal with a key at all, AMap works without one at build time — users
 supply their own in Settings — though it only covers mainland China.
 
+</details>
+
 ### Install the git hook
+
+<details>
+<summary>How to setup the git hook...</summary>
 
 Hooks are not versioned, so this is once per clone:
 
@@ -66,7 +74,16 @@ Optional but recommended for Python work:
 python -m pip install flake8 pyright
 ```
 
+</details>
+
 ### If you use a coding agent, install `gh`
+
+
+<details>
+<summary>Notes on setting up <code>gh</code> CLI, especially for coding agent users...</summary>
+
+
+Ensure you are logged in to `gh` when working on the project:
 
 ```bash
 gh auth login
@@ -82,6 +99,8 @@ commands, including how to read a failure while the rest of the run is still goi
 Note that `gh` authenticates separately from git: `gh` can be logged in while `git push`
 still fails, if your remote is HTTPS with no cached credential, or SSH with a
 passphrase-protected key and no agent running.
+
+</details>
 
 ### Build it
 
@@ -108,6 +127,8 @@ wizard).
 | --- | --- | --- | --- |
 | Android unit tests | `app/src/test/java/` | Gradle / JUnit | no |
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
+| Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
+| UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop wizard tests | `python/test/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
@@ -157,9 +178,32 @@ The device is defined in `testOptions { managedDevices { ... } }` in `app/build.
 and uses an `aosp-atd` image, which has **no Play Services** — a test that needs Maps would
 need a `google` image.
 
-To run against a device you already have, `scripts/run_instrumented_tests.sh` pins
-`ANDROID_SERIAL` so a run cannot install to a physical phone, and restarts the emulator and
-the Gradle daemon if a run wedges.
+> [!WARNING]
+> `connectedDebugAndroidTest` **uninstalls the app afterwards**, taking its session, settings
+> and every imported beacon with it. `allowBackup` is false, so on a real device that is gone
+> for good. Use a throwaway emulator, and keep `ANDROID_SERIAL` pinned to it.
+
+**Watching a UI flow happen.** These run too fast to follow. `slowMotion` pauses between
+steps — off by default, so CI is unaffected — and needs an emulator with a window, whose
+window keeps focus:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.slowMotion=1500 \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.AppleLoginFlowTest#signingInWithATextedCodeReachesTheMap
+```
+
+**UI tests otherwise need the managed device specifically.** Espresso refuses to touch a window that lacks
+focus, and a window inside a hand-started emulator only has focus while the emulator's window
+has focus on your desktop — so alt-tabbing away from a `connectedDebugAndroidTest` run makes
+every UI test fail with `RootViewWithoutFocusException`. The managed device is headless and
+has no such notion.
+
+`scripts/run_instrumented_tests.sh` runs the same task with retries, and retries only when a
+run failed *before* any test reported — a suite that ran and failed is reported as-is instead
+of being run a second time. Set `GRADLE_TASK=:app:connectedDebugAndroidTest` to point it at an
+emulator you already have open; it then pins `ANDROID_SERIAL` so a run cannot install to a
+physical phone, and restarts the emulator and the Gradle daemon if a run wedges.
 
 Report: `app/build/reports/androidTests/managedDevice/debug/allDevices/index.html`
 
@@ -168,6 +212,48 @@ Targeting a subset:
 ```bash
 ./gradlew :app:testEmulatorDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.package=dev.wander.android.opentagviewer.db
+```
+
+### Anisette tests (skipped by default)
+
+The tests under `dev.wander.android.opentagviewer.anisette` cover running Apple's ADI
+libraries in-process, so that logins do not have to go through a public Anisette server.
+They are skipped unless you ask for them:
+
+```bash
+./gradlew :app:testEmulatorDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.anisetteLiveTests=true \
+  -Pandroid.testInstrumentationRunnerArguments.package=dev.wander.android.opentagviewer.anisette
+```
+
+From Android Studio, add `-e anisetteLiveTests true` to **Instrumentation extra params** in
+the run configuration.
+
+They are gated because they talk to third parties, not because they are unfinished:
+
+- they download about 2.9 MB of Apple's libraries from Apple's CDN, so they need network
+- `AdiProvisioningTest` **provisions a new machine identity with Apple on every run**, which
+  is not something to do on every build. No Apple account is involved — it provisions
+  anonymously, with `dsId` of -2 and a randomly generated identity.
+- `AdiProvisioningTest` also spends about 40 seconds sampling how often the one-time
+  password rotates
+
+What to look at afterwards, since passing is not the whole story — filter logcat on
+`adi-stub`. The app ships generated stand-ins for two of Apple's libraries
+(`app/src/main/cpp/stubs/`), and each one reports itself when called:
+
+- **INFO** means a symbol we already know is called harmlessly, listed with its evidence in
+  `libmediaplatform.expected`
+- **ERROR** means Apple's code now depends on something we only pretend to implement. The
+  result may be silently wrong rather than obviously broken, so it needs investigating
+  before trusting anything the run produced.
+
+If the tests fail after Apple ships a new Apple Music build, regenerate the symbol lists and
+the verification manifest, then run them again:
+
+```bash
+python scripts/update_adi_stub_symbols.py           # regenerate
+python scripts/update_adi_stub_symbols.py --check   # what CI runs weekly
 ```
 
 ### Android unit tests
@@ -254,7 +340,7 @@ preference: a module-level `tuple[int, int] | None` annotation is evaluated at i
 
 ### Type checking
 
-**pyright, not mypy.** The editors used here run Pylance, which is pyright; mypy's defaults
+Type checking in this project uses **pyright.** The editors used here run Pylance, which is pyright; mypy's defaults
 are lenient enough to pass code Pylance flags.
 
 ```bash
@@ -269,7 +355,7 @@ The installs matter: pyright reports an unresolved import as an error, so withou
 
 ---
 
-## Adding user-facing strings
+## Adding user-facing strings (Coding Agents)
 
 For manual changes made by a human, you can make changes in the Android Studio UI (easiest)
 or make changes in the `strings.xml` file yourself.
@@ -349,7 +435,10 @@ You want `version: 0.0.2` in the yml and `KeyAlignmentRecords/<uuid>/<uuid>.plis
 Without those the app has no key alignment and every tag's first fetch searches its entire
 history — see rule 6 in [AGENTS.md](./AGENTS.md).
 
-### If the GUI will not start
+### If the GUI will not start?
+
+<details>
+<summary>Self-help steps for if the GUI fails to start...</summary>
 
 The wizard is tkinter, and Tk can fail to initialise even when `import tkinter` works — the
 process then dies with `Abort trap: 6` and no traceback. A Docker-OSX VM will do this if its
@@ -390,6 +479,8 @@ Unlike the wizard, this includes every decrypted beacon rather than only those w
 matching naming record. The importer does its own inner join, so the import is equivalent,
 but it is the importer's join being tested rather than the wizard's.
 
+</details>
+
 ### Things that catch people out
 
 - **macOS 15+ cannot extract the key automatically.** Keychain access was tightened; the
@@ -429,9 +520,11 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 | `macos-scripts-python.yml` | `python/**` changes | Wizard tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, wizard tests, the PyInstaller build for both architectures |
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
+| `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 
-The instrumented job needs KVM on the runner; the workflow enables it before starting the
-emulator.
+The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
+`:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
+emulator definition in CI to keep in step with `app/build.gradle.kts`.
 
 ---
 

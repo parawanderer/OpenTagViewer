@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.repo.model.AppleUserData;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.core.Completable;
@@ -29,7 +31,15 @@ public final class PythonAuthService {
 
     private static final String MODULE_MAIN = "main";
 
-    public static Observable<PythonAuthResponse> pythonLogin(final String email, final String password, final String anisetteServerUrl) {
+    /**
+     * @param localAnisette produces Anisette data on this device instead of relaying the login
+     *                      through a public Anisette server. May be null, and may decline at
+     *                      runtime - in either case the login falls back to
+     *                      {@code anisetteServerUrl}, which is what the app has always done.
+     */
+    public static Observable<PythonAuthResponse> pythonLogin(
+            final String email, final String password, final String anisetteServerUrl,
+            final AnisetteSource localAnisette) {
         return Observable.fromCallable(() -> {
             var py = Python.getInstance();
             var module = py.getModule(MODULE_MAIN);
@@ -38,7 +48,8 @@ public final class PythonAuthService {
                     "loginSync",
                     new Kwarg("email", email),
                     new Kwarg("password", password),
-                    new Kwarg("anisetteServerUrl", anisetteServerUrl)
+                    new Kwarg("anisetteServerUrl", anisetteServerUrl),
+                    new Kwarg("localAnisette", localAnisette)
             );
 
             var resultMap = returned.asMap();
@@ -123,7 +134,14 @@ public final class PythonAuthService {
         }).subscribeOn(Schedulers.computation());
     }
 
-    public static Observable<PythonAppleAccount> restoreAccount(final AppleUserData appleUserData) {
+    /**
+     * @param localAnisette produces Anisette on this device rather than relaying through a
+     *                      public server. May be null. Restoring is the common path - without
+     *                      passing this, local Anisette would only ever apply to the single
+     *                      login where the account was first created.
+     */
+    public static Observable<PythonAppleAccount> restoreAccount(
+            final AppleUserData appleUserData, final AnisetteSource localAnisette) {
         return Observable.fromCallable(() -> {
             var data = AppCryptographyUtil.AppEncryptedData.fromFlattened(appleUserData.getData());
             var account = new AppCryptographyUtil().decrypt(data, KEYSTORE_ALIAS_ACCOUNT);
@@ -135,7 +153,8 @@ public final class PythonAuthService {
             // (see AccountStateMapping.anisette), so we no longer pass a server URL here.
             var returned = module.callAttr(
                     "getAccount",
-                    new Kwarg("serializedAccountData", new String(account, StandardCharsets.UTF_8))
+                    new Kwarg("serializedAccountData", new String(account, StandardCharsets.UTF_8)),
+                    new Kwarg("localAnisette", localAnisette)
             );
 
             if (returned == null) {

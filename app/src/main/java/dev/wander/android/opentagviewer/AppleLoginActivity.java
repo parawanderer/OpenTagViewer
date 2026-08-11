@@ -48,9 +48,13 @@ import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.python.AppleAuthService;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
+import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -65,6 +69,7 @@ import dev.wander.android.opentagviewer.viewmodel.LoginActivityState;
 import dev.wander.android.opentagviewer.viewmodel.LoginActivityState.PAGE;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -96,6 +101,24 @@ public class AppleLoginActivity extends AppCompatActivity {
     private ActivityAppleLoginBinding binding;
 
     private Apple2FACodeInputManager twoFactorEntryManager;
+
+    /**
+     * Anisette produced here, which is what a sign-in normally uses.
+     *
+     * <p>A field rather than a local, so that the screen asks the same object every time and
+     * so that a test can put something else in its place - the states this screen has to
+     * handle otherwise require Apple to have shipped a new build, or the network to be down.
+     */
+    private AnisetteSource localAnisette;
+
+    /** Signing in to Apple. Behind an interface so a test can drive this screen at all. */
+    private AppleAuthService authService;
+
+    /**
+     * What it last said. Starts as "nothing tried yet", which is the only honest thing to say
+     * before the first check and is rendered as such.
+     */
+    private AnisetteStatus localAnisetteStatus = AnisetteStatus.pending();
 
     private TextInputEditText emailOrPhoneInput;
 
@@ -145,7 +168,13 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this::onAnisetteUrlInputTyped
         );
 
-        this.anisetteServerTesterService = new AnisetteServerTesterService(cronet);
+        this.anisetteServerTesterService = AppDependencies.serverTester(cronet);
+
+        this.authService = AppDependencies.authService();
+
+        // Nobody is signed in on this screen, so an unchosen mode means local: there is no
+        // existing session whose machine identity has to be preserved.
+        this.localAnisette = AppDependencies.anisette(this, this.getUserSettings(), false);
 
         this.twoFactorEntryManager = new Apple2FACodeInputManager(this, this::on2FAAuthCodeFilled);
 
@@ -261,7 +290,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.setCurrentStepText(R.string.welcome);
         this.showLoading(null);
 
-        var sub = this.getAnisetteServerSetupStatus()
+        var sub = this.getAnisetteSetupStatus()
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(status -> {
                 this.hideLoading();
@@ -284,6 +313,15 @@ public class AppleLoginActivity extends AppCompatActivity {
 
     public void onClickToLoginAccount(View view) {
         Log.d(TAG, "Clicked onwards to account login!");
+
+        // When Anisette comes from this device the server field is not even on screen, so
+        // there is nothing to validate and nothing that could stop somebody getting past here.
+        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
+            this.getUiState().setCurrentPage(PAGE.LOGIN);
+            this.showAccountLoginAuthOptions();
+            return;
+        }
+
         MaterialAutoCompleteTextView urlTextInput = findViewById(R.id.anisetteServerUrl);
         final String currentInput = Optional.ofNullable(urlTextInput.getText())
                 .map(CharSequence::toString)
@@ -326,9 +364,14 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         final String emailOrPhone = Objects.requireNonNull(emailOrPhoneInput.getText()).toString();
         final String password = Objects.requireNonNull(passwordInput.getText()).toString();
-        final String anisetteServerUrl = Objects.requireNonNull(this.getUserSettings().getAnisetteServerUrl());
+        final String anisetteServerUrl = this.getAnisetteServerUrlOrDefault();
 
-        var async = PythonAuthService.pythonLogin(emailOrPhone, password, anisetteServerUrl)
+        // Produces Anisette on this device when it can, so the login is not relayed through a
+        // public Anisette server. It decides for itself whether it is usable, and the Python
+        // side falls back to anisetteServerUrl when it is not - so this can only improve on
+        // the previous behaviour, never break it.
+        var async = this.authService.login(
+                    emailOrPhone, password, anisetteServerUrl, this.localAnisette)
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(authResponse -> {
                 Log.i(TAG, "Got logged in with response ");
@@ -439,7 +482,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(chosenAuthMethod)
+        var async = this.authService.requestCode(chosenAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::show2FACodeEntryTextbox,
                 error -> {
@@ -460,7 +503,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         accountLoginContainer.setVisibility(GONE);
         this.showLoading(R.string.requesting_code);
 
-        var async = PythonAuthService.requestCode(phoneAuthMethod)
+        var async = this.authService.requestCode(phoneAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::show2FACodeEntryTextbox,
                 error -> {
@@ -485,12 +528,26 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         MaterialAutoCompleteTextView urlTextInput = findViewById(R.id.anisetteServerUrl);
 
-        var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
-        assert properties != null;
-
-        final String currentAnisetteServerSelection = Optional.ofNullable(userSettings.getAnisetteServerUrl())
-                .orElse(properties.getProperty("defaultAnisetteUrl"));
+        final String currentAnisetteServerSelection = this.getAnisetteServerUrlOrDefault();
         urlTextInput.setText(currentAnisetteServerSelection);
+
+        // The server field only exists on this screen for the case where signing in cannot
+        // happen without it. Deciding that here, from what local Anisette actually said,
+        // rather than leaving it permanently on or permanently off.
+        SharedMainSettingsManager.applyLoginAnisetteFallback(
+                this.findViewById(android.R.id.content),
+                this.localAnisetteStatus,
+                userSettings.hasChosenAnisetteMode()
+                        && !userSettings.usesLocalAnisette(false));
+
+        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
+            // Nothing is going to ask a server for anything, so testing one would be a network
+            // request whose only possible effect is to block the button below it.
+            this.setCurrentStepText(R.string.welcome);
+            this.binding.setAllowServerConfNext(true);
+            return;
+        }
+
         this.testAndSaveAnisetteUrl(currentAnisetteServerSelection);
 
         if (setupStatus == SETUP_STATUS.NO_SERVER_CONFIGURED) {
@@ -607,13 +664,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         var chosenAuthMethod = this.getUiState().getChosenAuthMethod();
 
-        var async = PythonAuthService.submitCode(
+        var async = this.authService.submitCode(
                 Objects.requireNonNull(chosenAuthMethod),
                 authCode
         ).observeOn(AndroidSchedulers.mainThread())
         .subscribe(() -> {
 
-            var nextAsync = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+            var nextAsync = this.authService.retrieveAuthData(this.getUiState().getAuthResponse())
                 .flatMapCompletable(userAuthRepo::storeUserAuth)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
@@ -655,7 +712,7 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void handleIsAlreadyLoggedIn() {
-        var async = PythonAuthService.retrieveAuthData(this.getUiState().getAuthResponse())
+        var async = this.authService.retrieveAuthData(this.getUiState().getAuthResponse())
             .observeOn(AndroidSchedulers.mainThread())
             .flatMapCompletable(userAuthRepo::storeUserAuth)
             .subscribe(() -> {
@@ -674,6 +731,32 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.binding.setAllowAccountLogin(
                 state.isValidEmailOrPhone() && state.isValidPassword()
         );
+    }
+
+    /**
+     * Whether this screen can get somebody signed in, and what it has to ask for first.
+     *
+     * <p>Local Anisette is asked first, because when it works none of the server questions
+     * have a reason to be asked - and that is the normal case. Only when it cannot does this
+     * fall back to the old behaviour of testing a server and, if that fails too, sending the
+     * user to choose one.
+     *
+     * <p>The local check downloads and can talk to Apple, so it runs off the main thread. The
+     * spinner {@link #handleAuth} shows covers it, and doing it here means the cost lands on
+     * the welcome screen rather than on the login button.
+     */
+    private Observable<SETUP_STATUS> getAnisetteSetupStatus() {
+        return Observable.fromCallable(() -> AnisetteStatus.of(this.localAnisette))
+                .subscribeOn(Schedulers.io())
+                .flatMap(status -> {
+                    this.localAnisetteStatus = status;
+                    Log.i(TAG, "local Anisette on the sign-in screen: " + status);
+
+                    if (status.state() == AnisetteStatus.State.READY) {
+                        return Observable.just(SETUP_STATUS.OK);
+                    }
+                    return this.getAnisetteServerSetupStatus();
+                });
     }
 
     private Observable<SETUP_STATUS> getAnisetteServerSetupStatus() {
@@ -695,6 +778,23 @@ public class AppleLoginActivity extends AppCompatActivity {
                 Log.d(TAG, "Server did not seem available @ " + currentServerUrl);
                 return SETUP_STATUS.SERVER_UNAVAILABLE;
             });
+    }
+
+    /**
+     * The Anisette server to fall back to, which may never have been chosen.
+     *
+     * <p>Before Anisette was produced on the device, nobody reached the login button without
+     * passing a server test first, so the stored URL was always set by then. That is no longer
+     * true: a sign-in that needs no server never visits that step, and reading the setting
+     * without allowing for null would fail the login of exactly the people for whom everything
+     * had gone right.
+     */
+    private String getAnisetteServerUrlOrDefault() {
+        var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        assert properties != null;
+
+        return Optional.ofNullable(this.getUserSettings().getAnisetteServerUrl())
+                .orElse(properties.getProperty("defaultAnisetteUrl"));
     }
 
     private UserSettings getUserSettings() {
@@ -760,10 +860,47 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void sendToMapActivity() {
+        this.recordHowThisSessionWasEstablished();
+
         this.model.resetUiState();
         this.finish();
         Intent intent = new Intent(this, MapsActivity.class);
         startActivity(intent);
+    }
+
+    /**
+     * Write down what actually produced this session, now that there is one.
+     *
+     * <p>Without this, a brand-new sign-in leaves the mode unchosen - and "signed in with no
+     * mode chosen" is exactly how somebody updating from an older version looks. So a person
+     * who had just signed in using Anisette from their own phone was offered the chance to
+     * switch to Anisette from their own phone, at the price of signing in again. It also left
+     * Settings with nothing to show under "Anisette Provider", because the only thing it had
+     * to show was a server URL that a local sign-in never sets.
+     *
+     * <p>This does not defeat the null-is-meaningful rule in {@link UserSettings}: null still
+     * means nobody has decided, and someone who updated from a version without any of this
+     * never ran this code, so they keep it and still get asked once.
+     *
+     * <p><b>Read, not guessed.</b> Which kind actually produced the session is decided inside
+     * the Python sign-in, which consults local Anisette itself and falls back on its own - so
+     * it records the answer, and this only copies it. Inferring it here from the status shown
+     * when the screen opened would be wrong in precisely the interesting case: a sign-in that
+     * began local and fell back part-way would be filed as local.
+     */
+    private void recordHowThisSessionWasEstablished() {
+        if (this.localAnisette == null) {
+            return;
+        }
+
+        final boolean establishedLocally = this.localAnisette.wasSessionEstablishedLocally();
+
+        this.getUserSettings().setAnisetteMode(establishedLocally
+                ? UserSettings.ANISETTE_LOCAL : UserSettings.ANISETTE_REMOTE);
+        this.saveSettings();
+
+        Log.i(TAG, "session established with "
+                + (establishedLocally ? "local" : "remote") + " Anisette");
     }
 
     private LoginActivityState getUiState() {

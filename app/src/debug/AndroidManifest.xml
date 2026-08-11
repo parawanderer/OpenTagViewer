@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Manifest entries that exist only in debug builds. Nothing here reaches a release APK.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+            A bare activity for instrumented tests that need a real window and nothing else -
+            dialogs, snackbars, anything that inflates against an activity theme. The app's own
+            activities all build repositories, restore an Apple session and expect an account
+            before they finish onCreate, so hosting a dialog test on one would test the
+            activity instead, slowly and with a network in the loop.
+
+            In the debug source set rather than androidTest, even though only tests use it: an
+            activity declared in the instrumentation manifest belongs to the test package and
+            runs in a different process, and ActivityScenario refuses to launch across that
+            boundary ("Intent in process ... resolved to different process ...test").
+        -->
+        <activity
+            android:name="dev.wander.android.opentagviewer.ui.TestHostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenTagViewer" />
+
+    </application>
+
+</manifest>
