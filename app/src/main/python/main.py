@@ -16,6 +16,8 @@ from findmy.reports import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
+from findmy.reports.anisette import BaseAnisetteProvider
+from findmy.util import files as util_files
 from findmy.reports.twofactor import (
     SyncSecondFactorMethod
 )
@@ -144,12 +146,98 @@ def _convertToJavaDictWrapper(method: SyncSecondFactorMethod) -> dict[str, Any]:
     return return_obj
 
 
-def loginSync(email: str, password: str, anisetteServerUrl: str) -> dict:
+class LocalAnisetteProvider(BaseAnisetteProvider):
+    """Anisette produced on this device, rather than by somebody else's server.
+
+    Apple's ADI libraries are native Android code, so there is no reason a login has to be
+    relayed through a public Anisette server - which sees the traffic, and takes the app down
+    with it when it goes offline.
+
+    The base class does almost all the work: it builds every header itself and only asks a
+    provider for two values. Both come from Java, where the libraries are loaded and ADI is
+    provisioned (see the `anisette` package).
+
+    It serializes as the *remote* provider, on purpose. FindMy embeds the anisette provider in
+    the account state it exports, but this one has nothing worth embedding - the ADI state
+    lives in app storage, not in the account. Writing the remote server's URL instead means an
+    exported login stays restorable anywhere, including by app versions that have never heard
+    of local Anisette, and by this app when local Anisette is unavailable. Whether Anisette
+    came from here or from a server is a transport detail, not part of the account.
+    """
+
+    def __init__(self, bridge: Any, fallbackServerUrl: str) -> None:
+        super().__init__()
+        self._bridge = bridge
+        self._fallbackServerUrl = fallbackServerUrl
+
+    @property
+    def otp(self) -> str:
+        return str(self._bridge.otp())
+
+    @property
+    def machine(self) -> str:
+        return str(self._bridge.machine())
+
+    def to_json(self, dst=None, /):
+        # Deliberately the remote mapping - see the class docstring.
+        return util_files.save_and_return_json(
+            {
+                "type": "aniRemote",
+                "url": self._fallbackServerUrl,
+            },
+            dst,
+        )
+
+    @classmethod
+    def from_json(cls, val):
+        # Never reached: nothing is ever serialized as this type. Restoring picks the local
+        # provider up again through _anisetteProvider, not through deserialization.
+        raise NotImplementedError(
+            "LocalAnisetteProvider is never serialized under its own type"
+        )
+
+    async def close(self) -> None:
+        pass
+
+
+def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None):
+    """Prefer this device, fall back to the configured server.
+
+    The fallback is not a nicety. Apple can change their libraries at any time, the download
+    needs network the first time, and the whole mechanism is an optimisation over something
+    that already works - so anything going wrong here has to degrade to the old behaviour
+    rather than fail a login.
+    """
+    if localAnisette is not None:
+        try:
+            if localAnisette.ensureReady():
+                print(f"Using local Anisette: {localAnisette.describe()}")
+                return LocalAnisetteProvider(localAnisette, anisetteServerUrl)
+            print(
+                "Local Anisette unavailable, using the remote server instead: "
+                f"{localAnisette.unavailableReason()}"
+            )
+        except Exception:
+            print(f"Local Anisette failed, using the remote server: {traceback.format_exc()}")
+
+    return RemoteAnisetteProvider(anisetteServerUrl)
+
+
+def loginSync(email: str, password: str, anisetteServerUrl: str,
+              localAnisette: Any = None) -> dict:
     try:
-        anisette = RemoteAnisetteProvider(anisetteServerUrl)
+        anisette = _anisetteProvider(anisetteServerUrl, localAnisette)
         acc = AppleAccount(anisette)
 
         state = acc.login(email, password)
+
+        # Which Anisette established this session decides whether continuing it against the
+        # other kind will still be recognised by Apple - the machine identity differs between
+        # them. Recorded on every login, including remote ones, so it cannot go stale.
+        if localAnisette is not None:
+            localAnisette.recordSessionProvenance(
+                isinstance(anisette, LocalAnisetteProvider)
+            )
 
         if state == LoginState.REQUIRE_2FA:  # Account requires 2FA
             methods = acc.get_2fa_methods()
@@ -191,9 +279,16 @@ def exportToString(account: AppleAccount) -> str:
     return json.dumps(account.to_json())
 
 
-# The only anisette provider that works on Android. `aniLocal` needs the unicorn CPU
-# emulator to run Apple's ADI blob, and Chaquopy cannot build unicorn's native code -
-# which is why app/stubs/unicorn exists at all.
+# The anisette provider type accounts are stored with.
+#
+# FindMy's own `aniLocal` is not it: that one needs the unicorn CPU emulator to run Apple's ADI
+# blob, and Chaquopy cannot build unicorn's native code - which is why app/stubs/unicorn exists
+# at all.
+#
+# This app does run ADI locally, but through its own path (the `anisette` package, which loads
+# Apple's real Android libraries), and accounts are deliberately still serialized as
+# "aniRemote" - see LocalAnisetteProvider. So this stays the only supported stored type, and
+# saved logins remain restorable by any build.
 SUPPORTED_ANISETTE_TYPE = "aniRemote"
 
 
@@ -227,14 +322,66 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
         return "This saved login could not be read."
 
 
+def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:
+    """Swap a restored account's anisette provider for the local one, if it is usable.
+
+    This matters more than it looks: restoring a saved login is the common path, and a
+    restored account carries the remote provider that was serialized with it. Without this,
+    local Anisette would only ever apply to the one login where the account was first created,
+    and every subsequent session would go back to relaying through a public server.
+
+    Failing here is not an error - the account already has a working remote provider, so the
+    worst case is the behaviour the app has always had.
+    """
+    if localAnisette is None:
+        return
+
+    try:
+        if not localAnisette.ensureReady():
+            print(
+                "Local Anisette unavailable, restored account will use its remote server: "
+                f"{localAnisette.unavailableReason()}"
+            )
+            if localAnisette.isChangingMachineIdentity():
+                # Worth saying plainly. This session was established with a machine identity
+                # that no longer exists for it, so Apple may not recognise the device any
+                # more and may demand re-authentication. That is a consequence, not a bug,
+                # and it should not look like one.
+                print(
+                    "WARNING: this session was established with local Anisette and is now "
+                    "continuing against a remote server. Apple sees a different machine, so "
+                    "signing in again may be required."
+                )
+            return
+
+        # AppleAccount is a synchronous wrapper; the provider lives on the async account it
+        # delegates to. FindMy exposes no setter for it, hence reaching in - and hence the
+        # getattr guards, so a rename upstream degrades to "keep using remote" rather than
+        # breaking every restore.
+        inner = getattr(acc, "_asyncacc", None)
+        previous = getattr(inner, "_anisette", None) if inner is not None else None
+        if inner is None or previous is None:
+            print("FindMy's account internals have changed; keeping the remote provider")
+            return
+
+        inner._anisette = LocalAnisetteProvider(
+            localAnisette, getattr(previous, "_server_url", "")
+        )
+        print(f"Restored account switched to local Anisette: {localAnisette.describe()}")
+    except Exception:
+        print(f"Could not switch to local Anisette: {traceback.format_exc()}")
+
+
 def getAccount(
         serializedAccountData: str,
-        anisetteServerUrl: str | None = None) -> AppleAccount | None:
+        anisetteServerUrl: str | None = None,
+        localAnisette: Any = None) -> AppleAccount | None:
     """
     Restore an AppleAccount via FindMy 0.9.x's `from_json`. The anisette provider is rebuilt
-    from the embedded state inside the JSON, so `anisetteServerUrl` is unused here. We accept
-    the parameter for now to keep the existing Java callsite compiling; it will be dropped
-    in Phase 2 when the Java bridge is updated.
+    from the embedded state inside the JSON, so `anisetteServerUrl` is unused here.
+
+    If `localAnisette` is supplied and usable, the rebuilt provider is then swapped for one
+    backed by this device - see `_preferLocalAnisette`.
     """
     try:
         unsupported = assertAnisetteIsSupported(serializedAccountData)
@@ -245,6 +392,7 @@ def getAccount(
         data = json.loads(serializedAccountData)
 
         acc = AppleAccount.from_json(data)
+        _preferLocalAnisette(acc, localAnisette)
 
         print(f"Login State: {acc.login_state}")
 

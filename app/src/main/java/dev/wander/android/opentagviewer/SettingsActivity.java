@@ -6,6 +6,8 @@ import static android.view.View.inflate;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
@@ -20,6 +22,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -36,6 +40,7 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -46,6 +51,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.anisette.AdiLibraryImporter;
+import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
+import dev.wander.android.opentagviewer.anisette.AnisetteSource;
+import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.databinding.ActivitySettingsBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
@@ -54,6 +64,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -61,6 +72,7 @@ import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
+import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
@@ -68,6 +80,8 @@ import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -136,7 +150,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setOnClickLanguage(this::onClickEditLanguage);
         this.binding.setCurrentLanguage(Optional.ofNullable(this.currentSettings.getLanguage()).map(this::getPrettyLanguageName).orElse(this.getString(R.string.use_system_default)));
         this.binding.setOnClickAnisetteServerUrl(this::onClickEditAnisetteServerUrl);
-        this.binding.setCurrentAnisetteServerUrl(this.currentSettings.getAnisetteServerUrl());
+        this.binding.setCurrentAnisetteServerUrl(this.getAnisetteProviderSummary());
         this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
@@ -362,8 +376,270 @@ public class SettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
+    /**
+     * The choice between producing sign-in data here and asking a server for it, plus whatever
+     * the local side currently has to say for itself.
+     *
+     * <p>Anyone reaching this screen is already signed in, so an unchosen mode means they have
+     * been carried over from a version that only had servers: they stay on theirs until they
+     * say otherwise, because moving a live session onto a different machine identity forces a
+     * re-login. That is what the warning in this dialog is about.
+     */
+    private void setupAnisetteModeControls(final View view) {
+        final AppAutoCompleteTextView modeDropdown =
+                view.findViewById(R.id.anisetteModeSelectDropdown);
+        if (modeDropdown == null) {
+            return;
+        }
+
+        modeDropdown.setSimpleItems(new String[] {
+                this.getString(R.string.anisette_mode_local),
+                this.getString(R.string.anisette_mode_remote)
+        });
+
+        final String current = this.currentSettings.resolveAnisetteMode(true);
+        SharedMainSettingsManager.applyAnisetteMode(view, current);
+        // Nothing has changed yet, so there is nothing to warn about yet.
+        SharedMainSettingsManager.applyChangeWarning(view, false);
+
+        modeDropdown.setOnItemClickListener((parent, v, position, id) -> {
+            final String selected = position == 1
+                    ? UserSettings.ANISETTE_REMOTE : UserSettings.ANISETTE_LOCAL;
+            modeDropdown.setText(parent.getItemAtPosition(position).toString(), false);
+            modeDropdown.clearFocus();
+            SharedMainSettingsManager.applyAnisetteMode(view, selected);
+            this.pendingAnisetteMode = selected;
+            // Warn about the re-sign-in only once they have actually picked something else,
+            // and take it back if they pick their original mode again.
+            SharedMainSettingsManager.applyChangeWarning(view, !selected.equals(current));
+        });
+
+        this.loadLocalAnisetteStatus(view);
+
+        final View learnMore = view.findViewById(R.id.anisetteLearnMoreButton);
+        if (learnMore != null) {
+            learnMore.setOnClickListener(v -> this.openConfiguredLink("anisetteWikiPage"));
+        }
+
+        final View whereToGetApk = view.findViewById(R.id.anisetteWhereToGetApkButton);
+        if (whereToGetApk != null) {
+            whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
+        }
+
+        final View chooseApk = view.findViewById(R.id.anisetteChooseApkButton);
+        if (chooseApk != null) {
+            chooseApk.setOnClickListener(v -> {
+                // Held so the result can be applied to the dialog that is still on screen.
+                this.anisetteDialogView = view;
+                // Not the APK mime type: files downloaded from a browser or a file host
+                // routinely arrive as octet-stream or with no type at all, and filtering them
+                // out would hide the very file people were told to go and find.
+                this.pickAnisetteApkLauncher.launch(new String[] {"*/*"});
+            });
+        }
+
+        final View clearApk = view.findViewById(R.id.anisetteClearApkButton);
+        if (clearApk != null) {
+            clearApk.setOnClickListener(v -> this.forgetTheSuppliedApk(view));
+        }
+    }
+
+    /** The Anisette dialog currently on screen, so a file-picker result can update it. */
+    private View anisetteDialogView;
+
+    /**
+     * Picks an Apple Music APK to take the ADI libraries from.
+     *
+     * <p>{@code OpenDocument} rather than {@code GetContent}: this reads a file of tens of
+     * megabytes, and a persistable grant means a copy that stays readable rather than one that
+     * evaporates the moment the dialog closes.
+     */
+    private final ActivityResultLauncher<String[]> pickAnisetteApkLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) {
+                    this.importAnisetteApk(uri);
+                }
+            });
+
+    /**
+     * Take the libraries out of a chosen APK, if they are the ones this app knows how to use.
+     *
+     * <p>Off the main thread: it reads and hashes tens of megabytes.
+     *
+     * <p>Nothing about accepting a file from elsewhere lowers the bar. It is checked against
+     * the same recorded hashes as Apple's own copy, so a wrong or hostile file is rejected by
+     * exactly the check that rejects a corrupted download - and nothing is kept unless every
+     * library matched.
+     */
+    private void importAnisetteApk(final Uri apk) {
+        final View view = this.anisetteDialogView;
+        if (view != null) {
+            SharedMainSettingsManager.applyApkRejection(view, null);
+            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                    view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
+        }
+
+        var async = Observable.fromCallable(() -> {
+                    final String abi = Build.SUPPORTED_ABIS[0];
+                    final String problem = AdiLibraryImporter.importFrom(
+                            this, apk, LocalAnisette.libraryDirectory(this, abi), abi);
+                    return Optional.ofNullable(problem);
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(problem -> {
+                    if (problem.isPresent()) {
+                        // The status has to be put back, not merely left. The spinner was
+                        // turned on for this import, and returning without restoring it left
+                        // the dialog saying "Checking..." for ever after a refused file.
+                        if (view != null) {
+                            SharedMainSettingsManager.applyApkRejection(view, problem.get());
+                            this.loadLocalAnisetteStatus(view);
+                        }
+                        return;
+                    }
+
+                    // Remembered only so the screen can offer to go back to Apple's copy. The
+                    // libraries themselves are already extracted and verified, so nothing
+                    // later has to read this file again - or still have permission to.
+                    this.currentSettings.setAnisetteApkUri(apk.toString());
+                    this.saveSettings();
+
+                    if (view != null) {
+                        this.loadLocalAnisetteStatus(view);
+                    }
+                }, error -> Log.e(TAG, "failed to import the supplied APK", error));
+    }
+
+    /**
+     * Go back to Apple's copy.
+     *
+     * <p>Deletes the extracted libraries as well as forgetting the file: leaving them would
+     * mean "use Apple's copy" quietly kept using the other one, since the fetcher skips the
+     * network for files that are already there.
+     */
+    private void forgetTheSuppliedApk(final View view) {
+        SharedMainSettingsManager.applyApkRejection(view, null);
+
+        var async = Observable.fromCallable(() -> {
+                    final String abi = Build.SUPPORTED_ABIS[0];
+                    final File directory = LocalAnisette.libraryDirectory(this, abi);
+                    for (final String name : LocalAnisette.requiredLibraries()) {
+                        final File library = new File(directory, name);
+                        if (library.exists() && !library.delete()) {
+                            Log.w(TAG, "could not remove " + library);
+                        }
+                    }
+                    return Boolean.TRUE;
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(done -> {
+                    this.currentSettings.setAnisetteApkUri(null);
+                    this.saveSettings();
+                    this.loadLocalAnisetteStatus(view);
+                }, error -> Log.e(TAG, "failed to discard the supplied APK", error));
+    }
+
+    /**
+     * Find out how local Anisette is doing, and say so.
+     *
+     * <p>Off the main thread, because finding out means downloading Apple's libraries,
+     * hashing them and possibly provisioning with Apple. The dialog shows "sets itself up the
+     * next time you sign in" until an answer arrives, which is true while it is being worked
+     * out and stays true if nothing ever comes back.
+     *
+     * <p><b>This can do the setup rather than merely observe it.</b> There is no way to know
+     * whether something will work without trying it, and a status that said "unknown" would be
+     * worth nothing on the one screen built to answer the question. Opening these settings is
+     * a reasonable moment for it: somebody is looking at it, and the result explains itself.
+     *
+     * <p>Only attempted in local mode. Somebody using a server should not have 3 MB downloaded
+     * on their behalf for a status they are not reading.
+     */
+    private void loadLocalAnisetteStatus(final View view) {
+        if (!this.currentSettings.usesLocalAnisette(true)) {
+            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                    view, AnisetteStatus.pending(), "",
+                    this.currentSettings.hasOwnAnisetteApk());
+            return;
+        }
+
+        // Spinner up front, because the answer can take a full connection timeout to arrive -
+        // the worst case being offline, which waits 30 seconds and then fails.
+        SharedMainSettingsManager.applyLocalAnisetteStatus(
+                view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
+
+        var async = Observable.fromCallable(() -> {
+                    final AnisetteSource source =
+                            AppDependencies.anisette(this, this.currentSettings, true);
+                    final AnisetteStatus status = AnisetteStatus.of(source);
+
+                    // Read here rather than on the main thread: it opens an asset.
+                    String version = "";
+                    try {
+                        version = AdiLibraryManifest.load(this).apkVersion();
+                    } catch (final Exception e) {
+                        Log.w(TAG, "could not read the ADI manifest for its version", e);
+                    }
+                    return Pair.create(status, version);
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        result -> SharedMainSettingsManager.applyLocalAnisetteStatus(
+                                view, result.first, result.second,
+                                this.currentSettings.hasOwnAnisetteApk()),
+                        error -> Log.w(TAG, "could not determine the local Anisette status",
+                                error));
+    }
+
+    /**
+     * What the Anisette row says underneath its title.
+     *
+     * <p>Never blank. It used to be the stored server URL, which is null for anybody who has
+     * only ever signed in with Anisette from their own device - they never visit the step that
+     * sets it - so the row sat there with a heading and nothing under it. Falling back to the
+     * mode's own name says something true in every case.
+     */
+    private String getAnisetteProviderSummary() {
+        // Anyone on this screen is signed in, so an unchosen mode means they came from a
+        // version that only had servers, and stay on theirs until they say otherwise.
+        if (this.currentSettings.usesLocalAnisette(true)) {
+            return this.getString(R.string.anisette_mode_local);
+        }
+
+        final String url = this.currentSettings.getAnisetteServerUrl();
+        return url == null || url.isBlank()
+                ? this.getString(R.string.anisette_mode_remote) : url;
+    }
+
+    /** Open one of the reference links in app.properties, or do nothing if it is not set. */
+    private void openConfiguredLink(final String property) {
+        final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        if (properties == null) {
+            return;
+        }
+
+        final String url = properties.getProperty(property);
+        if (url == null || url.isBlank()) {
+            Log.w(TAG, "No " + property + " configured in app.properties");
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            this.startActivity(intent);
+        }
+    }
+
+    /** Set while the dialog is open; only meaningful until it is confirmed or dismissed. */
+    private String pendingAnisetteMode = null;
+
     private void onClickEditAnisetteServerUrl() {
         View view = inflate(this, R.layout.anisette_server_url_input_dialog, null);
+
+        this.setupAnisetteModeControls(view);
 
         CircularProgressIndicatorSpec spec = new CircularProgressIndicatorSpec(view.getContext(), /* attrs= */ null, 0, com.google.android.material.R.style.Widget_Material3_CircularProgressIndicator_ExtraSmall);
         final IndeterminateDrawable<CircularProgressIndicatorSpec> progressIndicatorDrawable = IndeterminateDrawable.createCircularDrawable(view.getContext(), spec);
@@ -450,7 +726,11 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.anisette_server_url)
+                // Not "Anisette Server URL": this dialog chooses where sign-in data comes
+                // from, and in the usual case that is this device, with no server and no URL
+                // anywhere in it. The login screen keeps that wording, where it does label a
+                // URL field.
+                .setTitle(R.string.anisette_provider)
                 .setView(view)
                 .show();
 
@@ -458,14 +738,27 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleAnisetteUrlChangeSave(final String validNewAnisetteUrl) {
+        final String originalMode = this.currentSettings.resolveAnisetteMode(true);
+        final boolean modeChanged = this.pendingAnisetteMode != null
+                && !this.pendingAnisetteMode.equals(originalMode);
+
+        if (this.pendingAnisetteMode != null) {
+            this.currentSettings.setAnisetteMode(this.pendingAnisetteMode);
+            // Choosing for themselves answers the question the upgrade prompt would ask, so
+            // it should not then go on to ask it.
+            this.currentSettings.setAnisetteUpgradeOffered(true);
+        }
+
         this.currentSettings.setAnisetteServerUrl(validNewAnisetteUrl);
-        this.binding.setCurrentAnisetteServerUrl(validNewAnisetteUrl);
+        this.binding.setCurrentAnisetteServerUrl(this.getAnisetteProviderSummary());
         this.saveSettings();
 
         var originalUrl = Optional.ofNullable(this.initialAnisetteUrl);
         var finalUrl = Optional.ofNullable(this.currentSettings.getAnisetteServerUrl());
 
-        if (!originalUrl.equals(finalUrl)) {
+        // Changing the mode binds the session to a different machine identity just as surely
+        // as changing the server does, so it takes the same path.
+        if (modeChanged || !originalUrl.equals(finalUrl)) {
             // A re-login is genuinely required, not just a limitation of how the account
             // is serialized. Anisette supplies a machine identity (X-Apple-I-MD-M and
             // friends) derived from that server's own ADI provisioning, and Apple binds

@@ -15,17 +15,34 @@
             type="boolean" />
     </data>
 
+    <!--
+        Scrollable, because this screen is no longer a fixed height. Local Anisette failing
+        reveals the server field and its explanation, and on a shorter phone that pushes the
+        button below it off the bottom - which is worse here than anywhere else in the app,
+        since this screen is the only route to that setting for somebody who cannot sign in.
+        Caught by AppleLoginFallbackFlowTest, which passed on a tall emulator and failed on a
+        Pixel 6.
+
+        fillViewport so the content still fills the screen when it does fit, which is the
+        normal case; without it the layout collapses to its content height.
+    -->
+    <ScrollView
+        android:id="@+id/app_login_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
     <LinearLayout
         android:id="@+id/app_login_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingTop="80dp">
 
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical">
 
             <LinearLayout
@@ -493,4 +510,6 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    </ScrollView>
 </layout>

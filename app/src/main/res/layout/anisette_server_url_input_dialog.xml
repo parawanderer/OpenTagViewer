@@ -18,21 +18,53 @@
         android:paddingBottom="16dp"
         >
 
-        <include layout="@layout/anisette_server_url_input" />
+        <!-- Where sign-in data comes from. Everything below reacts to this. -->
+        <include layout="@layout/anisette_mode_input" />
 
+        <!-- Shown for "on this device": status, and the escape hatch if Apple moves the APK. -->
+        <include layout="@layout/anisette_local_status" />
+
+        <!--
+            Shown for "remote server". Hidden entirely in the other mode rather than disabled -
+            a server URL and a test button have no meaning when nothing is being asked of a
+            server.
+        -->
+        <LinearLayout
+            android:id="@+id/anisetteRemoteSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <include layout="@layout/anisette_server_url_input" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/anisetteLearnMoreButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/anisette_learn_more" />
+
+        </LinearLayout>
+
+        <!--
+            Applies to both: changing either the mode or the server presents Apple with a
+            different machine, and the session does not survive that.
+        -->
         <FrameLayout
             android:layout_width="match_parent"
+            android:id="@+id/anisetteChangeWarningContainer"
             android:layout_height="match_parent"
             android:layout_marginTop="10dp"
             android:background="@drawable/layout_rounded_less"
             android:backgroundTint="@color/md_theme_errorContainer"
-            android:padding="10dp">
+            android:padding="10dp"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/anisette_url_change_warning"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/anisette_url_change_warning"
+                android:text="@string/anisette_mode_change_warning"
                 android:textColor="@color/md_theme_error_highContrast"
                 android:textSize="12sp" />
         </FrameLayout>

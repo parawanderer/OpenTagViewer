@@ -57,12 +57,25 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
 
 ### 4. Respect the Anisette constraints
 
-- **Remote only.** `anisette` needs `unicorn`, a CPU emulator Chaquopy cannot build for
-  Android. `app/stubs/unicorn/` is a stand-in that makes the dependency tree resolve; every
-  method raises. Local Anisette does not work, and the stub is not a step toward it.
-- **Sessions are bound to one server's machine identity.** Changing Anisette server requires
-  a re-login. That is inherent to how Apple binds the session, not a bug to work around —
-  rewriting the stored provider would leave the app running but silently failing auth.
+- **FindMy's own local provider still does not work.** `anisette` needs `unicorn`, a CPU
+  emulator Chaquopy cannot build for Android. `app/stubs/unicorn/` is a stand-in that makes
+  the dependency tree resolve; every method raises. The stub is not a step toward enabling
+  `aniLocal`, and never will be.
+- **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
+  loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
+  back to a remote server when it cannot. That is unrelated to `aniLocal` and needs no
+  emulator — the libraries are native Android code. See `CONTRIBUTING.md` for how to run its
+  tests.
+- **Sessions are bound to one machine identity.** Local and remote Anisette present different
+  ones, as do two different servers. Changing it requires a re-login. That is inherent to how
+  Apple binds the session, not a bug to work around.
+- **So a fallback must say so.** Accounts are deliberately serialized as `aniRemote` even
+  when established locally, because the ADI state lives in app storage and not in the account
+  — this keeps exported logins restorable anywhere. The cost is that a locally-established
+  session can end up continuing against a server, and Apple will see a different machine.
+  `LocalAnisette.recordSessionProvenance` records which kind established the session so that
+  this is reported rather than presenting as auth that silently stops working. Never remove
+  that warning to make a log quieter.
 
 ### 5. Never bundle an AMap API key
 
@@ -113,6 +126,24 @@ So releasing is two steps, in this order:
 before either build job. A tag that disagrees fails the release rather than shipping a build
 that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
 
+### 10. Update the docs that index what you added
+
+Some files list things rather than describe them, so they go stale silently — nothing fails,
+the list is just quietly wrong, and the next person trusts it.
+
+If you add or change one of these, update its index in the same commit:
+
+| You added | Update |
+| --- | --- |
+| A workflow in `.github/workflows/` | the CI table in [CONTRIBUTING.md](./CONTRIBUTING.md#continuous-integration) |
+| A test suite, or one that needs opting into | the test table and its section in `CONTRIBUTING.md` |
+| A script in `scripts/` that people run by hand | the section of `CONTRIBUTING.md` covering that workflow |
+| A constraint that would take someone an afternoon to rediscover | a rule here |
+
+The test for whether it belongs here rather than in a comment: would somebody hit it *before*
+reading the code that explains it? Anisette's machine-identity binding is the example — it
+presents as auth failing for no reason, hours away from the code responsible.
+
 ---
 
 ## Building and testing
@@ -128,7 +159,7 @@ See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup and every test suite. Sho
 Gradle provisions the emulator, runs the tests, and destroys it:
 
 ```bash
-./gradlew :app:testEmulatorDebugAndroidTest    # 24 tests, well under two minutes
+./gradlew :app:testEmulatorDebugAndroidTest    # 72 tests, about 20 seconds
 ```
 
 Use this rather than `connectedDebugAndroidTest`. The Android Gradle Plugin holds its ADB
@@ -139,15 +170,60 @@ has nothing to do with the code. Recovering from that needs *both* an emulator r
 bridge. A managed device is created fresh per run, so nothing survives to go stale. It is
 also the only form of this that CI can run unattended.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - The `aosp-atd` image carries no Play Services, so **a test that touches Maps will not run
   on it** — that device would need a `google` image. Nothing today does.
+- **Espresso only works on the managed device.** A guest window has focus only while the
+  emulator's own window has focus on the host desktop, so against a hand-started emulator any
+  UI test fails with `RootViewWithoutFocusException` the moment you alt-tab away. There is
+  nothing to fix in the test when that happens — run it on the managed device.
 - `./gradlew testDebugUnitTest` is close to meaningless: there is exactly one JVM test and it
   asserts `2 + 2 == 4`. Everything real is instrumented. Do not report "tests pass" off it.
 
-`scripts/run_instrumented_tests.sh` remains as a fallback for running against an emulator you
-already have open; it pins `ANDROID_SERIAL` so a run cannot install to a physical phone.
+### Showing a UI test to a person
+
+A UI test runs at machine speed — a whole sign-in is over in about three seconds and looks
+like a flicker. **When someone asks to watch a flow, do not just run it: it will be over
+before they look up.** Run it in slow motion, on a device with a window:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.slowMotion=1500 \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.AppleLoginFlowTest#signingInWithATextedCodeReachesTheMap
+```
+
+> [!WARNING]
+> **`connectedAndroidTest` uninstalls the app when it finishes.** Both APKs are removed, so
+> everything the app stored on that device is gone: the signed-in session, all settings
+> including a hand-registered AMap key, and every imported beacon and its location history.
+> `allowBackup` is false, so on a real phone that is unrecoverable and means redoing the macOS
+> export. **Only ever point this at a throwaway emulator**, tell the user it will wipe that
+> device, and never at a phone with real data — `ANDROID_SERIAL` pins the target, so set it.
+> The tests also overwrite settings while they run; `DeviceStateGuard` puts those back, but
+> nothing puts back an uninstall.
+
+Four prerequisites, and it silently does nothing useful without them:
+
+1. **`connectedDebugAndroidTest`, not the managed device.** The managed device is headless —
+   there is nothing to see. This is the one case where it is the wrong task.
+2. **An emulator with a window must already be running**, and `ANDROID_SERIAL` pinned to it so
+   the run cannot install onto a physical phone. Ask the user to start it rather than starting
+   one yourself; they may already have one, and two emulators fight over `emulator-5554`.
+3. **Its window must keep focus on the host desktop.** Espresso will not touch an unfocused
+   window, so clicking away mid-run fails the test with `RootViewWithoutFocusException`. Say
+   so before starting.
+4. **`slowMotion` is a number of milliseconds** and defaults to off, so a normal run and CI are
+   unaffected. 1000–1500 is comfortable to follow. See `TestPace`, and call
+   `TestPace.afterAStep()` after each visible step in any new UI test.
+
+Pick a single `#method` rather than a class. A whole class replays the same screens over and
+over, which is longer without showing more.
+
+`scripts/run_instrumented_tests.sh` wraps the same task with retries, and only retries when a
+run failed *before* any test reported — a suite that ran and failed is reported as-is rather
+than repeated. `GRADLE_TASK=:app:connectedDebugAndroidTest` switches it to a hand-started
+emulator, where it pins `ANDROID_SERIAL` so a run cannot install to a physical phone.
 
 Python must be on `PATH` — the build shells out to it to generate the unicorn stub wheel.
 
@@ -165,22 +241,41 @@ for those users — the build succeeds, and it looks fine in whichever language 
 the helper rather than editing ten files:
 
 ```bash
-python scripts/add_strings.py                # prints full usage and the input format
-python scripts/add_strings.py --locales      # which locales exist, discovered from the tree
-python scripts/add_strings.py new.json       # add strings to every locale
+python scripts/add_strings.py                 # prints full usage and the input format
+python scripts/add_strings.py --locales       # which locales exist, discovered from the tree
+python scripts/add_strings.py new.json        # add strings to every locale
 python scripts/add_strings.py --fill new.json # add only where missing, for back-filling
-python scripts/add_strings.py --check        # fail if any locale is missing a string
+python scripts/add_strings.py --show <name>…  # print current text, in the input format
+python scripts/add_strings.py --replace r.json # reword strings that already exist
+python scripts/add_strings.py --check         # fail if any locale is missing a string
 ```
+
+**Rewording an existing string goes through `--show` and `--replace`, never ten hand edits.**
+
+```bash
+python scripts/add_strings.py --show anisette_upgrade_message > reword.json
+# edit reword.json
+python scripts/add_strings.py --replace reword.json
+```
+
+Two reasons this is the rule. A missed locale keeps the old wording and still passes
+`--check`, so nothing complains and the app says two different things in two languages. And
+the intermediate JSON puts all ten translations in one reviewable diff, instead of ten
+separate edits nobody reads to the end.
 
 Translations are read **from a JSON file, never from a command-line argument**. That is not
 a style preference: passing non-ASCII text through shell quoting has twice corrupted it here,
 once putting a literal `\&#8217;` on screen where a French apostrophe belonged.
 
-The tool refuses to write unless every locale is supplied, escapes apostrophes, quotes and
-ampersands for you, preserves the inline tags `<u>`, `<b>` and `<i>`, and re-parses each file
-afterwards so a malformed write fails immediately rather than at aapt time. Locales are
-discovered from `app/src/main/res/values-*/strings.xml`, so adding a locale directory makes
-it required with no change to the script.
+**Write the JSON exactly as the text should appear on screen, and do not escape anything.**
+The tool escapes apostrophes, quotes and ampersands for you, and preserves the inline tags
+`<u>`, `<b>` and `<i>`. A `'` you escape yourself arrives on screen as `\'`. This is settled —
+do not go and re-read the script to check it before every batch of strings.
+
+It also refuses to write unless every locale is supplied, and re-parses each file afterwards
+so a malformed write fails immediately rather than at aapt time. Locales are discovered from
+`app/src/main/res/values-*/strings.xml`, so adding a locale directory makes it required with
+no change to the script.
 
 `--check` is worth running before opening a PR; it found eight strings missing across seven
 locales the first time it was run. It also runs in CI, on every PR and every release.

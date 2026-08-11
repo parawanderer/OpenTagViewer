@@ -16,4 +16,5 @@
     "terminal.integrated.env.linux": {
         "PYTHONPATH": "${workspaceFolder}/python:${env:PYTHONPATH}"
     },
+    "java.configuration.updateBuildConfiguration": "automatic",
 }

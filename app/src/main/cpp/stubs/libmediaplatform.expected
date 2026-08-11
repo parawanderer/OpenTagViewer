@@ -1,0 +1,19 @@
+# Stubbed symbols that ADI is known to call, and that are known to be harmless.
+#
+# These are the difference between an alarm worth reading and one people learn to ignore.
+# Anything in this file logs at INFO and is not counted as a reason to distrust the session;
+# anything NOT in this file logs at ERROR, because it means Apple's implementation started
+# depending on something we only pretend to provide.
+#
+# Add to this list only with evidence - a passing end-to-end provisioning run with the call
+# observed - never because a log line was annoying.
+
+# Called from a static constructor while dlopen'ing libstoreservicescore.so, before any ADI
+# function runs. Our stub returns NULL.
+#
+# Harmless, established two ways. Provisioning completes successfully with the NULL: verified
+# by AdiProvisioningTest against Apple's real servers on 2026-08-10 (session completed,
+# ADIGetLoginCode then returned 0). And the reference implementation is in the same position
+# by construction - Dadoum/Provision's loader never runs .init_array at all, so this
+# constructor does not execute there either, and every public Anisette server runs that way.
+F _ZN13mediaplatform9WorkQueue13makeWorkQueueERKNSt6__ndk112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEENS0_13WorkQueueTypeE

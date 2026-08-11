@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.util.rx;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -192,5 +193,50 @@ public class RefreshPolicyTest {
         assertTrue(this.decide(policy, ONE_MINUTE).shouldRefresh());
         policy.markFetched(ONE_MINUTE);
         assertEquals(Decision.TOO_SOON, this.decide(policy, ONE_MINUTE + 1));
+    }
+
+    // ------------------------------------------------------------------------------------
+    // The shared instance.
+    //
+    // Changing the theme, language or map provider makes AppCompat relaunch every activity in
+    // the process. Held per activity, this was rebuilt with it - so the map came back
+    // believing it had never fetched and asked Apple for every tag's history again. Toggling
+    // dark mode three times meant three full fetches.
+    // ------------------------------------------------------------------------------------
+
+    @Test
+    public void everybodyGetsTheSamePolicy() {
+        RefreshPolicy.resetShared();
+
+        assertSame("a rebuilt screen must not get a policy of its own",
+                RefreshPolicy.shared(ONE_MINUTE, 24), RefreshPolicy.shared(ONE_MINUTE, 24));
+    }
+
+    /**
+     * The point of sharing it: a fetch made before a rebuild still counts afterwards.
+     */
+    @Test
+    public void aFetchIsStillRememberedAfterTheScreenIsRebuilt() {
+        RefreshPolicy.resetShared();
+
+        // The screen fetches, then something recreates it...
+        RefreshPolicy.shared(ONE_MINUTE, 24).markFetched(NOW);
+
+        // ...and the rebuilt one asks whether it should fetch again.
+        final RefreshPolicy afterRebuild = RefreshPolicy.shared(ONE_MINUTE, 24);
+
+        assertTrue("it has fetched, and must know it", afterRebuild.hasEverFetched());
+        assertEquals("asking Apple again immediately is the bug",
+                Decision.TOO_SOON, this.decide(afterRebuild, NOW + 1));
+    }
+
+    /** And once the interval really has passed, it fetches as normal. */
+    @Test
+    public void theSharedPolicyStillAllowsARefreshWhenTheIntervalHasPassed() {
+        RefreshPolicy.resetShared();
+        RefreshPolicy.shared(ONE_MINUTE, 24).markFetched(NOW);
+
+        assertTrue(this.decide(RefreshPolicy.shared(ONE_MINUTE, 24), NOW + ONE_MINUTE + 1)
+                .shouldRefresh());
     }
 }

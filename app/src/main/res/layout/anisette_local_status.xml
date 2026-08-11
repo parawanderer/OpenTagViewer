@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Shown when Anisette is produced on this device.
+
+    Mostly it says "Ready" and needs no attention. The interesting case is the one at the
+    bottom: Apple serves exactly one build of the Apple Music APK that these libraries come
+    from, and when they replace it, the version this app knows how to read is no longer
+    downloadable. Rather than leave people stranded on a broken sign-in, they can point at a
+    copy of the known-good build obtained elsewhere - it is checked against the same recorded
+    hashes either way, so where it came from cannot make it more dangerous.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/anisetteLocalStatusContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/anisetteLocalSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/anisette_mode_local_summary"
+        android:textColor="@color/md_theme_outline"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!--
+            Shown while the status is being worked out. Worth having: finding out can take a
+            full connection timeout when offline, and without this the screen looks stuck on
+            "sets itself up the next time you sign in".
+        -->
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/anisetteLocalProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorSize="18dp"
+            app:trackCornerRadius="2dp"
+            app:trackThickness="2dp" />
+
+        <ImageView
+            android:id="@+id/anisetteLocalOkIcon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="6dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/check_circle_24px_fill"
+            app:tint="@color/md_theme_outline" />
+
+        <ImageView
+            android:id="@+id/anisetteLocalErrorIcon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="6dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/warning_24px_fill"
+            app:tint="@color/md_theme_error" />
+
+        <TextView
+            android:id="@+id/anisetteLocalStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nunito_bold"
+            android:text="@string/anisette_local_status_pending"
+            android:textColor="@color/md_theme_outlineVariant_mediumContrast"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <!--
+        Only shown once the automatic route has actually failed. Offering "supply your own
+        APK" to somebody whose sign-in works fine would be an invitation to break it.
+    -->
+    <LinearLayout
+        android:id="@+id/anisetteOwnApkContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/anisetteOwnApkExplanation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/md_theme_outline"
+            android:textSize="13sp" />
+
+        <!--
+            Why a chosen file was refused. Here rather than in a toast: the reason names the
+            library that did not match, which is two lines of text, and Android truncates a
+            toast at two lines and then takes it away. Somebody deciding whether to go and find
+            a different copy needs to be able to read it twice.
+        -->
+        <TextView
+            android:id="@+id/anisetteApkRejection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/md_theme_error"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/anisetteChooseApkButton"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/anisette_choose_apk" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/anisetteWhereToGetApkButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="@string/anisette_where_to_get_apk" />
+
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/anisetteClearApkButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/anisette_apk_use_apple_again"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>
