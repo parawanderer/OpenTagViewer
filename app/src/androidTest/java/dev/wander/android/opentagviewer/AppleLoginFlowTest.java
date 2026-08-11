@@ -66,8 +66,13 @@ public class AppleLoginFlowTest {
     private FakeAppleAuthService apple;
     private ActivityScenario<AppleLoginActivity> scenario;
 
+    private DeviceStateGuard deviceState;
+
     @Before
     public void replaceAppleAndSignEverybodyOut() {
+        // Before signing anybody out, so their session can be put back afterwards.
+        this.deviceState = DeviceStateGuard.capture(getInstrumentation().getTargetContext());
+
         signEverybodyOut();
 
         this.apple = FakeAppleAuthService.wantsTwoFactor();
@@ -101,6 +106,7 @@ public class AppleLoginFlowTest {
         // straight to the map before it could be driven anywhere.
         getInstrumentation().waitForIdleSync();
         signEverybodyOut();
+        this.deviceState.restore();
     }
 
     /**

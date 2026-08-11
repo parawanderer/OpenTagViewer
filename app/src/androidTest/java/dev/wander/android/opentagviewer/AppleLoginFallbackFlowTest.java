@@ -67,8 +67,14 @@ public class AppleLoginFallbackFlowTest {
     private FakeAnisetteServerTester server;
     private ActivityScenario<AppleLoginActivity> scenario;
 
+    private DeviceStateGuard deviceState;
+
     @Before
     public void breakLocalAnisette() {
+        // Captured first: everything below overwrites what is on the device, which matters on
+        // one somebody actually uses.
+        this.deviceState = DeviceStateGuard.capture(getInstrumentation().getTargetContext());
+
         signEverybodyOut();
         forgetAnyChosenServer();
 
@@ -95,6 +101,7 @@ public class AppleLoginFallbackFlowTest {
 
         getInstrumentation().waitForIdleSync();
         signEverybodyOut();
+        this.deviceState.restore();
     }
 
     /**

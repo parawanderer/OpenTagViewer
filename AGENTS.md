@@ -193,6 +193,16 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.AppleLoginFlowTest#signingInWithATextedCodeReachesTheMap
 ```
 
+> [!WARNING]
+> **`connectedAndroidTest` uninstalls the app when it finishes.** Both APKs are removed, so
+> everything the app stored on that device is gone: the signed-in session, all settings
+> including a hand-registered AMap key, and every imported beacon and its location history.
+> `allowBackup` is false, so on a real phone that is unrecoverable and means redoing the macOS
+> export. **Only ever point this at a throwaway emulator**, tell the user it will wipe that
+> device, and never at a phone with real data — `ANDROID_SERIAL` pins the target, so set it.
+> The tests also overwrite settings while they run; `DeviceStateGuard` puts those back, but
+> nothing puts back an uninstall.
+
 Four prerequisites, and it silently does nothing useful without them:
 
 1. **`connectedDebugAndroidTest`, not the managed device.** The managed device is headless —

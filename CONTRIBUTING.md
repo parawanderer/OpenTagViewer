@@ -178,6 +178,11 @@ The device is defined in `testOptions { managedDevices { ... } }` in `app/build.
 and uses an `aosp-atd` image, which has **no Play Services** — a test that needs Maps would
 need a `google` image.
 
+> [!WARNING]
+> `connectedDebugAndroidTest` **uninstalls the app afterwards**, taking its session, settings
+> and every imported beacon with it. `allowBackup` is false, so on a real device that is gone
+> for good. Use a throwaway emulator, and keep `ANDROID_SERIAL` pinned to it.
+
 **Watching a UI flow happen.** These run too fast to follow. `slowMotion` pauses between
 steps — off by default, so CI is unaffected — and needs an emulator with a window, whose
 window keeps focus:
