@@ -10,7 +10,11 @@ import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
 import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertFalse;
 
 import android.app.Activity;
@@ -153,6 +157,45 @@ public class AnisetteApkPickerFlowTest {
         assertFalse("a rejected file must not be recorded as the one in use",
                 storedSettings().hasOwnAnisetteApk());
         assertNothingWasExtracted();
+    }
+
+    /**
+     * The refusal is readable, and stays readable.
+     *
+     * <p>It was a toast to begin with. Android caps those at two lines and then takes them
+     * away, so the sentence naming the library that did not match was cut off mid-word - which
+     * is the one thing somebody needs in order to decide whether to go and find another copy.
+     */
+    @Test
+    public void theReasonForRefusingAFileIsShownInFull() {
+        stubThePickerWith(aZipPretendingToBeAppleMusic());
+        openTheAnisetteSettings();
+
+        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+                .perform(click()));
+
+        eventually(() -> onView(withId(R.id.anisetteApkRejection)).inRoot(isDialog())
+                .check(matches(allOf(isDisplayed(),
+                        withText(containsString("libc++_shared.so"))))));
+    }
+
+    /**
+     * A refused file stops the spinner.
+     *
+     * <p>Importing turns it on, and the early return for a refusal used to skip turning it
+     * off - leaving the dialog saying "Checking..." for ever, on the screen somebody is
+     * already on because something is broken.
+     */
+    @Test
+    public void aRefusedFileDoesNotLeaveTheDialogSpinning() {
+        stubThePickerWith(aZipPretendingToBeAppleMusic());
+        openTheAnisetteSettings();
+
+        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+                .perform(click()));
+
+        eventually(() -> onView(withId(R.id.anisetteLocalProgress)).inRoot(isDialog())
+                .check(matches(not(isDisplayed()))));
     }
 
     /**

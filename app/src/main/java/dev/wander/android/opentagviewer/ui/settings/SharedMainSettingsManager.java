@@ -326,6 +326,36 @@ public class SharedMainSettingsManager {
     }
 
     /**
+     * Say why a chosen APK was refused, or clear a previous refusal.
+     *
+     * <p>Shown in the dialog rather than as a toast. The reason names the library whose hash
+     * did not match, which runs to two lines, and a toast is capped at two lines and then
+     * disappears - so the one piece of information that tells somebody whether to go and find
+     * a different copy was being cut off mid-sentence.
+     *
+     * @param problem what was wrong with the file, or null to clear
+     */
+    public static void applyApkRejection(final View root, final String problem) {
+        if (root == null) {
+            return;
+        }
+
+        final TextView rejection = root.findViewById(R.id.anisetteApkRejection);
+        if (rejection == null) {
+            return;
+        }
+
+        if (problem == null) {
+            rejection.setVisibility(GONE);
+            rejection.setText(null);
+            return;
+        }
+
+        rejection.setText(root.getContext().getString(R.string.anisette_apk_rejected, problem));
+        rejection.setVisibility(VISIBLE);
+    }
+
+    /**
      * Draw what local Anisette has to say for itself.
      *
      * <p>Takes an already-computed {@link AnisetteStatus} rather than a source, because working
