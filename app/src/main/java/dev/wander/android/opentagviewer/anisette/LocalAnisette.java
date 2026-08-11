@@ -45,6 +45,23 @@ public final class LocalAnisette implements AnisetteSource {
 
     private static final List<String> STUBS = Arrays.asList("CoreFoundation", "mediaplatform");
 
+    /**
+     * Every library that has to be present before any of this can run.
+     *
+     * <p>Public because {@link AdiLibraryImporter} has to extract exactly this set from an APK
+     * somebody supplied by hand, and two lists that must agree is one list too many.
+     */
+    public static List<String> requiredLibraries() {
+        final List<String> everything = new ArrayList<>(FROM_APPLE);
+        everything.add(AdiLibrary.CORE_ADI);
+        return everything;
+    }
+
+    /** Where the libraries for this device live, supplied by Apple or by the user. */
+    public static File libraryDirectory(final Context context, final String abi) {
+        return new File(context.getFilesDir(), "anisette/lib/" + abi);
+    }
+
     private final Context context;
     private final String abi;
     private final UserSettings settings;
@@ -90,7 +107,7 @@ public final class LocalAnisette implements AnisetteSource {
 
         try {
             final AdiLibraryManifest manifest = AdiLibraryManifest.load(this.context);
-            final File libraryDir = new File(this.context.getFilesDir(), "anisette/lib/" + abi);
+            final File libraryDir = libraryDirectory(this.context, this.abi);
 
             download(manifest, libraryDir);
             verify(manifest, libraryDir);
@@ -111,10 +128,9 @@ public final class LocalAnisette implements AnisetteSource {
     }
 
     private void download(AdiLibraryManifest manifest, File libraryDir) throws Exception {
-        final List<String> needed = new ArrayList<>(FROM_APPLE);
-        needed.add(AdiLibrary.CORE_ADI);
-
-        final long bytes = AdiLibraryFetcher.fetchInto(libraryDir, this.abi, needed);
+        // Skips the network entirely when the files are already there - which is also how a
+        // user-supplied APK takes effect: AdiLibraryImporter writes into this same directory.
+        final long bytes = AdiLibraryFetcher.fetchInto(libraryDir, this.abi, requiredLibraries());
         if (bytes > 0) {
             Log.i(TAG, String.format("fetched Apple Music %s libraries (%.1f MB)",
                     manifest.apkVersion(), bytes / 1e6));
@@ -127,10 +143,7 @@ public final class LocalAnisette implements AnisetteSource {
      * the checked-in symbol lists may no longer describe them.
      */
     private void verify(AdiLibraryManifest manifest, File libraryDir) throws Exception {
-        final List<String> everything = new ArrayList<>(FROM_APPLE);
-        everything.add(AdiLibrary.CORE_ADI);
-
-        for (final String name : everything) {
+        for (final String name : requiredLibraries()) {
             final String problem = manifest.verify(new File(libraryDir, name), this.abi);
             if (problem != null) {
                 throw new AdiLibrary.AdiUnavailableException(problem);

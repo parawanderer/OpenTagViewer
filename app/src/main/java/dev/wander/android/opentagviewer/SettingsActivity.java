@@ -7,6 +7,7 @@ import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFa
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
@@ -21,6 +22,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -37,6 +40,7 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -47,6 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.anisette.AdiLibraryImporter;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
@@ -419,6 +424,113 @@ public class SettingsActivity extends AppCompatActivity {
         if (whereToGetApk != null) {
             whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
         }
+
+        final View chooseApk = view.findViewById(R.id.anisetteChooseApkButton);
+        if (chooseApk != null) {
+            chooseApk.setOnClickListener(v -> {
+                // Held so the result can be applied to the dialog that is still on screen.
+                this.anisetteDialogView = view;
+                // Not the APK mime type: files downloaded from a browser or a file host
+                // routinely arrive as octet-stream or with no type at all, and filtering them
+                // out would hide the very file people were told to go and find.
+                this.pickAnisetteApkLauncher.launch(new String[] {"*/*"});
+            });
+        }
+
+        final View clearApk = view.findViewById(R.id.anisetteClearApkButton);
+        if (clearApk != null) {
+            clearApk.setOnClickListener(v -> this.forgetTheSuppliedApk(view));
+        }
+    }
+
+    /** The Anisette dialog currently on screen, so a file-picker result can update it. */
+    private View anisetteDialogView;
+
+    /**
+     * Picks an Apple Music APK to take the ADI libraries from.
+     *
+     * <p>{@code OpenDocument} rather than {@code GetContent}: this reads a file of tens of
+     * megabytes, and a persistable grant means a copy that stays readable rather than one that
+     * evaporates the moment the dialog closes.
+     */
+    private final ActivityResultLauncher<String[]> pickAnisetteApkLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) {
+                    this.importAnisetteApk(uri);
+                }
+            });
+
+    /**
+     * Take the libraries out of a chosen APK, if they are the ones this app knows how to use.
+     *
+     * <p>Off the main thread: it reads and hashes tens of megabytes.
+     *
+     * <p>Nothing about accepting a file from elsewhere lowers the bar. It is checked against
+     * the same recorded hashes as Apple's own copy, so a wrong or hostile file is rejected by
+     * exactly the check that rejects a corrupted download - and nothing is kept unless every
+     * library matched.
+     */
+    private void importAnisetteApk(final Uri apk) {
+        final View view = this.anisetteDialogView;
+        if (view != null) {
+            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                    view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
+        }
+
+        var async = Observable.fromCallable(() -> {
+                    final String abi = Build.SUPPORTED_ABIS[0];
+                    final String problem = AdiLibraryImporter.importFrom(
+                            this, apk, LocalAnisette.libraryDirectory(this, abi), abi);
+                    return Optional.ofNullable(problem);
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(problem -> {
+                    if (problem.isPresent()) {
+                        Toast.makeText(this, this.getString(
+                                R.string.anisette_apk_rejected, problem.get()),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    // Remembered only so the screen can offer to go back to Apple's copy. The
+                    // libraries themselves are already extracted and verified, so nothing
+                    // later has to read this file again - or still have permission to.
+                    this.currentSettings.setAnisetteApkUri(apk.toString());
+                    this.saveSettings();
+
+                    if (view != null) {
+                        this.loadLocalAnisetteStatus(view);
+                    }
+                }, error -> Log.e(TAG, "failed to import the supplied APK", error));
+    }
+
+    /**
+     * Go back to Apple's copy.
+     *
+     * <p>Deletes the extracted libraries as well as forgetting the file: leaving them would
+     * mean "use Apple's copy" quietly kept using the other one, since the fetcher skips the
+     * network for files that are already there.
+     */
+    private void forgetTheSuppliedApk(final View view) {
+        var async = Observable.fromCallable(() -> {
+                    final String abi = Build.SUPPORTED_ABIS[0];
+                    final File directory = LocalAnisette.libraryDirectory(this, abi);
+                    for (final String name : LocalAnisette.requiredLibraries()) {
+                        final File library = new File(directory, name);
+                        if (library.exists() && !library.delete()) {
+                            Log.w(TAG, "could not remove " + library);
+                        }
+                    }
+                    return Boolean.TRUE;
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(done -> {
+                    this.currentSettings.setAnisetteApkUri(null);
+                    this.saveSettings();
+                    this.loadLocalAnisetteStatus(view);
+                }, error -> Log.e(TAG, "failed to discard the supplied APK", error));
     }
 
     /**
