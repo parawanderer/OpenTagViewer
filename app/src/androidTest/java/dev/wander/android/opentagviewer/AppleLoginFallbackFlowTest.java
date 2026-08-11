@@ -221,7 +221,9 @@ public class AppleLoginFallbackFlowTest {
                 .perform(scrollTo(), replaceText(PASSWORD), closeSoftKeyboard());
         TestPace.afterAStep();
 
-        onView(withId(R.id.login_button_main)).perform(scrollTo(), click());
+        // Retried: closeSoftKeyboard() asks the IME to go away and does not wait for it, so a
+        // click issued immediately can land while the keyboard is still over the button.
+        eventually(() -> onView(withId(R.id.login_button_main)).perform(scrollTo(), click()));
         TestPace.afterAStep();
     }
 

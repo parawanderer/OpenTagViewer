@@ -102,6 +102,14 @@ public final class FakeAppleAuthService implements AppleAuthService {
         if (this.loginFailsWith != null) {
             return Observable.error(this.loginFailsWith);
         }
+
+        // The real sign-in runs in Python, which asks local Anisette whether it is usable,
+        // falls back to the server if not, and records which one it ended up using. That
+        // recording is what the screen reads afterwards to store the mode, so a fake that
+        // skipped it would leave the screen reading a value nothing had written.
+        if (localAnisette != null) {
+            localAnisette.recordSessionProvenance(localAnisette.ensureReady());
+        }
         return Observable.just(
                 new PythonAuthResponse(null, this.loginState, this.authMethods));
     }

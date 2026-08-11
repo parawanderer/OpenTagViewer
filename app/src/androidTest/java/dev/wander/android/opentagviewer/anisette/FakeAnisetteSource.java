@@ -98,6 +98,11 @@ public final class FakeAnisetteSource implements AnisetteSource {
         return this.ready ? "fake, ready" : "fake, unavailable: " + this.unavailableReason;
     }
 
+    @Override
+    public boolean wasSessionEstablishedLocally() {
+        return Boolean.TRUE.equals(this.recordedProvenance);
+    }
+
     /** What was recorded, or null if nothing was. */
     public Boolean recordedProvenance() {
         return this.recordedProvenance;

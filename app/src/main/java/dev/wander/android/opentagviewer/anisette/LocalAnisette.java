@@ -235,6 +235,7 @@ public final class LocalAnisette implements AnisetteSource {
     }
 
     /** Whether the stored session was established with local Anisette. */
+    @Override
     public synchronized boolean wasSessionEstablishedLocally() {
         return this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                 .getBoolean(KEY_SESSION_WAS_LOCAL, false);

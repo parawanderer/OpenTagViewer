@@ -37,8 +37,18 @@ public interface AnisetteSource {
     /** The machine identifier, base64. Empty string when unavailable. */
     String machine();
 
-    /** Record which kind of Anisette established the current session. */
+    /**
+     * Record which kind of Anisette established the current session.
+     *
+     * <p>Called from the Python side, which is the only place that knows: it decides at
+     * sign-in time whether the local provider was usable and falls back on its own. Anything
+     * on the Java side can only guess from a status read earlier, and would be wrong exactly
+     * when it mattered - a sign-in that started local and fell back mid-way.
+     */
     void recordSessionProvenance(boolean establishedLocally);
+
+    /** What {@link #recordSessionProvenance} last recorded. False if nothing has. */
+    boolean wasSessionEstablishedLocally();
 
     /** Short human-readable state, for logs and diagnostics. */
     String describe();

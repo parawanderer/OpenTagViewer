@@ -882,18 +882,18 @@ public class AppleLoginActivity extends AppCompatActivity {
      * means nobody has decided, and someone who updated from a version without any of this
      * never ran this code, so they keep it and still get asked once.
      *
-     * <p>Also records provenance on the source itself, which is what lets a later fall-back to
-     * a server report itself rather than presenting as auth failing for no reason.
+     * <p><b>Read, not guessed.</b> Which kind actually produced the session is decided inside
+     * the Python sign-in, which consults local Anisette itself and falls back on its own - so
+     * it records the answer, and this only copies it. Inferring it here from the status shown
+     * when the screen opened would be wrong in precisely the interesting case: a sign-in that
+     * began local and fell back part-way would be filed as local.
      */
     private void recordHowThisSessionWasEstablished() {
-        // What was handed to Python, rather than asking again: ensureReady() blocks, and this
-        // runs on the main thread at the end of a sign-in.
-        final boolean establishedLocally =
-                this.localAnisetteStatus.state() == AnisetteStatus.State.READY;
-
-        if (this.localAnisette != null) {
-            this.localAnisette.recordSessionProvenance(establishedLocally);
+        if (this.localAnisette == null) {
+            return;
         }
+
+        final boolean establishedLocally = this.localAnisette.wasSessionEstablishedLocally();
 
         this.getUserSettings().setAnisetteMode(establishedLocally
                 ? UserSettings.ANISETTE_LOCAL : UserSettings.ANISETTE_REMOTE);
