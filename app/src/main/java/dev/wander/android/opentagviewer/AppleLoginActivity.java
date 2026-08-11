@@ -168,7 +168,7 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this::onAnisetteUrlInputTyped
         );
 
-        this.anisetteServerTesterService = new AnisetteServerTesterService(cronet);
+        this.anisetteServerTesterService = LoginDependencies.serverTester(cronet);
 
         this.authService = LoginDependencies.authService();
 
