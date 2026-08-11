@@ -73,9 +73,16 @@ public class AnisetteApkPickerFlowTest {
     private Context context;
     private ActivityScenario<SettingsActivity> scenario;
 
+    private DeviceStateGuard deviceState;
+
     @Before
     public void pretendAppleShippedANewBuild() {
         this.context = getInstrumentation().getTargetContext();
+
+        // First, before anything below overwrites it. These tests are destructive to whatever
+        // is on the device, which is invisible on the managed device and very visible on one
+        // somebody uses.
+        this.deviceState = DeviceStateGuard.capture(this.context);
 
         // Local mode explicitly: this screen is for somebody already signed in, and an
         // unchosen mode deliberately keeps those people on their server.
@@ -98,7 +105,7 @@ public class AnisetteApkPickerFlowTest {
         AppDependencies.reset();
 
         deleteExtractedLibraries();
-        storeSettings(UserSettings.builder().build());
+        this.deviceState.restore();
     }
 
     /**
