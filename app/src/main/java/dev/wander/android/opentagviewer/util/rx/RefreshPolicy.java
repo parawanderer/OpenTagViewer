@@ -46,6 +46,33 @@ public final class RefreshPolicy {
     /** Volatile: written from the fetch's thread, read by the scheduler on the main thread. */
     private volatile long lastFetchAt = 0L;
 
+    /**
+     * The one everybody shares, for as long as the process lives.
+     *
+     * <p>"When did we last ask Apple" is a fact about the app, not about a screen. Held per
+     * activity, it was reset every time the activity was rebuilt - and changing the theme,
+     * language or map provider rebuilds every activity in the process, so the map came back
+     * believing it had never fetched and immediately asked Apple for everything again.
+     *
+     * <p>That is not merely slow. A full fetch walks each tag's key history, and repeating it
+     * because somebody toggled dark mode three times is the kind of traffic AGENTS.md rule 6
+     * is about.
+     */
+    private static volatile RefreshPolicy shared;
+
+    public static synchronized RefreshPolicy shared(
+            final long minIntervalMillis, final int maxHoursBack) {
+        if (shared == null) {
+            shared = new RefreshPolicy(minIntervalMillis, maxHoursBack);
+        }
+        return shared;
+    }
+
+    /** Forget the shared instance, so a test starts from "never fetched". */
+    public static synchronized void resetShared() {
+        shared = null;
+    }
+
     public RefreshPolicy(final long minIntervalMillis, final int maxHoursBack) {
         this.minIntervalMillis = minIntervalMillis;
         this.maxHoursBack = maxHoursBack;
