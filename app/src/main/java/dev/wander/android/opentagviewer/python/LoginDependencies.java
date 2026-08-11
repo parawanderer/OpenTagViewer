@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.python;
 
 import android.content.Context;
 
+import org.chromium.net.CronetEngine;
+
 import androidx.annotation.VisibleForTesting;
 
 import java.util.function.Function;
@@ -9,6 +11,7 @@ import java.util.function.Function;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 
 /**
  * What the sign-in screen depends on, in one place a test can replace.
@@ -45,8 +48,27 @@ public final class LoginDependencies {
         AnisetteSource create(Context context, UserSettings settings, boolean hasExistingSession);
     }
 
+    /**
+     * How to build the thing that asks an Anisette server whether it is alive.
+     *
+     * <p>Here for the same reason as the rest: the sign-in screen tests a server before it
+     * will let anybody past, so a test of the fall-back path would otherwise depend on a
+     * stranger's machine being up.
+     */
+    private static Function<CronetEngine, AnisetteServerTesterService> serverTesterFactory =
+            AnisetteServerTesterService::new;
+
     public static AppleAuthService authService() {
         return authService;
+    }
+
+    public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
+        return serverTesterFactory.apply(engine);
+    }
+
+    @VisibleForTesting
+    public static void replaceServerTester(final AnisetteServerTesterService replacement) {
+        serverTesterFactory = engine -> replacement;
     }
 
     public static AnisetteSource anisette(
@@ -69,5 +91,6 @@ public final class LoginDependencies {
     public static void reset() {
         authService = new PythonAppleAuthService();
         anisetteFactory = LocalAnisette::new;
+        serverTesterFactory = AnisetteServerTesterService::new;
     }
 }
