@@ -179,7 +179,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private boolean initialFetchComplete = false;
 
     /** When a refresh is allowed, and how much history it should ask for. See RefreshPolicyTest. */
-    private final RefreshPolicy refreshPolicy = new RefreshPolicy(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
+    // Shared across activity instances on purpose - see RefreshPolicy.shared. Rebuilding this
+    // screen must not look like an app that has never spoken to Apple.
+    private final RefreshPolicy refreshPolicy =
+            RefreshPolicy.shared(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
 
     private TagListSwiperHelper tagListSwiperHelper = null;
 
@@ -886,9 +889,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // afterwards try to fetch the latest location reports from the Apple servers
         // store those reports in the DB (cache) and then show the updated positions
         var asyncCombo = Observable.zip(asyncAppleService, asyncBeaconData, (service, beacons) ->
+            // Not on every start. This screen is rebuilt whenever the theme, language or map
+            // provider changes - AppCompat relaunches every activity in the process - and an
+            // unconditional fetch here meant each of those cost a full walk of every tag's
+            // key history. The cached locations are already on screen by this point, so
+            // skipping is invisible except for the absence of the "locating" banner.
+            this.refreshPolicy.decide(
+                        System.currentTimeMillis(), true, true, PythonAppleService.isBusy())
+                    .shouldRefresh()
             // map to expected format:
-            this.fetchLastReports(
+            ? this.fetchLastReports(
                     beacons.stream().collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw)))
+            : this.skipTheStartupFetch()
         ).flatMap(o -> o)
         .doOnNext(this::addBeaconLocationsToCurrent)
         .flatMap(o -> this.updateBeaconGeocodings().andThen(Observable.just(o)))
@@ -1305,6 +1317,20 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, false);
                     //Toast.makeText(this, "Failed to refresh current location markers!", LENGTH_SHORT).show();
                 });
+    }
+
+    /**
+     * Stand in for a startup fetch that was not worth making.
+     *
+     * <p>Empty rather than absent, so the stream still completes and everything hanging off
+     * it - the loading indicators, {@code initialFetchComplete}, the periodic refresher -
+     * runs exactly as it would have. The scheduled refresh will pick things up when the
+     * interval is actually up.
+     */
+    private Observable<Map<String, List<BeaconLocationReport>>> skipTheStartupFetch() {
+        Log.i(TAG, "Skipping the startup fetch: " + this.refreshPolicy.describeTimeSinceLastFetch(
+                System.currentTimeMillis()) + ", so the cached locations stand");
+        return Observable.empty();
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReports(final Map<String, String> beaconIdToPlist) {
