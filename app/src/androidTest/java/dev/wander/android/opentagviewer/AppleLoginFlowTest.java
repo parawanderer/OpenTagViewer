@@ -112,6 +112,11 @@ public class AppleLoginFlowTest {
         this.deviceState.restore();
     }
 
+    private static UserSettings storedSettings() {
+        return new UserSettingsRepository(UserSettingsDataStore.getInstance(
+                getInstrumentation().getTargetContext())).getUserSettings();
+    }
+
     /**
      * Clear any stored session, and wait until it stays cleared.
      *
@@ -120,11 +125,6 @@ public class AppleLoginFlowTest {
      * could therefore see an empty store that is about to be written to, so this insists on
      * seeing it empty a few times running before believing it.
      */
-    private static UserSettings storedSettings() {
-        return new UserSettingsRepository(UserSettingsDataStore.getInstance(
-                getInstrumentation().getTargetContext())).getUserSettings();
-    }
-
     private static void signEverybodyOut() {
         final UserAuthRepository auth = new UserAuthRepository(
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
@@ -366,7 +366,11 @@ public class AppleLoginFlowTest {
                 .perform(replaceText(PASSWORD), closeSoftKeyboard());
         TestPace.afterAStep();
 
-        onView(withId(R.id.login_button_main)).perform(click());
+        // Retried: closeSoftKeyboard() asks the IME to go away and does not wait for it, so a
+        // click issued straight after can land while the keyboard is still over the button.
+        // Fast machines hide it in time and slow ones do not, which is why this passed locally
+        // and failed in CI.
+        eventually(() -> onView(withId(R.id.login_button_main)).perform(click()));
         TestPace.afterAStep();
     }
 
