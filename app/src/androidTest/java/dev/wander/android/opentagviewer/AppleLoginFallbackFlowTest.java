@@ -127,7 +127,7 @@ public class AppleLoginFallbackFlowTest {
 
         eventually(() -> onView(withId(R.id.go_to_maininfo))
                 .perform(scrollTo()).check(matches(isDisplayed())));
-        onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click());
+        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
         TestPace.afterAStep();
 
         signIn();
@@ -146,7 +146,7 @@ public class AppleLoginFallbackFlowTest {
 
         eventually(() -> onView(withId(R.id.go_to_maininfo))
                 .perform(scrollTo()).check(matches(isDisplayed())));
-        onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click());
+        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
         signIn();
 
         eventually(() -> assertNotNull(apple.serverUrlUsed()));
