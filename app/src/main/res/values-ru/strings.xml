@@ -136,4 +136,5 @@
     <string name="anisette_upgrade_later_hint">Переключиться можно позже в настройках.</string>
     <string name="anisette_local_status_checking">Проверка…</string>
     <string name="anisette_login_needs_server">Это устройство не смогло настроить вход самостоятельно, поэтому в этот раз используется сервер. Позже это можно изменить в настройках.</string>
+    <string name="anisette_provider">Источник Anisette</string>
 </resources>
