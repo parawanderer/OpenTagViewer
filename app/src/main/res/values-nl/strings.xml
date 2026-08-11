@@ -136,4 +136,5 @@
     <string name="anisette_upgrade_later_hint">Je kunt later overstappen via Instellingen.</string>
     <string name="anisette_local_status_checking">Controleren…</string>
     <string name="anisette_login_needs_server">Dit apparaat kon het aanmelden niet zelf regelen, dus doet een server dat deze keer. Je kunt dit later wijzigen in de instellingen.</string>
+    <string name="anisette_provider">Anisette-aanbieder</string>
 </resources>

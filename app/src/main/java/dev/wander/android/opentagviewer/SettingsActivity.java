@@ -706,7 +706,11 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.anisette_server_url)
+                // Not "Anisette Server URL": this dialog chooses where sign-in data comes
+                // from, and in the usual case that is this device, with no server and no URL
+                // anywhere in it. The login screen keeps that wording, where it does label a
+                // URL field.
+                .setTitle(R.string.anisette_provider)
                 .setView(view)
                 .show();
 

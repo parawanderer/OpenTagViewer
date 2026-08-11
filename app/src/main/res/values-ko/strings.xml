@@ -136,4 +136,5 @@
     <string name="anisette_upgrade_later_hint">설정에서 언제든 전환할 수 있습니다.</string>
     <string name="anisette_local_status_checking">확인 중…</string>
     <string name="anisette_login_needs_server">이 기기에서 로그인을 직접 준비하지 못해 이번에는 서버를 사용합니다. 나중에 설정에서 변경할 수 있습니다.</string>
+    <string name="anisette_provider">Anisette 제공자</string>
 </resources>
