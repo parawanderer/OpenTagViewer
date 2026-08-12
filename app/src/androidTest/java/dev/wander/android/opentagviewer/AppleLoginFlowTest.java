@@ -160,16 +160,16 @@ public class AppleLoginFlowTest {
         signIn();
 
         // Apple asked for a second factor, so the choice of how to receive it comes next.
-        eventually(() -> onView(withText(R.string.two_factor_authentication))
+        Eventually.check(() -> onView(withText(R.string.two_factor_authentication))
                 .check(matches(isDisplayed())));
         chooseTheTextTo(FakeAppleAuthService.PHONE_TWO);
 
-        eventually(() -> onView(withId(R.id.twofa_sent_info_text)).check(matches(isDisplayed())));
+        Eventually.check(() -> onView(withId(R.id.twofa_sent_info_text)).check(matches(isDisplayed())));
         pasteTheCode(CODE);
 
-        eventually(() -> assertEquals("the code has to reach Apple exactly as typed",
+        Eventually.check(() -> assertEquals("the code has to reach Apple exactly as typed",
                 CODE, apple.submittedCode()));
-        eventually(() -> intended(hasComponent(MapsActivity.class.getName())));
+        Eventually.check(() -> intended(hasComponent(MapsActivity.class.getName())));
     }
 
     /**
@@ -188,7 +188,7 @@ public class AppleLoginFlowTest {
 
         pasteTheCode(CODE);
 
-        eventually(() -> assertEquals(CODE, apple.submittedCode()));
+        Eventually.check(() -> assertEquals(CODE, apple.submittedCode()));
         assertEquals("submitted once, not once per box", 1, apple.timesCalled("submitCode"));
     }
 
@@ -201,7 +201,7 @@ public class AppleLoginFlowTest {
 
         pasteTheCode(CODE);
 
-        eventually(() -> assertNotNull(apple.codeSubmittedAgainst()));
+        Eventually.check(() -> assertNotNull(apple.codeSubmittedAgainst()));
         assertEquals("the code belongs to the number Apple texted",
                 FakeAppleAuthService.PHONE_TWO,
                 ((AuthMethodPhone) apple.codeSubmittedAgainst()).getPhoneNumber());
@@ -225,7 +225,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        eventually(() -> assertEquals("the mode has to be written down once there is a session",
+        Eventually.check(() -> assertEquals("the mode has to be written down once there is a session",
                 UserSettings.ANISETTE_LOCAL, storedSettings().getAnisetteMode()));
         assertFalse("nobody should be offered an upgrade to what they just signed in with",
                 storedSettings().shouldOfferLocalAnisette(true));
@@ -240,7 +240,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        eventually(() -> intended(hasComponent(MapsActivity.class.getName())));
+        Eventually.check(() -> intended(hasComponent(MapsActivity.class.getName())));
         assertEquals("nothing should have asked for a code",
                 0, apple.timesCalled("requestCode"));
     }
@@ -259,7 +259,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        eventually(() -> onView(withId(R.id.login_error_container)).check(matches(isDisplayed())));
+        Eventually.check(() -> onView(withId(R.id.login_error_container)).check(matches(isDisplayed())));
         onView(withId(R.id.login_maininfo_container)).check(matches(isDisplayed()));
         onView(withId(R.id.login_button_main)).check(matches(isDisplayed()));
     }
@@ -275,7 +275,7 @@ public class AppleLoginFlowTest {
         chooseTheTextTo(FakeAppleAuthService.PHONE_ONE);
         pasteTheCode("000000");
 
-        eventually(() -> onView(withId(R.id.verification_code_error_msg_container))
+        Eventually.check(() -> onView(withId(R.id.verification_code_error_msg_container))
                 .check(matches(isDisplayed())));
         onView(withId(R.id.login_2fa_container)).check(matches(isDisplayed()));
     }
@@ -294,7 +294,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        eventually(() -> onView(withId(R.id.twofactorauth_choice_trusted_device))
+        Eventually.check(() -> onView(withId(R.id.twofactorauth_choice_trusted_device))
                 .check(matches(isDisplayed())));
     }
 
@@ -313,7 +313,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        eventually(() -> assertSame("local Anisette has to reach the sign-in",
+        Eventually.check(() -> assertSame("local Anisette has to reach the sign-in",
                 fakeAnisette, apple.anisetteUsed()));
         assertNotNull("Python needs a fallback URL even when it is not used",
                 apple.serverUrlUsed());
@@ -332,32 +332,6 @@ public class AppleLoginFlowTest {
         TestPace.afterAStep();
     }
 
-    /**
-     * Retry an assertion until it holds, or give up.
-     *
-     * <p>Espresso waits for the main thread to go idle, and for nothing else. Every step of
-     * signing in runs on an RxJava scheduler and hops back, so an assertion made the instant
-     * a click returns is asking about work that has not started yet. This is a real property
-     * of the screen rather than a test defect - the alternative, an IdlingResource, would mean
-     * threading test-only bookkeeping through production Rx chains.
-     */
-    private static void eventually(final Runnable assertion) {
-        AssertionError last = null;
-
-        for (int attempt = 0; attempt < 50; attempt++) {
-            try {
-                assertion.run();
-                return;
-            } catch (final AssertionError error) {
-                last = error;
-                getInstrumentation().waitForIdleSync();
-                SystemClock.sleep(100);
-            }
-        }
-
-        throw last;
-    }
-
     private void signIn() {
         onView(withId(R.id.email_or_phone_input_field)).perform(replaceText(EMAIL));
         TestPace.afterAStep();
@@ -366,16 +340,16 @@ public class AppleLoginFlowTest {
                 .perform(replaceText(PASSWORD), closeSoftKeyboard());
         TestPace.afterAStep();
 
-        // Retried: closeSoftKeyboard() asks the IME to go away and does not wait for it, so a
-        // click issued straight after can land while the keyboard is still over the button.
-        // Fast machines hide it in time and slow ones do not, which is why this passed locally
-        // and failed in CI.
-        eventually(() -> onView(withId(R.id.login_button_main)).perform(click()));
+        // Retried until Apple was actually asked, not until nothing throws. The keyboard may
+        // still be over the button (retry), or the tap may have worked and already finished a
+        // sign-in that tears this screen down (stop). See Eventually.perform.
+        Eventually.perform("the sign in button", () -> apple.timesCalled("login") > 0,
+                () -> onView(withId(R.id.login_button_main)).perform(click()));
         TestPace.afterAStep();
     }
 
     private void chooseTheTextTo(final String phoneNumber) {
-        eventually(() -> onView(withText(
+        Eventually.check(() -> onView(withText(
                 getInstrumentation().getTargetContext()
                         .getString(R.string.auth_by_sms_to_x, phoneNumber)))
                 .perform(click()));

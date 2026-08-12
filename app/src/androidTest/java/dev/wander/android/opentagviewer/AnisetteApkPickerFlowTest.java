@@ -118,7 +118,7 @@ public class AnisetteApkPickerFlowTest {
     public void appleChangingTheLibrariesOffersTheChoice() {
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteOwnApkContainer)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteOwnApkContainer)).inRoot(isDialog())
                 .check(matches(isDisplayed())));
         onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .check(matches(isDisplayed()));
@@ -135,10 +135,10 @@ public class AnisetteApkPickerFlowTest {
         stubThePickerWith(null);
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .perform(click()));
 
-        eventually(() -> intended(hasAction(Intent.ACTION_OPEN_DOCUMENT)));
+        Eventually.check(() -> intended(hasAction(Intent.ACTION_OPEN_DOCUMENT)));
     }
 
     /**
@@ -153,7 +153,7 @@ public class AnisetteApkPickerFlowTest {
         stubThePickerWith(aZipPretendingToBeAppleMusic());
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .perform(click()));
 
         // Give the import - which reads and hashes the file - time to finish and be rejected.
@@ -178,10 +178,10 @@ public class AnisetteApkPickerFlowTest {
         stubThePickerWith(aZipPretendingToBeAppleMusic());
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .perform(click()));
 
-        eventually(() -> onView(withId(R.id.anisetteApkRejection)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteApkRejection)).inRoot(isDialog())
                 .check(matches(allOf(isDisplayed(),
                         withText(containsString("libc++_shared.so"))))));
     }
@@ -198,10 +198,10 @@ public class AnisetteApkPickerFlowTest {
         stubThePickerWith(aZipPretendingToBeAppleMusic());
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .perform(click()));
 
-        eventually(() -> onView(withId(R.id.anisetteLocalProgress)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteLocalProgress)).inRoot(isDialog())
                 .check(matches(not(isDisplayed()))));
     }
 
@@ -216,7 +216,7 @@ public class AnisetteApkPickerFlowTest {
         stubThePickerWith(null);
         openTheAnisetteSettings();
 
-        eventually(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
+        Eventually.check(() -> onView(withId(R.id.anisetteChooseApkButton)).inRoot(isDialog())
                 .perform(click()));
         settle();
 
@@ -231,7 +231,7 @@ public class AnisetteApkPickerFlowTest {
         this.scenario = ActivityScenario.launch(SettingsActivity.class);
         TestPace.afterAStep();
 
-        eventually(() -> onView(withId(R.id.setting_app_anisette_server))
+        Eventually.check(() -> onView(withId(R.id.setting_app_anisette_server))
                 .perform(click()));
         TestPace.afterAStep();
     }
@@ -302,24 +302,4 @@ public class AnisetteApkPickerFlowTest {
         }
     }
 
-    /** See AppleLoginFlowTest.eventually - the same reason, and the same RuntimeException catch. */
-    private static void eventually(final Runnable assertion) {
-        Throwable last = null;
-
-        for (int attempt = 0; attempt < 50; attempt++) {
-            try {
-                assertion.run();
-                return;
-            } catch (final AssertionError | RuntimeException error) {
-                last = error;
-                getInstrumentation().waitForIdleSync();
-                SystemClock.sleep(100);
-            }
-        }
-
-        if (last instanceof RuntimeException) {
-            throw (RuntimeException) last;
-        }
-        throw (AssertionError) last;
-    }
 }
