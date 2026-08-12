@@ -181,6 +181,42 @@ Three consequences worth knowing:
 - `./gradlew testDebugUnitTest` is close to meaningless: there is exactly one JVM test and it
   asserts `2 + 2 == 4`. Everything real is instrumented. Do not report "tests pass" off it.
 
+### Writing an Espresso test that is not flaky
+
+**Never call `onView(...)` bare when the screen may still be settling, and never retry a click
+until it stops throwing.** Both mistakes pass on a fast machine and fail in CI, which is how
+this repo went red three runs in a row.
+
+Use `Eventually` (in `app/src/androidTest/.../Eventually.java`). It has exactly two methods,
+and picking the wrong one is the bug:
+
+| | Use for | Why |
+| --- | --- | --- |
+| `Eventually.check(() -> …)` | assertions, and waiting for a view to appear | Espresso waits for the main thread to go idle and **nothing else**; every step in this app runs on an Rx scheduler and hops back, so a check made the instant a click returns asks about work that has not started |
+| `Eventually.perform(what, tookEffect, () -> …)` | **anything that changes the screen** | see below |
+
+`perform` exists because retrying-until-no-exception cannot tell two opposite things apart:
+
+- the tap **missed** — the soft keyboard was still over the button — and must be retried
+- the tap **worked**, and what it started has already torn the screen down, so Espresso throws
+  `NoActivityResumedException` from the very same call
+
+Retrying the second turns one success into fifty failures. Only the test knows what "it
+worked" means, so it says — usually by asking a fake what it was called with:
+
+```java
+Eventually.perform("the sign in button", () -> apple.timesCalled("login") > 0,
+        () -> onView(withId(R.id.login_button_main)).perform(click()));
+```
+
+Two more rules that came out of the same failures:
+
+- **One `ViewAction` per `perform` when the action might finish the flow.**
+  `perform(replaceText(code), closeSoftKeyboard())` fails on the *second* action, because the
+  first one completed the sign-in and there is no activity left to close a keyboard on.
+- **A `GONE` view still matches `withId`.** "Not on screen" is `matches(not(isDisplayed()))`,
+  never an expected `NoMatchingViewException`.
+
 ### Showing a UI test to a person
 
 A UI test runs at machine speed — a whole sign-in is over in about three seconds and looks
