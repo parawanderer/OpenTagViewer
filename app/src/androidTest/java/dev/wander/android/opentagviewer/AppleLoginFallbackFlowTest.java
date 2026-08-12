@@ -115,7 +115,7 @@ public class AppleLoginFallbackFlowTest {
     public void aDeviceThatCannotManageOnItsOwnGetsTheServerFieldBack() {
         launch();
 
-        eventually(() -> onView(withId(R.id.anisetteRemoteSection))
+        Eventually.check(() -> onView(withId(R.id.anisetteRemoteSection))
                 .perform(scrollTo()).check(matches(isDisplayed())));
         onView(withId(R.id.anisetteLoginFallbackReason)).perform(scrollTo()).check(matches(isDisplayed()));
     }
@@ -125,14 +125,14 @@ public class AppleLoginFallbackFlowTest {
     public void theyCanStillSignInThroughAServer() {
         launch();
 
-        eventually(() -> onView(withId(R.id.go_to_maininfo))
+        Eventually.check(() -> onView(withId(R.id.go_to_maininfo))
                 .perform(scrollTo()).check(matches(isDisplayed())));
-        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
+        Eventually.check(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
         TestPace.afterAStep();
 
         signIn();
 
-        eventually(() -> intended(hasComponent(MapsActivity.class.getName())));
+        Eventually.check(() -> intended(hasComponent(MapsActivity.class.getName())));
     }
 
     /**
@@ -144,12 +144,12 @@ public class AppleLoginFallbackFlowTest {
     public void theConfiguredServerIsWhatTheSignInActuallyUses() {
         launch();
 
-        eventually(() -> onView(withId(R.id.go_to_maininfo))
+        Eventually.check(() -> onView(withId(R.id.go_to_maininfo))
                 .perform(scrollTo()).check(matches(isDisplayed())));
-        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
+        Eventually.check(() -> onView(withId(R.id.go_to_maininfo)).perform(scrollTo(), click()));
         signIn();
 
-        eventually(() -> assertNotNull(apple.serverUrlUsed()));
+        Eventually.check(() -> assertNotNull(apple.serverUrlUsed()));
         assertTrue("a real URL, not a placeholder", apple.serverUrlUsed().startsWith("http"));
         assertTrue("the server should have been checked before letting anybody past",
                 server.calls() > 0);
@@ -170,7 +170,7 @@ public class AppleLoginFallbackFlowTest {
         launch();
 
         // Straight to the account form - no welcome step, no server to choose.
-        eventually(() -> onView(withId(R.id.email_or_phone_input_field))
+        Eventually.check(() -> onView(withId(R.id.email_or_phone_input_field))
                 .perform(scrollTo()).check(matches(isDisplayed())));
 
         assertEquals("nothing should have asked a server anything", 0, server.calls());
@@ -191,10 +191,10 @@ public class AppleLoginFallbackFlowTest {
     @Test
     public void aSignInThroughAServerIsRecordedAsRemote() {
         launch();
-        eventually(() -> onView(withId(R.id.go_to_maininfo)).perform(click()));
+        Eventually.check(() -> onView(withId(R.id.go_to_maininfo)).perform(click()));
         signIn();
 
-        eventually(() -> assertEquals(UserSettings.ANISETTE_REMOTE,
+        Eventually.check(() -> assertEquals(UserSettings.ANISETTE_REMOTE,
                 storedSettings().getAnisetteMode()));
     }
 
@@ -211,7 +211,7 @@ public class AppleLoginFallbackFlowTest {
     }
 
     private void signIn() {
-        eventually(() -> onView(withId(R.id.email_or_phone_input_field))
+        Eventually.check(() -> onView(withId(R.id.email_or_phone_input_field))
                 .perform(scrollTo()).check(matches(isDisplayed())));
 
         onView(withId(R.id.email_or_phone_input_field)).perform(scrollTo(), replaceText(EMAIL));
@@ -221,31 +221,14 @@ public class AppleLoginFallbackFlowTest {
                 .perform(scrollTo(), replaceText(PASSWORD), closeSoftKeyboard());
         TestPace.afterAStep();
 
-        // Retried: closeSoftKeyboard() asks the IME to go away and does not wait for it, so a
-        // click issued immediately can land while the keyboard is still over the button.
-        eventually(() -> onView(withId(R.id.login_button_main)).perform(scrollTo(), click()));
+        // Two opposite hazards meet on this button. closeSoftKeyboard() does not wait for the
+        // IME to go, so a tap can land on the keyboard and needs retrying - but a tap that
+        // works signs the user straight in and tears this screen down, which Espresso reports
+        // from the same call. "Did Apple get asked to sign in" separates them; nothing about
+        // the exception or the view state can.
+        Eventually.perform("the sign in button", () -> apple.timesCalled("login") > 0,
+                () -> onView(withId(R.id.login_button_main)).perform(scrollTo(), click()));
         TestPace.afterAStep();
-    }
-
-    /** See {@code AppleLoginFlowTest.eventually} - the same reason applies here. */
-    private static void eventually(final Runnable assertion) {
-        Throwable last = null;
-
-        for (int attempt = 0; attempt < 50; attempt++) {
-            try {
-                assertion.run();
-                return;
-            } catch (final AssertionError | RuntimeException error) {
-                last = error;
-                getInstrumentation().waitForIdleSync();
-                SystemClock.sleep(100);
-            }
-        }
-
-        if (last instanceof RuntimeException) {
-            throw (RuntimeException) last;
-        }
-        throw (AssertionError) last;
     }
 
 
