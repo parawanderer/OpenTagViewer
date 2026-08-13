@@ -521,3 +521,24 @@ because unlike the device list nothing ever removes it.
   simply not what explains these.
 - The `partial` cross-check is implemented as specified: `join_recovery_options` takes the count
   and logs a warning if it disagrees with the number of described-but-unviable records.
+
+### H2. Deletion works, and the corrected addressing is confirmed [observed]
+
+Escrow deletion was run against a live account on 2026-08-13. **Records were removed, and a
+re-listing confirmed the count dropped.** So §7.1's two-call flow is verified end to end, and with
+it the correction that deletion addresses `<label>` rather than `<bottleID>` — the earlier text
+would have addressed nothing.
+
+That the confirmation came from a *re-listing* rather than from the calls returning success is the
+part worth keeping. The protocol reports success for a deletion that addressed nothing, so a client
+that trusts its own return values cannot tell a removal from a no-op. The only proof is asking
+again, and any interface offering deletion should do that rather than reporting what it attempted.
+
+The viability guard did the work it was designed for without the user having to be careful: every
+record from the retired VM route sorted into the non-viable list and was offered, and the three
+live recovery paths were withheld. Debris and danger separated on their own, exactly as §7.1 now
+predicts — which is the argument for making viability the guard rather than the warning.
+
+**What this does not establish:** that new records stop appearing. Two of those removed were from
+the week before, so the route producing them is still running and the count will climb again. The
+cleanup is a cleanup, not a fix.
