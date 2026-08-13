@@ -956,43 +956,70 @@ Unwrapping one:
    >
    > **These are Apple's `SFIESCiphertext` from SecurityFoundation**, so the construction is a
    > named framework class rather than anything bespoke to this protocol. **No initialisation
-   > vector is archived**, which means it is derived or fixed rather than transmitted.
-   >
-   > A body length that is not a multiple of the block size rules out CBC and any padded mode.
+   > vector is archived** — it is derived, as §3 below sets out.
 
-3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
-   message: a UUID, a zone name, a key class and the key bytes.
+   ### The ciphertext member is longer than the ciphertext
+   >
+   > **This is the whole trap, and no amount of trying cipher parameters reaches it.**
+   >
+   > `SFCiphertext` carries the ciphertext followed by **113 bytes that are not part of it** —
+   > 97 + 16, the sizes of the ephemeral point and the authentication code. The producer sizes
+   > that buffer to hold all three parts, writes only the ciphertext into it, and archives the
+   > whole buffer without trimming it back.
+   >
+   > **So the ciphertext is the member with its last 113 bytes discarded.** For the 230-byte
+   > member observed above, 117 bytes are real. Passing all 230 to the cipher fails
+   > authentication exactly as a wrong key or a wrong parameter would, which is why a search
+   > over parameters can run to any size and never succeed.
+   >
+   > Derive the 113 from the sizes of the other two members rather than writing the constant —
+   > it is a point length plus a tag length, and a curve other than P-384 changes it.
+   >
+   > The trailing bytes are **uninitialised heap**, so they are whatever was in that memory.
+   > Do not read them, do not log them, and do not treat them as a field.
 
-   > **The exact key-derivation parameters are not established.** The structure above is confirmed;
-   > what turns the ECDH secret into an AES key is not. An implementation should try the
-   > combinations rather than assume one — each fails in microseconds on the authentication tag,
-   > and a wrong guess shipped costs a round trip against a real account to discover.
+3. **Decrypt with the recovered peer's encryption private key.**
+
+   | Step | |
+   | --- | --- |
+   | Agreement | ECDH between the recovered encryption private key and the archived ephemeral point. **Plain, not cofactor** — P-384's cofactor is 1 |
+   | Derivation | **ANSI X9.63**, **SHA-256**, 4-byte big-endian counter from 1, **shared info = the 97-byte ephemeral point** exactly as archived. Output **48 bytes** |
+   | Key | the **first 32** bytes — AES-256 |
+   | Nonce | the **next 16** bytes. **A 16-byte GCM nonce, not 12** |
+   | AAD | **none** |
+   | Cipher | AES-256-GCM over the trimmed ciphertext, with `SFIESAuthenticationCode` as the tag |
+
+   The plaintext is a protobuf message:
+
+   | # | Field |
+   | --- | --- |
+   | 1 | `uuid` |
+   | 2 | `zoneName` |
+   | 3 | `keyclass` |
+   | 4 | `key` — **the key bytes, and the thing this whole stage is for** |
+
+   > **This message is the view's top-level key.** It is not a container the real key is nested
+   > inside, and `key` is **symmetric key material, not an EC private key** — trying to read it as
+   > one fails for a reason nothing announces.
+
+4. **Unwrap the class keys the entry carries.** `viewkeys` holds `classA` and `classB` as `synckey`
+   records, and their `wrappedkey` is wrapped **under the key from step 3**.
+
+   > **These are not ECIES**, and this is the second place a reader reasonably assumes the
+   > construction carries over from the step before. They are **AES-256-CMAC-SIV**
+   > ([RFC 5297](https://www.rfc-editor.org/rfc/rfc5297), CMAC rather than PMAC), keyed with the
+   > `key` bytes from step 3, with **no associated data** — an empty vector of headers, which is
+   > not the same as one empty header.
    >
-   > **[observed] Every share on one account failed to authenticate** under X9.63 key derivation
-   > across both SHA-256 and SHA-384, 128- and 256-bit keys, 12- and 16-byte zero and derived IVs,
-   > and the point or nothing as shared info and as additional data. The failure was **uniform
-   > across every view**, which rules out per-share damage and nothing else: one wrong parameter
-   > and one wrong key fail identically and everywhere. Uniformity is not evidence for the
-   > cipher, and reading it that way is how a search gets widened when the key was the problem.
-   >
-   > Untried, and therefore where to look: HKDF rather than X9.63; deriving the IV **before** the
-   > key rather than after; the authentication code being an **HMAC over the point and ciphertext**
-   > rather than a GCM tag; and shared info other than the raw point — its compact
-   > representation, or the receiver's own public key.
-   >
-   > Not worth pursuing: cofactor ECDH. P-384's cofactor is 1, so it is indistinguishable from
-   > the plain exchange.
-   >
-   > **Before blaming the construction, check that the key is the right one.** A share names the
-   > key it was wrapped to in `receiverPublicEncryptionKey`, and a wrong key and a wrong
-   > construction both fail as an unchecked tag with nothing to separate them. If that field is
-   > absent or unparsed, a comparison against it silently passes and the resulting failure says
-   > nothing about the cipher. `receiver` against the recovered peer's own identifier is the same
-   > check for free.
-4. **Unwrap the view keys it carries.** `viewkeys` holds up to three `synckey` records — `tlk`,
-   `classA` and `classB` — whose `wrappedkey` is wrapped under **the key just recovered in step 3**,
-   not under a peer key. Decrypt each and keep all of them, together with the recovered key itself:
-   the top-level key alone is not what Stage 5 matches against.
+   > **`tlk` is not unwrapped here.** Step 3's plaintext *is* the top-level key, so an entry's
+   > `tlk` member is not a fourth thing to decrypt. Keep the step 3 message alongside the two
+   > class keys.
+
+   Each class key becomes a key of the same shape as step 3's message: the `synckey` record's own
+   `recordIdentifier` as the UUID, the zone name carried over from step 3, the record's `class`,
+   and the unwrapped bytes.
+
+   Keep all three. The top-level key alone is not what Stage 5 matches against.
 
 > ### This may remove every write from the flow
 >
