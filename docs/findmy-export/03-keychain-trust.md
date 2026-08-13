@@ -944,8 +944,49 @@ Unwrapping one:
    A share whose sender is not in the directory is to be skipped, not trusted.
 2. **Decode the wrapped key.** It is base64 of an **`NSKeyedArchiver` archive**, which expands to
    an ECIES ciphertext structure. Another encoding appearing nowhere else in this protocol.
+
+   > **[observed] The archive holds the three parts separately, under named members** — a reader
+   > expecting one concatenated blob finds nothing to slice. On a real share:
+   >
+   > | Member | Size | What it is |
+   > | --- | --- | --- |
+   > | `SFEphemeralSenderPublicKeyExternalRepresentation` | 97 B | the uncompressed P-384 point |
+   > | `SFCiphertext` | 230 B | the body |
+   > | `SFIESAuthenticationCode` | 16 B | the tag |
+   >
+   > **These are Apple's `SFIESCiphertext` from SecurityFoundation**, so the construction is a
+   > named framework class rather than anything bespoke to this protocol. **No initialisation
+   > vector is archived**, which means it is derived or fixed rather than transmitted.
+   >
+   > A body length that is not a multiple of the block size rules out CBC and any padded mode.
+
 3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
    message: a UUID, a zone name, a key class and the key bytes.
+
+   > **The exact key-derivation parameters are not established.** The structure above is confirmed;
+   > what turns the ECDH secret into an AES key is not. An implementation should try the
+   > combinations rather than assume one — each fails in microseconds on the authentication tag,
+   > and a wrong guess shipped costs a round trip against a real account to discover.
+   >
+   > **[observed] Every share on one account failed to authenticate** under X9.63 key derivation
+   > across both SHA-256 and SHA-384, 128- and 256-bit keys, 12- and 16-byte zero and derived IVs,
+   > and the point or nothing as shared info and as additional data. That the failure was *uniform
+   > across every view* points at one systematic parameter rather than at the shares.
+   >
+   > Untried, and therefore where to look: HKDF rather than X9.63; deriving the IV **before** the
+   > key rather than after; the authentication code being an **HMAC over the point and ciphertext**
+   > rather than a GCM tag; and shared info other than the raw point — its compact
+   > representation, or the receiver's own public key.
+   >
+   > Not worth pursuing: cofactor ECDH. P-384's cofactor is 1, so it is indistinguishable from
+   > the plain exchange.
+   >
+   > **Before blaming the construction, check that the key is the right one.** A share names the
+   > key it was wrapped to in `receiverPublicEncryptionKey`, and a wrong key and a wrong
+   > construction both fail as an unchecked tag with nothing to separate them. If that field is
+   > absent or unparsed, a comparison against it silently passes and the resulting failure says
+   > nothing about the cipher. `receiver` against the recovered peer's own identifier is the same
+   > check for free.
 4. **Unwrap the view keys it carries.** `viewkeys` holds up to three `synckey` records — `tlk`,
    `classA` and `classB` — whose `wrappedkey` is wrapped under **the key just recovered in step 3**,
    not under a peer key. Decrypt each and keep all of them, together with the recovered key itself:
