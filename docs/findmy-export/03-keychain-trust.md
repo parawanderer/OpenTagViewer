@@ -862,28 +862,33 @@ the guard uncritically cannot clean those up.
 
 ## 8. Open questions
 
-This stage has more of them than the rest of the set combined, and they are load-bearing.
+**Answered by the runs of 2026-08-13:**
 
-1. ~~Is the escrow host really `p<N>-escrowproxy.icloud.com`?~~ **[observed] Yes.** Derived from
-   the account's CloudKit partition, and the service answered. Ruled out as sources along the
-   way: the MobileMe delegate config (carries no configuration at all), and `ckAppInit`'s
-   `values` array — that is a per-environment endpoint table for the container being opened, one
-   row each for `PRODUCTION` and `SANDBOX`.
-2. **What is the exact SRP exchange for recovery?** §6 is a sketch. The parameters, the
-   derivation from the passcode, and the response format all need specifying before anything can
-   be implemented.
-3. **How are the peer's signed blobs constructed, exactly?** §6.9 enumerates every message, but
-   two things it does not settle: which fields of `PeerStableInfo` a client is *required* to
-   populate, and what the policy version and hash fields must contain. A peer that signs an
-   incomplete stable info may be admitted and then behave oddly rather than being rejected.
-4. **Which token authenticates what?** Stage 1 issues `com.apple.gs.icloud.escrow.auth`, but the
-   escrow proxy is authenticated with the PET. Whether that token is needed at all is unknown.
-5. **Can bottles be listed without any prior trust state?** §5 is presented as read-only and
-   safe, and the reference performs it before joining — but it also constructs a keychain client
-   first, and what that construction requires is not established. If listing turns out to need
-   local trust state that only exists after joining, the safe read-only step is not available.
+1. ~~Is the escrow host really `p<N>-escrowproxy.icloud.com`?~~ **Yes.** Derived from the account's
+   CloudKit partition, and the service answered. Ruled out along the way: the MobileMe delegate
+   configuration, which carries none, and `ckAppInit`'s `values` array, which is a per-environment
+   endpoint table for the container being opened.
+2. ~~What is the exact SRP exchange for recovery?~~ **Specified** in §6.1 to §6.5 — framing,
+   parameters, both blob layers and the passcode's two uses. **Written, not run.**
+3. ~~Can bottles be listed without any prior trust state?~~ **Yes.** The listing of §5 was
+   performed against a live account with no trust circle, no keychain state and no passcode, and
+   returned both halves of the join.
+
+**Still open:**
+
+4. **Which fields of `PeerStableInfo` must a client populate, and what must the policy version and
+   hash contain?** §6.9 enumerates every message but does not settle what a valid peer *asserts*.
+   A peer that signs an incomplete stable info may be admitted and then behave oddly rather than
+   being rejected, which is the worse failure.
+5. **Which token authenticates what?** Stage 1 issues `com.apple.gs.icloud.escrow.auth`, but the
+   escrow proxy is authenticated with the PET and works. Whether that token is needed at all is
+   unknown.
 6. **Does an account with Advanced Data Protection enabled behave differently?** ADP changes how
-   keychain material is protected, and Stage 1 §7.3 already notes an unverified claim that it
+   keychain material is protected, and Stage 1 §12 already carries an unverified claim that it
    breaks the two-factor configuration endpoint. It is likely to matter more here.
-7. **What happens on an account whose keychain circle is empty?** Presumably no viable bottles
-   and no way in. That case needs detecting and explaining to the user, not failing obscurely.
+7. **What happens on an account whose keychain circle is empty?** Presumably no viable bottles and
+   no way in. That case needs detecting and explaining, not failing obscurely.
+8. **Is a non-viable bottle ever transiently non-viable?** §7.1 makes viability the primary guard
+   on deletion, which is sound only if non-viability is a durable property. If a service outage can
+   make a live bottle look dead, the guard could invite deleting something real.
+

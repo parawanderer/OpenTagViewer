@@ -141,11 +141,14 @@ and must not be treated as an error.
 
 ## 7. Open questions
 
-1. **Does anything read `cloudKitMetadata`?** §2.2. If nothing does, the key can hold a
-   placeholder indefinitely; if something does, this stage is not as thin as it looks.
-2. **What is `stableIdentifier` a list of** in the plist, given CloudKit returns a single string?
-   A one-element list is the obvious guess and is not confirmed.
-3. **What does `isZeus` mean?** It is carried faithfully by both formats and understood by
-   neither.
-4. **Is `secureLocationsSharedSecret` needed for anything?** It was absent on the account
-   examined, and no consumer of it has been identified.
+1. **Does anything read `cloudKitMetadata`?** §2.2. If nothing does, the key can hold a placeholder
+   indefinitely; if something does, this stage is not as thin as it looks.
+2. **What is `stableIdentifier` a list of** in the plist, given CloudKit returns a single string? A
+   one-element list is the obvious guess and is unconfirmed.
+3. **What does `isZeus` mean?** Carried faithfully by both formats and understood by neither.
+4. **Is `secureLocationsSharedSecret` needed for anything?** Absent on the account examined, and no
+   consumer of it has been identified.
+
+**Unexercised:** this stage has never run, because it needs decrypted records. Its *mapping* is
+confirmed against real CloudKit records and the committed macOS fixtures; its output is not.
+

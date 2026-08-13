@@ -643,28 +643,29 @@ Stage 5 and needs the keychain from Stage 3.
 
 ## 4. Open questions
 
-**Answered by the run of 2026-08-13:**
+**Answered by the runs of 2026-08-13:**
 
-1. ~~Does `ckAppInit` succeed with only Stage 2's tokens?~~ **Yes.** The whole argument for doing
-   this before Stage 3 rested on it, and it holds: CloudKit access needs no keychain state.
-2. ~~Where does the CloudKit endpoint come from?~~ **From `ckAppInit` itself**, as
-   `cloudKitDatabaseUrl`. Not from the MobileMe delegate, and not hardcoded.
+1. ~~Does `ckAppInit` succeed with only Stage 2's tokens?~~ **Yes.** CloudKit access needs no
+   keychain state, which is what justified specifying this stage before Stage 3.
+2. ~~Where does the CloudKit endpoint come from?~~ **From `ckAppInit` itself.** Not from the
+   MobileMe delegate, and not hardcoded.
 3. ~~Can Apple's protobuf descriptor set be fetched?~~ **No** — see §3.1.
+4. ~~What is the zone name holding accessory records?~~ **`BeaconStore`.**
+5. ~~Can records be listed without any keychain state?~~ **Yes.** All 35 records were fetched with
+   no trust circle and no passcode. Fetching and decrypting are cleanly separable.
+6. ~~What is in `values`?~~ A per-environment endpoint table for the container being opened, one
+   row each for `PRODUCTION` and `SANDBOX`. Useful for confirming the partition; not a service
+   directory, and it does not carry the escrow host Stage 3 needs.
+7. ~~Plain URL or `GatewayUrl`?~~ **The gateway form**, with its `/ckdatabase` prefix — see
+   §3.2.1. The plain per-partition host is not what operations are addressed to.
 
 **Still open:**
 
-4. ~~What is the zone name holding accessory records?~~ **[observed] `BeaconStore`.**
-5. **Plain URL or `GatewayUrl`?** ~~The distinction is unexplained~~ — it is now known to be
-   direct-to-partition versus routed-through-the-gateway (§2.3). **Which to prefer is still
-   open**, and it may not matter; trying the direct form first is the obvious default.
-6. ~~Can records be listed without any keychain state?~~ **[observed] Yes.** All 35 records were
-   fetched with no keychain, no trust circle and no device passcode. Fetching and decrypting are
-   cleanly separable, and Stage 3 is required only to *read* what has already been retrieved.
-7. **Is `cloudKitToken` used at all**, given `ckAppInit` authenticates with `mmeAuthToken`?
-   Presumably it authenticates record operations rather than the setup call, but which requests
-   take which credential is not established.
-8. ~~What is in `values`?~~ **[observed]** An array of two objects, one per environment
-   (`PRODUCTION` and `SANDBOX`), each carrying the container `name`, its `env`, a database `url`
-   and a `ckDeviceUrl`. It is a per-environment endpoint table for the container being opened —
-   useful for confirming the partition, and **not** a general service directory. Notably it does
-   not carry the escrow host that [Stage 3](./03-keychain-trust.md) needs.
+8. **Is `cloudKitToken` used for anything besides record operations?** §3.2.0 establishes it
+   authenticates those, while `ckAppInit` uses `mmeAuthToken`. Whether any request takes both, or
+   neither, is not established.
+9. **What do the other values of `status` mean?** §3.5 records that `3` terminates paging. No other
+   value has been observed, so nothing is known about what one would indicate.
+10. **What is `zoneAttributesChanges`?** §3.5 field 12, around 900 bytes on a first page and absent
+    afterwards. Not needed to read accessories; unexamined.
+
