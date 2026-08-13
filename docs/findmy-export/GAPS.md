@@ -542,3 +542,114 @@ predicts — which is the argument for making viability the guard rather than th
 **What this does not establish:** that new records stop appearing. Two of those removed were from
 the week before, so the route producing them is still running and the count will climb again. The
 cleanup is a cleanup, not a fix.
+
+### H3. Transient non-viability, answered structurally rather than left open
+
+*Raised on the specification side as newly load-bearing once viability became the deletion guard:
+could a service outage make a live bottle look dead, and invite deleting something real?*
+
+A client cannot distinguish a transient outage from a bottle that is genuinely gone — that much is
+true and does not look solvable. What it *can* distinguish is when the answer is not worth trusting
+at all, and the clearest such case is **no viable bottle reported whatsoever**.
+
+An account holding escrow records but no usable bottle is possible. An account where every record
+became unusable at the same moment is a far better description of a service having a bad day. Since
+being wrong destroys a real device's recovery path, that reads as "ask again later".
+
+So `RecoveryOptions.viability_is_trustworthy` is false when nothing was reported viable, and in
+that state `safe_to_delete` is **empty** and `delete_record` refuses outright. The dangerous case
+is not warned about; it is removed, in the same spirit as offering only non-viable records.
+
+This does not cover a partial outage — one bottle unreachable while others answer — and nothing
+here could. It covers the total failure, which is both the most likely shape of an outage and the
+one that would otherwise offer the user every record on the account at once.
+
+Worth noting the shape of the fix, since it is the third time it has applied: where a guard cannot
+be made correct, it can often still be made *refuse*. Deletion refuses without a listing, refuses a
+viable record, and now refuses when viability is unavailable. Each is a case that could have been a
+warning and is instead a closed door.
+
+---
+
+# Third round — from running recovery against a live account
+
+Stage 3 §6.2 is confirmed and §6.3 is not working. `srp_init` succeeds and parses; `recover` is
+rejected with an internal error. Below is everything the account said, so the answer can be worked
+out rather than guessed at.
+
+## I1. §6.1's four "skipped" bytes are the message's total length [observed]
+
+> "| 0 | 4 bytes, skipped |"
+
+True for a reader — every section is addressed by offset, so the four bytes can be ignored and
+everything still parses. **False for a writer**, and the asymmetry is not visible from the table.
+
+An `srp_init` reply with a 24-byte header and sections of 8, 64 and 256 bytes declared
+`0x00000180`. Its actual total length is `4 + 24 + (3+1)×4 + (4+8) + (4+64) + (4+256)` = **384**.
+Exactly.
+
+This cost two wrong attempts. First zeros, on the reading that "skipped" meant "ignored". Then —
+worse, because it felt principled — echoing the server's own four bytes back, which put `384` on a
+100-byte proof. A message declaring four times its own length is a good way to make a parser fail
+somewhere internal.
+
+**Suggested amendment:** state that the field is the total length in bytes, big-endian, and that a
+reply computes its own rather than echoing the one it answers.
+
+## I2. §6.2 is confirmed exactly [observed]
+
+The reply parsed with `H = 24, S = 3` and the sections came out as the table says: a request
+identifier, a 64-byte salt, and a 256-byte server public value — the last being the right size for
+the RFC 5054 2048-bit group.
+
+The header's two 32-bit values were **164** and **0**, followed by a 16-byte request id. Since §6.3
+says to reply with **165**, the pair reads as request-type/response-type and confirms that constant
+from the other direction.
+
+`clubTypeID` was **absent**, so the zero branch of §6.3 and the 24-byte branch of §6.4 are the ones
+in play on this account. The 40-byte and club-type-1 paths remain unexercised.
+
+A framing built from the specification reproduces the server's 384-byte message byte-for-byte at
+those sizes, so the offsets, the `S + 1` rule and the length prefix are all confirmed correct
+against real output.
+
+## I3. §6.3: "sized to 20 bytes" is ambiguous, and it is where this now stops
+
+> "the request identifier from section 0, **sized to 20 bytes**, followed by the SRP proof M1"
+
+**[observed] Section 0 is 8 bytes.** So "sized to 20" means padding it by 12, and the document does
+not say with what, on which side, or why 20.
+
+It is also not the only candidate. §6.2 states the header carries **a 16-byte request id**, so
+there are *two* request identifiers in the reply and §6.3 names one of them without distinguishing
+it from the other. Padding an 8-byte value to 20 is an odd operation; padding a 16-byte value to 20
+is a more natural one, which makes the header's id the likelier reading — but that is a guess about
+plausibility, not something the document supports.
+
+Current behaviour: section 0, right-padded with zeros to 20 bytes. The result is rejected with
+
+```
+status -6138
+CLUBH ERROR: An internal error occurred.
+```
+
+**What is ruled out:** the framing (I2 confirms it byte-for-byte), the header rewrite (165 and 0
+are both what §6.3 asks for and 164 corroborates the first), the label (`srp_init` accepted it),
+the transaction id (shared across both calls), and the encoding (both blobs are base64 in plist
+strings). What remains is the *content* of the two sections.
+
+**Also tried, without effect:** declaring `baseRootCertVersions` and `trustedRootCertVersions` as
+`[101, 102, 103, 500]` per §6.6 on both commands, and echoing `dsid` back on `recover`. Both are
+listed in §4.4 as per-command fields without it being said which commands require them; both are
+harmless and have been left in.
+
+**What would close it:** which of the two request identifiers is meant, and how it reaches 20
+bytes. Failing that, whether §6.3's two sections are the whole body — a third section would
+explain an internal error better than a mis-sized first one.
+
+> **A note on method.** Further variants could be tried against the account, and deliberately have
+> not been. Each attempt spends a real passcode against a real service, the failure is
+> indistinguishable from a wrong passcode by design, and the search space is large enough that
+> guessing would more likely produce a false positive than an answer. This is the situation the
+> clean-room split exists for: one reading of the reference settles it, where a dozen live attempts
+> might not.
