@@ -711,3 +711,115 @@ Two things made that easy to do, and both are worth guarding against rather than
 Both are fixed: `adsid` is carried forward through login rather than discarded, and the salt is
 now *found* by trying candidates against the bottle's own escrowed keys rather than assumed — the
 same free-offline-check reasoning as above. The error now says the salt may be at fault too.
+
+---
+
+## J — the key-share round
+
+Three corrections landed and the trust circle now reads 13 peers. What follows is what
+implementing them found, one new specification question, and one note on method.
+
+### J1. §5.3's response is nested one level deeper than a flat reading gives [closed]
+
+The amended table gives the response as field 1 `changes`, holding `syncToken` (1) and repeated
+`change` (2). I had it flat — `repeated change = 1` and `syncToken = 2` directly on the response —
+and that is the shape that reported 0 peers.
+
+**It parses.** A flat reading of the nested message yields exactly one change per response whose
+own fields are 1 and 2, so `add` at field 3 is absent and it is skipped as an unrecognised kind.
+Nothing errors, the directory is empty, and the symptom surfaces one layer away in §6.7.0 as shares
+whose senders cannot be identified.
+
+That is now the third instance of the same shape — the `tlkshare` record, the share entry, and this
+— so it may deserve a general note: **in this protocol a repeated member is usually inside a
+wrapper, not on the response.** Protobuf's tolerance of unknown fields turns each such mistake into
+a quiet empty result rather than a parse error.
+
+### J2. Implementing the loop, and a trap that is Python's rather than the protocol's [closed]
+
+The paging correction is implemented as specified: the only termination is an empty `changes`.
+
+One thing bit me between writing it and testing it. The break read `if not response.changes`, and
+with `changes` now a **message** rather than a repeated field that is always false — a protobuf
+message is truthy however empty it is. The loop ran to the page backstop rather than terminating,
+which against a real account is fifty calls per run. It must test the repeated field inside it. A
+test for a feed that never empties caught this; reading the code would not have.
+
+Not a specification defect, but recorded because the amendment's shape is what introduced it, so
+anyone else implementing this amendment in Python will meet it too.
+
+### J3. `changeTokenExpired` is handled, and restarts exactly once [closed]
+
+As specified: discard the token *and* the accumulated directory, then restart from no token. The
+restart is attempted once — a second expiry raises rather than looping, since a circle that expires
+the token on every call is not a state that retrying escapes.
+
+### J4. §6.7.0's signature integers can be negative, and the document implies otherwise [new]
+
+§6.7.0 step 1 gives `version`, `curve`, `epoch` and `poisoned` as 32- or 64-bit little-endian, and
+§6.7.0's record table declares them `int64`. Real records carry **negative** values — this account
+has shares with `epoch = -1`.
+
+"64-bit little-endian" alone does not say signed, and an unsigned rendering does not merely
+mis-encode: in Python it *raises*, and the raise propagates out of the per-share loop and takes
+down the entire listing. Twenty-one readable shares became one traceback.
+
+Worth one word in the table — **signed** — because the failure is disproportionate to the mistake
+and does not point at itself.
+
+Fixed here by rendering two's complement into the fixed width, and by making verification report an
+unreadable share as unverified rather than raising. The second is the more important half: one
+malformed share must not be able to hide the others.
+
+### J5. §6.7.0 step 2's "ECIES ciphertext structure" — the parts are named [open]
+
+The archive holds the parts as **separate members**, and they name themselves. Every share on this
+account:
+
+```
+SFEphemeralSenderPublicKeyExternaRepresentation.NS.data = 97 bytes
+SFCiphertext                                            = 227–245 bytes
+SFIESAuthenticationCode                                 = 16 bytes
+```
+
+That settles the framing, and the document could state it — a reader taking "expands to an ECIES
+ciphertext" at face value pulls out the largest member and hands it to a point parser, which is
+what I did.
+
+**The construction is still unspecified.** "An ECIES ciphertext" leaves open: which hash the X9.63
+KDF uses, whether the derived material is 16 or 32 bytes, whether the GCM nonce is 12 or 16 bytes
+and whether it is derived or all-zero, whether the KDF's shared info is the ephemeral point or
+empty, and whether the point is also the AAD. Every wrong combination fails identically, as a tag
+that does not check.
+
+I have not guessed. The implementation tries all 64 combinations and **logs the name of whichever
+authenticates**, so the next run either hands you the answer to record or establishes that the
+construction is outside that space. Each attempt is one AES-GCM over ~230 bytes; the sweep is free,
+whereas verifying a single guess costs a passcode-authenticated run.
+
+### J6. A diagnostic the record already supported and I was not using
+
+`tlkshare` carries `receiverPublicEncryptionKey` — the key the share was wrapped to. I was
+decrypting without consulting it, so **"the recovered key is wrong" and "the ECIES parameters are
+wrong" arrived as the same failure**, and they lead in opposite directions.
+
+Comparing it against the recovered key's public point costs nothing and separates them before any
+decryption. Now done, comparing by meaning rather than bytes, since the same key written as a
+SubjectPublicKeyInfo and as a bare point is the same key.
+
+No amendment needed — the field was already documented. Recorded because the general form recurs:
+**where two failures are indistinguishable and lead different ways, look for something already in
+the data that tells them apart before widening the search.**
+
+### J7. On method: I implemented an amendment from its summary rather than from the file
+
+The §5.3 correction reached me as prose alongside the note that the file had been updated. I
+implemented from the prose. It was accurate as far as it went, but it did not carry the response's
+nesting — which was in the table in the file, and which was the actual cause of the empty directory.
+
+So the paging loop I built from the summary was correct and would still have returned nothing.
+
+**The specification is the file.** A summary is a pointer to a change, not the change. This is the
+same discipline as not reading the reference implementation: the value of a written specification is
+that it is the single artefact both halves work from, and substituting a description of it
+reintroduces exactly the drift it exists to prevent.
