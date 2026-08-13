@@ -393,15 +393,25 @@ to `signature2` is implemented and tested as rotation rather than failure.
 Verification is skipped, not failed, when the read-only flag is set. It is off by default in
 `unwrap_protection` for the same reason the HMAC check is: neither has met a real record.
 
-### F2. Stage 3 §5 step 3: what joins to what is ambiguous
+### F2 — closed, and the answer was not the forgiving one
 
-The join key is described as an escrow record's `label` matching a bottle's `id`. §5.1 separately
-records that the decoded metadata carries its own `bottleID`. On the observed account those are
-presumably equal, but the document does not say so, and an implementation has to pick.
+*Raised as "the document does not say whether a record's `label` and its `bottleID` are the same
+value, so an implementation has to pick". They are never the same value.*
 
-This one is handled rather than blocked: the implementation matches on **either**, and reports both
-mismatch directions rather than dropping them. Worth one sentence stating whether they are always
-the same value.
+The join is now on the **label** alone — `com.apple.icdp.record.<peerId>`, which is what the
+trust-circle service reports as a bottle's id. `bottleID` is a UUID naming the bottle inside the
+record, and matching on it as well was forgiving of a confusion that should be caught. A test now
+asserts that a viable-bottle list containing a `bottleID` produces **no** match and reports both
+mismatch directions, rather than quietly working.
+
+**The §7.1 correction did not reach this implementation, because deletion is not implemented.**
+Worth recording why that was the right call independent of the bug: a delete path written against
+the old text would have addressed `<bottleID>.double` and `<bottleID>`, which name nothing. The
+document's own note is that this would "fail, or worse, silently succeed against nothing" — and it
+is the second that matters, because a user who has been shown a list, typed a serial to confirm,
+and watched a delete return success would reasonably believe a record was gone. The reason for
+leaving deletion out was that the confirmation interface is the only protection the protocol has;
+it turns out the addressing was wrong too.
 
 ### F3 — closed, and it was a correctness bug rather than an efficiency one
 
@@ -434,3 +444,36 @@ Recorded so the next reader knows these were exercised rather than assumed:
 - **EncryptedValue's field numbers.** Round-tripping the wrapper reproduces the exact plaintext
   sizes the amendment derived from ciphertext sizes — 8 bytes for `AirTag`, 11 for a date, 2 for a
   small integer, 38 for a UUID string. Independent confirmation that 3, 5 and 6 are right.
+
+---
+
+## H — observed, running the read-only half of Stage 3
+
+The escrow proxy and the trust-circle service were asked together against a live account for the
+first time on 2026-08-13. Both answered, the join produced matches, and nothing was written.
+
+**The label join is confirmed live.** Three records matched viable bottles. Had `bottleID` been the
+join key, the answer would have been three undescribed bottles and nothing recoverable — so F2's
+correction was load-bearing rather than cosmetic, and the previous match-on-either would have
+hidden it by succeeding for the wrong reason.
+
+**§5.1's "treat the schema as unstable" is confirmed, exactly.** Twelve escrow records, of which
+eleven carry the device shape and one does not — the same eleven-and-one split §5.1 records, on a
+different account and two years later. The odd one is filtered out as not a recovery candidate
+rather than reported as broken, which is what §5 asks for.
+
+**`partial` accounts for the gap precisely.** Cuttlefish returned 3 valid bottles and 8 partial;
+the join produced 3 recoverable records and 8 described-but-not-viable. §2.3 says an `EscrowMeta`
+is empty and so "conveys only that a bottle exists in that state" — but the *count* is evidently
+not noise. It corresponds one-to-one with the records that have metadata and are not recoverable,
+which makes `partial` a usable cross-check on the join rather than something to ignore.
+
+**The phantom iMacs are visible, and they are still accumulating.** Of the eight not-viable
+records, six are iMac Pros and they come in duplicate pairs — two records with one serial, two
+with another — from the macOS-VM export route the README describes. Two of them are dated within
+the last week. So this is not only historical debris: the route that produces it is still in use,
+and the records it leaves are exactly the ones no Apple interface will ever show the user.
+
+That is the strongest available argument for the residue rules, and for building the deletion path
+eventually: this account is carrying eight unrecoverable escrow records, and until now there was no
+way for anyone to know.
