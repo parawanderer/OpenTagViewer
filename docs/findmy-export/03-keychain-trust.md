@@ -970,8 +970,10 @@ Unwrapping one:
    >
    > **[observed] Every share on one account failed to authenticate** under X9.63 key derivation
    > across both SHA-256 and SHA-384, 128- and 256-bit keys, 12- and 16-byte zero and derived IVs,
-   > and the point or nothing as shared info and as additional data. That the failure was *uniform
-   > across every view* points at one systematic parameter rather than at the shares.
+   > and the point or nothing as shared info and as additional data. The failure was **uniform
+   > across every view**, which rules out per-share damage and nothing else: one wrong parameter
+   > and one wrong key fail identically and everywhere. Uniformity is not evidence for the
+   > cipher, and reading it that way is how a search gets widened when the key was the problem.
    >
    > Untried, and therefore where to look: HKDF rather than X9.63; deriving the IV **before** the
    > key rather than after; the authentication code being an **HMAC over the point and ciphertext**
