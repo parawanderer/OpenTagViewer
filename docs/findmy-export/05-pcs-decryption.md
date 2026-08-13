@@ -474,15 +474,29 @@ exporting it.
 
 ## 8. Open questions
 
-1. ~~Is a decrypted field raw bytes, or the `EncryptedValue` message?~~ **[observed] Both, by
-   type** — see §7. What remains open is only the **date epoch**: 2001 or 1970.
-2. **What are the `SharingCircleSecret` records for?** [Stage 4 §3.5.1](./04-cloudkit.md)
-   observes five of them in the zone, each with a `secretType`, a `sharingCircleIdentifier` and a
-   `secretData` blob. The plausible reading is that they protect accessories shared with others,
-   as a parallel key hierarchy to this one — but nothing here establishes it.
-3. **Does the zone's `protectionInfo` play a role, given every record carries its own?**
-4. **What is the `meta` field, and the two `unknown` integers?** All three are carried and none
-   is needed to decrypt a field, so they are recorded rather than explained. Stage 4
-   observed both present at the zone and universal at the record. Whether a record's structure is
-   unwrapped under a zone key or directly under the keychain service key is not established, and
-   it changes what §4 step 1 is matching against.
+**Answered by the runs of 2026-08-13:**
+
+1. ~~Is a decrypted field raw bytes, or the `EncryptedValue` message?~~ **Both, chosen by declared
+   type** — see §7.
+
+**Still open:**
+
+2. **Does the date count from 2001 or from the Unix epoch?** §7. The `Date` message holds a double
+   and nothing observed distinguishes the two. Reject an implausible result rather than exporting
+   it.
+3. **Does the zone's `protectionInfo` play any role?** Every record carries its own (§3.7), and the
+   zone's was present but `recordProtectionInfo` absent. Whether a record's structure is unwrapped
+   under a zone key or directly under the keychain service key is not established, and it changes
+   what §4 step 1 matches against.
+4. **What are the `SharingCircleSecret` records for?** [Stage 4 §3.5.1](./04-cloudkit.md) observes
+   five in the zone, each with a `secretType`, a `sharingCircleIdentifier` and a `secretData` blob.
+   The plausible reading is a parallel key hierarchy for accessories shared with others — see the
+   [README](./README.md) — but nothing establishes it.
+5. **What is the `meta` field, and the two unnamed integers?** All three are carried, none is needed
+   to decrypt a field, and they are recorded rather than explained.
+6. **What does `SignatureData.version` mean beyond `5`?** §3.1. Only the branch §4 step 3 depends on
+   is established; the reference's own note on the numbering is self-contradictory.
+
+**Unexercised:** nothing in this document has been run against a real record. It becomes testable
+the moment Stage 3 can supply keys.
+

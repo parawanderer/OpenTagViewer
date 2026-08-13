@@ -835,7 +835,7 @@ Apply the same care to Anisette provisioning state, which identifies the machine
 Things this specification cannot answer without running against a real account. Each needs
 confirming on first implementation, and the answer belongs back in this document.
 
-**Answered by the run of 2026-08-13:**
+**Answered by the runs of 2026-08-13:**
 
 1. ~~Which scheme does Apple select?~~ **`s2k`.** The `s2k_fo` branch remains specified but
    unexercised — Apple could still select it for another account.
@@ -857,10 +857,16 @@ confirming on first implementation, and the answer belongs back in this document
    specified but is the least likely to have been exercised by anyone.
 7. **Do the two code-submission endpoints return different token sets?** `validate` returned 25
    tokens; what `securitycode` returns is unknown. Stage 2 needs the PET from either.
-8. **What does GSA do on repeated sign-ins from the same synthetic machine?** One run tells us
-   nothing about rate limiting or flagging over time.
-9. **Does the iteration count vary?** One account, one observation (20082). Whether it differs
-   per account, or drifts, is unknown — which is the argument for never hardcoding it.
+8. **What does GSA do on repeated sign-ins from the same synthetic machine, over time?**
+   Partially answered: several sign-ins across a day were accepted, and after the first the
+   machine was no longer challenged for a second factor. Nothing is known about rate limiting or
+   flagging over weeks, which is the timescale that would matter.
+9. **Does the PBKDF2 iteration count vary?** Observed twice, both `20082`, on **one account**.
+   Whether it differs per account or drifts over time is unknown — which is the argument for
+   never hardcoding it.
+10. **Is there a limit on how many devices one account may register?** Not encountered. The
+    account examined carried a dozen escrow records and several registrations without complaint,
+    but no limit was searched for and hitting one would present as an unexplained failure.
 
 ---
 

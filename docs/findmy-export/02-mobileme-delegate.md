@@ -440,14 +440,14 @@ again should local state ever be lost. Stage 3 specifies that trade properly.
 
 ## 8. Open questions
 
-**Answered by the run of 2026-08-13:**
+**Answered by the runs of 2026-08-13:**
 
-1. ~~Does the legacy request form still work?~~ **Yes.** This was the load-bearing unknown for
-   the whole project — the basis for authenticating without an attestation blob. HTTP 200,
-   status 0, tokens returned. Apple has not withdrawn it.
+1. ~~Does the legacy request form still work?~~ **Yes.** This was the load-bearing unknown for the
+   whole project — the basis for authenticating without an attestation blob. Apple has not
+   withdrawn it.
 2. ~~What is the full token set?~~ **Eleven names**, listed in §5.
-3. ~~Which configuration key carries the CloudKit endpoint?~~ **None of them — no configuration
-   is returned at all.** See the correction in §6. This moves to Stage 4.
+3. ~~Which configuration key carries the CloudKit endpoint?~~ **None — no configuration is
+   returned at all.** It comes from opening the container instead; see §6.
 4. ~~Is the configuration nested under a `com.apple.mobileme` key?~~ **No**, and there is no such
    key.
 
@@ -456,15 +456,19 @@ again should local state ever be lost. Stage 3 specifies that trade properly.
 5. **Is `UNAUTHORIZED` really always an expired PET?** It is the obvious cause and the useful
    default, but treating every rejection as "retry Stage 1" risks an infinite loop against an
    account that is genuinely refused. Bound the retry.
-5. **Does the device-name call in §7 rename an existing entry, or only name a new one?** If it
-   only applies at registration, calling it later is useless and the serial is the only lever.
-6. **Does the sign-out sequence remove the device from the account, or only sign services out?**
-   §7.1 commits the app to removing what it creates, and this decides whether that promise can
-   be kept at all. It is directly testable: run it and watch the device list.
-7. **Does re-registering after a removal create a fresh entry or restore the old one?** Decides
-   whether "remove at sign-out" or "reuse one identity forever" is the right policy.
-8. **What do the terms endpoints return for an account with nothing outstanding?** The
-   acceptance flow of §5.2 must not fire spuriously, so the no-terms-pending response needs to
-   be distinguishable.
 6. **Does requesting only `com.apple.mobileme` return the same service data as requesting it
    alongside the IDS delegate?** Assumed yes; unverified.
+7. **What do the terms endpoints return for an account with nothing outstanding?** The acceptance
+   flow of §5.2 must not fire spuriously, so the no-terms-pending response needs to be
+   distinguishable from one carrying terms.
+
+**Open, and only relevant if the device-naming call of §7 is implemented:**
+
+8. **Does it rename an existing entry, or only name a new one?** If only at registration, calling
+   it later is useless and the serial of Stage 1 §2.2 is the only lever.
+9. **Does the sign-out sequence remove the device from the account, or only sign services out?**
+   §7.1 makes removal at sign-out the policy, and this decides whether that promise can be kept.
+   Directly testable: run it and watch the device list.
+10. **Does re-registering after a removal create a fresh entry or restore the old one?** Bears on
+    whether removal at sign-out costs a two-factor prompt on the next run — see the README.
+
