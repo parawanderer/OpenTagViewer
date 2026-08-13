@@ -95,6 +95,24 @@ being extended by people solving the problem in front of them. But an implemente
 coherence will keep searching for a pattern that is not there, so: **expect none, and copy the
 tables exactly.**
 
+## Report fields you do not understand, permanently
+
+These documents are incomplete in ways their authors cannot see, and the cheapest way to find out
+where is to have the implementation say so.
+
+**A client should log, at a level someone will actually read, any field it receives and does not
+model** — its number, its wire type, and its size. Not as a warning: their presence is normal and
+the schema is working. As information.
+
+This has already paid for itself twice. A CloudKit response carried two unmodelled fields that
+this document had omitted; one turned out to be the paging terminator, and the loop that had been
+written without it was not merely doing an extra request but **stopping on the wrong condition** —
+it happened to work only because the last page of one account was empty.
+
+Neither would have been found by a client that quietly discarded what it could not parse, and
+neither was guessable from the outside. **Keep the reporting after the fields are modelled**: the
+next gap is in a document nobody has read closely yet.
+
 ## The stages
 
 The full flow from an Apple ID to accessory private keys is six stages. They are specified
