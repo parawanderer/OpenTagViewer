@@ -12,7 +12,7 @@ Read [README.md](./README.md) first. In particular: **implement from this docume
 > the reference had suggested.
 >
 > **Everything from §6 onward is unverified**: recovery, joining the circle, enrolling and
-> deleting. §6.7's message layouts are moreover incomplete — see §8. Those are derived by reading implementations whose authors report them working.
+> deleting. The sequence, cryptography and message layouts are all specified; none has been run. Those are derived by reading implementations whose authors report them working.
 >
 > It is also the stage that **needs the user's device passcode** and **writes to their account**.
 > Everything before it was read-only; this is not. Treat the residue rules of §7 as part of the
@@ -528,6 +528,139 @@ views (§6.8). Only then does [Stage 5](./05-pcs-decryption.md) have keys.
 > value this project touches: it is the key to the user's whole keychain, and unlike an Apple ID
 > password it cannot be rotated without physical access to the device.
 
+### 6.9 The messages `joinWithVoucher` carries
+
+All are protobuf, and all travel inside the invoke envelope of §2.2 — so they are serialised into
+a `bytes` field that CloudKit does not inspect.
+
+**`CuttlefishJoinWithVoucherRequest`** — the request itself:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `restorePoint` | string — the client's sync token, if it has one |
+| 2 | `peer` | `CuttlefishPeer` |
+| 3 | `bottle` | `Bottle` — the escrow record being created for the new identity |
+| 4 | `shares` | repeated `TlkShare` |
+| 5 | `keys` | repeated `ViewKeys` |
+
+`CuttlefishEstablishRequest` is the same message with the fields in a **different order** — peer 1,
+bottle 2, keys 3, shares 4 — and no restore point. Another reason not to confuse the two (§6.7).
+
+**`CuttlefishPeer`** — everything except `hash` is a signed blob:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `hash` | string — the peer's identifier |
+| 2 | `permanentInfo` | `SignedInfo` |
+| 3 | `stableInfo` | `SignedInfo` |
+| 4 | `dynamicInfo` | `SignedInfo` |
+| 5 | `voucher` | `SignedInfo` |
+
+**`SignedInfo`** is the wrapper that makes this work — field 1 `info` (bytes, a serialised message)
+and field 2 `signature` (bytes). **The signature covers the serialised bytes, not the parsed
+message**, so a client must keep the exact bytes it signed and send those; re-encoding before
+sending invalidates the signature even if the content is identical.
+
+**`PeerPermanentInfo`** — inside `permanentInfo.info`:
+
+| # | Field |
+| --- | --- |
+| 1 | `epoch` (uint64) |
+| 2 | `signingKey` (bytes) |
+| 3 | `encryptionKey` (bytes) |
+| 4 | `machineId` (string) |
+| 5 | `modelId` (string) |
+| 6 | `creationTime` (uint64) |
+
+**`PeerStableInfo`** — inside `stableInfo.info`. Larger, and mostly optional:
+
+| # | Field | | # | Field |
+| --- | --- | --- | --- | --- |
+| 1 | `clock` | | 10 | `flexiblePolicyVersion` |
+| 2 | `frozenPolicyVersion` | | 11 | `flexiblePolicyHash` |
+| 3 | `frozenPolicyHash` | | 12 | `userControllableViewStatus` |
+| 4 | `secrets` (repeated bytes) | | 13 | `custodianRecoveryKeys` (repeated) |
+| 5 | `osVersion` | | 14 | `secureElementIdentity` |
+| 6 | `deviceName` | | 15 | `walrus` |
+| 7 | `recoverySigningPublicKey` | | 16 | `webAccess` |
+| 8 | `recoveryEncryptionPublicKey` | | 18 | `isInheritedAccount` (bool) |
+| 9 | `serialNumber` | | | |
+
+Note field 17 is absent. `deviceName` and `serialNumber` are how this peer appears to the user, so
+the labelling rules of the [README](./README.md) apply here as they do to the device registration.
+
+**`PeerDynamicInfo`** — inside `dynamicInfo.info`, and the actual statement of who trusts whom:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `clock` | uint64 |
+| 2 | `includeds` | repeated string — peer ids this peer trusts |
+| 3 | `excludeds` | repeated string — peer ids it has removed |
+| 4 | `dispositions` | repeated `PeerDisposition` |
+| 5 | `preapprovals` | repeated string |
+
+**`Voucher`** — inside `voucher.info`, and remarkably small for what it does:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `reason` | uint32 |
+| 2 | `beneficiary` | string — the peer being vouched **for** |
+| 3 | `sponsor` | string — the peer vouching |
+
+Three fields. The signature on the enclosing `SignedInfo`, made with the recovered peer's signing
+key, is the entire weight of the claim.
+
+**`Bottle`** — the escrow record created for the new identity:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 2 | `bottle` | bytes — a serialised `OTBottle` |
+| 3 | `escrowedSigningKey` | bytes |
+| 4 | `escrowedKeySignature` | bytes |
+| 5 | `peerKeySignature` | bytes |
+| 6 | `peerID` | string |
+| 7 | `bottleID` | string |
+
+Field 1 is absent. `escrowedKeySignature` and `peerKeySignature` are the two signatures §6.7 step 3
+verifies when recovering.
+
+**`OTBottle`** — inside `bottle.bottle`:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `peerID` | string |
+| 2 | `bottleID` | string — a UUID |
+| 8 | `escrowedSigningKey` | bytes |
+| 9 | `escrowedEncryptionKey` | bytes |
+| 10 | `peerSigningKey` | bytes |
+| 11 | `peerEncryptionKey` | bytes |
+| 12 | `ciphertext` | message: 1 `ciphertext`, 2 `authenticationCode`, 3 `initializationVector` |
+
+**Fields 3 to 7 are reserved and must not be used.** The AES-256-GCM unsealing of §6.7 step 4
+takes its three inputs from field 12; note the tag is carried separately from the ciphertext and
+must be appended before decryption, or supplied to a detached-tag interface.
+
+The plaintext is an **`OTInternalBottle`**, which is two fields and both are at surprising numbers:
+`signingKey` at **3** and `encryptionKey` at **4**, each an `OTPrivateKey` of `keyType` (1) and
+`keyData` (2). There is no field 1 or 2.
+
+**`TlkShare`** — one per view key being handed to the new peer. Note that almost everything is a
+**string**, including things that look like binary:
+
+| # | Field | Type | | # | Field | Type |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `service` | string | | 7 | `receiverPublicEncryptionKey` | **string** |
+| 2 | `curve` | uint64 | | 8 | `sender` | string |
+| 3 | `epoch` | uint64 | | 9 | `signature` | **string** |
+| 4 | `keyId` | string | | 10 | `version` | uint32 |
+| 5 | `poisoned` | uint32 | | 11 | `wrappedKey` | **string** |
+| 6 | `receiver` | string | | | | |
+
+**`ViewKeys`** — sent when *establishing* keys rather than receiving them, so this project sends an
+empty list: field 1 `service`, then `topLevelKey` (2), `classA` (3), `classC` (4) and
+`oldTopLevelKey` (5), each a `ViewKey` of `keyId` (1), `topLevelKeyId` (2), `keyNumber` (3),
+`key` (4) and a fifth field whose name is misspelled in every schema examined.
+
 ### 6.8 What this stage must actually deliver
 
 [Stage 5 §2](./05-pcs-decryption.md) makes the output contract concrete, and it is narrower than
@@ -626,10 +759,10 @@ This stage has more of them than the rest of the set combined, and they are load
 2. **What is the exact SRP exchange for recovery?** §6 is a sketch. The parameters, the
    derivation from the passcode, and the response format all need specifying before anything can
    be implemented.
-3. **What are the peer, voucher and TLK-share message layouts?** §6.7 specifies the *sequence* and
-   its cryptography, but the protobuf messages it passes to `joinWithVoucher` — the peer's
-   permanent and dynamic info, the voucher, and the key shares — are not enumerated. This is the
-   largest remaining gap in the set, and it is the same kind of work Stage 4 §3 did for CloudKit.
+3. **How are the peer's signed blobs constructed, exactly?** §6.9 enumerates every message, but
+   two things it does not settle: which fields of `PeerStableInfo` a client is *required* to
+   populate, and what the policy version and hash fields must contain. A peer that signs an
+   incomplete stable info may be admitted and then behave oddly rather than being rejected.
 4. **Which token authenticates what?** Stage 1 issues `com.apple.gs.icloud.escrow.auth`, but the
    escrow proxy is authenticated with the PET. Whether that token is needed at all is unknown.
 5. **Can bottles be listed without any prior trust state?** §5 is presented as read-only and

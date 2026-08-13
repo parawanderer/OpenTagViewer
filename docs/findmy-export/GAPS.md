@@ -323,3 +323,99 @@ certificates specifically because the material crossing that exchange is the use
 keychain, protected by a passcode short enough to brute-force offline. Those two facts cannot both
 stand. Fixing it is out of scope for a protocol implementation and is upstream's call, but Stage 3
 must not be built on that session as it is.
+
+---
+
+# Second round — gaps found implementing the amendments
+
+Written after implementing every closed gap above. Stage 5 is now exact throughout, Stage 4's
+schema states rather than assumes, and Stage 3's Cuttlefish invoke path is built.
+
+Same grading. Nothing here was resolved by reading the references.
+
+## E — blocking
+
+### E1. Stage 3 §6.7 gives the sequence and the cryptography, but not the message layouts
+
+§6.7 is a large step forward and closes the "what actually happens" question. It does not close
+the implementation question, because **not one of the structures it manipulates is specified**.
+Compare §2.3, which gives `fetchViableBottles` a field-numbered request and response; §6.7 names
+six steps and no messages.
+
+Concretely, what is missing, step by step:
+
+| Step | Specified | Missing |
+| --- | --- | --- |
+| 1 — parse the recovered blob | it is a plist holding a bottled peer entropy blob | **the key it is under**, and what the plist's other fields are |
+| 2 — derive three keys | exactly: HKDF-SHA384, `adsid` as salt, three info strings, P-384, FIPS 186-4 B.5.1 | nothing. **This step is implementable today** |
+| 3 — verify | which four checks, and that the digest is SHA-384 | the **bottle structure**: where the escrowed encryption key, escrowed signing key, bottle signature and sponsor signature live, and how the sponsoring peer's key is obtained |
+| 4 — open the bottle | AES-256-GCM under the symmetric key | where the **IV and tag** sit in the bottle structure, the tag length, and what the AAD is — Stage 5 §6 is a standing warning that both are easy to get wrong and fail identically |
+| 5 — vouch and join | the order of operations, and that `establish` must never be called | **what a peer is** (its fields, how an identity is generated and serialised), **what a voucher is and what it signs over**, **what a TLK share is**, what "re-shared keys" means concretely, and `joinWithVoucher`'s request and response messages |
+| 6 — sync the views | that it must happen | **the whole of it.** No operation, container, message or view-sync protocol is named |
+
+So the honest status is that §6.7 makes the *shape* of the work clear and leaves it unbuildable.
+**Step 2 is the exception** and is worth implementing immediately as a testable primitive, because
+it is stated precisely enough to be right or wrong on its own.
+
+**What would close it:** the treatment §2.3 already gives one method — field-numbered request and
+response messages — extended to `joinWithVoucher`, to the peer and voucher structures, to the
+bottle structure of steps 3 and 4, and to whatever step 6 turns out to be.
+
+> **A note on where the danger is.** §6.7's warning about `establish` is well taken and the
+> implementation will never call it. But the more likely failure is quieter: step 5.3 says to stop
+> if the recovered peer has no key shares, because joining would otherwise succeed and yield no
+> keys. Without a specified TLK share structure there is no way to *perform* that check, so an
+> implementation built from §6.7 as it stands would join the circle, write an escrow record, and
+> then discover it has nothing — having left two permanent artefacts on the account for nothing.
+> That is the outcome the README's residue rules exist to prevent, and it is currently reachable.
+
+## F — smaller, from the same pass
+
+### F1. Stage 5 §4 step 4: what the structure's *signature* covers is still unstated
+
+B5 closed what the **HMAC** covers, and that is implemented. The **signature** of the same step is
+still described only as "the structure is signed" — there is no statement of what data is signed.
+`SignatureData` carries a `version` and a `data`, and §3.1's note says the version numbering is not
+established, so even the obvious guess is not safe.
+
+Consequence: the master EC key derivation is implemented and tested — B4 closed which bits it keeps
+— but nothing uses it, because there is nothing to verify against. It is dead code until this is
+answered, which is a strange place for a correctly-specified derivation to sit.
+
+### F2. Stage 3 §5 step 3: what joins to what is ambiguous
+
+The join key is described as an escrow record's `label` matching a bottle's `id`. §5.1 separately
+records that the decoded metadata carries its own `bottleID`. On the observed account those are
+presumably equal, but the document does not say so, and an implementation has to pick.
+
+This one is handled rather than blocked: the implementation matches on **either**, and reports both
+mismatch directions rather than dropping them. Worth one sentence stating whether they are always
+the same value.
+
+### F3. Stage 4 §3.5: the extra response fields are documented, and one of them is useful
+
+The amendment documenting fields 3 through 12 is confirmed correct — declaring them silences the
+diagnostic, and a live run now reports nothing unmodelled.
+
+**Field 4, `status`, came back as the varint `3` on both a full page and an empty one.** If it
+distinguishes "more to come" from "complete", reading it would remove one request per fetch: the
+loop currently learns a page was the last only by asking again and being told nothing. Given this
+feature polls periodically and the README treats surplus requests to Apple as an account-flagging
+risk, that is worth knowing. What its values mean is not stated.
+
+## G — confirmed by implementing
+
+Recorded so the next reader knows these were exercised rather than assumed:
+
+- **The KDF, verbatim.** `be32(i) ‖ label ‖ 0x00 ‖ be32(bits)` with an empty context reproduces
+  independently. The counter loop is implemented even though 16 bytes from SHA-256 never advances it.
+- **The RFC 6637 rewrite.** MPI bit count, 32-byte compact point, AES-128 KEK from the first half of
+  the digest, and the framed plaintext with its checksum and self-describing padding all round-trip.
+  The compact point needs the y coordinate recovered by solving the curve equation; either root
+  works, since a point and its negation share an x and ECDH takes only x.
+- **The AAD correction.** Implemented as `header ‖ "<zone>-<record>-<field>"`. The consequence the
+  document predicts is real: decryption now takes a field's identity, and the plumbing to carry a
+  zone name from the fetch down to a field decrypt was the largest single change of this round.
+- **EncryptedValue's field numbers.** Round-tripping the wrapper reproduces the exact plaintext
+  sizes the amendment derived from ciphertext sizes — 8 bytes for `AirTag`, 11 for a date, 2 for a
+  small integer, 38 for a UUID string. Independent confirmation that 3, 5 and 6 are right.
