@@ -635,9 +635,14 @@ checks should pass before anything is decrypted:
 
 - the derived encryption key's public part equals the bottle's escrowed encryption key
 - the derived signing key's public part equals the bottle's escrowed signing key
-- the bottle's own signature verifies under the escrowed signing key, **SHA-384**
-- the sponsoring peer's signature over the bottle verifies under that peer's signing key, taken
-  from the directory of **§5.3**
+- `escrowedKeySignature` verifies under the **escrowed signing key**, **ECDSA over SHA-384**
+- `peerKeySignature` verifies under the **sponsoring peer's signing key** from the directory of
+  §5.3, also **SHA-384**
+
+> **Both signatures cover the same data: the raw serialised `OTBottle` bytes** — the value of the
+> `bottle` field of §6.9, exactly as received, with nothing prepended and no re-encoding. This is
+> the simplest signed-data construction in the stage, and the only one that is just a field's
+> bytes.
 
 A mismatch on either of the first two means the passcode produced the wrong entropy. The third and
 fourth mean the bottle is not what it claims.
@@ -708,9 +713,28 @@ bottle 2, keys 3, shares 4 — and no restore point. Another reason not to confu
 | 5 | `voucher` | `SignedInfo` |
 
 **`SignedInfo`** is the wrapper that makes this work — field 1 `info` (bytes, a serialised message)
-and field 2 `signature` (bytes). **The signature covers the serialised bytes, not the parsed
-message**, so a client must keep the exact bytes it signed and send those; re-encoding before
-sending invalidates the signature even if the content is identical.
+and field 2 `signature` (bytes).
+
+**The signature does not cover `info` alone.** It covers a **type string prepended to it**:
+
+```
+signed data = <type string, ASCII> ‖ info
+```
+
+| Blob | Type string |
+| --- | --- |
+| `permanentInfo` | `TPPB.PeerPermanentInfo` |
+| `stableInfo` | `TPPB.PeerStableInfo` |
+| `dynamicInfo` | `TPPB.PeerDynamicInfo` |
+| `voucher` | `TPPB.Voucher` |
+
+No separator, no length, no terminator — the ASCII bytes immediately followed by the serialised
+message. The prefix is what stops a blob of one kind being presented as another, so omitting it
+does not merely fail verification, it removes a protection.
+
+**And the signature covers the serialised bytes, not the parsed message**, so a client must keep
+the exact bytes it signed and send those; re-encoding before sending invalidates the signature
+even when the content is identical.
 
 **`PeerPermanentInfo`** — inside `permanentInfo.info`:
 
@@ -831,9 +855,25 @@ receive are shares this client can unwrap**, with nothing further required.
 
 Unwrapping one:
 
-1. **Verify the sender.** Each share names a sending peer and carries a signature over its own
-   fields; check it against that peer's signing key from the directory of **§5.3**, **SHA-256**. A
-   share whose sender is not in the directory is to be skipped, not trusted.
+1. **Verify the sender.** Each share carries a signature over a concatenation of its own fields,
+   in this order and no other:
+
+   | Order | Field | Encoding |
+   | --- | --- | --- |
+   | 1 | `version` | **32-bit little-endian** |
+   | 2 | `receiver` | UTF-8 bytes |
+   | 3 | `sender` | UTF-8 bytes |
+   | 4 | `wrappedKey` | the **base64-decoded** bytes, not the string |
+   | 5 | `curve` | **64-bit little-endian** |
+   | 6 | `epoch` | **64-bit little-endian** |
+   | 7 | `poisoned` | **32-bit little-endian** |
+
+   > **The integers are little-endian.** Everything else in this protocol — CloudKit, the KeyVault
+   > framing, the PCS structures — is big-endian. This one construction is not, and getting it
+   > wrong produces a verification failure with no other symptom.
+
+   Verify with **ECDSA over SHA-256** against the sender's signing key from the directory of §5.3.
+   A share whose sender is not in the directory is to be skipped, not trusted.
 2. **Decode the wrapped key.** It is base64 of an **`NSKeyedArchiver` archive**, which expands to
    an ECIES ciphertext structure. Another encoding appearing nowhere else in this protocol.
 3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
