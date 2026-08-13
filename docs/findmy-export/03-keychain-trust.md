@@ -426,16 +426,43 @@ Both escrow blobs use a framing that appears nowhere else in this protocol. Give
 
 | Offset | Content |
 | --- | --- |
-| 0 | 4 bytes, skipped |
+| 0 | **the total message length**, 4 bytes big-endian |
 | 4 | the header, *H* bytes |
-| 4 + *H* | *S* offsets, each a 4-byte big-endian integer |
+| 4 + *H* | *S* + 1 offsets, each 4 bytes big-endian, **relative to the start of the body** |
+| 4 + *H* + (*S*+1)×4 | the body |
 
-Each section then lives at `(H + 4 + (S + 1) × 4) + offset`, and begins with its own 4-byte
-big-endian length followed by that many bytes.
+Each section lives at `body_start + offset` and begins with its own 4-byte big-endian length,
+followed by that many bytes.
 
-> Note the `S + 1` in the base calculation: there is **one more offset than there are sections**,
-> the last marking end-of-data. Computing the base from *S* rather than *S* + 1 puts every
-> section four bytes out and produces garbage that looks like a decryption failure.
+> There is **one more offset than there are sections**, the last marking end-of-body. Computing
+> the body's start from *S* rather than *S* + 1 puts every section four bytes out and produces
+> garbage that looks like a decryption failure.
+
+**[observed]** A real `srp_init` response: prefix `00000180` = 384 bytes, *H* = 24, three sections
+of 8, 64 and 256 bytes. The arithmetic checks: body starts at 24 + 4 + 16 = 44, the sections with
+their length prefixes occupy (4+8) + (4+64) + (4+256) = 340, and 44 + 340 = **384**. If a decoder's
+computed total does not equal the prefix, it has the framing wrong and should say so rather than
+proceeding.
+
+### 6.1.1 Writing one
+
+Reading and writing are not symmetrical, and this is the step where that bites.
+
+1. Lay out the **body** first: each section is `be32(length) ‖ data`, concatenated. Record each
+   section's offset from the body's start as you go.
+2. Append **one more offset**, equal to the finished body's length.
+3. Emit: a 4-byte placeholder, the header, the *S* + 1 offsets, then the body.
+4. **Overwrite the placeholder with the total length** of everything written.
+
+> **A section may be padded to a fixed footprint, and then its length prefix and its footprint
+> disagree.** Where §6.3 asks for a section "sized to 20 bytes", it means: build
+> `be32(length) ‖ data` as usual, then **zero-pad the result until it occupies exactly 20 bytes**.
+> For an 8-byte value that is 4 + 8 = 12 bytes of content followed by 8 zero bytes.
+>
+> The declared length stays **8**, not 20 — a reader takes the length from the prefix and ignores
+> the padding — but the **offsets must account for the full 20**, or every later section is
+> misplaced. Sending the value unpadded, or padded without the inner length prefix, produces a
+> message the server rejects without saying why.
 
 ### 6.2 Begin the exchange
 
@@ -470,8 +497,13 @@ The identity is the **`dsid` string from the `srp_init` response**, not the Appl
 
 Then build the response blob: take the 24-byte header from §6.2 and change two fields — set the
 first 32-bit value to **165**, and the second to **2** if `clubTypeID` is 1, otherwise **0**.
-Frame it as a KeyVault message with two sections: the request identifier from section 0, **sized
-to 20 bytes**, followed by the SRP proof **M1**.
+
+**[observed]** The value received in that first field is **164**, so the response is the request's
+value plus one. Both readings — a literal 165, or an increment — fit what has been seen; the
+reference sends a literal 165.
+Frame it as a KeyVault message (§6.1.1) with two sections: the request identifier from section 0
+**sized to 20 bytes** in the sense §6.1.1 defines — its own length prefix, then the value, then
+zero padding to a 20-byte footprint — followed by the SRP proof **M1** as an ordinary section.
 
 Send that as `blob` with the `recover` command, same `label` and same transaction id.
 
