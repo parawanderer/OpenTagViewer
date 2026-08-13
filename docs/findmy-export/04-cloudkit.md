@@ -487,7 +487,7 @@ incremental sync. Two levels exist, and both work the same way.
 | 1 | `change` | repeated `RecordChange` | |
 | 2 | `syncContinuationToken` | bytes | |
 | 3 | `clientChangeToken` | bytes | |
-| 4 | `status` | int32 | **[observed] present, value 3**, on every page |
+| 4 | `status` | int32 | **the paging terminator — see below** |
 | 5 | `changedShares` | repeated bytes | sharing; not needed here |
 | 6 | `pendingArchivedRecords` | bool | |
 | 7 | `changedDeltas` | repeated bytes | mergeable deltas |
@@ -495,9 +495,15 @@ incremental sync. Two levels exist, and both work the same way.
 | 12 | `zoneAttributesChanges` | bytes | **[observed] ~900 bytes on the first page only** |
 
 Fields 4 and 12 arrive in practice and an earlier draft of this document omitted both, so a
-decoder built from it routed them to the unknown-field set. They are not needed to read
-accessories — but a client that logs unmodelled fields will see them, and should not treat their
-presence as a sign the schema is wrong.
+decoder built from it routed them to the unknown-field set.
+
+> **`status == 3` means the zone is fully synced.** It is how a client knows to stop paging, and
+> it is more reliable than inferring completion from an empty page or an unchanged token: **a
+> response can carry `status = 3` and still contain changes**, so a client that stops only when a
+> page comes back empty always spends one request more than it needs to. Loop while `status != 3`,
+> carrying the continuation token forward each time.
+>
+> Other values of this field have not been observed and their meanings are unestablished.
 
 each `RecordChange` being:
 

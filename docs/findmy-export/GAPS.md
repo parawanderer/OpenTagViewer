@@ -18,7 +18,7 @@ Written by the implementation side of the clean-room split, addressed to the spe
 | Gap | Outcome |
 | --- | --- |
 | **A1** Cuttlefish invoke message | **Closed.** Stage 3 §2.2 and §2.3 now specify the invoke envelope and `fetchViableBottles` with field numbers. |
-| **A2** joining after recovery | **Still open.** Stage 3 §6.7 remains unwritten; it is the last unspecified section in the set. |
+| **A2** joining after recovery | **Closed.** Stage 3 §6.7 specifies the sequence and the cryptography, §6.9 the messages. See [E1](#e1-closed-by-69) below for what was built from them. |
 | **B1** the KDF's fixed input | **Closed.** Stage 5 §5. The default reading — `be32(i) ‖ label ‖ 0x00 ‖ context ‖ be32(bits)`, context empty, counter from 1 — was correct. |
 | **B2** RFC 6637 parameters | **Closed.** Stage 5 §4 step 2, in full: MPI ciphertext layout, the KDF input, and the framed plaintext. **The ciphertext-layout assumption was wrong** — it is a 2-byte big-endian *bit* count then a 32-byte compact point, not an X9.62 point with a self-describing length. |
 | **B3** a decrypted field's form | **Partly closed.** The AAD correction above is the load-bearing part. Date and integer encodings remain unstated; the runtime search is still the right approach. |
@@ -335,39 +335,38 @@ Same grading. Nothing here was resolved by reading the references.
 
 ## E — blocking
 
-### E1. Stage 3 §6.7 gives the sequence and the cryptography, but not the message layouts
+### E1 — closed by §6.9
 
-§6.7 is a large step forward and closes the "what actually happens" question. It does not close
-the implementation question, because **not one of the structures it manipulates is specified**.
-Compare §2.3, which gives `fetchViableBottles` a field-numbered request and response; §6.7 names
-six steps and no messages.
+*Raised when §6.7 landed without message layouts; closed by §6.9, which supplies them.*
 
-Concretely, what is missing, step by step:
+§6.9 enumerates every message the join carries, and all of it is now modelled in
+`findmy/cloudkit/proto/cuttlefish.proto`. The four members that fail silently rather than loudly
+each have a test rather than a comment:
 
-| Step | Specified | Missing |
-| --- | --- | --- |
-| 1 — parse the recovered blob | it is a plist holding a bottled peer entropy blob | **the key it is under**, and what the plist's other fields are |
-| 2 — derive three keys | exactly: HKDF-SHA384, `adsid` as salt, three info strings, P-384, FIPS 186-4 B.5.1 | nothing. **This step is implementable today** |
-| 3 — verify | which four checks, and that the digest is SHA-384 | the **bottle structure**: where the escrowed encryption key, escrowed signing key, bottle signature and sponsor signature live, and how the sponsoring peer's key is obtained |
-| 4 — open the bottle | AES-256-GCM under the symmetric key | where the **IV and tag** sit in the bottle structure, the tag length, and what the AAD is — Stage 5 §6 is a standing warning that both are easy to get wrong and fail identically |
-| 5 — vouch and join | the order of operations, and that `establish` must never be called | **what a peer is** (its fields, how an identity is generated and serialised), **what a voucher is and what it signs over**, **what a TLK share is**, what "re-shared keys" means concretely, and `joinWithVoucher`'s request and response messages |
-| 6 — sync the views | that it must happen | **the whole of it.** No operation, container, message or view-sync protocol is named |
+| Trap | How it is held |
+| --- | --- |
+| `SignedInfo`'s signature covers the **serialised bytes**, not the parsed message | `SignedBlob` in `findmy/keychain/join.py` holds bytes and a signature, never a message. There is nothing in it to re-encode, so a signature cannot be invalidated by a re-serialisation that changes bytes without changing content. |
+| `OTBottle` reserves 3–7 | `reserved 3, 4, 5, 6, 7;` in the schema, which makes reuse a compile error rather than a convention |
+| `OTInternalBottle` starts at field 3 | modelled as-is, with a test asserting its field set is exactly `{3, 4}` |
+| `TlkShare` declares binary-looking members as `string` | modelled as `string`, with a test asserting the wire type of all three |
 
-So the honest status is that §6.7 makes the *shape* of the work clear and leaves it unbuildable.
-**Step 2 is the exception** and is worth implementing immediately as a testable primitive, because
-it is stated precisely enough to be right or wrong on its own.
+**`CuttlefishEstablishRequest` is deliberately not defined at all.** The document's warning is
+sound, but a comment saying "never call this" is weaker than not being able to. With the message
+undefined, no code in the package can construct one, and a test asserts the name appears nowhere.
+That the two requests carry the same four members in a *different order* is the argument for
+structural prevention rather than discipline: a confusion between them would serialise perfectly
+cleanly and mean something else entirely.
 
-**What would close it:** the treatment §2.3 already gives one method — field-numbered request and
-response messages — extended to `joinWithVoucher`, to the peer and voucher structures, to the
-bottle structure of steps 3 and 4, and to whatever step 6 turns out to be.
+**Step 5.3's check is implemented and is a refusal, not a warning.** `require_key_shares` raises
+rather than logging, because the failure it prevents is the expensive kind: joining without shares
+*succeeds*, and leaves a peer in the user's trust circle and an escrow record on their account —
+both permanent, both invisible in Apple's own interfaces — in exchange for no keys at all.
 
-> **A note on where the danger is.** §6.7's warning about `establish` is well taken and the
-> implementation will never call it. But the more likely failure is quieter: step 5.3 says to stop
-> if the recovered peer has no key shares, because joining would otherwise succeed and yield no
-> keys. Without a specified TLK share structure there is no way to *perform* that check, so an
-> implementation built from §6.7 as it stands would join the circle, write an escrow record, and
-> then discover it has nothing — having left two permanent artefacts on the account for nothing.
-> That is the outcome the README's residue rules exist to prevent, and it is currently reachable.
+**What is still not built, and why.** The join is assembled but never sent. Sending it needs the
+passcode-authenticated recovery of §6.2–§6.5, which is specified and not yet implemented, and it
+writes two permanent artefacts to a real account. Those are worth building deliberately rather than
+as the tail of a schema change. The message layer is the part that can be written and tested
+without an account, and that is what exists.
 
 ## F — smaller, from the same pass
 

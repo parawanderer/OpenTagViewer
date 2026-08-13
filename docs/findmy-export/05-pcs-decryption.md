@@ -102,14 +102,32 @@ KeyRef ::= SEQUENCE {
 `keyset` is a **SET OF**, not a SEQUENCE OF — the entries are unordered and must be searched by
 matching `pubKey`, never indexed.
 
-**`SignatureData`** — carries the version that §4 step 3 branches on:
+**`SignatureData`** — carries the version that §4 step 3 branches on, and a nested structure:
 
 ```asn1
 SignatureData ::= SEQUENCE {
     version           INTEGER,
-    data              OCTET STRING
+    data              OCTET STRING          -- itself DER: an ObjectSignature
 }
 ```
+
+**`ObjectSignature`**, found by decoding `SignatureData.data` — this is what §4 step 4 verifies
+against:
+
+```asn1
+ObjectSignature ::= SEQUENCE {
+    rollCount             INTEGER,
+    outerSignKeyType      INTEGER,
+    public                KeyRef,
+    signature             Signature,
+    symmKeyCount      [0] EXPLICIT INTEGER OPTIONAL,
+    signature2        [1] EXPLICIT Signature OPTIONAL,
+    ecKeyList         [2] EXPLICIT SEQUENCE OF KeyRef OPTIONAL,
+    attributes        [3] EXPLICIT SEQUENCE OF Attribute OPTIONAL
+}
+```
+
+`signature2` is the "past" signature §4 step 4 falls back to — it is key rotation, not corruption.
 
 > The version numbering is **not clearly established**. The reference implementation's own note
 > on it is self-contradictory, mapping the same values to different names in one breath. What is
@@ -238,10 +256,44 @@ if signature_data.version != 5 and not read_only:
 Otherwise the master key is used directly. **This branch is easy to miss and produces a key that
 fails every subsequent check**, so verify against the checksum in step 5 rather than pressing on.
 
-**Step 4 — verify the signatures.** The structure is signed, and unless the read-only flag is set
-the signature is verified against a key derived from the master key itself (§5). A second,
-"past" signature may be present and should be tried if the first fails — that is key rotation,
-not corruption. An owner signature may additionally be present as attribute `7`.
+**Step 4 — verify the signatures.**
+
+The signed data is a **hand-built concatenation, not a DER structure** — nothing re-encodes it as
+one message, so it must be assembled in exactly this order:
+
+| Order | Bytes |
+| --- | --- |
+| 1 | DER of `keyset` |
+| 2 | raw `meta` |
+| 3 | `outerSignKeyType`, big-endian 32-bit |
+| 4 | `rollCount`, big-endian 32-bit |
+| 5 | `symmKeyCount`, big-endian 32-bit — **`0` when absent**, not omitted |
+| 6 | `public.keytype`, big-endian 32-bit |
+| 7 | `public.pubKey`, raw |
+| 8 | DER of `attributes`, **only if present** |
+| 9 | DER of `ecKeyList`, **only if present** |
+
+Note the asymmetry: an absent `symmKeyCount` contributes four zero bytes, while absent
+`attributes` or `ecKeyList` contribute nothing at all. Getting that backwards is a four-byte
+difference that fails verification with no other symptom.
+
+Signatures are **ECDSA over SHA-256**. `Signature.digest` is `1` for SHA-256; nothing observed
+uses `2`.
+
+**Which key verifies what:**
+
+| Signature | Verified with |
+| --- | --- |
+| `ObjectSignature.signature` | the **master EC key** derived per §5 — this is what B4's bit-ordering answer is for |
+| `ShareProtection.signature`, when present | the private key that unwrapped the entry, or a caller-supplied signing key |
+| Attribute `7`, when present | a caller-supplied signing key |
+
+**The master-key check is skipped when the read-only flag is set**, and falls back to `signature2`
+if the first fails.
+
+> **`Signature.keyid`, when non-empty, is the compressed public key of the signer** — not a hash
+> or an identifier. Check it before verifying: a mismatch names the wrong key immediately, where a
+> failed verification does not. An **empty** `keyid` means self-signed.
 
 **Step 5 — check you have the right key.** Two independent checks, and both should be performed
 before anything is decrypted:
