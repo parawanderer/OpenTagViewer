@@ -425,13 +425,30 @@ Cuttlefish  fetchChanges
 | Response | 1 | `changes`: `syncToken` (1) and repeated `change` (2) |
 | `change` | 3 | `add` — a `CuttlefishPeer` |
 
-Walk the changes and collect every peer. Each carries its `hash` — the identifier used everywhere
-else — and a `permanentInfo` whose `info` decodes to a `PeerPermanentInfo` (§6.9) holding
-**`signingKey` at field 2** and `encryptionKey` at field 3. That signing key is what the checks
-below verify against.
+A `change` may carry other kinds at other field numbers; **only `add` at field 3 builds the
+directory**, and anything else is skipped. Each added peer carries its `hash` — the identifier used
+everywhere else — and a `permanentInfo` whose `info` decodes to a `PeerPermanentInfo` (§6.9)
+holding **`signingKey` at field 2** and `encryptionKey` at field 3. That signing key is what the
+checks below verify against.
 
-**Keep the returned `syncToken`** and pass it next time; this is an incremental feed, and a client
-that always fetches from the beginning re-reads the whole circle on every run.
+> **This is a paging loop, not a single call.** One request does not return the circle. Loop:
+>
+> 1. Call `fetchChanges` with the current token — **absent** on the first call.
+> 2. If `changes` is **empty**, store the returned token and **stop**. That is the only
+>    termination condition.
+> 3. Otherwise add every peer found, take the returned `syncToken`, and go again.
+>
+> A client that issues one request and reads its result **will often see nothing**, because the
+> first page need not carry peers. An empty directory after a single call is not evidence that the
+> circle is empty — it is the expected outcome of not looping.
+
+**Keep the final `syncToken`** and pass it next time; the feed is incremental, and a client that
+always starts from nothing re-reads the whole circle on every run.
+
+**Handle a rejected token.** If a call fails with a CloudKit error whose description is
+`.changeTokenExpired`, the stored token is no longer valid — someone has reset the circle. Discard
+the token **and the accumulated directory**, then start again from no token. Treating this as a
+fatal error strands a client that could simply resynchronise.
 
 > **This is a prerequisite, not an optimisation, and it is needed twice:**
 >
