@@ -775,6 +775,60 @@ empty list: field 1 `service`, then `topLevelKey` (2), `classA` (3), `classC` (4
 `oldTopLevelKey` (5), each a `ViewKey` of `keyId` (1), `topLevelKeyId` (2), `keyNumber` (3),
 `key` (4) and a fifth field whose name is misspelled in every schema examined.
 
+### 6.7.1 The steady state — what the passcode buys
+
+**The device passcode is needed once, not per fetch.** Everything this stage establishes persists,
+and ordinary use afterwards never touches it again. That is what makes the feature a connection
+rather than a one-time import, and it is what lets a newly-paired accessory be noticed later.
+
+**What persists locally, and must be stored as carefully as any key:**
+
+| | |
+| --- | --- |
+| the **new peer identity** — its signing and encryption private keys | this client's membership of the circle |
+| the **keychain view keys** synced from `Manatee` and `ProtectedCloudStorage` | what [Stage 5](./05-pcs-decryption.md) decrypts with |
+| the trust **sync token** | so later syncs are incremental |
+| the CloudKit **continuation token** | so later fetches are incremental — see [Stage 4 §3.5](./04-cloudkit.md) |
+
+**What persists on the account:** the device registration of [Stage 1 §13](./01-authentication.md),
+and the escrow record this stage creates for the new identity.
+
+**What an ordinary later run does:**
+
+1. Stage 1 — re-authenticate. **Silent**: no second factor, because the machine is registered.
+2. Stage 2 — refresh the service tokens if they have aged out, roughly weekly.
+3. Stage 4 — fetch changes from the continuation token.
+4. Stage 5 — decrypt with the keys already held.
+
+No passcode, no escrow call, no join. **Stage 3 does not run at all.**
+
+**What forces a re-sync, but not a passcode:** a record whose protection structure names a key not
+held. Keys roll — that is what `rollCount` and the fallback signature in
+[Stage 5 §3.1](./05-pcs-decryption.md) are for — so sync the two views again and retry once before
+concluding anything is wrong. This is a cache miss, not a failure.
+
+**What forces the whole stage again:** losing the local state above, or the user removing this
+client from the circle. Both are recoverable; neither is silent.
+
+### 6.7.2 Losing local state need not cost another passcode
+
+The bottle this client creates for itself (§6.7 step 5) is sealed under a **password the client
+chooses**, not under the user's device passcode. That is the point of it: it is this client's own
+recovery path.
+
+So if local state is lost and that password was kept, the client recovers **from its own bottle**
+and the user is never asked for anything. If the password was not kept, or the record was deleted,
+recovery falls back to a first-party device's bottle and the user's device passcode again.
+
+> **This sharpens the trade in §7.** Deleting the client's own escrow record removes the artefact
+> from the user's account and removes the client's ability to recover itself. Keeping it means one
+> more record on an account that already accumulates them. There is no free option, and the choice
+> should be the user's rather than a default nobody explained.
+>
+> **The chosen password must be stored as securely as the keys it protects**, because it is
+> equivalent to them: anyone holding it and the record can reconstitute this client's membership of
+> the keychain circle.
+
 ### 6.8 What this stage must actually deliver
 
 [Stage 5 §2](./05-pcs-decryption.md) makes the output contract concrete, and it is narrower than
