@@ -370,16 +370,28 @@ without an account, and that is what exists.
 
 ## F — smaller, from the same pass
 
-### F1. Stage 5 §4 step 4: what the structure's *signature* covers is still unstated
+### F1 — closed by the §3.1 and §4 step 4 amendments
 
-B5 closed what the **HMAC** covers, and that is implemented. The **signature** of the same step is
-still described only as "the structure is signed" — there is no statement of what data is signed.
-`SignatureData` carries a `version` and a `data`, and §3.1's note says the version numbering is not
-established, so even the obvious guess is not safe.
+*Raised because the signature's coverage was unstated, leaving a correctly-specified key
+derivation with nothing to verify. Closed.*
 
-Consequence: the master EC key derivation is implemented and tested — B4 closed which bits it keeps
-— but nothing uses it, because there is nothing to verify against. It is dead code until this is
-answered, which is a strange place for a correctly-specified derivation to sit.
+`SignatureData.data` decoding to an `ObjectSignature`, and the nine-part concatenation, are both
+implemented. The asymmetry the amendment calls out has its own test, because it is the one that
+fails with no symptom: an absent `symmKeyCount` contributes four zero bytes, absent `attributes`
+and `ecKeyList` contribute nothing, and a test asserts each half separately rather than asserting
+one signature verifies and calling it proof.
+
+`Signature.keyid` is checked before verifying rather than after. The reasoning in the amendment is
+right and worth restating: a mismatch names the wrong key, where a failed verification only says
+something is wrong.
+
+**B4 is no longer dead code.** The master EC key derivation now has the use it was always specified
+for, and a test signs a structure with the derived key and verifies it back — so the low-bit
+masking is exercised end to end rather than merely asserted against a recomputation. The fallback
+to `signature2` is implemented and tested as rotation rather than failure.
+
+Verification is skipped, not failed, when the read-only flag is set. It is off by default in
+`unwrap_protection` for the same reason the HMAC check is: neither has met a real record.
 
 ### F2. Stage 3 §5 step 3: what joins to what is ambiguous
 
@@ -391,16 +403,20 @@ This one is handled rather than blocked: the implementation matches on **either*
 mismatch directions rather than dropping them. Worth one sentence stating whether they are always
 the same value.
 
-### F3. Stage 4 §3.5: the extra response fields are documented, and one of them is useful
+### F3 — closed, and it was a correctness bug rather than an efficiency one
 
-The amendment documenting fields 3 through 12 is confirmed correct — declaring them silences the
-diagnostic, and a live run now reports nothing unmodelled.
+*Raised as "field 4 might save a request". The answer was worth more than that.*
 
-**Field 4, `status`, came back as the varint `3` on both a full page and an empty one.** If it
-distinguishes "more to come" from "complete", reading it would remove one request per fetch: the
-loop currently learns a page was the last only by asking again and being told nothing. Given this
-feature polls periodically and the README treats surplus requests to Apple as an account-flagging
-risk, that is worth knowing. What its values mean is not stated.
+`status == 3` means the zone is fully synced, and the paging loop now reads it.
+
+The important part is not the saved request. **A response can carry `status = 3` and still contain
+changes**, which means the previous condition — stop when a page comes back empty — was not merely
+wasteful but wrong: it relied on emptiness coinciding with completion, and nothing guarantees that.
+It happened to work on the observed account because the last page *was* empty.
+
+So this is a case where a diagnostic that said "here is a field I do not understand" was worth more
+than the guess that followed it. The loop now stops on the status, warns if it can neither finish
+nor continue, and a test covers a synced page that still carries records.
 
 ## G — confirmed by implementing
 

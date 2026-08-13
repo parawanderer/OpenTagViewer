@@ -260,12 +260,21 @@ A dictionary. Fields vary by command; the ones common to all:
 and, per command: `blob`, `blobDigest`, `metadata`, `dsid`, `silentAttempt`,
 `baseRootCertVersions`, `trustedRootCertVersions`.
 
-Two labels appear:
+**`label` is overloaded**, and which meaning applies depends on the command:
 
-| Label | Used for |
+| Command | `label` means |
 | --- | --- |
-| `com.apple.securebackup.record` | escrow records themselves — the label for `get_records` |
-| `com.apple.icdp.record` | the club certificate, when enrolling |
+| `get_records` | a **record class** — `com.apple.securebackup.record` |
+| `get_club_cert` | a record class — `com.apple.icdp.record` |
+| `srp_init`, `recover`, `enroll`, `delete` | **one specific record**, identified individually |
+
+A specific record's label has the form `com.apple.icdp.record.<peerId>` — the class, then the
+identifier of the peer the record belongs to.
+
+> **A record's label is not its `bottleID`, and the two must not be substituted for each other.**
+> The label identifies the *escrow record*; `bottleID`, found inside the record's metadata, is a
+> separate **UUID** identifying the bottle. They are different strings with different shapes.
+> Everything addressed to the escrow proxy takes the **label**.
 
 > **`userActionLabel` is a free-text string that Apple keeps.** The reference sends descriptions
 > of the operation being performed. It is not authentication and nothing checks it, but it is
@@ -285,8 +294,14 @@ an array of:
 
 | Key | Meaning |
 | --- | --- |
-| `label` | **the bottle identifier** — the join key |
+| `label` | **the record's identifier, and the join key** — see below |
 | `metadata` | base64 of an XML plist: the record's descriptive fields |
+
+> **Join on `label`, not on `bottleID`.** The escrow proxy's `label` is the same value as the
+> Cuttlefish bottle's `id` (§2.3), and that pairing is what step 3 matches. The `bottleID` inside
+> the decoded metadata is a **different** value — a UUID for the bottle itself — and nothing
+> requires it to equal the label. Reporting a mismatch between them is reasonable
+> diagnostics; treating either as a substitute for the other is not.
 
 **Step 2 — viable bottles.** Cuttlefish `fetchViableBottles`, with a filter value of `1` and an
 empty metrics list. The response carries a list of valid bottles, each with an id.
@@ -375,8 +390,9 @@ big-endian length followed by that many bytes.
 
 ### 6.2 Begin the exchange
 
-Send `srp_init` (§4.3) with `label` set to the chosen record's `bottleID`, and `blob` set to the
-base64 of the SRP client's public value **A**.
+Send `srp_init` (§4.3) with `label` set to the chosen record's **label** — its own identifier from
+the `metadataList` entry, *not* its `bottleID` — and `blob` set to the base64 of the SRP client's
+public value **A**.
 
 SRP parameters match [Stage 1 §4.1](./01-authentication.md): the RFC 5054 2048-bit group,
 SHA-256, and a 32-byte client secret.
@@ -711,8 +727,12 @@ Deletion is **two calls**, both `delete`, in this order:
 
 | Order | `label` |
 | --- | --- |
-| 1 | `<bottleID>.double` — a companion record |
-| 2 | `<bottleID>` |
+| 1 | `<label>.double` — a companion record |
+| 2 | `<label>` |
+
+> **Correction: an earlier version of this section said `<bottleID>`. That was wrong** — these
+> take the record's **label**, the same value used for `srp_init` and `recover` and the same value
+> §5 joins on. Deleting by `bottleID` addresses nothing.
 
 Both carry only `command`, `label`, `transactionUUID`, `userActionLabel` and `version`. The
 `.double` suffix names a paired record that exists alongside the main one; deleting only the main
