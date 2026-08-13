@@ -457,7 +457,9 @@ Reading and writing are not symmetrical, and this is the step where that bites.
 > **A section may be padded to a fixed footprint, and then its length prefix and its footprint
 > disagree.** Where §6.3 asks for a section "sized to 20 bytes", it means: build
 > `be32(length) ‖ data` as usual, then **zero-pad the result until it occupies exactly 20 bytes**.
-> For an 8-byte value that is 4 + 8 = 12 bytes of content followed by 8 zero bytes.
+> For an 8-byte value that is 4 + 8 = 12 bytes of content followed by 8 zero bytes. The padding is
+> **appended**, never prepended, and the fixed footprint is a constant the service expects rather
+> than anything derivable from the data.
 >
 > The declared length stays **8**, not 20 — a reader takes the length from the prefix and ignores
 > the padding — but the **offsets must account for the full 20**, or every later section is
@@ -478,11 +480,16 @@ The response carries `respBlob`, `dsid`, and an optional `clubTypeID`. Parse `re
 
 | Section | Contents |
 | --- | --- |
-| 0 | a request identifier, echoed back in §6.3 |
-| 1 | the SRP **salt** |
-| 2 | the server public value **B** |
+| 0 | an **exchange token** — echoed back in §6.3. **[observed] 8 bytes.** |
+| 1 | the SRP **salt**. **[observed] 64 bytes.** |
+| 2 | the server public value **B**. **[observed] 256 bytes**, matching the 2048-bit group. |
 
-The 24-byte header is two 32-bit values followed by a 16-byte request id.
+The 24-byte header is two 32-bit values followed by a **16-byte transaction id**.
+
+> **There are two identifier-like values here and they are not interchangeable.** The header's
+> 16-byte transaction id is carried back **unchanged, inside the header**. The 8-byte exchange
+> token in section 0 is what §6.3 re-sends **as a section**. Padding 16 bytes to 20 looks like the
+> more natural operation and is the wrong one; the value that gets padded is the 8-byte token.
 
 ### 6.3 Compute the proof
 
@@ -501,9 +508,19 @@ first 32-bit value to **165**, and the second to **2** if `clubTypeID` is 1, oth
 **[observed]** The value received in that first field is **164**, so the response is the request's
 value plus one. Both readings — a literal 165, or an increment — fit what has been seen; the
 reference sends a literal 165.
-Frame it as a KeyVault message (§6.1.1) with two sections: the request identifier from section 0
-**sized to 20 bytes** in the sense §6.1.1 defines — its own length prefix, then the value, then
-zero padding to a 20-byte footprint — followed by the SRP proof **M1** as an ordinary section.
+Frame it as a KeyVault message (§6.1.1) with **exactly two sections, and no others**:
+
+| Section | Contents |
+| --- | --- |
+| 0 | the **8-byte exchange token** from §6.2 section 0, in a **20-byte footprint** |
+| 1 | the SRP proof **M1**, an ordinary section |
+
+The first is built as §6.1.1 describes: its own 4-byte length prefix holding **8**, then the eight
+bytes, then **eight zero bytes appended** to bring the footprint to twenty. The declared length
+stays 8. Why twenty is not established — it is simply the size the service expects.
+
+The header is the same 24 bytes received in §6.2 with only its two 32-bit fields changed; **the
+16-byte transaction id is carried back untouched.**
 
 Send that as `blob` with the `recover` command, same `label` and same transaction id.
 
