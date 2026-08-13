@@ -65,6 +65,36 @@ file from those projects.
 
 ---
 
+## Do not look for the underlying logic
+
+This is called a protocol specification throughout, and for an implementer it is one: every layer
+must be spoken correctly or nothing comes out. But it was plainly never *designed* as one. It is
+strata — work by different teams in different years, each building on whatever was already there.
+
+That matters because it changes how to read these documents. **Where they record an inconsistency,
+the inconsistency is the specification.** There is no rule underneath it waiting to be found, and
+looking for one costs time. Some examples, all documented in the stages below:
+
+- **Four wire formats in one flow** — XML property lists for Grand Slam and escrow, JSON for the
+  two-factor endpoints, protobuf for CloudKit, DER ASN.1 for the protection structures.
+- **Two different SRP variants in one login.** Grand Slam deviates from RFC 5054 in three specific
+  ways; escrow recovery deviates in none. The same code serves both only if parameterised.
+- **Commands named twice, differently.** `get_records` in the URL is `GETRECORDS` in the body, and
+  `get_club_cert` is `GETCLUB`. There is no transformation connecting the pairs; they are tables.
+- **The operation type declared twice** in a CloudKit request, as an enum and as a field number,
+  and required to agree.
+- **A keychain trust protocol tunnelled through a storage API.** Octagon's server side is invoked
+  as a CloudKit server-side function, its protobuf inside a `bytes` field CloudKit never parses.
+- **Fixed strings padded to length by hand** — key-derivation labels of exactly twenty characters,
+  `Anonymous Sender    ` with its four trailing spaces, and an RFC 6637 fingerprint slot holding
+  the literal ASCII word `fingerprint`.
+- **Constants nobody can name.** Three integer header fields set to 0, 0 and 1 on every request.
+
+None of this is a criticism of anyone. It is what a system looks like after fifteen years of
+being extended by people solving the problem in front of them. But an implementer who expects
+coherence will keep searching for a pattern that is not there, so: **expect none, and copy the
+tables exactly.**
+
 ## The stages
 
 The full flow from an Apple ID to accessory private keys is six stages. They are specified
