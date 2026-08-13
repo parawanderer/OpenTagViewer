@@ -12,7 +12,7 @@ Read [README.md](./README.md) first. In particular: **implement from this docume
 > the reference had suggested.
 >
 > **Everything from §6 onward is unverified**: recovery, joining the circle, enrolling and
-> deleting. Those are derived by reading implementations whose authors report them working.
+> deleting. §6.7's message layouts are moreover incomplete — see §8. Those are derived by reading implementations whose authors report them working.
 >
 > It is also the stage that **needs the user's device passcode** and **writes to their account**.
 > Everything before it was read-only; this is not. Treat the residue rules of §7 as part of the
@@ -453,18 +453,82 @@ entire keychain, and the passcode protecting it is short enough to brute-force o
 attacker obtains the blob. Do not disable verification, and do not fall back to the system trust
 store because pinning was inconvenient.
 
-### 6.7 After recovery
+### 6.7 From recovered material to a trusted peer
 
-The recovered material lets the client reconstitute itself as a peer in the trust circle via
-Cuttlefish (§2.1). **That sequence is not specified here** — establishing or joining via a
-voucher, and syncing trust changes, are named in the protocol and remain unwritten. See §8.
+The §6.5 plaintext is not the keychain. It is a **bottled peer** — the sealed identity of a
+device that was already in the circle. Recovering it lets this client impersonate that device
+just long enough for it to vouch for a *new* identity of our own, which is what actually joins.
+
+That indirection is the whole design, and it is why the sequence has five steps rather than one.
+
+**Step 1 — parse the recovered blob.** It is a property list with one field that matters: a
+**bottled peer entropy** blob. Everything below derives from it plus the account's `adsid`.
+
+**Step 2 — derive the bottle's three keys.** All by **HKDF-SHA384**, with the **`adsid` as salt**
+and the entropy as the input keying material:
+
+| Key | HKDF info string | Output |
+| --- | --- | --- |
+| Symmetric | `Escrow Symmetric Key` | 32 bytes |
+| Signing | `Escrow Signing Private Key` | 56 bytes → an EC scalar |
+| Encryption | `Escrow Encryption Private Key` | 56 bytes → an EC scalar |
+
+The two EC keys are on **P-384**, and the 56-byte output is converted to a scalar by **FIPS 186-4
+B.5.1**, the extra-random-bits method — generate more bits than the order needs and reduce, rather
+than retrying.
+
+> Note the salt: the account identifier, not a random value. Two accounts recovering the same
+> entropy would derive different keys, which is the point.
+
+**Step 3 — verify before trusting.** The bottle carries public keys and signatures, and all four
+checks should pass before anything is decrypted:
+
+- the derived encryption key's public part equals the bottle's escrowed encryption key
+- the derived signing key's public part equals the bottle's escrowed signing key
+- the bottle's own signature verifies under the escrowed signing key, **SHA-384**
+- the sponsoring peer's signature over the bottle verifies under that peer's known key
+
+A mismatch on either of the first two means the passcode produced the wrong entropy. The third and
+fourth mean the bottle is not what it claims.
+
+**Step 4 — open the bottle.** **AES-256-GCM**, keyed by the symmetric key from step 2, with the
+IV and authentication tag carried alongside the ciphertext in the bottle structure. The plaintext
+holds the sponsoring peer's **signing and encryption private keys**, again P-384.
+
+At this point the client holds a second peer's identity. It has not joined anything.
+
+**Step 5 — vouch, then join.**
+
+1. Generate a **new identity of our own** — a fresh peer, with its own keys.
+2. Using the recovered peer, **sign a voucher** for the new identity. This is the recovered
+   device saying "I trust this one".
+3. **Fetch the recovered peer's key shares** — the TLK shares that carry the actual keychain view
+   keys. **If it has none, stop**: joining would succeed and yield no keys, which is a worse
+   outcome than failing.
+4. **Create a bottle for the new identity**, sealed under the *device passcode*, so that this
+   client is itself recoverable later. This is the escrow record §7 discusses.
+5. Call Cuttlefish **`joinWithVoucher`** with the new peer, its bottle, the voucher's sponsor, and
+   the re-shared keys.
+
+The response carries trust changes to apply to local state. A client with no voucher would call
+**`establish`** instead, creating a new circle rather than joining one — **not what this project
+wants**, and calling it by mistake resets the account's trust rather than joining it.
+
+> **`establish` and `joinWithVoucher` differ by one branch and are catastrophically different.**
+> The first is for a device forming a circle where none exists; the second for joining one that
+> does. An implementation that falls back from the second to the first on error will silently
+> destroy the user's existing trust circle. There is no reason this project should ever call
+> `establish`.
+
+**Step 6 — sync the views.** With trust established, sync the `Manatee` and `ProtectedCloudStorage`
+views (§6.8). Only then does [Stage 5](./05-pcs-decryption.md) have keys.
 
 > **Passcode handling.** Read it, use it twice, discard it. Never written to disk, never logged,
 > never in diagnostics, and not retained in memory past the exchange. It is the most sensitive
 > value this project touches: it is the key to the user's whole keychain, and unlike an Apple ID
 > password it cannot be rotated without physical access to the device.
 
-### What this stage must actually deliver
+### 6.8 What this stage must actually deliver
 
 [Stage 5 §2](./05-pcs-decryption.md) makes the output contract concrete, and it is narrower than
 "join the circle":
@@ -562,9 +626,10 @@ This stage has more of them than the rest of the set combined, and they are load
 2. **What is the exact SRP exchange for recovery?** §6 is a sketch. The parameters, the
    derivation from the passcode, and the response format all need specifying before anything can
    be implemented.
-3. **What does joining the circle actually involve after recovery?** Reconstituting a peer,
-   establishing or joining via a voucher, and syncing trust changes are all named in the protocol
-   and none are specified here.
+3. **What are the peer, voucher and TLK-share message layouts?** §6.7 specifies the *sequence* and
+   its cryptography, but the protobuf messages it passes to `joinWithVoucher` — the peer's
+   permanent and dynamic info, the voucher, and the key shares — are not enumerated. This is the
+   largest remaining gap in the set, and it is the same kind of work Stage 4 §3 did for CloudKit.
 4. **Which token authenticates what?** Stage 1 issues `com.apple.gs.icloud.escrow.auth`, but the
    escrow proxy is authenticated with the PET. Whether that token is needed at all is unknown.
 5. **Can bottles be listed without any prior trust state?** §5 is presented as read-only and
