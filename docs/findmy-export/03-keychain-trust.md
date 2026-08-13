@@ -11,8 +11,11 @@ Read [README.md](./README.md) first. In particular: **implement from this docume
 > independent implementations written from this document. Values from that run are marked **[observed]**, and several corrected what reading
 > the reference had suggested.
 >
-> **Everything from §6 onward is unverified**: recovery, joining the circle, enrolling and
-> deleting. The sequence, cryptography and message layouts are all specified; none has been run. Those are derived by reading implementations whose authors report them working.
+> **[observed] Deletion (§7.1) is verified** against a live account, including the corrected
+> label addressing.
+>
+> **Recovery, joining the circle and enrolling remain unverified** — §6 onward. The sequence,
+> cryptography and message layouts are specified; none has been run. Those are derived by reading implementations whose authors report them working.
 >
 > It is also the stage that **needs the user's device passcode** and **writes to their account**.
 > Everything before it was read-only; this is not. Treat the residue rules of §7 as part of the
@@ -807,7 +810,31 @@ A count of records is therefore not a count of devices.
 > could have recovered the record. Any client holding a valid PET can delete **any** escrow record
 > on the account, including one belonging to a real device that the user still depends on.
 
+### [observed] A deletion that addressed nothing reports success
+
+**The service returns success for a `delete` that removed nothing.** A wrong label — one that
+names no record — is indistinguishable at the call site from one that names a record and removed
+it.
+
+So **the return value is not evidence.** The only proof a record is gone is to **list again and
+find it absent**, and an interface that offers deletion must do that rather than reporting what it
+attempted. Telling a user "removed" on the strength of a success code is telling them something
+the protocol did not say.
+
+This is not hypothetical. An earlier version of this document had deletion addressing a record's
+`bottleID` rather than its label (see above); a client built from that text would have deleted
+nothing, reported success, and left the user believing their account was clean — the worst of the
+available outcomes, because they would not check again.
+
+**[observed] The flow is otherwise verified end to end**: records were deleted from a live account
+on 2026-08-13 and a re-listing confirmed the count had dropped.
+
 Two things follow, and they are the whole design of this operation:
+
+> **[observed] The guard works in practice.** On the live account, every record left by the
+> retired export route sorted into the non-viable list and was offered for deletion, while the
+> three live recovery paths were withheld — with no judgement required from the user. That is the
+> case for making viability the guard rather than the warning.
 
 **Viability is a safety signal, and a better one than any prompt.**
 
