@@ -809,10 +809,38 @@ A count of records is therefore not a count of devices.
 
 Two things follow, and they are the whole design of this operation:
 
-**The client-side confirmation is the only protection that exists.** There is no server-side
-check to fall back on. So: list first, show the full identifying detail — device name, model,
-serial, escrow date — require the user to re-enter the **serial** of the record being deleted,
-and never accept a list position. Never offer a bulk or "clean up all" action.
+**Viability is a safety signal, and a better one than any prompt.**
+
+The listing of §5 already separates records that can be recovered from from those that cannot. That
+distinction maps directly onto the risk:
+
+| Record | Deleting it destroys | Risk |
+| --- | --- | --- |
+| **Not viable** — described, but no usable bottle | nothing that could have been used | **low** |
+| **Viable** — a usable bottle exists | that device's ability to recover its keychain | **high** |
+
+A record with no viable bottle cannot be recovered from, so removing it takes away a capability
+nobody had. A viable one is a live recovery path for a real device, and destroying it means its
+owner cannot get their keychain back after a wipe — a loss they will discover at the worst
+possible moment and cannot undo.
+
+**[observed] The distinction is not theoretical.** On the account examined, all the records
+attributable to the retired export route were among the **non-viable** ones — their peers no longer
+exist in the circle, so their bottles are unusable. The debris and the danger sorted themselves.
+
+**So the default should be: offer only non-viable records for deletion.** Viable ones require a
+deliberate, separately-worded step, if they are offered at all. That is a stronger protection than
+any confirmation prompt, because it removes the dangerous option rather than asking the user to
+be careful around it.
+
+**Viability is a signal, not a guarantee.** A record could be non-viable for a transient reason —
+a service unavailable, a peer temporarily unreachable — and a client cannot tell that apart from a
+peer that is gone for good. So the confirmation still matters underneath: list first, show the full
+identifying detail — device name, model, serial, escrow date — require the user to re-enter the
+**serial**, and never accept a list position. Never offer a bulk or "clean up all" action.
+
+If a listing cannot be obtained at all, **do not offer deletion**. Without viability information
+every record looks alike, and that is precisely the situation the rule above exists to avoid.
 
 **Requiring recovery before deletion is a choice, not a constraint.** The reference exporter
 demands a successful recovery with the record's password before it will delete, which is a sound
