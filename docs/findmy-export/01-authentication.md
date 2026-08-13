@@ -87,8 +87,15 @@ in the sense that it is time-derived, not that Apple rejects a repeat within its
 
 ### 2.2 Client identity
 
-The client presents itself as an iPhone. The values are invented and are not validated against
+The client presents itself as a device. The values are invented and are not validated against
 real hardware, but they must be **internally consistent** and **stable across logins**.
+
+> **The iPhone below is a worked example, not a requirement.** A client presenting as a Mac works
+> equally well, including against the `iosbuddy` endpoint of [Stage 2](./02-mobileme-delegate.md)
+> despite the name — FindMy.py has long presented as a MacBook Pro and authenticates fine. What
+> matters is that one client is consistent with itself. An implementation that already has an
+> identity should **keep it**: introducing a second invalidates every existing session, and
+> Stage 1 §13 explains what a changed identity costs.
 
 A worked example, using an iPhone 14 Pro on iOS 17.4:
 
@@ -102,7 +109,7 @@ A worked example, using an iPhone 14 Pro on iOS 17.4:
 | Device serial | **User-visible — choose it as a label.** Uppercase alphanumeric, 10–12 characters. `0PENTAGVIEWR` is confirmed accepted and displayed. See §13. |
 | Device name | any user-visible string |
 | Device UUID | a random v4 UUID, **uppercase**, generated once and persisted |
-| UDID | 32 uppercase hex characters, generated once and persisted |
+| UDID | 32 uppercase hex characters, generated once and persisted. **May be the same value as the device UUID**, with its hyphens removed — a UUID's hex form is exactly 32 uppercase hex characters. Nothing observed requires them to differ, and one persisted value is one fewer thing that can drift out of step with itself. |
 
 The OS version, build, CFNetwork version and Darwin version must correspond to one another —
 they describe one real iOS release, and Apple's own clients never disagree with themselves.

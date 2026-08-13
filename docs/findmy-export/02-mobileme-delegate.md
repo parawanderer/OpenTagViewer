@@ -147,6 +147,14 @@ produce far better diagnostics than the third.
 **2. `status`.** An integer, and `0` means success. Anything else is a failure and the whole
 response is the diagnostic.
 
+**`dsid`.** The response also carries a top-level `dsid`: the **numeric** account identifier.
+This is the same value as `DsPrsId` in the Stage 1 session payload, and it is what
+[Stage 4 §2.1](./04-cloudkit.md) needs as its HTTP Basic username.
+
+**Prefer this one.** Stage 1 §6 records that the session payload's keys vary between logins, so
+depending on it for a value that is also available here is needless fragility. Taking `dsid` from
+this response means Stage 4 needs nothing retained from Stage 1 at all.
+
 **3. `delegates`.** A dictionary keyed by the same service identifiers that were requested. Each
 value is:
 
