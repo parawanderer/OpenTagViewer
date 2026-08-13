@@ -274,8 +274,21 @@ and, per command: `blob`, `blobDigest`, `metadata`, `dsid`, `silentAttempt`,
 | `get_club_cert` | a record class — `com.apple.icdp.record` |
 | `srp_init`, `recover`, `enroll`, `delete` | **one specific record**, identified individually |
 
-A specific record's label has the form `com.apple.icdp.record.<peerId>` — the class, then the
-identifier of the peer the record belongs to.
+A specific record's label has the form:
+
+```
+com.apple.icdp.record.SHA256:<base64>
+```
+
+the class, then the identifier of the peer the record belongs to. **[observed] That peer
+identifier is a `SHA256:`-prefixed base64 digest** — not a UUID, not a serial number, and not
+anything a client chooses. It is the same value `CuttlefishPeer.hash` carries (§6.9), which is why
+a peer is addressed by a hash rather than a name.
+
+Two consequences: a label cannot be constructed from anything the user can see, so a record must
+always be located by listing rather than by building its label; and **two records for the same
+physical device will have entirely different labels** if the client regenerated its peer identity
+between them.
 
 > **A record's label is not its `bottleID`, and the two must not be substituted for each other.**
 > The label identifies the *escrow record*; `bottleID`, found inside the record's metadata, is a
@@ -336,6 +349,33 @@ Decoding the base64 plist gives:
 Apple interface — see the [README](./README.md). Present it to the user as device name, model,
 serial and escrow date, because those are the fields they can match against their own device
 list.
+
+### 5.2 Records count runs; serials count devices [observed]
+
+A live listing showed twelve records whose serials were **not** distinct: one serial appeared three
+times, another twice, and two more once each.
+
+Three records for one serial is not a pair under any reading. What it fits is a client that
+**regenerated its peer identity on every run while reusing a fixed serial** — the serial being the
+thing the client declares about itself, the peer identity being the thing it was supposed to
+persist. Each run minted a new peer, each new peer escrowed a new record, and the serial stayed
+put.
+
+So when counting:
+
+| To count | Group by |
+| --- | --- |
+| escrow **runs** | the record, or its peer digest |
+| claimed **devices** | the **serial** |
+
+Reporting a record count as a device count overstates the position, and grouping by peer identity
+does not fix it — only the serial does.
+
+> **This is the residue rule failing, observed in the wild.** The
+> [README](./README.md) says identity state must never be silently regenerated; these records are
+> what happens when it is. And the escrow list is where the evidence accumulates rather than the
+> device list, because **nothing ever removes an escrow record** — so it preserves a run-by-run
+> history of a mistake that the device list would have partly hidden.
 
 > ### [observed] Escrow records outlive the devices that created them
 >
@@ -755,15 +795,13 @@ companion, and deleting `<label>.double` for it addresses nothing — harmless, 
 ordinary entries, so a device that escrowed once through a first-party client appears **twice**.
 A count of records is therefore not a count of devices.
 
-> **[observed] This is the likeliest explanation for records appearing in pairs.** A live listing
-> showed six records attributable to two serial numbers — two per serial — from a macOS export
-> route running first-party code. Reading those as six devices overstates the position by double;
-> reading them as two devices with companions fits both the pairing and the existence of the
-> companion mechanism.
+> **[observed] Companions do not explain records that repeat per serial.** An earlier version of
+> this note guessed they might. They do not: across twelve records on a live account **not one
+> label ended in `.double`**, and records sharing a serial had entirely different peer digests.
+> They are distinct peers, not a record and its companion.
 >
-> **It is testable without any further request:** the two labels of a pair should be identical but
-> for a `.double` suffix. If they are, the pairing is explained; if they differ some other way, it
-> is not, and this note is wrong.
+> The companion mechanism is real and deletion must still issue both calls — but it is not what a
+> repeated serial means. See §5.2.
 
 > **The protocol requires nothing but the label.** No password, no blob, no proof that the caller
 > could have recovered the record. Any client holding a valid PET can delete **any** escrow record

@@ -477,3 +477,47 @@ and the records it leaves are exactly the ones no Apple interface will ever show
 That is the strongest available argument for the residue rules, and for building the deletion path
 eventually: this account is carrying eight unrecoverable escrow records, and until now there was no
 way for anyone to know.
+
+### H1. The companion hypothesis does not hold, and the labels say what does
+
+*Tested as suggested, from the listing already in hand. It is falsified.*
+
+**No label on the account ends in `.double`.** Not one of the twelve. Every label has the shape
+
+```
+com.apple.icdp.record.SHA256:<base64>
+```
+
+so `peerId` in §4.3's `com.apple.icdp.record.<peerId>` is itself a `SHA256:`-prefixed base64
+digest — worth recording, since it is neither a UUID nor a serial and nothing said so.
+
+The apparent pairs have **entirely different digests**, not one differing by a suffix. So they are
+distinct peers, not a record and its companion, and the note should come out as offered.
+
+**What the data shows instead is worse than pairs, in one case:**
+
+| Serial | Records | Escrowed |
+| --- | --- | --- |
+| `C02X70…` | **three** | all the same day |
+| `C02Y40…` | two | both the same day |
+| two further iMac Pro serials | one each | |
+
+Three records for one serial is not a pair by any reading. What it is consistent with is the
+README's own account of the macOS-VM route: **a fresh peer identity minted per run against a
+reused serial**. The serial is the part the client controls and kept constant; the peer identity
+is the part it regenerated. So the count of records is a count of *runs*, and the count of serials
+is the count of claimed devices — four iMac Pros claimed, seven records left behind.
+
+That sharpens the residue rule rather than softening it. "Never regenerate a persisted identity"
+is the rule that was broken, and the escrow list is where the evidence of breaking it accumulates,
+because unlike the device list nothing ever removes it.
+
+**Consequences taken:**
+
+- `device_count` groups by **serial**, not by record or by companion. Eight devices across twelve
+  records on this account.
+- Companion support is kept — `is_companion`, `companion_of`, and the requirement that a deletion
+  issue both calls — because §7.1 describes them and a first-party record may well have one. It is
+  simply not what explains these.
+- The `partial` cross-check is implemented as specified: `join_recovery_options` takes the count
+  and logs a warning if it disagrees with the number of described-but-unviable records.
