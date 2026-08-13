@@ -869,6 +869,12 @@ identifying detail — device name, model, serial, escrow date — require the u
 If a listing cannot be obtained at all, **do not offer deletion**. Without viability information
 every record looks alike, and that is precisely the situation the rule above exists to avoid.
 
+**A cleanup is not a fix.** Removing accumulated records does nothing to stop them accumulating —
+whatever regenerated its identity per run is still doing so, and the count will climb again.
+**[observed]** Two of the records deleted from the live account dated from the preceding week. Any
+interface offering deletion should say this plainly, or a user who has just cleaned up will
+reasonably conclude the problem is solved.
+
 **Requiring recovery before deletion is a choice, not a constraint.** The reference exporter
 demands a successful recovery with the record's password before it will delete, which is a sound
 guard against deleting the wrong thing — but it also makes it *impossible* to remove records
