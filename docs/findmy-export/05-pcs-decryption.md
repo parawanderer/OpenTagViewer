@@ -380,17 +380,50 @@ The key is `KDF(master_key, "encryption key key m")`, 16 bytes for AES-128.
 
 ## 7. Interpreting the plaintext
 
-Stage 4 §3.6 establishes that a field's declared `type` describes its **plaintext**, so once
-decrypted the bytes are interpreted according to it — a `STRING_TYPE` field yields a string, an
-`INT64_TYPE` field an integer, and so on. The protocol also defines a small `EncryptedValue`
-message holding a signed value, a date or a string, which is the shape a decrypted field takes.
+Stage 4 §3.6 establishes that a field's declared `type` describes its **plaintext**. What the
+plaintext *is* depends on that type, and the two cases differ:
 
-Which of those two forms applies to which field type is **not established** — see §8.
+| Declared type | Decrypted plaintext |
+| --- | --- |
+| `ENCRYPTED_BYTES_TYPE` (20) | **raw bytes.** No wrapper. |
+| `STRING_TYPE`, `INT64_TYPE`, `DATE_TYPE`, and the other scalars | an **`EncryptedValue` message**, with the value in the field matching its type |
+
+`EncryptedValue` carries `signedValue` at field 3, `dateValue` at 5 and `stringValue` at 6.
+
+> **[observed] This is established by arithmetic, without decrypting anything.** Ciphertext
+> overhead is fixed at 30 bytes — a 6-byte header, a 12-byte IV and a 12-byte tag (§6) — so
+> plaintext length is the ciphertext length minus 30. Comparing that against the accessory data
+> in the macOS cache format ([Stage 6](./06-output.md)):
+>
+> | Field | Ciphertext | Plaintext | macOS cache |
+> | --- | --- | --- | --- |
+> | `privateKey` | 115 | **85** | **85** |
+> | `publicKey` | 87 | **57** | **57** |
+> | `sharedSecret` | 62 | **32** | **32** |
+> | `sharedSecret2` | 62 | **32** | **32** |
+>
+> Four exact matches: the `ENCRYPTED_BYTES_TYPE` fields decrypt to raw key material with nothing
+> around it. The scalars do not fit that pattern and fit a wrapper exactly:
+>
+> | Field | Plaintext | As an `EncryptedValue` |
+> | --- | --- | --- |
+> | `stableIdentifier` | 38 | tag + length + **36** = a UUID string |
+> | `model` | 8 | tag + length + **6** = `AirTag` |
+> | `pairingDate` | 11 | tag + length + a 9-byte `Date` (tag + 8-byte double) |
+> | `batteryLevel`, `isZeus`, `vendorId` | 2 | tag + a 1-byte varint |
+>
+> Every one lands exactly. Note the varint cases carry **no length prefix** — protobuf varint
+> fields are not length-delimited — which is why they are two bytes rather than three.
+
+**The date's epoch is still unsettled.** The `Date` message holds a double, and whether it counts
+from 2001-01-01 as Apple's frameworks do or from the Unix epoch is not established here. Reject
+an implausible result — a pairing date in the future, or before AirTags existed — rather than
+exporting it.
 
 ## 8. Open questions
 
-1. **Is a decrypted field raw bytes, or the `EncryptedValue` message?** §7 cannot say, and the
-   answer decides whether decryption yields a value or another parse step.
+1. ~~Is a decrypted field raw bytes, or the `EncryptedValue` message?~~ **[observed] Both, by
+   type** — see §7. What remains open is only the **date epoch**: 2001 or 1970.
 2. **What are the `SharingCircleSecret` records for?** [Stage 4 §3.5.1](./04-cloudkit.md)
    observes five of them in the zone, each with a `secretType`, a `sharingCircleIdentifier` and a
    `secretData` blob. The plausible reading is that they protect accessories shared with others,

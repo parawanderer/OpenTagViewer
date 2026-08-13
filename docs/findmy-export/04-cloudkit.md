@@ -482,10 +482,22 @@ incremental sync. Two levels exist, and both work the same way.
 
 **`RetrieveChangesResponse`:**
 
-| # | Field | Type |
-| --- | --- | --- |
-| 1 | `change` | repeated `RecordChange` |
-| 2 | `syncContinuationToken` | bytes |
+| # | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 1 | `change` | repeated `RecordChange` | |
+| 2 | `syncContinuationToken` | bytes | |
+| 3 | `clientChangeToken` | bytes | |
+| 4 | `status` | int32 | **[observed] present, value 3**, on every page |
+| 5 | `changedShares` | repeated bytes | sharing; not needed here |
+| 6 | `pendingArchivedRecords` | bool | |
+| 7 | `changedDeltas` | repeated bytes | mergeable deltas |
+| 8 | `syncObligations` | repeated bytes | |
+| 12 | `zoneAttributesChanges` | bytes | **[observed] ~900 bytes on the first page only** |
+
+Fields 4 and 12 arrive in practice and an earlier draft of this document omitted both, so a
+decoder built from it routed them to the unknown-field set. They are not needed to read
+accessories — but a client that logs unmodelled fields will see them, and should not treat their
+presence as a sign the schema is wrong.
 
 each `RecordChange` being:
 

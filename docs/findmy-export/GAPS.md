@@ -186,32 +186,69 @@ absent.
 
 ---
 
-## C — assumed field numbers
+## C — assumed field numbers, now mostly confirmed
 
 Stage 4 §3 gives field numbers for most messages and omits them for these. Each was assumed; a
 wrong assumption means protobuf silently routes the data to the unknown-field set and the caller
-sees an empty result, so the implementation logs which field numbers actually arrived whenever a
-response decodes as empty. **One live `record/sync` settles all of them.**
+sees an empty result rather than an error.
+
+**The live run of 2026-08-13 confirmed every assumption it exercised**, so these are no longer
+guesses and the document can simply state them:
+
+| Message | Assumed, and **[confirmed]** | Evidence |
+| --- | --- | --- |
+| `RetrieveChangesResponse` | 1 = repeated `recordChange`, 2 = `syncContinuationToken` | 35 records decoded, and paging advanced |
+| `Zone` | 1 = `zoneIdentifier`, 2 = `etag` | both zones named themselves correctly |
+| the name wrapper | `name` at 1 | record types decoded without the fallback path firing |
+| `ZoneSummary` | 1 = `targetZone`, 4 = `deviceCount` | `BeaconStore` reported 11 devices, `_defaultZone` none |
+
+Still assumed, because nothing exercised them:
 
 | Message | Assumed | Where the document stops |
 | --- | --- | --- |
-| `RetrieveChangesResponse` | 1 = repeated `recordChange`, 2 = `syncContinuationToken` | §3.5 gives `RecordChange`'s own layout but not its envelope's |
 | `RetrieveZoneChangesResponse` | 1 = repeated `changedZone`, 2 = token, 3 = status | §3.5 names the members only |
 | `ChangedZone` | 1 = `identifier`, 2 = `changeType`, 3 = `deleteType` | as above |
-| `Zone` | 1 = `zoneIdentifier`, 2 = `etag` | §3.2.3 pins only `protectionInfo` (3) and `recordProtectionInfo` (6) |
 | `ExtensionError` | 1, 2, 3 | §3.2.2 names the three members |
-| the name wrapper | `name` at 1 | §3.6 says "a message wrapping a `name` string" |
 | `Header.deviceLibraryVersion` | a string | §3.3 gives the value `1970`, which could be either |
 | `ResponseOperation.operationCost` | int64 | §3.2.2 names it without a type |
 | `RetrieveChangesRequest.requestedFields` | repeated string | §3.5 names it without a type |
 
-**One of these is riskier than the rest.** §3.6 describes a record's `type` and a field's
-`identifier` as "a message wrapping a `name` string", while §3.5 describes `RecordChange.recordType`
-as "the record's type name" — which reads like a bare string. A bare string and a wrapper message
-are both length-delimited on the wire, so declaring the wrong one does not degrade, it throws and
-takes the whole response with it. All three are declared as `bytes` and resolved at read time
-instead. **Worth stating explicitly in the document which they are**, because a reader will
-otherwise reasonably declare a message and lose an afternoon.
+**One was riskier than the rest, and the risk did not materialise.** §3.6 describes a record's
+`type` and a field's `identifier` as "a message wrapping a `name` string", while §3.5 describes
+`RecordChange.recordType` as "the record's type name" — which reads like a bare string. A bare
+string and a wrapper message are both length-delimited on the wire, so declaring the wrong one does
+not degrade, it throws and takes the whole response with it. All three were declared as `bytes` and
+resolved at read time, and the wrapper reading turned out to be correct. **Worth stating explicitly
+in the document that these are wrappers with the name at field 1**, since a reader who guesses the
+other way loses the whole response rather than one field.
+
+### C2. `RetrieveChangesResponse` carries a field 4 the document does not mention [observed]
+
+The first page returned 35 records and a continuation token. A second call with that token returned
+**no records, no token, and a field 4** the schema does not model — so the paging loop makes one
+request whose only content is that field.
+
+Two things follow, and the second matters more than the first:
+
+- The document should record field 4's existence. By analogy with `RetrieveZoneChangesResponse`,
+  which §3.5 does say carries a `status`, it is most likely a status or completion flag.
+- **If it is a "no more changes" indicator, reading it saves a request per fetch.** The README's
+  own rule 6 treats unnecessary requests against Apple as an account-flagging risk rather than mere
+  slowness, and this feature is meant to poll periodically, so one wasted round trip per poll is
+  worth removing. Right now the only way to know a fetch is complete is to ask again and be told
+  nothing.
+
+The implementation now logs the wire type and value of any unmodelled field, so the next run
+identifies it. Its earlier diagnostic overstated this as "the schema's assumed field numbers are
+likely wrong", which was misleading — the numbers were right; the field was simply extra. That has
+been fixed to distinguish "decoded nothing" from "decoded fine, plus something unknown".
+
+### C3. Not yet exercised: the parts Stage 5 actually needs
+
+Fetching proved the envelope, but the run printed only record types and counts. **Whether
+`Record.recordField` (7) and `Record.protectionInfo` (13) decoded is still unknown**, and those two
+are precisely what Stage 5 consumes — a record with zero fields would look identical in that
+output. The probe now reports both, so the next run settles it.
 
 ### C1. Stage 4 §3.2: `recordRetrieveRequest` is listed as needed but never specified
 
