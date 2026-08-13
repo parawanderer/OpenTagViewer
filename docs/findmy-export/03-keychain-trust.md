@@ -410,6 +410,42 @@ shape will fail on the others. Decode defensively, report what could not be unde
 discard a record silently. A record without a `bottleID` cannot be a recovery candidate and
 should be filtered out rather than treated as broken.
 
+## 5.3 The peer directory
+
+Two verifications later in this stage need to look up a peer's public keys by its identifier, and
+nothing described so far provides that. The directory comes from Cuttlefish:
+
+```
+Cuttlefish  fetchChanges
+```
+
+| Message | # | Field |
+| --- | --- | --- |
+| Request | 1 | `syncToken` — omit on a first call |
+| Response | 1 | `changes`: `syncToken` (1) and repeated `change` (2) |
+| `change` | 3 | `add` — a `CuttlefishPeer` |
+
+Walk the changes and collect every peer. Each carries its `hash` — the identifier used everywhere
+else — and a `permanentInfo` whose `info` decodes to a `PeerPermanentInfo` (§6.9) holding
+**`signingKey` at field 2** and `encryptionKey` at field 3. That signing key is what the checks
+below verify against.
+
+**Keep the returned `syncToken`** and pass it next time; this is an incremental feed, and a client
+that always fetches from the beginning re-reads the whole circle on every run.
+
+> **This is a prerequisite, not an optimisation, and it is needed twice:**
+>
+> - [§6.7 step 3](#step-3--verify-before-trusting) verifies the **sponsoring peer's signature**
+>   over the recovered bottle. That peer is looked up here.
+> - [§6.7.0 step 1](#670-fetching-the-recovered-peers-key-shares--and-why-joining-may-be-unnecessary)
+>   verifies each **key share's sender**. Likewise.
+>
+> A client without the directory cannot perform either check. Skipping them is not a small
+> weakening: an unverified bottle is one an attacker who could serve a response may have chosen,
+> and an unverified share is key material of unknown origin being trusted to decrypt the user's
+> data. **Fetch the directory first**, and treat a peer that is genuinely absent from it as a
+> reason to reject that share or bottle rather than to proceed.
+
 ## 6. Recovering — the passcode step
 
 Recovery is an **SRP exchange in which the device's passcode is the password**. That is why a
@@ -600,7 +636,8 @@ checks should pass before anything is decrypted:
 - the derived encryption key's public part equals the bottle's escrowed encryption key
 - the derived signing key's public part equals the bottle's escrowed signing key
 - the bottle's own signature verifies under the escrowed signing key, **SHA-384**
-- the sponsoring peer's signature over the bottle verifies under that peer's known key
+- the sponsoring peer's signature over the bottle verifies under that peer's signing key, taken
+  from the directory of **§5.3**
 
 A mismatch on either of the first two means the passcode produced the wrong entropy. The third and
 fourth mean the bottle is not what it claims.
@@ -795,8 +832,8 @@ receive are shares this client can unwrap**, with nothing further required.
 Unwrapping one:
 
 1. **Verify the sender.** Each share names a sending peer and carries a signature over its own
-   fields; check it against that peer's known key, **SHA-256**. A share from an unknown sender is
-   to be skipped, not trusted.
+   fields; check it against that peer's signing key from the directory of **§5.3**, **SHA-256**. A
+   share whose sender is not in the directory is to be skipped, not trusted.
 2. **Decode the wrapped key.** It is base64 of an **`NSKeyedArchiver` archive**, which expands to
    an ECIES ciphertext structure. Another encoding appearing nowhere else in this protocol.
 3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
