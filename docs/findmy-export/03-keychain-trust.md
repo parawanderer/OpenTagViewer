@@ -7,8 +7,8 @@ readable.
 Read [README.md](./README.md) first. In particular: **implement from this document alone.**
 
 > **The read-only half is verified against a live account on 2026-08-13** — host derivation,
-> transport, error envelope, and the record schema of §5, all by a probe written from this
-> document. Values from that run are marked **[observed]**, and several corrected what reading
+> transport, error envelope, the record schema of §5, and the escrow-to-Cuttlefish join, by two
+> independent implementations written from this document. Values from that run are marked **[observed]**, and several corrected what reading
 > the reference had suggested.
 >
 > **Everything from §6 onward is unverified**: recovery, joining the circle, enrolling and
@@ -117,7 +117,13 @@ The method [§5](#5-listing-what-the-account-has--read-only) step 2 needs.
 | 4 | `meta` | message | metadata |
 
 > Note field 3 is skipped, and that `EscrowMeta` is an **empty message** in every schema examined
-> — it carries nothing, so a `partial` entry conveys only that a bottle exists in that state.
+> — an individual `partial` entry carries nothing at all.
+>
+> **But the count is meaningful.** [observed] A live call returned 3 `valid` and 8 `partial`, and
+> the join of §5 produced exactly 3 recoverable records and 8 that had metadata but no viable
+> bottle. So `partial` is not noise to discard: its length should equal the number of described-
+> but-unrecoverable records, and a discrepancy means the join has gone wrong. **Use it as a
+> cross-check**, and log both counts.
 
 **The endpoint is a different service from the record database**:
 
@@ -734,9 +740,30 @@ Deletion is **two calls**, both `delete`, in this order:
 > take the record's **label**, the same value used for `srp_init` and `recover` and the same value
 > §5 joins on. Deleting by `bottleID` addresses nothing.
 
-Both carry only `command`, `label`, `transactionUUID`, `userActionLabel` and `version`. The
-`.double` suffix names a paired record that exists alongside the main one; deleting only the main
-record appears to leave it behind.
+Both carry only `command`, `label`, `transactionUUID`, `userActionLabel` and `version`.
+
+### What `.double` is
+
+The suffix names a **companion record** created alongside the main one. Two things about it are
+worth knowing before writing either a delete path or a listing:
+
+**Companions are created by Apple's own clients, not by this protocol's enrolment.** Nothing in
+§7's enrolment produces one; only deletion mentions them. So a record this project creates has no
+companion, and deleting `<label>.double` for it addresses nothing — harmless, and worth expecting.
+
+**A listing shows both, which inflates the apparent count.** `get_records` returns companions as
+ordinary entries, so a device that escrowed once through a first-party client appears **twice**.
+A count of records is therefore not a count of devices.
+
+> **[observed] This is the likeliest explanation for records appearing in pairs.** A live listing
+> showed six records attributable to two serial numbers — two per serial — from a macOS export
+> route running first-party code. Reading those as six devices overstates the position by double;
+> reading them as two devices with companions fits both the pairing and the existence of the
+> companion mechanism.
+>
+> **It is testable without any further request:** the two labels of a pair should be identical but
+> for a `.double` suffix. If they are, the pairing is explained; if they differ some other way, it
+> is not, and this note is wrong.
 
 > **The protocol requires nothing but the label.** No password, no blob, no proof that the caller
 > could have recovered the record. Any client holding a valid PET can delete **any** escrow record
