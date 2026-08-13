@@ -653,3 +653,61 @@ explain an internal error better than a mis-sized first one.
 > guessing would more likely produce a false positive than an answer. This is the situation the
 > clean-room split exists for: one reading of the reference settles it, where a dozen live attempts
 > might not.
+
+## I4. Recovery works end to end [observed]
+
+Stage 3 §6.1–§6.5 and §6.7 steps 1–4 all verified against a live account on 2026-08-13, with the
+§6.3 correction applied. The passcode exchange completed, the bottle opened, and this client now
+holds the recovered peer's own private keys.
+
+Four things the run settled that the documents do not state:
+
+**The recovered plist's fields.** §6.7 step 1 says the blob holds "one field that matters" without
+naming it. Seven fields, 713 bytes:
+
+| Field | Type |
+| --- | --- |
+| `BottledPeerEntropy` | 72 bytes — the one step 2 needs |
+| `SecureBackupIDMSData` | 286 bytes |
+| `DoubleEnrollmentPassword` | 36-character string |
+| `DoubleEnrollmentVersion` | integer |
+| `BackupBagPassword` | 29 bytes |
+| `BackupVersion` | 1-character string |
+| `com.apple.securebackup.timestamp` | string |
+
+**`DoubleEnrollmentPassword` explains `.double`.** A companion record is a *double enrollment*, and
+the password for it travels inside the parent's recovered material. That is the first concrete
+connection between §7.1's companion records and anything else in the protocol, and it implies a
+client creating its own record has to decide whether to create one — which §7 does not discuss.
+
+**Escrowed public keys are DER SubjectPublicKeyInfo**, 120 bytes for P-384. Not the X9.62 point a
+reader might assume. §6.7 step 3 says to compare derived public keys against escrowed ones without
+saying in what form either is.
+
+**A peer's private key is 145 bytes: the 97-byte uncompressed public point, then the 48-byte
+scalar.** Not DER, not PKCS#8, not a bare scalar. Both keys reported `keyType` 1, so that field
+does not distinguish signing from encryption.
+
+The last one is worth a note on method. 145 is exactly 97 + 48, which is a guess — but a
+self-checking one: deriving a public key from the trailing 48 bytes must reproduce the leading 97,
+and it does, for both keys. That is a free offline check that either passes or does not, so it
+needed no live attempt. Where such a check exists, guessing is cheap; where it does not, it costs a
+credential and fails ambiguously.
+
+### The one that cost a run: the salt is `adsid`, and I used `dsid`
+
+§6.7 step 2 says the HKDF salt is the account's `adsid`. The implementation passed `DsPrsId`,
+which Stage 4 §2.1 states plainly is "not `adsid`, which is a different identifier in the same
+dictionary" — so the document was right, unambiguous, and ignored.
+
+Two things made that easy to do, and both are worth guarding against rather than blaming:
+
+- The library exposed `dsid` and not `adsid`, because nothing had needed `adsid` before. The
+  available value won.
+- The failure said **"the passcode produced the wrong entropy"**, which was confidently wrong. A
+  wrong salt and a wrong passcode are indistinguishable at that check, and the error named only
+  one of them.
+
+Both are fixed: `adsid` is carried forward through login rather than discarded, and the salt is
+now *found* by trying candidates against the bottle's own escrowed keys rather than assumed — the
+same free-offline-check reasoning as above. The error now says the salt may be at fault too.

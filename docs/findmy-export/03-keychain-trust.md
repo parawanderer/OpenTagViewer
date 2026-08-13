@@ -775,6 +775,62 @@ empty list: field 1 `service`, then `topLevelKey` (2), `classA` (3), `classC` (4
 `oldTopLevelKey` (5), each a `ViewKey` of `keyId` (1), `topLevelKeyId` (2), `keyNumber` (3),
 `key` (4) and a fifth field whose name is misspelled in every schema examined.
 
+### 6.7.0 Fetching the recovered peer's key shares — and why joining may be unnecessary
+
+Step 5.3 above says to fetch the recovered peer's key shares. The method is:
+
+```
+Cuttlefish  fetchRecoverableTLKShares
+```
+
+| Message | # | Field |
+| --- | --- | --- |
+| Request | 1 | `forPeer` — the **recovered peer's** identifier, which §4.3 shows is already in the record's label |
+| Response | 1 | `shares` — repeated, each carrying a share record and optionally a set of view keys |
+
+**The important property: a share is wrapped to the *receiving* peer's encryption key.** Escrow
+recovery (§6.7 step 4) yields exactly that key for the recovered peer — so **the shares it can
+receive are shares this client can unwrap**, with nothing further required.
+
+Unwrapping one:
+
+1. **Verify the sender.** Each share names a sending peer and carries a signature over its own
+   fields; check it against that peer's known key, **SHA-256**. A share from an unknown sender is
+   to be skipped, not trusted.
+2. **Decode the wrapped key.** It is base64 of an **`NSKeyedArchiver` archive**, which expands to
+   an ECIES ciphertext structure. Another encoding appearing nowhere else in this protocol.
+3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
+   message: a UUID, a zone name, a key class and the key bytes.
+4. **Unwrap the view keys it carries.** A share may also carry class A and class B view keys, each
+   wrapped under the key just recovered. Decrypt them the same way and keep all of them — the top
+   key alone is not what Stage 5 matches against.
+
+> ### This may remove every write from the flow
+>
+> §6.7 presents joining as the way to obtain keys, and for a device that wants to *be* in the
+> circle it is. But this project only wants to **read**, and the keys arrive at step 5.3 —
+> **before** any peer is created, any voucher signed, any bottle enrolled, or anything sent to
+> Cuttlefish.
+>
+> If the shares unwrap and yield the `Manatee` view keys, then steps 5.4 and 5.5 and everything in
+> §6.9 are **unnecessary for reading**, and the flow becomes: recover the bottle, unwrap the
+> shares, decrypt. **No peer, no escrow record, nothing written to the user's account.**
+>
+> That is a materially better position than this document has assumed throughout — it would make
+> the whole feature read-only apart from the device registration of
+> [Stage 1 §13](./01-authentication.md), and it removes the artefact the residue rules of §7 exist
+> to manage.
+>
+> **It is not yet established**, and the cheap way to find out is the order above: fetch the
+> shares, unwrap them, and see whether the keys they yield satisfy §6.8's contract. If they do,
+> stop there. **Nothing in steps 1 to 5.3 writes anything**, so trying costs a passcode and no
+> account change.
+>
+> **What would make joining necessary anyway:** wanting to *stay* in the circle across key
+> rotations. A non-member receives no new shares, so a client that never joins may find its keys
+> going stale and have to recover again. That is a real cost, but it is a later one, and it trades
+> against never writing to the account at all.
+
 ### 6.7.1 The steady state — what the passcode buys
 
 **The device passcode is needed once, not per fetch.** Everything this stage establishes persists,
