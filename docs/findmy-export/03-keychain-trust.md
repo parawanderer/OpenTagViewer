@@ -847,7 +847,58 @@ Cuttlefish  fetchRecoverableTLKShares
 | Message | # | Field |
 | --- | --- | --- |
 | Request | 1 | `forPeer` — the **recovered peer's** identifier, which §4.3 shows is already in the record's label |
-| Response | 1 | `shares` — repeated, each carrying a share record and optionally a set of view keys |
+| Response | 1 | `shares` — repeated `RecoverableTlkShare` |
+
+**`RecoverableTlkShare`:**
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `service` | string — the view this share is for, e.g. `Manatee` |
+| 2 | `viewkeys` | `RecoverableViewKeys` — `tlk` (1), `classA` (2), `classB` (3) |
+| 3 | `share` | the share itself |
+
+Each of those four members is a wrapper whose **field 2** holds a **CloudKit `Record`** — the same
+`Record` message as [Stage 4 §3.6](./04-cloudkit.md), field numbers and all.
+
+> ### The share is a CloudKit record, not a protobuf message
+>
+> **This is the mistake to avoid, and it fails silently.** §6.9 specifies a `TlkShare` *message*
+> with numbered fields. That message is what a client **sends** when joining. What it **receives**
+> here is entirely different: a CloudKit record of type `tlkshare`, whose values live in
+> **named fields** — the `recordField` list of Stage 4 §3.6, each with an `identifier.name` and a
+> typed value.
+>
+> Decoding the record's bytes as a `TlkShare` message does not error. Protobuf skips fields whose
+> numbers it does not recognise, so it yields a message with **every field empty** — which looks
+> like a share with no sender rather than a parse that found nothing. Forty-one identical empty
+> results is the signature of this mistake.
+>
+> **Read the fields by name.**
+
+**Record type `tlkshare`** — the share:
+
+| Field name | Type |
+| --- | --- |
+| `sender`, `receiver` | string |
+| `receiverPublicEncryptionKey` | string |
+| `wrappedkey` | string — base64 |
+| `signature` | string — base64 |
+| `curve`, `epoch`, `poisoned`, `version` | int64 |
+| `parentkeyref` | reference |
+
+**Record type `synckey`** — each of `tlk`, `classA` and `classB`:
+
+| Field name | Type |
+| --- | --- |
+| `wrappedkey` | string — base64 |
+| `class` | string |
+| `uploadver` | string |
+| `parentkeyref` | reference |
+
+> **The record carries no `service` and no `keyId`.** Both exist on the `TlkShare` *message* and
+> neither is on the record — the view name comes from `RecoverableTlkShare.service` at field 1, one
+> level up, and the record's own identity comes from its `recordIdentifier`. Looking for them among
+> the record's fields finds nothing, correctly.
 
 **The important property: a share is wrapped to the *receiving* peer's encryption key.** Escrow
 recovery (§6.7 step 4) yields exactly that key for the recovered peer — so **the shares it can
@@ -878,9 +929,10 @@ Unwrapping one:
    an ECIES ciphertext structure. Another encoding appearing nowhere else in this protocol.
 3. **Decrypt with the recovered peer's encryption private key.** The plaintext is a serialised key
    message: a UUID, a zone name, a key class and the key bytes.
-4. **Unwrap the view keys it carries.** A share may also carry class A and class B view keys, each
-   wrapped under the key just recovered. Decrypt them the same way and keep all of them — the top
-   key alone is not what Stage 5 matches against.
+4. **Unwrap the view keys it carries.** `viewkeys` holds up to three `synckey` records — `tlk`,
+   `classA` and `classB` — whose `wrappedkey` is wrapped under **the key just recovered in step 3**,
+   not under a peer key. Decrypt each and keep all of them, together with the recovered key itself:
+   the top-level key alone is not what Stage 5 matches against.
 
 > ### This may remove every write from the flow
 >
