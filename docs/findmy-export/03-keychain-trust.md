@@ -68,6 +68,57 @@ Calls are made with the function-invoke operation — field `1101` of `RequestOp
 [Stage 4 §3.2](./04-cloudkit.md) — naming the target `Cuttlefish`, the method, and a protobuf
 body. The response body is protobuf too.
 
+### 2.2 The invoke message
+
+Field `1101` of `RequestOperation` carries a `FunctionInvokeRequest`:
+
+| # | Field | Type | Value |
+| --- | --- | --- | --- |
+| 1 | `service` | string | `Cuttlefish` |
+| 2 | `name` | string | the method, e.g. `fetchViableBottles` |
+| 3 | `parameters` | bytes | **the method's own request message, serialised** |
+
+The response arrives at field `1101` of `ResponseOperation` as a `FunctionInvokeResponse`:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `serializedResult` | bytes — **the method's own response message, serialised** |
+
+So there are **two layers of protobuf**: the CloudKit envelope, and inside `parameters` and
+`serializedResult` an entirely separate message that CloudKit neither parses nor validates. A
+malformed inner message therefore produces a successful CloudKit operation carrying a payload that
+fails to decode, not a CloudKit error.
+
+### 2.3 `fetchViableBottles`
+
+The method [§5](#5-listing-what-the-account-has--read-only) step 2 needs.
+
+**Request:**
+
+| # | Field | Type | Value |
+| --- | --- | --- | --- |
+| 1 | `filter` | uint32 | `1` |
+| 2 | `metrics` | bytes | empty |
+
+**Response:**
+
+| # | Field | Type | Meaning |
+| --- | --- | --- | --- |
+| 1 | `valid` | repeated `EscrowData` | **the usable bottles** |
+| 2 | — | — | a legacy repeat of the same type; ignore |
+| 3 | `partial` | repeated `EscrowMeta` | bottles that are not fully usable |
+
+**`EscrowData`:**
+
+| # | Field | Type | Meaning |
+| --- | --- | --- | --- |
+| 1 | `id` | string | **the join key** — matches an escrow record's `label` (§5 step 3) |
+| 2 | `bottle` | message | the sealed material |
+| 4 | `meta` | message | metadata |
+
+> Note field 3 is skipped, and that `EscrowMeta` is an **empty message** in every schema examined
+> — it carries nothing, so a `partial` entry conveys only that a bottle exists in that state.
+
 **The endpoint is a different service from the record database**:
 
 ```
@@ -90,12 +141,21 @@ id, exists for keychain item operations proper.
 
 | Value | From |
 | --- | --- |
-| **PET** | Stage 1. Used as the escrow proxy's HTTP Basic password — so the five-minute expiry applies here too. |
+| **PET** | Stage 1. Used as the escrow proxy's HTTP Basic password — see the warning below. |
 | The account's email | Stage 1 `acname`, the Basic username |
 | A working CloudKit container | Stage 4 §2, for every Cuttlefish call |
 | `com.apple.gs.icloud.escrow.auth` | Stage 1 issues this token; whether this stage needs it, or only the PET, is unestablished |
 | **The user's device passcode** | the user, at the moment of recovery. Never stored. |
 | Anisette headers | the same identity as every other stage |
+
+> **The PET is spent by Stage 2, and this is an ordering constraint on the whole flow.** Stage 2
+> uses it as its HTTP Basic password and then replaces it with the service tokens it returns, so
+> an implementation that follows Stage 2 as written has **no PET left** by the time this stage
+> begins — and it expires in about five minutes regardless.
+>
+> So Stage 3 needs either a **second, fresh authentication** whose PET is retained rather than
+> spent, or Stage 2 amended to keep a copy. This is not a detail of Stage 3; it changes how
+> Stages 1 to 3 fit together, and an implementation that discovers it late will have to restructure.
 
 ## 4. The escrow proxy
 

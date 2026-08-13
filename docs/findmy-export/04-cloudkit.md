@@ -61,8 +61,10 @@ POST https://gateway.icloud.com/setup/setup/ck/v1/ckAppInit?container=com.apple.
 **Authentication is HTTP Basic**, and the credential pair is worth stating precisely because both
 halves are easy to get wrong:
 
-- **username** — `DsPrsId`, the *numeric* account identifier from the Stage 1 session payload.
-  Not `adsid`, which is a different identifier in the same dictionary.
+- **username** — the *numeric* account identifier. Not `adsid`, which is a different identifier
+  entirely. It is available as `DsPrsId` in the Stage 1 session payload **and** as the top-level
+  `dsid` of the Stage 2 delegate response; **prefer the latter**, since Stage 1's payload keys
+  vary between logins and Stage 2's do not.
 - **password** — `mmeAuthToken`. Not `cloudKitToken`, despite this being CloudKit.
 
 Headers are the CloudKit set of §2.2.
@@ -208,7 +210,7 @@ the operation type**, which is the neatest thing in this protocol and worth rely
 | 202 | `zoneDeleteRequest` | delete a zone |
 | **203** | **`retrieveZoneChangesRequest`** | **which zones changed** |
 | 210 | `recordSaveRequest` | write records |
-| **211** | **`recordRetrieveRequest`** | **fetch records by identifier** |
+| 211 | `recordRetrieveRequest` | fetch records by identifier — **not needed**, see below |
 | **213** | **`retrieveChangesRequest`** | **which records changed — the main fetch** |
 | 214 | `recordDeleteRequest` | delete records |
 | 220 | `queryRetrieveRequest` | query records |
@@ -231,8 +233,12 @@ The `Operation` message declares the same thing again as an enum:
 So the operation is declared twice — once as this enum, once by which high-numbered field of
 `RequestOperation` is populated — and the two must agree.
 
-Only the four in bold are needed to read accessory data. Everything else in this schema writes,
-deletes, shares or subscribes, and this project does none of those.
+Only the three in bold are needed to read accessory data: list the zones, find what changed, and
+fetch the changes. `recordRetrieveRequest` (211) fetches records by identifier and is **not
+required** — `record/sync` returns everything — so its messages are not specified here.
+
+Everything else in this schema writes, deletes, shares or subscribes, and this project does none
+of those.
 
 ### 3.2.1 Where operations are sent
 
@@ -292,7 +298,7 @@ Responses are `ResponseOperation`, mirroring the request:
 
 | # | Field | Meaning |
 | --- | --- | --- |
-| 1 | `operationCost` | what the operation cost against the account's budget |
+| 1 | `operationCost` | uint32 — what the operation cost against the account's budget |
 | 2 | `response` | the `Operation`, echoing the type |
 | 3 | `result` | **success or failure — check this first** |
 | 4 | `bundled` | bundled sub-requests |
@@ -313,7 +319,7 @@ total failure will discard good results.
 | 4 | `errorDescription` | string | human-readable |
 | 5 | `errorKey` | string | a stable key for the error |
 | 6 | `errorInternal` | string | Apple-internal detail |
-| 7 | `extensionError` | message | `extensionName`, `typeCode`, `extensionPayload` |
+| 7 | `extensionError` | message | 1 `extensionName` (string), 2 `typeCode` (uint32), 3 `extensionPayload` (bytes) |
 
 > **`clientError` and `serverError` are wrapper messages, not bare enums.** Each is a message
 > whose field 1 holds the code. Declaring them as plain integers decodes as
@@ -351,7 +357,7 @@ in the same way escrow records do (see [Stage 3 §5](./03-keychain-trust.md)).
 
 | # | Field | Meaning |
 | --- | --- | --- |
-| 1 | `targetZone` | the `Zone` — its identifier, etag, and **both** protection infos |
+| 1 | `targetZone` | the `Zone`: 1 `zoneIdentifier`, 2 `etag` (string), 3 `protectionInfo`, 6 `recordProtectionInfo` |
 | 2 | `currentServerContinuationToken` | the sync token to start from |
 | 3 | `clientChangeToken` | the client's own change marker |
 | 4 | `deviceCount` | devices participating in the zone |
@@ -377,7 +383,7 @@ in the same way escrow records do (see [Stage 3 §5](./03-keychain-trust.md)).
 | 25 | `isolationLevel` | `ZONE = 1` or `OPERATION = 2` |
 | 26 | `group` | operation group, matching the correlation headers of §2.2 |
 | 10 | `deviceLibraryName` | `com.apple.cloudkit.CloudKitDaemon` |
-| 11 | `deviceLibraryVersion` | `1970` |
+| 11 | `deviceLibraryVersion` | `1970`, as a **string** |
 | 29, 34 | undocumented | `0` |
 | 35 | undocumented | `1` |
 
@@ -449,8 +455,16 @@ incremental sync. Two levels exist, and both work the same way.
 | 1 | `syncContinuationToken` | omit on a first run; everything is returned |
 | 2 | `maxChangedZones` | page size |
 
-The response returns repeated `ChangedZone` entries — each with the zone `identifier`, a
-`changeType` and a `deleteType` — plus a new `syncContinuationToken` and a `status`.
+**`RetrieveZoneChangesResponse`:**
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `changes` | repeated `ChangedZone` |
+| 2 | `syncContinuationToken` | bytes |
+| 3 | `status` | int32 |
+
+**`ChangedZone`:** 1 `identifier`, 2 `changeType`, 3 `deleteType`, 4 `capabilities` (bytes),
+5 `isAnonymous` (bool), 6 `anonymousZoneInfo` (bytes), 7 `zoneParentIdentifier`.
 
 **Which records changed** — `RetrieveChangesRequest`, field 213, sent to
 `/ckdatabase/api/client/record/sync`:
@@ -466,7 +480,14 @@ The response returns repeated `ChangedZone` entries — each with the zone `iden
 | 8 | `ignoreCallingDeviceChanges` | skip changes this client made |
 | 9 | `includeMergeableDeltas` | include deltas rather than whole records |
 
-Its response holds repeated `RecordChange`:
+**`RetrieveChangesResponse`:**
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `change` | repeated `RecordChange` |
+| 2 | `syncContinuationToken` | bytes |
+
+each `RecordChange` being:
 
 | # | Field | Meaning |
 | --- | --- | --- |
@@ -535,8 +556,14 @@ separate-database design would.
 
 | # | Field | Meaning |
 | --- | --- | --- |
-| 1 | `identifier` | a message wrapping the field's `name` string |
+| 1 | `identifier` | **a message** whose field 1 is the `name` string |
 | 2 | `value` | the value |
+
+> **Three places wrap a name in a message rather than using a bare string**, and they are easy to
+> get wrong because both encode as length-delimited on the wire: a record's `type` (field 3 of
+> `Record`), a change's `recordType` (field 3 of `RecordChange`), and a field's `identifier`
+> here. **All three are messages with the string at field 1.** Declaring one as a bare string does
+> not degrade gracefully — it throws, and takes the whole response with it.
 
 **`Record.Field.Value`** is a tagged union — a `type` enum plus whichever typed field is
 populated:

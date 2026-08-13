@@ -154,7 +154,7 @@ PublicKey ::= [APPLICATION 1] EXPLICIT SEQUENCE {
 
 PrivateKey ::= CHOICE {
     v1                SEQUENCE { key OCTET STRING, public PublicKey OPTIONAL },
-    v2                [APPLICATION 5] SEQUENCE { data OCTET STRING }
+    v2                [APPLICATION 5] EXPLICIT SEQUENCE { data OCTET STRING }
 }
 ```
 
@@ -162,7 +162,9 @@ PrivateKey ::= CHOICE {
 > where they appear, not by their tag, so a decoder must be told which one to expect rather than
 > dispatching on the tag alone.
 
-The Find My service is **v2** (§2), so its keys are the `[APPLICATION 5]` form.
+The Find My service is **v2** (§2), so its keys are the `[APPLICATION 5]` form. That tag is
+**explicit**, like every other application tag here — it wraps the SEQUENCE rather than replacing
+its tag, so the contents are one level deeper than an implicit reading would place them.
 
 There is also a keyset wrapper used when keys are carried together:
 
@@ -182,9 +184,49 @@ the keyset for an entry whose public key matches those bytes. That entry's ciphe
 wrapped key intended for us. If none matches, we do not hold a key for this record and no amount
 of retrying will change that — report it as a missing key, not as a decryption failure.
 
-**Step 2 — unwrap it.** The wrapping is **RFC 6637** — the ECDH key-wrap construction from
-OpenPGP — with the fixed parameter string `fingerprint`. The result is the PCS **master key**,
-16 bytes.
+**Step 2 — unwrap it.** The wrapping is **RFC 6637**, the ECDH key-wrap construction from
+OpenPGP. It has three parts, and each has a detail worth stating.
+
+*The ciphertext layout* is OpenPGP's MPI encoding, **not** an X9.62 point:
+
+| Part | Size |
+| --- | --- |
+| Bit length of the ephemeral point | 2 bytes, big-endian — a count of **bits**, not bytes |
+| Ephemeral public key | that many bits. **[observed] 256 bits — a 32-byte compact point**, not a 33- or 65-byte X9.62 encoding |
+| Wrapped key length | 1 byte |
+| Wrapped key | that many bytes |
+
+*The key derivation* is ECDH against that ephemeral point, then:
+
+```
+KEK = SHA-256( be32(1) ‖ shared_secret ‖ 08 2A 86 48 CE 3D 03 01 07
+                ‖ 0x12 ‖ 0x03 0x01 ‖ 0x08 ‖ 0x07
+                ‖ "Anonymous Sender    " ‖ fingerprint )
+```
+
+where the OID bytes are length-prefixed P-256, `0x12` is ECDH, `0x08` names SHA-256 as the KDF
+hash, `0x07` names **AES-128** as the key-wrap cipher, the sender string is exactly twenty
+characters including its four trailing spaces, and:
+
+> **The "fingerprint" is the literal ASCII word `fingerprint`, zero-padded to 20 bytes.** It is
+> not a key fingerprint, not a hash of anything, and not eleven bytes — it occupies the 20-byte
+> fingerprint slot of an otherwise ordinary RFC 6637 parameter block, right-padded with zeros.
+
+Only the **first 16 bytes** of that 32-byte digest are used, as an AES-128 key-encryption key.
+The unwrapping itself is RFC 3394 AES key unwrap, whose integrity check is the first signal that
+everything above was assembled correctly.
+
+*The plaintext* is framed, not bare:
+
+| Part | Content |
+| --- | --- |
+| byte 0 | algorithm identifier, **must be `1`** |
+| bytes 1 … *L* | the key — the PCS master key, 16 bytes |
+| next 2 bytes | big-endian checksum: the sum of the key bytes, modulo 65536 |
+| trailing *p* bytes | padding, every byte equal to *p* |
+
+*L* is `len - p - 3`. Verify the checksum and the padding; both are cheap and both catch a wrong
+key before it propagates.
 
 **Step 3 — derive the share key, conditionally.**
 
@@ -205,7 +247,11 @@ not corruption. An owner signature may additionally be present as attribute `7`.
 before anything is decrypted:
 
 - the first 4 bytes of the derived key's **key id** must equal the structure's truncated key id
-- the structure's **HMAC** must verify under the derived key
+- the structure's **HMAC** must verify under the derived key, over the concatenation of three
+  things: the **DER of `keyset`**, then the raw bytes of **`meta`**, then the **DER of
+  `signatureData`** — in that order, and nothing else. Note it is a re-encoding of two sub-
+  structures rather than a span of the original bytes, so a decoder that discards the input after
+  parsing must be able to re-encode faithfully.
 
 A mismatch means the wrong key, not corrupt data.
 
@@ -213,9 +259,27 @@ A mismatch means the wrong key, not corrupt data.
 
 ## 5. Key derivation
 
-Every derived key comes from the master key by the same construction: a **counter-mode KDF with
-HMAC** (the NIST SP 800-108 shape), with a fixed label and an output the same length as the input
-key.
+Every derived key comes from the master key by the same construction: **NIST SP 800-108
+counter-mode KDF with HMAC-SHA256**, with a fixed label and an output the same length as the
+input key.
+
+The PRF input is, exactly:
+
+```
+HMAC-SHA256( master_key,  be32(i) ‖ label ‖ 0x00 ‖ context ‖ be32(L) )
+```
+
+| Part | Value |
+| --- | --- |
+| `i` | the block counter, **starting at 1**, big-endian 32-bit |
+| `label` | the fixed label from the table below, as raw ASCII bytes |
+| `0x00` | the separator SP 800-108 specifies |
+| `context` | **empty** — no context is used |
+| `L` | the output length **in bits**, big-endian 32-bit |
+
+Blocks are concatenated and truncated to the requested length. Since every use here requests 16
+bytes and SHA-256 produces 32, the counter never advances past 1 in practice — but implement the
+loop anyway rather than assuming a single block.
 
 | Derived key | Label |
 | --- | --- |
@@ -241,14 +305,16 @@ key by a route that is unusual enough to be worth spelling out:
 ```
 out = PBKDF2-HMAC-SHA256(master_key, salt = "full master key", iterations = 10, length = 128)
 out = reverse(out)                      # the output is little-endian; big-endian is needed
-n   = mask_to_bit_length(out, order_bits(P-256))
+n   = keep_low_bits(out, order_bits(P-256))    # the LOW 256 bits, not the high ones
 if n > order: n = n - order
 private_scalar = n
 ```
 
-Three traps in five lines: **ten** iterations, not a realistic PBKDF2 count; the output is
-**reversed** because it is produced little-endian and consumed big-endian; and the reduction is a
-single conditional subtraction rather than a modulo. The curve is **P-256**
+Four traps in five lines. **Ten** iterations, not a realistic PBKDF2 count. The output is
+**reversed**, because it is produced little-endian and consumed big-endian. The truncation keeps
+the **low** 256 bits — the operation is a bit mask, not the `bits2int` convention that keeps the
+high bits, and the two are indistinguishable by the arithmetic that follows. And the reduction is
+a single **conditional subtraction**, not a modulo. The curve is **P-256**
 (`prime256v1`/`secp256r1`).
 
 ## 6. Field decryption
@@ -278,8 +344,34 @@ After the header:
 | Tag | 12 bytes — **not the usual 16** |
 | Ciphertext | the remainder |
 
-**The AAD is the entire header** — bytes 0 to `4 + N`, including the version byte and the length
-byte, not merely the key id.
+### The AAD is the header **and** a field context string
+
+> **Correction — this section previously said the AAD was the header alone, and that was wrong.**
+> Decryption with only the header as AAD fails authentication on every field, with no diagnostic
+> beyond "GCM error". The AAD is the concatenation of **two** parts:
+
+```
+AAD = header ‖ "<zoneName>-<recordName>-<fieldName>"
+```
+
+| Part | Content |
+| --- | --- |
+| First | the entire header — bytes 0 to `4 + N`, version and length byte included |
+| Second | the context string, ASCII, no separator between it and the header |
+
+where the three names are the **zone's name** (`BeaconStore`), the **record's own name** from its
+`recordIdentifier`, and the **field's name** from its `identifier` — joined by single hyphens.
+
+Two consequences worth stating:
+
+- **Decryption needs the record's identity, not just its bytes.** A function taking only a
+  ciphertext and a key cannot decrypt a PCS field. It needs the zone name, the record name and the
+  field name too, so the plumbing has to carry them down.
+- **It binds each field to its position.** A ciphertext moved to another field, another record or
+  another zone will not authenticate, which is the point.
+
+For reference, a header as actually produced is six bytes: `03`, two key-id bytes, `02`, two more
+key-id bytes — version 3, then the two-byte-plus-two-byte split of §6's layout.
 
 The key is `KDF(master_key, "encryption key key m")`, 16 bytes for AES-128.
 
