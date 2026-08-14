@@ -1128,3 +1128,58 @@ Neither is fatal today and both may matter once the key is found:
 
 If either is meant to gate what follows rather than merely confirm it, that would matter
 here.
+
+---
+
+## N continued — the HMAC is fixed, and the zone still yields one key
+
+### N4. §4 step 5's third part was the whole of that bug [closed]
+
+**The HMAC now verifies**, on the zone's structure and on every record's. Signing the
+`ObjectSignature` — the contents of the `data` OCTET STRING, taken as bytes with no
+re-encoding — was exactly it. The amendment's note about the asymmetry is worth keeping:
+key-id-matches-but-HMAC-fails really is diagnostic, and a wrong key would have failed both.
+
+Worth recording that my own test fixture had been building its HMAC the same wrong way. It
+agreed with the implementation and therefore proved only that the two agreed, which is the
+failure mode of a fixture written from the same misreading as the code.
+
+### N5. The SET OF warning found a real bug, but not this one [closed]
+
+`_identity_keys` was handing whole `SET`s to the private-key reader. That does not fail —
+it returns a **pair**, because the structure it returns holds an encryption key and a
+signing key — so a set of five keys would have yielded two and looked complete. Exactly the
+shape described. Fixed, with tests for a five-entry set and for one unreadable entry not
+ending the loop.
+
+**But it did not change this account's numbers**, because the zone's `meta` genuinely holds
+one identity whose keyset is 112 bytes — about what a single v1 key, a name, a set and a
+32-byte hash come to. The prediction was falsifiable and it falsified: the HMAC cleared and
+the count stayed at one.
+
+### N6. So the zone's only key is not the one its records name [open]
+
+| | |
+| --- | --- |
+| Zone `meta` | `[2]{SET{SEQUENCE{INTEGER, OCTET STRING(112B)}}}` — one identity |
+| Zone yields | **one** key, `1df257ad ee267516 …` |
+| Every record names | **one** key, `20fb99a6 4463a920 …` |
+| HMAC | verifies at both levels now |
+
+Given N2's answer — the zone's `meta` is the only source, a record's keyset names a zone
+key directly, and there is no derivation between them — one of these must be true, and
+nothing here distinguishes them:
+
+1. **The zone's `meta` should hold more than one identity on this account and does not**,
+   which would make this a property of the account rather than of the reader.
+2. **`1df257ad` is the wrong key to have taken** — the identity's keyset holds one key and
+   this took it, but perhaps the keyset is not where a *zone* key lives.
+3. **The structure being unwrapped is not the one whose keys the records name.** It is the
+   `BeaconStore` zone's `protectionInfo` from a zone retrieve, which is what step 0 says.
+   If `recordProtectionInfo` is the one that yields keys records name — rather than the
+   alternative-for-structureless-records the amendment describes — that would fit.
+
+The next run reports, for a real record, whether the key it names is among the 133 keychain
+keys, among the zone keys, or in neither. **If it is in neither**, no better reading of
+either source finds it and the key comes from somewhere not yet described. That is a cheap
+check and it should settle which of the three above applies.
