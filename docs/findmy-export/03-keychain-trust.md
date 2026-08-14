@@ -328,9 +328,19 @@ version number is the certificate's **serial number**:
 | 103 | 2021-05-13 | `FDBA6F3365D617B9EB799D2F48851B1A85C62CF366C36797E539B3C4C2C3BDC6` |
 | 500 | 2022-12-09 | `654BFB656D80A715559034C7FE08E637B335E770C84EC05CD90475E8BBC59EB0` |
 
-> **Obtain them from Apple and check them against these fingerprints.** The fingerprints are the
-> useful half: a root delivered by any route is only trustworthy once it matches one of these, and
-> a pinning set assembled without checking is pinning to whatever arrived.
+> **The four are carried alongside this document**, in [`escrow-roots/`](./escrow-roots/), as DER
+> (`.crt`, what a loader wants) and PEM (`.pem`, for reading). Each has been checked against the
+> fingerprint above.
+>
+> **The fingerprints are the useful half, and that is what makes the delivery route irrelevant.** A
+> root is trustworthy once it matches one of these and not before, so it needs no trusted channel —
+> and equally, a pinning set assembled without checking is pinning to whatever arrived. Keep the
+> check on the bundled copies too: a bundled certificate that fails its own fingerprint is a
+> corrupted install, and should refuse exactly as loudly as a wrong one from a caller.
+>
+> **This is library data, not user input.** A client that asks whoever installs it to go and find
+> four certificates gets them pasted in unverified, which is worse than shipping them, because it
+> looks like someone made a security decision when nobody did.
 >
 > Note 500 expires in **2032**, while the three older roots run to 2049. Whichever set is carried,
 > a client should say clearly when a chain fails to verify rather than falling back to the system
