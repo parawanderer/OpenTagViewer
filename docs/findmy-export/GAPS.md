@@ -1423,7 +1423,7 @@ comparison, a missed one costs everything below it.
 
 ## Round O — terms of service
 
-### O1. A five-minute credential across a human reading a contract
+### O1. Closed — renew before each terms request
 
 §5.2 and §5.3 are consistent and complete, and implementing them turned up one thing the
 document does not mention, which is a property of the two sections combined rather than of
@@ -1444,12 +1444,19 @@ extra GSA exchange in a flow that already involves a person reading — but it i
 made in the implementation about a property the specification states in two separate
 places without connecting them.
 
-**Worth a sentence in §5.2**, whichever way it is resolved: either that the PET must be
-renewed before the `agreeUrl` POST, or that it need not be and the token from §3 remains
-valid there. This implementation assumed the first, because assuming the second and being
-wrong is unrecoverable for the user without a second acceptance.
+**Answered, and §5.2 now specifies it**: renew immediately before each terms request. The
+assumption was right, for a better reason than the one it was made on. Renewing a PET
+repeats the SRP exchange, which needs the password — and terms can only block a login that
+is *in progress*, so the password is necessarily in hand. A session restored from storage
+is past this stage entirely. That is why the renewal can be unconditional here when it
+could not be elsewhere.
 
-### O2. What `localizedError` says for pending terms is still open
+The one exception is §5.1's weekly token refresh, which repeats this stage unattended. With
+new terms published and no password retained, renewal is impossible and a fresh sign-in is
+the only answer — so falling back to the token already held rather than failing at the
+renewal is correct, and §5.2 now says so.
+
+### O2. Open by design — what `localizedError` says for pending terms
 
 Implemented as §5.2 directs: `localizedError` and `description` are surfaced verbatim,
 nothing branches on a guessed value, and the terms flow is offered as a remedy the caller
