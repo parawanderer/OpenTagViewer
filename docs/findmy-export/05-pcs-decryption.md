@@ -431,6 +431,24 @@ Each `identities` entry holds a `keyset` **OCTET STRING that is itself DER**, on
 | a set | unnamed, of unconstrained type |
 | `hash` | SHA-256 **over this structure's own DER with `hash` absent** — remove it, re-encode, compare |
 
+> **The construction is settled: it is the structure with `hash` omitted entirely**, not present
+> and empty, not zeroed, and not some sub-member on its own. A reference implementation treats a
+> mismatch here as fatal and runs against real accounts, so this reproduces exactly — **a failure
+> is the encoder, not the rule.**
+>
+> Where an encoder diverges, on a structure of this shape:
+>
+> - **Empty members must still be emitted.** Two of the four are empty on real data — a
+>   zero-length string and an empty set — and an encoder that omits falsy values drops both,
+>   changing the bytes while parsing back identically.
+> - **`SET OF` is DER-sorted by encoded value**, as in step 5.
+> - The outer length necessarily changes when `hash` is removed. That is expected, not a sign the
+>   approach is wrong.
+>
+> Until it verifies, **do not let it gate anything**. The keys taken from these keysets have been
+> confirmed correct by every downstream use, so a failing checksum here is a statement about the
+> checksum code and nothing else.
+
 So the two outputs of a fully unwrapped structure are:
 
 - **PCS master keys** — the one from step 2, followed by each of `symmKeys`. These decrypt fields.
