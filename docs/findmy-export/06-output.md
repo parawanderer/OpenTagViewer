@@ -245,15 +245,60 @@ rather than an untidiness.
   facts about the accessory and no user identity. The device name inside it is the only part worth
   a moment's thought.
 
-### 5.4 A bundle must say when it was made
+### 5.4 What an accessory *is* decides its format
 
-An export that cannot say how old it is produces the §7 problem months later with nobody able to
+The list a user picks from is **not homogeneous**, and export is where that stops being an internal
+detail. Two kinds of thing can sit in it:
+
+| Kind | Where its keys came from | Formats it can be written in |
+| --- | --- | --- |
+| Apple-paired — an AirTag, or a Find My-certified third-party accessory | this pipeline, out of `BeaconStore` | the plists **and** FindMy.py's `accessory` JSON |
+| Self-generated — an OpenHaystack-style tag | the user made the keypair; **it was never in any Apple account** | FindMy.py's `custom_rolling_key_accessory` JSON **only** |
+
+**The plist layout cannot represent a self-generated tag at all.** It is built around
+`privateKey`, `sharedSecret` and `secondarySharedSecret` — the inputs to Apple's rolling-key
+derivation. A tag whose keys are a plain list has none of them, and no field to put them in.
+
+So **the format is chosen per accessory, not per bundle**. A bundle holding one of each is normal
+and must remain readable.
+
+> **The failure mode to design against is silence.** A writer that only knows the plist layout,
+> handed a mixed selection, produces a bundle missing exactly the tags it could not represent — no
+> error, a plausible-looking zip, and a recipient who finds out when a tag never appears. If a
+> selected accessory cannot be written in a chosen format, **say so at export time**, do not skip
+> it.
+
+Two smaller consequences:
+
+- **A self-generated tag's name is local.** There is no `BeaconNamingRecord` for it, because there
+  is no CloudKit record at all — so its name comes from the app's own state and travels in the
+  JSON's `name` field or not at all.
+- **Nor is there a `KeyAlignmentRecord`, and none is needed.** Its keys are a fixed list rather than
+  a rolling derivation, so [rule 6](../../AGENTS.md)'s index search does not arise. The ageing
+  described in §5 applies only to the paired kind.
+
+> **An OpenHaystack tag missing from an export is not a bug.** It was never in the account, so
+> Stages 3 to 5 have nothing to find for it — it reaches the list by a different route entirely. A
+> null result here is the correct one, and it is not guessable from the absence.
+
+### 5.5 A bundle must say when it was made
+
+An export that cannot say how old it is produces the §8 problem months later with nobody able to
 explain it. **Stamp the format, the time and the producer**, the way the macOS exporter's `via:`
 line does — that line is how anyone looking at a zip afterwards works out what built it, and an
 export made this way needs the same.
 
 That is a statement about the bundle, not about the person: a version and a timestamp, not an
 account.
+
+> **There are now two producers, and they must not claim to be the same one.** `via:` currently
+> reads `OpenTagViewer.app:<version>`, and [rule 9](../../AGENTS.md) exists so that a zip can be
+> traced to the macOS exporter that built it. An export made in the app is a **different producer
+> with a different version number**, so it needs its own identifier — otherwise the field that was
+> added to answer "what built this" starts answering it wrongly, which is worse than not having it.
+>
+> The same rule then applies to the app's own identifier: whatever it stamps must be the version
+> that shipped, and nothing may patch it at build time.
 
 ## 6. What not to export
 
