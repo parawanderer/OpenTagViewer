@@ -1260,3 +1260,37 @@ Two shapes that would fit, offered as shapes rather than as candidates to try:
   held. That is expected for items of another class, and it is also the only place on the
   read path where something exists and was not opened. Worth mentioning only because it is
   the sole remaining "read something better" possibility, and everything else is exhausted.
+
+### N9. The blob layout was already being read correctly — the prediction falsifies [observed]
+
+§6.8.1's amendment is right and is now implemented as stated, with the check at the point of
+parse. **It changed nothing**, and that is the informative part.
+
+The prediction was that `20fb99a6…` would be the leading 32 bytes of the zone identity's
+blob and `1df257ad…` the public x of reading those bytes as a scalar. Neither holds:
+
+- The zone still yields **`1df257ad…`**, byte-identical to before.
+- **No blob raised** the new halves-disagree error, at any of the 133 keychain keys or the
+  zone's identity.
+
+The reason is that the previous reader was not doing what it looked like. It searched both
+ends, but it tried the **trailing** scalar *first* and compared the remainder against a set
+of public forms that included the bare x — which is exactly `x ‖ scalar`. So it matched the
+stated layout on its first attempt, and the two readers are equivalent for 64-byte blobs.
+The search was ugly and its being a search was a real problem, but it was not producing the
+wrong half.
+
+So `1df257ad…` is a correctly-read zone key, and `20fb99a6…` is genuinely not it. N6, N7 and
+N8 are not one bug.
+
+**What the amendment did buy**, and worth keeping: the layout is now stated rather than
+searched for, a 32-byte blob is dispatched on rather than assumed, and a disagreeing pair
+raises where it is parsed instead of travelling. It removes the class of error even though
+this account did not have an instance of it.
+
+The next run also reports, per blob, whether it was 64 bytes with agreeing halves or 32 with
+no public half. That distinguishes the two remaining readings of the zone identity's key,
+though neither changes the conclusion: whatever shape it is, it is not `20fb99a6…`.
+
+**N8's question stands unchanged**: one key protects all 35 records, and it is in neither
+the 133 keychain keys nor the zone's structure.
