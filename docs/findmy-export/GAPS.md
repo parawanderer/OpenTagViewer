@@ -1377,3 +1377,46 @@ is — but the amendment describes a *key blob*, and this reader applies it to a
 it meets while walking a structure. Those are not the same thing, and the check I added at
 the point of parse does not help, because a 32-byte blob is precisely the case it cannot
 check.
+
+### N12. Closed — it was reading the keyset's checksum as its key [closed]
+
+The identity's shape answered it:
+
+```
+16{2(1B), 4(112B -> APP 2{16{12(0B), 17{16{4(64B)}}, 17{}, 4(32B)}})}
+```
+
+That is §3.2's `ShareProtectionKeySet` — `[APPLICATION 2] { name, keys, set, hash }` — with a
+**64-byte key blob inside `keys`** and a 32-byte `hash` beside it. This implementation was
+returning the hash.
+
+Nothing in the document was wrong. The mechanism was that reading the keyset *as* a key
+**succeeds**: its `hash` is exactly a P-256 scalar's length, and an unverifiable 32-byte blob
+carries nothing that distinguishes a checksum from a secret. The walk then stopped at the
+first member to yield something and never opened `keys`.
+
+**Records decrypt.** Two levels, both halves taken at the right one.
+
+Worth recording as a pattern rather than an incident, because it is the third instance in
+this stage alone:
+
+| Where | What stopped early |
+| --- | --- |
+| §6.7.0 identities | a `SET` handed to a reader that returns a *pair*, so five keys yielded two |
+| §6.8.1 key blobs | a search that took the first plausible scalar |
+| §4 step 6 keysets | a walk that halted at the first member to yield anything |
+
+Each looks like efficiency, each produces a **short list that looks complete**, and none
+reports anything. The general rule the last of these earned: where a structure may hold keys
+in more than one place, collect rather than settle — a spurious key costs one failed
+comparison, a missed one costs everything below it.
+
+**Still open and now worth doing**, since the structure is finally known:
+
+- The nested keyset's own `hash` — SHA-256 over its DER with `hash` removed — is still not
+  verified. It is the checksum this was mistaking for a key, and checking it would have
+  named the mistake immediately.
+- Stage 5 §8 Q2, the date epoch, is now answerable from a real accessory's pairing date
+  rather than by argument.
+- M2 and §8 Q4 remain open: `OwnedDeviceKeyRecord` and `SharingCircleSecret` are still
+  unexplained, though N8 established they are protected by the same key as everything else.
