@@ -956,9 +956,21 @@ set, and it does not send an empty one.
 > **not** in the circle resets to it, rather than keeping what it last asserted. It is the reset,
 > not the join.
 
-> **`updateTrust` is a different call for a different purpose.** It carries a peer id and a set of
-> `TlkShare`s, and it is how an established member hands view keys to *another* peer later. It is
-> not the second half of a join, and a join that relies on it to assert trust asserts none.
+> **`updateTrust` is a different call for a different purpose.** It is how an established member
+> re-states its trust or hands view keys to *another* peer later — not the second half of a join,
+> and a join that relies on it to assert trust asserts none.
+>
+> | # | Field | Type |
+> | --- | --- | --- |
+> | 1 | `restorePoint` | string |
+> | 2 | `peerId` | string |
+> | 3 | `stableInfo` | `SignedInfo` |
+> | 4 | `dynamicInfo` | `SignedInfo` |
+> | 5 | `tlkshares` | repeated `TlkShare` |
+> | 6 | `viewKeys` | repeated `ViewKeys` |
+>
+> Handing a newly-vouched peer its keys is this call with `peerId` and `tlkshares` set and the two
+> signed blobs omitted. Its response is the same `CuttlefishChanges` as §6.9.5.
 
 ### 6.9 The messages `joinWithVoucher` carries
 
@@ -1277,6 +1289,36 @@ One is permanent and invisible; the other is tidy-up. So the sequence is:
 > only for an error the escrow service *reports* — a transport failure has not established that
 > anything exists, and deleting on one would remove a record this client cannot see the contents
 > of. §7.1 covers the deletion and its residue rules.
+
+### 6.9.5 What `joinWithVoucher` returns, and the token it carries
+
+**The response is a defined message, not an opaque blob**, and it is one a client that has synced
+the peer directory already decodes:
+
+| Message | # | Field |
+| --- | --- | --- |
+| `CuttlefishJoinWithVoucherResponse` | 1 | `changes` — a `CuttlefishChanges` |
+| `CuttlefishChanges` | 1 | `syncToken` — **string** |
+| | 2 | `changes` — repeated `CuttlefishChange` |
+
+This is the **same `CuttlefishChanges` that `fetchChanges` returns**, so the join's result goes
+through the existing path: apply the changes to the peer directory, and take `syncToken` as the
+new sync token.
+
+> **Leaving it undecoded is a reasonable instinct applied to the wrong case.** Decoding as the
+> wrong message yields every field empty rather than an error — the §6.7.0 trap — but that argues
+> for decoding as a message that is *specified*, which this one is. Discarding it silently drops
+> both the trust changes the server is reporting and the token below.
+
+**`restorePoint` is that `syncToken`, and it is a string on both sides.** The field is declared
+`string` on the request and `string` on the response that produces it, so there is nothing to
+encode and nothing to guess: send back exactly what Cuttlefish last sent. A client holding it as
+bytes has converted it locally and should stop.
+
+> Sending it is optional and omitting it costs at most a fuller response — but the reason to hold
+> the token is not this call. It is what makes later syncs incremental
+> ([§6.7.1](#671-the-steady-state--what-the-passcode-buys)), and the join's response is where a
+> new peer first receives one.
 
 ### 6.7.0 Fetching the recovered peer's key shares — and why joining may be unnecessary
 
