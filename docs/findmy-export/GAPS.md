@@ -2225,7 +2225,7 @@ It also confirms **U1 on real data**: the reply decoded as
 `CuttlefishJoinWithVoucherResponse`, its single change was an `add`, applying it through the
 same path `fetchChanges` uses produced 14 peers, and a sync token came back as a string.
 
-### W1. What is still not established
+### W1. Closed — the new record recovers, and its keys decrypt beacons
 
 Acceptance is not usability, and two things remain unproven:
 
@@ -2249,3 +2249,40 @@ Both are read-only checks and both should be run now rather than in a year:
 
 If the second fails, the peer is permanent residue and the record is deletable by §7.1 --
 worth knowing immediately, while what created it is still in front of somebody.
+
+---
+
+**W1 answered: both checks passed against the record the join created.**
+`trace_key_recovery.py` recovered from `FINDMYPY0001` and reached the service key, and
+`fetch_beacons_from_icloud.py` then decrypted accessory records with it.
+
+That closes the loop in the direction acceptance could not:
+
+- **The bottle opens.** The record round-trips, so it is a live recovery path rather than
+  the permanent invisible residue §4.5 warns about. It also proves the one-derivation
+  constraint held end to end -- the entropy the record escrowed derived the keys that
+  unsealed the bottle this project built.
+- **The new peer holds the view keys.** Twenty-one shares were not merely accepted; they
+  were read back *as* the new peer, which is what re-sharing exists to achieve and the only
+  thing that demonstrates Cuttlefish counts the peer as holding them.
+- **And the keys work.** Stage 5 decrypted with what came out, so the whole flow runs from
+  an Apple ID to accessory locations through an identity this project created, with no Mac
+  anywhere in it.
+
+Every construction in the write direction has now been exercised from both sides by
+something other than itself.
+
+### W2. What remains untested, and why it cannot be tested yet
+
+- **Staying current across key rotation**, which is the actual reason to be a member rather
+  than a recoverer. Nothing demonstrates it until the keys rotate.
+- **`updateTrust`**, transcribed from §6.8.2's table and unbuilt. It is how a member hands
+  view keys to another peer, and the first thing to reach for when the above matters.
+- **The content choices Apple tolerates but may not require** -- the policy hashes, `epoch`
+  1, the machine id. They were accepted and the resulting peer functions, which is as strong
+  as this gets short of long-term operation.
+
+One consequence worth noting for anyone tidying up afterwards: the new record is **viable**,
+so §7.1's deletion refuses it by default. That is the safeguard working as designed -- it is
+now a live recovery path for a real client, and removing it costs exactly what removing any
+other viable record costs.
