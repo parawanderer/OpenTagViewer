@@ -1064,3 +1064,67 @@ circle key — it answers M1 outright.
 Nothing here is blocked on the answer for the read-only flow's other half: Stage 3 is
 complete and verified end to end, and every part of Stage 5 before the keyset match is
 implemented as specified and untested only because no record has reached it.
+
+---
+
+## N. The zone yields one key and the record asks for another [open]
+
+§4 step 0 works. The zone's structure unwraps under a keychain service key, its key id
+matches, its `meta` decrypts under the empty-context AAD, and the identity inside yields an
+elliptic-curve key. Every level the amendment added is confirmed.
+
+**The zone yields exactly one key, and a record's keyset names a different one** —
+`20fb99a6 4463a920 …`, 32 bytes, one entry per record. So there is either a source of zone
+keys this is not reading, or a step between the zone key and the record's.
+
+**Where the numbers stand**, after correcting the v1 reader (N1 below):
+
+| | |
+| --- | --- |
+| `Manatee` | 67 of 67 items read, **101** elliptic-curve keys |
+| `ProtectedCloudStorage` | 34 of 35 items read, **32** keys |
+| Zone structure | unwraps; `meta` holds **0 symmetric** and **1 private** key |
+| Record structures | one entry each, 32-byte public key, none matching |
+
+### N1. My own bug, recorded because it changed the numbers
+
+§4 step 6 says the nested keyset's keys are "the same private-key CHOICE as a keychain
+item's `v_Data`". This implementation had taught the **v2** arm of that CHOICE that a key
+blob may be a bare x coordinate beside its scalar (K2), and had never taught the **v1** arm,
+which passed its octets straight to a bare-scalar reader.
+
+That rejected every v1 key as "matches no curve" — and the identity search above it caught
+the exception and moved on, so a correct structure produced nothing at all. Fixing it took
+`Manatee` from 68 keys to 101, `ProtectedCloudStorage` from 0 to 32, and the zone from 0 to
+1. Not a specification defect; recorded because the counts in M were measured with it
+present and are therefore wrong.
+
+### N2. What could be missing
+
+Three readings, and nothing here distinguishes them:
+
+1. **More zone keys exist than one.** §4 step 0 says a record's keyset names "one of the
+   zone keys", plural. This account's zone `meta` holds one identity with one key. If the
+   plural is meaningful, something else supplies the rest.
+2. **A step between the zone key and the record's.** The record's key may be derived from
+   the zone key, or wrapped under it somewhere this is not looking, rather than being it.
+3. **`recordProtectionInfo` is the source, not the exception.** §4 step 0 gives it as the
+   fallback for records that carry no `protectionInfo` of their own. Every record here
+   carries one, so it is not being read — but if a record's own structure names a key that
+   comes *from* the zone's `recordProtectionInfo`, the two are not alternatives and the
+   order matters.
+
+### N3. Two checks that have never verified, now on the path
+
+Neither is fatal today and both may matter once the key is found:
+
+- **The protection structure's HMAC fails on every structure**, including the zone's, while
+  the key id matches. §4 step 5 says it covers the DER of `keyset`, the raw `meta` and the
+  DER of `signatureData`, **re-encoded** rather than sliced from the input. That
+  re-encoding is the most likely divergence, and a wrong reading of what the HMAC covers
+  looks exactly like this.
+- **The nested keyset's own `hash`** — SHA-256 over its DER with `hash` removed — is not
+  implemented. Same re-encoding shape.
+
+If either is meant to gate what follows rather than merely confirm it, that would matter
+here.
