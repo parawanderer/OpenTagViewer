@@ -2203,3 +2203,49 @@ would have raised rather than quietly continuing.
 **Nothing open on my side.** The join is built, checked as far as anything offline can check
 it, and unsent. What remains untested is everything this client puts in its own blobs, which
 by construction has no oracle short of sending one.
+
+## Round W — the join went through
+
+`join_circle.py` against the live account. **A peer, a bottle and an escrow record now
+exist**, and the circle went from 13 peers to 14.
+
+    club certificate verifies against pinned escrow root 500
+    Enrolling escrow record com.apple.icdp.record.SHA256:… -- permanent
+    Joined as SHA256:…; the reply carried 1 change(s)
+      keys re-addressed to it: 21
+      the circle now holds 14 peer(s)
+
+What that settles, which is most of the write direction at once: §4.5's enrolment (the
+blob's two layers, the club-certificate seal, the metadata, the record), §6.9.1's permanent
+info, §6.8.2's stable and dynamic info, the voucher, §6.9.3's bottle, §6.9.2's twenty-one
+shares, and §6.9.4's order. Apple accepted all of it in one call, which is the only oracle
+any of it had.
+
+It also confirms **U1 on real data**: the reply decoded as
+`CuttlefishJoinWithVoucherResponse`, its single change was an `add`, applying it through the
+same path `fetchChanges` uses produced 14 peers, and a sync token came back as a string.
+
+### W1. What is still not established
+
+Acceptance is not usability, and two things remain unproven:
+
+- **That the new peer holds the view keys.** Twenty-one shares were accepted; nothing has
+  yet read a key back *as* the new peer. Cuttlefish counting a peer as holding a view key
+  is the thing the re-sharing exists for, and the only proof is reading one.
+- **That the bottle is recoverable.** This is the important one. An enrolled record whose
+  bottle does not open is exactly the residue §4.5 warns about -- permanent, invisible in
+  every Apple interface, and discovered whenever somebody actually needs it. Nothing in the
+  join proves the record round-trips; only a recovery does.
+
+Both are read-only checks and both should be run now rather than in a year:
+
+1. `preflight_join.py` again -- it will report 14 peers, and the identifier and signature
+   checks now include **this client's own peer**. If Cuttlefish reports back a hash equal to
+   the one derived locally, that is Apple echoing this project's identifier derivation for
+   an identity it did not produce.
+2. `trace_key_recovery.py`, choosing the new record by its serial and giving the passcode
+   chosen during the join. That exercises the bottle, the escrow blob and the shares from
+   the reading side, which is the direction none of them has been tested in.
+
+If the second fails, the peer is permanent residue and the record is deletable by §7.1 --
+worth knowing immediately, while what created it is still in front of somebody.
