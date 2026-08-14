@@ -1120,9 +1120,21 @@ The plaintext is an **`OTInternalBottle`**, which is two fields and both are at 
 | 6 | `receiver` | string | | | | |
 
 **`ViewKeys`** — sent when *establishing* keys rather than receiving them, so this project sends an
-empty list: field 1 `service`, then `topLevelKey` (2), `classA` (3), `classC` (4) and
-`oldTopLevelKey` (5), each a `ViewKey` of `keyId` (1), `topLevelKeyId` (2), `keyNumber` (3),
-`key` (4) and a fifth field whose name is misspelled in every schema examined.
+empty list: `service` (1, string), then `topLevelKey` (2), `classA` (3), `classC` (4) and
+`oldTopLevelKey` (5), each a nested `ViewKey`:
+
+| # | Field | Type |
+| --- | --- | --- |
+| 1 | `keyId` | string |
+| 2 | `topLevelKeyId` | string |
+| 3 | `keyNumber` | uint32 |
+| 4 | `key` | **string** |
+| 5 | `harware` | string — the name is misspelled in every schema examined, and that spelling is the one to use |
+
+> **Nothing in this project writes one**, so unlike every other table here this one has never been
+> exercised in the direction that would check it. `key` being a `string` follows the pattern of
+> `TlkShare` and is stated on the same authority as the rest, but the README's own test applies:
+> a transcription no writer has ever constructed is weaker than one that has.
 
 ### 6.9.1 Signing, and what the new identity's `PeerPermanentInfo` says
 
@@ -1487,12 +1499,20 @@ Unwrapping one:
 
    The plaintext is a protobuf message:
 
-   | # | Field |
-   | --- | --- |
-   | 1 | `uuid` |
-   | 2 | `zoneName` |
-   | 3 | `keyclass` |
-   | 4 | `key` — **the key bytes, and the thing this whole stage is for** |
+   | # | Field | Type |
+   | --- | --- | --- |
+   | 1 | `uuid` | string |
+   | 2 | `zoneName` | string |
+   | 3 | `keyclass` | string |
+   | 4 | `key` | **bytes** — the key material, and the thing this whole stage is for |
+
+   > **`key` is the one `bytes` field**, against the pattern of §6.9 where binary-looking values
+   > are declared `string`. The three around it are strings.
+   >
+   > A writer should not need this table: §6.9.2 re-shares this message **byte for byte** as it was
+   > recovered, reading only `zoneName` and `uuid` out of it. Re-encoding would change the bytes the
+   > receiver's key is bound to even when every field is identical, so pass-through is the rule
+   > regardless of what the types are.
 
    > **This message is the view's top-level key.** It is not a container the real key is nested
    > inside, and `key` is **symmetric key material, not an EC private key** — trying to read it as
