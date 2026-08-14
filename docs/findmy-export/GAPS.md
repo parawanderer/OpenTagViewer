@@ -998,3 +998,69 @@ The probe ended by asking the operator to write down "the INFO line naming the k
 KDF", which was the output of the searches those sections describe. §5 and §4 step 2 now
 specify both exactly, the implementation has one construction rather than a search, and no
 such line is emitted. The instruction has been removed and both sections marked closed.
+
+---
+
+## M. The key protecting a beacon record is in neither keychain view [open]
+
+Everything up to Stage 5's first step now works, and this is where it stops. Asking rather
+than searching, on the J5 principle: the unknown here is *which key*, and no parameter
+sweep addresses that.
+
+**What is established, on a live account:**
+
+| | |
+| --- | --- |
+| `Manatee` view | 67 items, **67 of 67 decrypt**, yielding **68 elliptic-curve keys** |
+| Item self-consistency | every item's key matches the `acct` that indexes it — no warnings |
+| Records wanted | 15 (`MasterBeaconRecord`, `BeaconNamingRecord`, `KeyAlignmentRecord`) |
+| Entries per record | **exactly one** |
+| That entry's public key | **32 bytes** — a bare x coordinate, as §4 step 1 compares against |
+| Matches among our 68 | **none** |
+
+So this is not an encoding problem — 32-byte forms are compared and the sizes agree — and
+not a coverage problem, since every item in the view was read rather than only the one the
+`currentitem` pointer names. **The key those records are protected under is not in
+`Manatee`.** `ProtectedCloudStorage` is now read as well, per §2's "two views must be
+synced"; if that also finds nothing, the questions below are what remain.
+
+### M1. Should the record's key be in a keychain view at all?
+
+§2 says "`Manatee` is the keychain view holding these keys", and §4 step 1 says to scan the
+keyset for an entry whose public key matches ours. Both read as though the service key
+found in `Manatee` is the one a record's keyset names. On this account it is not, and
+neither is any of the other 67.
+
+Three readings, and the document does not distinguish them:
+
+1. **The record's key is elsewhere** — another view, another container, or not in the
+   keychain at all.
+2. **The record's key is *derived* from the service key** rather than being it, so
+   comparing public halves was never going to match.
+3. **The keyset is not matched against our key directly** — §8 Q3 already asks whether a
+   record's structure is unwrapped under a *zone* key rather than the service key, and
+   that question turns out to be load-bearing rather than incidental. Every zone in the
+   container reported `protected=True`.
+
+### M2. What are the parallel key records for?
+
+The zone holds records this flow ignores, and two look like a key hierarchy rather than
+data: **`OwnedDeviceKeyRecord` ×8** and **`SharingCircleSecret` ×5**, plus
+`OwnerSharingCircle` and `OwnerPeerTrust` ×1 each. §8 Q4 already asks about the sharing
+circle ones and offers "a parallel key hierarchy for accessories shared with others" as the
+plausible reading.
+
+If a beacon record is protected under something reached through those rather than through
+the keychain directly, that would explain this exactly — and it would mean §4 step 1 needs
+a preceding step that the document does not currently have.
+
+### M3. What this side can supply
+
+The next run names the public key each entry asks for, in hex, now that *which key* is the
+only thing left to learn. It is a public key, so it identifies the holder without
+disclosing anything. If that value is recognisable — a device key, a zone key, a sharing
+circle key — it answers M1 outright.
+
+Nothing here is blocked on the answer for the read-only flow's other half: Stage 3 is
+complete and verified end to end, and every part of Stage 5 before the keyset match is
+implemented as specified and untested only because no record has reached it.
