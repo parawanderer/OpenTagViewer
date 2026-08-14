@@ -298,6 +298,99 @@ between them.
 > separate **UUID** identifying the bottle. They are different strings with different shapes.
 > Everything addressed to the escrow proxy takes the **label**.
 
+### 4.5 Enrolling a record
+
+**This is the write, and it is what makes an escrowed bottle recoverable at all.** A bottle sent in
+`joinWithVoucher` whose entropy was never enrolled produces a peer that is in the circle and can
+**never** be recovered — permanent, invisible in every Apple interface, and precisely the residue
+§7's rules exist to prevent. Enrol before joining, not after.
+
+It is two requests sharing one `transactionUUID`.
+
+**Step 1 — `get_club_cert`.** Label `com.apple.icdp.record` — the *class*, not a specific record.
+Send `baseRootCertVersions` and `trustedRootCertVersions` as the same list of acceptable versions,
+**[observed]** `[101, 500, 103, 102]`. The response carries `clubCert`, base64 of a DER
+certificate.
+
+> **Verify that certificate against a pinned set of roots before using it.** It is the key the
+> user's escrow blob is encrypted to, so accepting an unverified one hands the material to
+> whoever supplied it. The four versions above correspond to four root certificates a client
+> carries; a chain that does not verify against them is a refusal, not a warning.
+
+**Step 2 — `enroll`.** Label is the **specific record's** label, per §4.4. Fields:
+
+| Key | Content |
+| --- | --- |
+| `blob` | base64 of the escrow blob, §4.5.1 |
+| `blobDigest` | base64 of the blob's **SHA-1** — not SHA-256 |
+| `dsid` | the numeric account id |
+| `metadata` | base64 of a **binary** property list, §4.5.2 |
+
+#### 4.5.1 The escrow blob
+
+Two nested layers, both in the KeyVault framing of §6.1.1.
+
+**The inner message** — header `unk1=160`, `unk2=0`, `rounds=10000`, `unk3=10`, then six sections
+in this order:
+
+| # | Section | Note |
+| --- | --- | --- |
+| 1 | the **dsid**, as ASCII | padded to a 16-byte footprint |
+| 2 | a random **64-byte salt** | |
+| 3 | the **SRP verifier** | computed over the dsid as identity, the password, and that salt, using the 2048-bit group and SHA-256 |
+| 4 | the **encrypted record** | AES-128-CBC under PBKDF2-HMAC-SHA256(password, salt, **10000** iterations, 16 bytes), IV = the salt's **first 16 bytes** |
+| 5 | the **label**, as ASCII | padded to an 80-byte footprint |
+| 6 | the **timestamp**, as ASCII | padded to a 24-byte footprint |
+
+> The verifier is what later makes `srp_init` and `recover` (§6) work with this password. The
+> encrypted record and the verifier are derived from the **same** password and the **same** salt,
+> by two different constructions — do not reuse one derivation for the other.
+
+**The outer message** — header `unk1=161`, `unk2=1`, `unk3=0`, `unk4=0`, `unk5=10`, then:
+
+| # | Section |
+| --- | --- |
+| 1 | HMAC-SHA-256 of section 2, under a fresh random 32-byte key |
+| 2 | a random 16-byte IV, followed by the inner message encrypted with **AES-256-CBC** under a fresh random 32-byte key |
+| 3 | **RSA-OAEP** of those two random keys concatenated — the AES key then the HMAC key — to the club certificate's public key, with **SHA-1** as both the OAEP and MGF1 digest |
+| 4 | SHA-256 of the certificate's public key, as **PKCS#1** DER |
+| 5 | SHA-256 of the **inner message** |
+
+> Note the digest asymmetry, all three of which are load-bearing and none derivable: the blob is
+> announced with **SHA-1**, the RSA padding uses **SHA-1**, and the two integrity hashes inside are
+> **SHA-256**.
+
+#### 4.5.2 The metadata
+
+A binary property list, base64-encoded:
+
+| Key | Content |
+| --- | --- |
+| `serial`, `build` | the client's own, as in [Stage 1 §2.2](./01-authentication.md) |
+| `timestamp` | the same string as the blob's section 6 |
+| `bottleID` | the bottle's **UUID** — see §4.4 on why this is not the label |
+| `passcodeGeneration` | **[observed]** `13` |
+| `escrowedSPKI` | the escrowed **signing** public key |
+| `multipleICSC` | `true` |
+| `clientMetadata` | a nested dictionary, below |
+
+`clientMetadata` describes the device to a human reading the record listing of §5 — which is the
+only place any of it is ever seen:
+
+| Key | |
+| --- | --- |
+| `device_name`, `device_model`, `device_model_version`, `device_model_class`, `device_platform` | what §5.1's listing shows the user |
+| `device_mid` | the machine identifier |
+| `SecureBackupMetadataTimestamp` | the timestamp again |
+| `SecureBackupUsesNumericPassphrase` | whether the password is all digits |
+| `SecureBackupNumericPassphraseLength` | its length if so, otherwise `0` |
+| `SecureBackupUsesComplexPassphrase` | `1` |
+
+> **This metadata is how a user recognises their own record**, so it is worth filling honestly.
+> §5.1 records that escrow records outlive the devices that made them and appear in no Apple
+> interface; a record labelled with an empty device name is one the user cannot identify when
+> deciding what to delete.
+
 > **`userActionLabel` is a free-text string that Apple keeps.** The reference sends descriptions
 > of the operation being performed. It is not authentication and nothing checks it, but it is
 > written into someone else's audit trail, so it should describe what is actually happening and
@@ -700,6 +793,66 @@ views (§6.8). Only then does [Stage 5](./05-pcs-decryption.md) have keys.
 > never in diagnostics, and not retained in memory past the exchange. It is the most sensitive
 > value this project touches: it is the key to the user's whole keychain, and unlike an Apple ID
 > password it cannot be rotated without physical access to the device.
+
+### 6.8.2 Building the identity a join sends
+
+Three values a joining client must produce for itself, none of which is derivable from the message
+layouts of §6.9. Each fails **after** `joinWithVoucher` has been sent.
+
+#### The peer identifier
+
+```
+peerId = "SHA256:" ‖ base64( SHA-256( permanentInfo.info ‖ permanentInfo.signature ) )
+```
+
+where both parts come from the **signed `PeerPermanentInfo`** of §6.9 — its serialised payload
+bytes followed by its signature bytes, concatenated, and nothing else.
+
+> **The `SHA256:` prefix is part of the identifier**, not decoration on the escrow label. It is
+> what `CuttlefishPeer.hash` carries and what `Voucher.beneficiary` must equal, and it is the same
+> string that appears in §5.1's escrow labels.
+>
+> **This is checkable before anything is sent.** A client can recompute it for every peer already
+> in the directory and confirm each matches the `hash` that peer reports. If they do, the
+> derivation is right; if not, nothing has been written. Do that first — it converts the one
+> irreversible call in this stage into an ordinary one.
+
+#### `PeerStableInfo`
+
+Eighteen fields, all optional on the wire, and an incomplete one is **admitted and then behaves
+oddly** rather than refused. What a real client sends:
+
+| Field | Value |
+| --- | --- |
+| `clock` | **the highest `clock` among all peers in the circle, plus one** — so a first peer sends 1, not 0 |
+| `frozenPolicyVersion` | `5` |
+| `frozenPolicyHash` | `SHA256:O/ECQlWhvNlLmlDNh2+nal/yekUC87bXpV3k+6kznSo=` |
+| `flexiblePolicyVersion` | `20` |
+| `flexiblePolicyHash` | `SHA256:OIzjC3WyLGrM8GAd/EyIfVzTJdYmcGoKPFdQeWeRZTY=` |
+| `secrets` | empty |
+| `osVersion` | this client's OS string |
+| `deviceName` | may be empty |
+| `serialNumber` | the client's serial, as in [Stage 1 §2.2](./01-authentication.md) |
+| `userControllableViewStatus` | `1` |
+| `isInheritedAccount` | `false` |
+
+Everything else is omitted.
+
+> **The two policy hashes are constants, not something to compute.** They are the digests of
+> Apple's own trust policy documents, and a client asserts which policy version it is speaking
+> rather than deriving anything. Send them verbatim; a wrong value here is not detectable locally.
+
+#### `PeerDynamicInfo`
+
+**A joining peer sends `clock: 0` and nothing else.** Not the circle's membership, not itself.
+
+> **`includeds` is empty at join time**, which is the opposite of what the field's description
+> suggests. Trust is asserted *afterwards*, by a separate `updateTrust` call once the peer is in
+> the circle and has synced it. A joining peer has nothing to assert yet, and enumerating the
+> circle it is trying to enter is not what the message means.
+>
+> The same reset applies later: a client that finds itself **not** in the circle returns its
+> dynamic info to `clock: 0` with everything cleared, rather than keeping what it last asserted.
 
 ### 6.9 The messages `joinWithVoucher` carries
 
