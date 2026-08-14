@@ -345,6 +345,11 @@ version number is the certificate's **serial number**:
 | `dsid` | the numeric account id |
 | `metadata` | base64 of a **binary** property list, §4.5.2 |
 
+> **The certificate versions go on `get_club_cert` only.** `enroll` does not carry
+> `baseRootCertVersions` or `trustedRootCertVersions`; they asked which roots the *client* would
+> accept, and that question was answered by the first request. Sending them again is sending a
+> field to a write that a working client does not send.
+
 #### 4.5.1 The escrow blob
 
 Two nested layers, both in the KeyVault framing of §6.1.1.
@@ -356,8 +361,8 @@ in this order:
 | --- | --- | --- |
 | 1 | the **dsid**, as ASCII | padded to a 16-byte footprint |
 | 2 | a random **64-byte salt** | |
-| 3 | the **SRP verifier** | computed over the dsid as identity, the password, and that salt, using the 2048-bit group and SHA-256 |
-| 4 | the **encrypted record** | AES-128-CBC under PBKDF2-HMAC-SHA256(password, salt, **10000** iterations, 16 bytes), IV = the salt's **first 16 bytes** |
+| 3 | the **SRP verifier** | computed over the dsid as identity, the password, and that salt, using the 2048-bit group and SHA-256. **Zero-pad it to 256 bytes** |
+| 4 | the **encrypted record** | §4.5.3, AES-128-CBC under PBKDF2-HMAC-SHA256(password, salt, **10000** iterations, 16 bytes), IV = the salt's **first 16 bytes** |
 | 5 | the **label**, as ASCII | padded to an 80-byte footprint |
 | 6 | the **timestamp**, as ASCII | `YYYY-MM-DD HH:MM:SS` — a space rather than a `T`, and no zone. Padded to a 24-byte footprint |
 
@@ -383,15 +388,25 @@ in this order:
 
 A binary property list, base64-encoded:
 
+> **Correction. These key names disagreed with §5.1, and §5.1 was right.** Three of them were
+> written here as an implementation's internal field names rather than as what goes on the wire.
+> The two sections describe one plist, the service stores it verbatim, and a record written under
+> the wrong spellings is one §5.1's listing cannot describe — no name, no serial, no date — which
+> is the only place these records are ever seen.
+
 | Key | Content |
 | --- | --- |
 | `serial`, `build` | the client's own, as in [Stage 1 §2.2](./01-authentication.md) |
-| `timestamp` | the same string as the blob's section 6, in the same `YYYY-MM-DD HH:MM:SS` form |
-| `bottleID` | the bottle's **UUID** — see §4.4 on why this is not the label |
 | `passcodeGeneration` | **[observed]** `13` |
+| `bottleID` | the bottle's **UUID** — see §4.4 on why this is not the label |
 | `escrowedSPKI` | the escrowed **signing** public key |
-| `multipleICSC` | `true` |
-| `clientMetadata` | a nested dictionary, below |
+| **`com.apple.securebackup.timestamp`** | the same string as the blob's section 6, in the same `YYYY-MM-DD HH:MM:SS` form |
+| **`ClientMetadata`** | a nested dictionary, below. **Capital C** |
+| **`SecureBackupUsesMultipleiCSCs`** | `true`. Note the lower-case `i` in `iCSCs` |
+
+> Only three keys are ordinary camelCase. The rest are a reverse-DNS key, a PascalCase one and a
+> `SecureBackup`-prefixed one with irregular capitalisation — the same
+> [strata](./README.md) pattern as everywhere else here. Copy them exactly; none is derivable.
 
 `clientMetadata` describes the device to a human reading the record listing of §5 — which is the
 only place any of it is ever seen:
@@ -409,6 +424,28 @@ only place any of it is ever seen:
 > §5.1 records that escrow records outlive the devices that made them and appear in no Apple
 > interface; a record labelled with an empty device name is one the user cannot identify when
 > deciding what to delete.
+
+#### 4.5.3 What the encrypted record holds
+
+Section 4 of the inner message is a **binary property list** before encryption, with three keys:
+
+| Key | Content |
+| --- | --- |
+| `BottledPeerEntropy` | **72 random bytes**. Everything the bottle yields derives from this |
+| `com.apple.securebackup.timestamp` | the same timestamp again |
+| `BackupVersion` | the string `1` |
+
+> **`BottledPeerEntropy` is the whole point of the record**, and §6.7's recovery reads exactly this
+> key back out. A record enrolled without it recovers successfully and yields nothing — which is
+> worse than failing, because the escrow proxy will report a usable record for as long as the
+> account exists.
+>
+> The entropy is **generated, not derived**: it is fresh randomness this client keeps nowhere else,
+> and enrolling is what makes it recoverable at all.
+
+> **PascalCase and a reverse-DNS key in the same three-key dictionary**, and the timestamp key is
+> the same reverse-DNS spelling as §4.5.2's. Two of the three do not follow the convention of
+> either neighbouring structure.
 
 > **`userActionLabel` is a free-text string that Apple keeps.** The reference sends descriptions
 > of the operation being performed. It is not authentication and nothing checks it, but it is
