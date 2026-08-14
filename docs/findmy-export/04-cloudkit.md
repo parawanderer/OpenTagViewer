@@ -646,8 +646,10 @@ Stage 5 and needs the keychain from Stage 3.
 Everything above reads. This is the one write this project has a use for: **renaming an accessory
 on the owner's own account**, which means saving a `BeaconNamingRecord`.
 
-> **Unexercised.** Nothing here has been run. §2 and §3 were verified against a live account; this
-> section was written from the same sources and has not been.
+> **[observed] Verified.** A `BeaconNamingRecord` saved by an implementation built from this
+> section appeared correctly in **Apple's own Find My on a Mac**, with the accessory's emoji and
+> its association intact — which is the check §4.3 asks for, and the only one that could have
+> caught a wrong field layout.
 
 | | |
 | --- | --- |
@@ -704,7 +706,11 @@ than trusting the response.
 And re-fetching is still the weaker check. [Stage 5 §6.1](./05-pcs-decryption.md) explains why —
 a value this client wrote and can read back proves the layout is self-consistent, not that Apple's
 implementation agrees. **The write that matters is the one an untouched Apple device displays
-correctly.** Until that has been seen once, this path is unverified.
+correctly.**
+
+**[observed] That has now been seen**, once, on a Mac. Keep asking for it anyway on any change to
+the field layout: a writer and a reader that share a mistake agree with each other perfectly, and
+nothing on this side can tell that apart from being right.
 
 ### 4.4 What may be written, and what may not
 
