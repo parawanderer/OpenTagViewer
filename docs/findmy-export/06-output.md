@@ -247,8 +247,15 @@ rather than an untidiness.
 
 ### 5.4 What an accessory *is* decides its format
 
-The list a user picks from is **not homogeneous**, and export is where that stops being an internal
-detail. Two kinds of thing can sit in it:
+> **Not reachable yet.** OpenTagViewer cannot import a self-generated tag today, so every accessory
+> in the list is Apple-paired and a selection is homogeneous in practice. This section is here so
+> that an exporter is not built around the assumption — the constraint costs nothing to respect now
+> and is expensive to retrofit, since it decides whether the writer is chosen per bundle or per
+> accessory. Whether the app should import such tags at all is a separate question this
+> specification does not answer.
+
+The list a user picks from is **not homogeneous** once it can hold both kinds, and export is where
+that stops being an internal detail:
 
 | Kind | Where its keys came from | Formats it can be written in |
 | --- | --- | --- |
