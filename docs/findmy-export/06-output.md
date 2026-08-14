@@ -288,9 +288,49 @@ Two smaller consequences:
 > Stages 3 to 5 have nothing to find for it — it reaches the list by a different route entirely. A
 > null result here is the correct one, and it is not guessable from the absence.
 
-### 5.5 A bundle must say when it was made
+### 5.5 The zip layout, exactly
 
-An export that cannot say how old it is produces the §8 problem months later with nobody able to
+```
+OPENTAGVIEWER.yml
+OwnedBeacons/<beacon-uuid>.plist
+BeaconNamingRecord/<beacon-uuid>/<naming-record-uuid>.plist
+KeyAlignmentRecords/<beacon-uuid>/<record-uuid>.plist
+```
+
+Four details are not guessable from the shape, and each produces a bundle that looks correct:
+
+| | |
+| --- | --- |
+| **`KeyAlignmentRecords` is plural** | the other two directories are singular. There is no reason for it; it is simply the name |
+| **Every file is `.plist`** | macOS stores alignment and naming records as `.record`, and the exporter rewrites the extension. A bundle carrying `.record` is not what the importer looks for |
+| **Plists are XML** | not binary. The importer parses them as XML with XPath |
+| **An alignment record's accessory is its parent directory** | it carries no `associatedBeacon` field, unlike a naming record. The identity is positional, so writing these flat loses it |
+
+`OPENTAGVIEWER.yml` carries four keys:
+
+| Key | |
+| --- | --- |
+| `version` | the **export format** version, currently `0.0.2` — not the producer's version |
+| `exportTimestamp` | **milliseconds** since the Unix epoch |
+| `sourceUser` | a local username on the exporting machine. **Reconsider this for §5.3's case** — it names a person and travels in the bundle |
+| `via` | the producer, per §5.6 |
+
+> **A naming record is mandatory for import**, even though §3 says an accessory without one is
+> normal. The importer reads both plists unconditionally, and the macOS exporter drops any
+> accessory it cannot pair with a naming record rather than exporting it nameless.
+>
+> That is a real decision this route has to make, because CloudKit **[observed]** returns fewer
+> naming records than accessories — six against five on the account examined. Dropping an
+> accessory silently is the worse option: prefer synthesising a minimal naming record with an
+> empty `name` and the correct `associatedBeacon`, so the accessory survives and the user can name
+> it themselves.
+
+`MasterBeacons` is the same directory under an older name, used by macOS 11. A **reader** should
+accept it; a writer has no reason to emit it.
+
+### 5.6 A bundle must say when it was made
+
+An export that cannot say how old it is produces the §7 problem months later with nobody able to
 explain it. **Stamp the format, the time and the producer**, the way the macOS exporter's `via:`
 line does — that line is how anyone looking at a zip afterwards works out what built it, and an
 export made this way needs the same.
