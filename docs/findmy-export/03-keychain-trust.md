@@ -1102,6 +1102,172 @@ empty list: field 1 `service`, then `topLevelKey` (2), `classA` (3), `classC` (4
 `oldTopLevelKey` (5), each a `ViewKey` of `keyId` (1), `topLevelKeyId` (2), `keyNumber` (3),
 `key` (4) and a fifth field whose name is misspelled in every schema examined.
 
+### 6.9.1 Signing, and what the new identity's `PeerPermanentInfo` says
+
+**Every `SignedInfo` in §6.9 is ECDSA over SHA-384**, made with the signing key of the peer the
+blob belongs to, over the type-prefixed bytes above. The one exception in this stage is the share
+signature of §6.7.0, which is **SHA-256** — a different construction with a different digest, in
+the same message.
+
+Both of a peer's keys are **P-384**, generated fresh, and both public halves travel as **DER
+SPKI**, not as raw points. That matters twice over: `PeerPermanentInfo` carries them, and the
+identifier of §6.8.2 is a digest of the signed blob that contains them, so a different encoding is
+a different peer.
+
+| Field | Value |
+| --- | --- |
+| `epoch` | `1` |
+| `signingKey`, `encryptionKey` | the two public keys, **DER SPKI** |
+| `machineId` | the Anisette **`X-Apple-I-MD-M`** header — the same machine identity Stage 1 binds the session to |
+| `modelId` | the client's hardware model string, as in [Stage 1 §2.2](./01-authentication.md) |
+| `creationTime` | **milliseconds** since the Unix epoch, not seconds |
+
+> **`machineId` ties the peer to the Anisette in use.** Rule 4 of the repo's `AGENTS.md` applies
+> here with more force than anywhere else: a peer created under local Anisette and a peer created
+> under a server carry different machine ids, permanently, because this blob is signed at creation
+> and never rewritten.
+
+**The permanent info is signed once, when the identity is generated**, and the signed bytes are
+kept. Everything afterwards — the identifier, the peer message, the bottle — refers to those
+bytes. Re-encoding the message later gives a different signature and a different identifier.
+
+### 6.9.2 Creating a share
+
+The inverse of §6.7.0, and the direction a joining peer actually needs. The plaintext is the same
+four-field message §6.7.0 step 3 recovers — `uuid`, `zoneName`, `keyclass`, `key` — serialised.
+
+**A joining peer shares to itself.** Both `sender` and `receiver` are the new peer's identifier,
+and the wrapping key is the new peer's own encryption public key. That reads like a no-op and is
+not: the keys were recovered from a *different* peer's shares, and Cuttlefish only recognises a
+peer as holding a view key when a share addressed to that peer says so. The join is where the
+keys are re-addressed from the recovered identity to this one.
+
+**Wrapping** — SFIES, mirroring §6.7.0 step 3:
+
+| Step | |
+| --- | --- |
+| Ephemeral key | a fresh P-384 key pair; its **uncompressed point** is what gets archived |
+| Agreement | ECDH with the receiver's public key |
+| Derivation | ANSI X9.63, SHA-256, shared info = that same 97-byte point, output 48 bytes |
+| Key / nonce | first 32 bytes, then the next 16 — a **16-byte** GCM nonce |
+| Cipher | AES-256-GCM, **no AAD** |
+
+Then split the output: the last 16 bytes are the tag and go in `SFIESAuthenticationCode`; the rest
+is the ciphertext.
+
+> ### Reproduce the overrun, with zeros
+>
+> §6.7.0 describes `SFCiphertext` carrying 113 bytes past the end of the ciphertext, and a reader
+> trimming them. **A writer must produce them**, padding the ciphertext by `len(point) + len(tag)`
+> — the same quantity, derived the same way.
+>
+> This is not politeness towards a quirk. Apple's reader trims by that amount unconditionally,
+> because Apple's writer always produces it; a tightly-sized ciphertext would have its last 113
+> real bytes cut off and would fail authentication.
+>
+> **Pad with zeros.** The bytes Apple leaks there are uninitialised heap, and there is no reason
+> to reproduce *that* part of the behaviour.
+
+Archive the three members under the names of §6.7.0 — including the misspelled one — as a **binary
+property list**, and base64 that for `wrappedKey`.
+
+> **The archived object is a plain dictionary, not a class.** The top level is an ordinary keyed
+> archive of a three-entry dictionary; nothing has to declare `$class` naming `SFIESCiphertext` or
+> reconstruct its class hierarchy. The only class that matters is the `NSMutableData` on the
+> ephemeral point, and that is a property of the member rather than of the envelope.
+>
+> Apple's side finds the members by name, which is why this works and why the misspelling is fatal
+> while the missing class is not.
+
+**The message's fields**, for a share this client creates:
+
+| Field | Value |
+| --- | --- |
+| `service` | the key's zone name |
+| `keyId` | the key's UUID — present on the message, absent from the record form |
+| `curve` | `4` — P-384 |
+| `epoch` | `1` |
+| `receiver`, `sender` | the new peer's identifier, both |
+| `receiverPublicEncryptionKey` | base64 of the receiver's **uncompressed point**, not its SPKI |
+| `wrappedKey` | base64 of the archive |
+| `poisoned`, `version` | **omitted** |
+| `signature` | base64 of ECDSA-SHA-256 over §6.7.0's concatenation |
+
+> **`poisoned` and `version` are omitted from the message and signed as zero.** The signature input
+> of §6.7.0 has seven parts and none of them may be skipped, so both contribute eight zero bytes
+> each to the digest of a message that does not carry them. Building the signed data by walking the
+> populated fields produces a signature over five parts, which verifies nowhere.
+
+### 6.9.3 Building the bottle for the new identity
+
+Step 5.4's bottle, inverting §6.7 steps 1 to 4. **Fresh entropy** — the 72 bytes of §4.5.3 — with
+the three keys derived from it exactly as §6.7 step 2 derives them, `adsid` as salt.
+
+| Field | Value |
+| --- | --- |
+| `OTInternalBottle.signingKey`, `.encryptionKey` | the **new peer's private keys**, each an `OTPrivateKey` with `keyType` `1` |
+| `keyData` | the **uncompressed public point followed by the private scalar** — 97 + 48 bytes on P-384 |
+| `OTBottle.peerID` | the new peer's identifier |
+| `.bottleID` | a **v4 UUID, upper-case** |
+| `.escrowedSigningKey`, `.escrowedEncryptionKey` | the public halves of the two HKDF-derived keys, **DER SPKI** |
+| `.peerSigningKey`, `.peerEncryptionKey` | the new peer's own public keys, DER SPKI |
+| `.ciphertext` | the sealed `OTInternalBottle` |
+
+**The seal is AES-256-GCM under the derived symmetric key, with a 32-byte IV.** Not 12, not 16 —
+32 random bytes, carried in `initializationVector`, with the tag split off into
+`authenticationCode` as §6.9 describes.
+
+The outer `Bottle` then carries the serialised `OTBottle` bytes and two signatures over exactly
+those bytes, both **ECDSA-SHA-384**, as §6.7 step 3 verifies them:
+
+- `escrowedKeySignature` — by the **derived escrow signing key**
+- `peerKeySignature` — by the **new peer's own signing key**
+
+> §6.7 step 3 describes the second as verifying "under the sponsoring peer's signing key". For a
+> bottle a peer creates for itself those are the same key, and the general rule is the one to
+> implement: **the signature is by the peer the bottle belongs to**, which for every bottle this
+> project creates is this client.
+
+**The escrow label is `com.apple.icdp.record.<peerID>`** — the peer's full identifier, `SHA256:`
+prefix and base64 included, appended to the prefix. §5.1's listing shows the same shape from the
+read side.
+
+> **§4.5.2's `escrowedSPKI` is the same value as `OTBottle.escrowedSigningKey`** — the DER SPKI of
+> the HKDF-derived escrow *signing* key, not the encryption one and not the peer's own. That
+> identity is what ties an escrow record to the bottle it accompanies, and it is why the record
+> and the bottle have to be built from **one** derivation rather than from two calls that each
+> generate entropy.
+
+### 6.9.4 The order these happen in, which is not the order they are described in
+
+**Enrol the escrow record before calling `joinWithVoucher`, not after.** The two failure modes are
+not comparable:
+
+- enrolment fails after joining → a peer in the circle whose entropy was never escrowed. **Nobody
+  can ever recover it**, there is no listing that shows it, and §7's deletion does not reach it.
+- joining fails after enrolment → an escrow record for a peer that does not exist. Visible in the
+  listing of §5, and **deletable** by §7.1.
+
+One is permanent and invisible; the other is tidy-up. So the sequence is:
+
+1. Recover the bottle (§6.7 steps 1–4) → the recovered peer's identity.
+2. Generate the new identity (§6.9.1). **This clears any keys and items held under a previous
+   identity** — they were addressed to a peer that is being replaced.
+3. Sign the voucher with the recovered peer, `reason` `1`, `beneficiary` the new peer.
+4. Fetch the recovered peer's shares (§6.7.0). **If empty, stop** — §6.7 step 5.3.
+5. Build the dynamic info (§6.8.2), which syncs the directory as its first act.
+6. Create the bottle **and enrol it** (§6.9.3, §4.5).
+7. Re-share the keys to the new peer (§6.9.2).
+8. Call `joinWithVoucher` with `restorePoint` set to the sync token if one is held, the peer, the
+   bottle, the shares, and **`keys` empty** — this project never establishes view keys.
+9. Apply the returned changes, persist the dynamic info as sent, and store the keys.
+
+> **Enrolment can fail because a record already exists under that label**, which is the one case
+> worth handling rather than reporting: delete the record at that label and enrol again. Do that
+> only for an error the escrow service *reports* — a transport failure has not established that
+> anything exists, and deleting on one would remove a record this client cannot see the contents
+> of. §7.1 covers the deletion and its residue rules.
+
 ### 6.7.0 Fetching the recovered peer's key shares — and why joining may be unnecessary
 
 Step 5.3 above says to fetch the recovered peer's key shares. The method is:

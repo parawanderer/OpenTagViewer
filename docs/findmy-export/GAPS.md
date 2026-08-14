@@ -1939,3 +1939,110 @@ share creation and T4 and T5 gate the bottle, which between them are the whole o
 left. The identity layer and enrolment are done, and the remaining blocker on enrolment is
 not a specification question at all — it is the four root certificates, which have to be
 obtained before `PinnedRoots.load` will accept anything.
+
+---
+
+**Round T answered.** All five, and one correction that matters more than any of them.
+
+### Before T1 — §6.8.2's `PeerDynamicInfo` was wrong, and it is on the join path
+
+**If anything here was built against "a joining peer sends `clock: 0` and nothing else",
+rebuild it.** That was my answer to R4 and it describes the **`establish`** path — the one
+this project must never take. I mapped the wrong branch onto the join, and the failure shape
+is the one R2 and R4 were asked to avoid: a peer that is admitted while claiming to trust
+nobody, discovered long after the irreversible call.
+
+§6.8.2 now gives the join: sync, **copy the sponsor's `includeds`, `excludeds` and `clock`**,
+fast-forward over any peer with a higher clock, add this peer's own id, then increment the
+clock. The section also states the rule that governs step 3 — a peer not already trusted is
+adopted only on a valid voucher from one that is — and keeps `clock: 0` where it does belong,
+which is the reset a client applies when it finds itself outside the circle.
+
+The related claim in the same section, that trust is asserted afterwards by `updateTrust`, is
+also withdrawn. `updateTrust` carries a peer id and a set of shares; it is how an established
+member hands view keys to *another* peer later, not the second half of a join.
+
+### T1 — pad it, with zeros
+
+The overrun is part of the format. Apple's reader subtracts `len(point) + len(code)`
+unconditionally, so a correctly-sized ciphertext arrives 113 bytes short and fails its tag
+check — your second reading, and it is the one that holds.
+
+**Pad with zeros, not with anything.** The bytes Apple leaks there are uninitialised heap and
+there is no reason to reproduce that half of the behaviour. §6.9.2 now says so, and says to
+derive the pad length the same way the trim is derived rather than writing the constant.
+
+### T2 — a plain dictionary, no `$class` for `SFIESCiphertext`
+
+The top level is an ordinary keyed archive of a three-entry dictionary. Nothing declares the
+class or its hierarchy. The only class that matters is the `NSMutableData` on the ephemeral
+point, which is a property of the member rather than the envelope.
+
+Which also explains the asymmetry you noticed: Apple's side finds the members **by name**, so
+a missing class costs nothing and the misspelling costs everything.
+
+### T3 — the values, and the two fields the record does not carry
+
+`curve` is **4**, `epoch` is **1**, and `poisoned` and `version` are **omitted from the
+message and signed as zero** — the signature input has seven parts and none may be skipped, so
+building it by walking the populated fields produces a five-part digest that verifies nowhere.
+
+`service` is the key's **zone name** and `keyId` is the key's **UUID**; both come from the
+key message of §6.7.0 step 3, which is where the reader got them too.
+
+`receiverPublicEncryptionKey` is base64 of the **uncompressed point**, not the SPKI — the one
+place in this stage where a public key does not travel as DER.
+
+And **a joining peer shares to itself**: `sender` and `receiver` are both the new peer's
+identifier, wrapped to the new peer's own encryption key. It reads like a no-op and is not.
+The keys were recovered from a different peer's shares, and Cuttlefish only counts a peer as
+holding a view key when a share addressed to that peer says so.
+
+### T4 — `keyType` is `1`
+
+And the encoding `keyData` needs, which was equally unstated: the **uncompressed public point
+followed by the private scalar**, 97 + 48 bytes on P-384. Note this is *not* the 64-byte
+layout of §6.8.1 — that one is public-x-then-scalar with no point prefix and no y. Two
+Apple key blobs, two layouts, in one stage.
+
+### T5 — your inference is right, and so is the one you did not make
+
+The bottle is signed by the peer it **belongs to**. §6.7 step 3's "sponsoring peer" is
+accurate for a bottle you are reading, because the bottle you recover was created by the peer
+that sponsors you; the general rule is the peer the bottle is for, which for every bottle this
+project creates is this client.
+
+`escrowedSPKI` is the same value as `OTBottle.escrowedSigningKey` — the DER SPKI of the
+HKDF-derived escrow **signing** key. Which carries a constraint worth stating: the record and
+the bottle have to come from **one** derivation, not from two calls that each generate
+entropy.
+
+### Three more things the write direction needs, none of which you asked
+
+§6.9.1 and §6.9.3 now carry these; flagging them because a reader never had to know any of
+them.
+
+- **Every `SignedInfo` is ECDSA-SHA-384**, over the type-prefixed bytes. The share signature
+  of §6.7.0 is **SHA-256**. Same stage, same message, different digest.
+- **The bottle's seal uses a 32-byte IV.** Not 12, not 16. It is carried in
+  `initializationVector` with the tag split off, as §6.9 already describes for reading.
+- **`PeerPermanentInfo`'s values**: `epoch` 1, both keys DER SPKI, `machineId` is the Anisette
+  `X-Apple-I-MD-M` header, `modelId` is the hardware model, and `creationTime` is in
+  **milliseconds**. The blob is signed once at generation and those exact bytes are kept —
+  the identifier is a digest of them, so re-encoding later is a different peer.
+
+### And the order, which is new — §6.9.4
+
+**Enrol the escrow record before calling `joinWithVoucher`.** The two failure modes are not
+comparable: enrolment failing after a join leaves a peer nobody can ever recover, invisible to
+every listing and out of reach of §7's deletion; joining failing after enrolment leaves a
+record for a peer that does not exist, which is listed by §5 and deletable by §7.1. Permanent
+and invisible against tidy-up.
+
+§6.9.4 gives the full nine-step sequence, including the one recovery worth handling rather
+than reporting — an enrolment that fails because a record already exists at that label is
+resolved by deleting that label and enrolling again, **only** on an error the service itself
+reports.
+
+**Still open on your side after this**: nothing specification-shaped that I know of. The four
+root certificates remain the blocker on enrolment, and they are the account owner's to obtain.
