@@ -229,6 +229,34 @@ device in its keychain circle has nothing to recover from.
 
 **It writes to the user's Apple account**, in more than one way. See below.
 
+### The one thing left, and why it is not worth starting
+
+Everything else this project set out to remove is gone. The macOS VM, the Find My app, reading
+plists off a disk, the export being tied to one operating system — all of that is replaced by an
+Apple ID, a passcode, and iCloud. **The single remaining requirement is the iPhone or iPad that
+paired the tag in the first place**, and nothing here reaches it.
+
+Pairing has two halves. The account half looks close: pairing ends with an `OwnedBeacons` record,
+and [Stage 4 §4](./04-cloudkit.md) writes those. But it also appears to involve Apple binding the
+tag's serial to the account server-side, and **whether that accepts anything other than an Apple
+client presenting a factory attestation from the tag was never observed here** — none of these six
+stages watched a pairing.
+
+The accessory half is the wall. The tag has to be handed its key material over BLE, in a
+provisioning exchange that never touches CloudKit and therefore never appeared anywhere in this
+work. Apple's public Find My Network Accessory Specification covers MFi third-party accessories
+rather than AirTags, and those carry factory certificates precisely so that arbitrary software
+cannot do this.
+
+> **So it is a hardware reverse-engineering project, not a protocol one**, with a real chance the
+> answer is that an Apple-signed step is mandatory. And the payoff is narrow: anyone who owns
+> AirTags already paired them with an Apple device, so this only helps someone buying a fresh
+> AirTag having never owned one — who is better served by an OpenHaystack tag, which is built for
+> exactly that and needs none of it.
+>
+> Recorded so nobody mistakes it for an oversight. It is the known edge of what this covers, and
+> it is deliberately outside.
+
 ## Account-side residue is a first-class design problem
 
 This feature does not only read. It leaves artefacts behind in the user's Apple account, and
