@@ -369,7 +369,16 @@ not let it reach an export file because nobody wrote a filter.
 ## 7. Key alignment
 
 `KeyAlignmentRecord` carries `beaconIdentifier`, `lastIndexObserved` and
-`lastIndexObservationDate`.
+`lastIndexObservationDate`, and renders with `identifier` and `cloudKitMetadata` as §2 and §3 do.
+
+> **Keep `beaconIdentifier` in the rendered record.** The plist layout drops it — the association
+> lives in a directory name instead (§5.5) — but a writer that discards it forces its caller to
+> re-derive a grouping that was in the data. It costs nothing to carry, and a reader that does not
+> want it can ignore it.
+>
+> **The join keys differ between the two related records**, which is worth stating plainly because
+> they look symmetrical and are not: a naming record names its accessory in `associatedBeacon`, an
+> alignment record in `beaconIdentifier`.
 
 This is not incidental. OpenTagViewer's rule 6 explains why: without an alignment record, a
 freshly imported accessory starts its key search at index 0 from its pairing date, which for an
