@@ -443,6 +443,23 @@ Section 4 of the inner message is a **binary property list** before encryption, 
 > The entropy is **generated, not derived**: it is fresh randomness this client keeps nowhere else,
 > and enrolling is what makes it recoverable at all.
 
+> ### Generate it outside enrolment, not inside
+>
+> **The same bytes must seal the bottle that `joinWithVoucher` carries.** Enrolment makes the
+> entropy recoverable by passcode; the bottle is what that entropy opens. A record escrowing
+> different entropy from the bottle sent alongside it enrols cleanly, joins cleanly, and recovers
+> months later to **a peer that does not exist** — with no step in between that could notice.
+>
+> So the entropy is an input to enrolment, never something enrolment invents. A function that
+> generates its own is one a caller cannot make agree with the bottle, and the failure is
+> unobservable until someone needs the recovery.
+
+> **[observed] The other fields recovered material carries are not required.** §6.7 reports
+> `SecureBackupIDMSData`, a `DoubleEnrollmentPassword` and version, a `BackupBagPassword`, a backup
+> version and a timestamp coming back from real records. A record enrolled with the three keys
+> above is recoverable and yields its entropy — so those are what an Apple client happens to
+> include, not what the service or the recovery requires. Do not synthesise them.
+
 > **PascalCase and a reverse-DNS key in the same three-key dictionary**, and the timestamp key is
 > the same reverse-DNS spelling as §4.5.2's. Two of the three do not follow the convention of
 > either neighbouring structure.
