@@ -427,7 +427,7 @@ Each `identities` entry holds a `keyset` **OCTET STRING that is itself DER**, on
 | Member | |
 | --- | --- |
 | a string | unnamed |
-| `keys` | SET OF the **same private-key CHOICE** as a keychain item's `v_Data` — [Stage 3 §6.8.1](./03-keychain-trust.md) |
+| `keys` | SET OF the **same private-key CHOICE** as a keychain item's `v_Data` — [Stage 3 §6.8.1](./03-keychain-trust.md), **including its 64-byte public-then-private layout** |
 | a set | unnamed, of unconstrained type |
 | `hash` | SHA-256 **over this structure's own DER with `hash` absent** — remove it, re-encode, compare |
 

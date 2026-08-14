@@ -1251,6 +1251,28 @@ key structure** — the thing [Stage 5](./05-pcs-decryption.md) needs.
 **Find My's service key is V2.** Its `com.apple.icloud.searchparty` service is type **82**, view
 hint and zone both `Manatee`.
 
+> ### The key octets are 64 bytes, and the public half comes first
+>
+> **This layout is shared by both forms** — V1's octets and each of V2's protobuf key fields are
+> written the same way, so a single reader serves both:
+>
+> | Bytes | Content |
+> | --- | --- |
+> | 0–31 | the **public x coordinate** |
+> | 32–63 | the **private scalar** |
+>
+> **Public first.** Reading the leading 32 bytes as the scalar does not fail — it yields a
+> perfectly valid key on the curve, with a public x that matches nothing. Everything downstream
+> then reports "no key held" rather than "wrong key", because the two are indistinguishable once
+> the wrong key is a valid one.
+>
+> The check that catches it costs nothing and is worth doing at the point of parse: **derive the
+> public x from the scalar and confirm it equals bytes 0–31**. The blob carries both halves
+> precisely so that this is possible.
+>
+> **A 32-byte blob also occurs**, and is the scalar alone with no public half — so dispatch on
+> length rather than assuming either. At 32 bytes there is nothing to check against.
+
 > **This is the join Stage 5 was missing.** A 64-byte AES-SIV view key never becomes an EC private
 > key, and no derivation turns one into the other. The view key decrypts an *item*; the item's
 > `v_Data` **contains** the EC private key. Two different things, one step apart.
