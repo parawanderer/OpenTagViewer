@@ -1659,3 +1659,72 @@ search worthless and is why I refused that one.
 **One ordinary run answers it**, on this account or the reference's, and needs nothing new:
 if either framing matches, the run says which. If the reference implementation is to hand,
 looking at whether it hashes the wrapper or its contents is cheaper still.
+
+## Round R — what is missing before a join can be built
+
+Taking stock of §6.7 step 5 against what exists. The **message layer of §6.9 is built** —
+`SignedBlob` with the type-prefixed signing discipline, `make_voucher`, `make_peer`,
+`make_join_request`, and `require_key_shares`. `CuttlefishEstablishRequest` remains
+undefined in `cuttlefish.proto`, so no code here can build one, and that stays.
+
+Two of step 5's five sub-steps are fully specified and I can build them now:
+
+- **Signing a voucher** — done.
+- **Re-sharing the view keys.** §6.7.0 gives the share signature's field order and its
+  little-endian integers, and gives SFIES exactly. Creating a share is the inverse of the
+  reader already written, and inverting a construction this precisely stated is not a guess.
+
+Three are not, and each blocks the whole thing rather than degrading it.
+
+### R1. How is a peer's `hash` computed?
+
+`CuttlefishPeer.hash` is "the peer's identifier" and `Voucher.beneficiary` must equal it.
+Nothing says how a client **derives** it for an identity it just generated. §5.1 observes
+the related escrow label is `SHA256:` followed by base64 — a digest of *something*.
+
+This is not searchable. A wrong peer id produces a voucher naming a peer that does not
+exist, and the failure lands **after** `joinWithVoucher` has been sent, which is the one
+call in this project that cannot be taken back.
+
+What is needed: the exact input to that digest — which fields, in which encoding, in which
+order — and whether the `SHA256:` prefix is part of the id or only of the escrow label.
+
+### R2. What must `PeerStableInfo` assert?
+
+Already §8 Q4, and it is now blocking rather than theoretical. Eighteen fields, all
+optional on the wire, and a peer that signs an incomplete one **may be admitted and then
+behave oddly** rather than be rejected — the worse failure, and one that would present
+long after the irreversible step.
+
+Specifically: which fields are required; what `frozenPolicyVersion`/`frozenPolicyHash` and
+their flexible counterparts must contain; and whether `clock` starts at 0 or 1.
+
+### R3. How is the new identity's escrow record enrolled?
+
+Step 5.4 says to create a bottle for the new identity "sealed under the device passcode",
+so the client is recoverable later. §6.9 gives `Bottle` and `OTBottle`, and §6.7 steps 2–4
+give the key derivation and the seal — all invertible.
+
+**What is missing is the enrolment**: §4 specifies the escrow proxy's *read* commands, and
+writing a record is what makes the entropy recoverable by passcode at all. A bottle sent in
+`joinWithVoucher` whose entropy was never escrowed produces a peer that is in the circle and
+**cannot ever be recovered** — permanent, invisible, and exactly the residue the README's
+rules exist to prevent.
+
+### R4. What does a joining peer put in `PeerDynamicInfo`?
+
+`includeds` is "peer ids this peer trusts". A peer joining a circle presumably includes its
+sponsor and itself, but whether it must enumerate the whole circle, what `dispositions`
+carries, and what `clock` starts at are unstated. Same failure shape as R2: plausibly
+accepted, then wrong.
+
+---
+
+**What I am not doing.** Guessing any of these and sending it. §6.7's own warning is the
+reason — this is the one call in the project that creates permanent account state, and
+unlike the deletes there is no listing that would even show a mistake afterwards. The
+account owner runs the first real join; I build and hand over, and I would rather hand over
+four unanswered questions than a peer id I inferred.
+
+**What I will build while these are open**: SFIES encryption and share creation (R's second
+bullet), since they are specified and are reusable regardless of how R1–R4 resolve.
