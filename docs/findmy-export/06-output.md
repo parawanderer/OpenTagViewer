@@ -60,10 +60,21 @@ reason nothing will explain.
 
 ### 2.2 `cloudKitMetadata`
 
-The plists carry CloudKit's own record metadata as an opaque blob. **Whether anything reads it is
-unestablished**; the fixtures in OpenTagViewer's test resources contain a 3-byte stub, which
-suggests it is at least tolerated as a placeholder. Prefer emitting a placeholder over omitting
-the key, and do not attempt to synthesise real CloudKit metadata.
+The plists carry CloudKit's own record metadata as an opaque blob. **[observed] What OpenTagViewer
+reads out of it is three fields** — when the accessory record was created, when it was last
+modified, and which device registered the accessory.
+
+That is worth exporting: it is real information about the accessory, and nothing else in the format
+carries it.
+
+It is also less than the name suggests. CloudKit's system fields can identify a record's creator
+and last modifier as *user* records; these do not, so this blob is not a route by which an account
+identity reaches a file. The fixtures in OpenTagViewer's test resources contain a 3-byte stub, so a
+placeholder is tolerated where the real thing is unavailable — but prefer the real thing.
+
+> **The device is named, so a person may be.** Devices are commonly called *someone's* laptop, and
+> that is the one part of this blob worth a thought before it goes to another person in §5.3's
+> case. It is a naming convention rather than an account identifier, and it is the owner's call.
 
 ## 3. The naming mapping
 
@@ -163,11 +174,13 @@ rather than an untidiness.
 
 - **`SafeLocation` must be discarded at decryption**, per §6 — before anything is serialised, not
   filtered out afterwards.
-- **`cloudKitMetadata` must not be passed through.** CloudKit's system fields identify the record's
-  creator and last modifier, so real metadata carries the **owner's** identity into a file given to
-  someone else. §2.2 already prefers a placeholder for a different reason; this is the stronger one.
-- **Nothing identifying the owner's account.** The accessory records themselves do not carry it —
-  keep it that way rather than adding a provenance field that does.
+- **Nothing identifying the owner's account.** Neither output format has anywhere to put a token, a
+  `dsid`, an `adsid` or an Apple ID, and the accessory records do not carry them either. **That is
+  what makes §5.2's requirement hold** — not a filter that has to be right, but a format with no
+  field to be wrong about. Adding a provenance field that names the owner is the way to break it.
+- **`cloudKitMetadata` is fine to export.** §2.2 records what it actually contains, which is three
+  facts about the accessory and no user identity. The device name inside it is the only part worth
+  a moment's thought.
 
 ### 5.4 A bundle must say when it was made
 
@@ -217,12 +230,10 @@ and must not be treated as an error.
 
 ## 8. Open questions
 
-1. **Does anything read `cloudKitMetadata`?** §2.2. If nothing does, the key can hold a placeholder
-   indefinitely; if something does, this stage is not as thin as it looks.
-2. **What is `stableIdentifier` a list of** in the plist, given CloudKit returns a single string? A
+1. **What is `stableIdentifier` a list of** in the plist, given CloudKit returns a single string? A
    one-element list is the obvious guess and is unconfirmed.
-3. **What does `isZeus` mean?** Carried faithfully by both formats and understood by neither.
-4. **Is `secureLocationsSharedSecret` needed for anything?** Absent on the account examined, and no
+2. **What does `isZeus` mean?** Carried faithfully by both formats and understood by neither.
+3. **Is `secureLocationsSharedSecret` needed for anything?** Absent on the account examined, and no
    consumer of it has been identified.
 
 **Unexercised:** this stage has never run, because it needs decrypted records. Its *mapping* is
