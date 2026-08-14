@@ -314,8 +314,27 @@ certificate.
 
 > **Verify that certificate against a pinned set of roots before using it.** It is the key the
 > user's escrow blob is encrypted to, so accepting an unverified one hands the material to
-> whoever supplied it. The four versions above correspond to four root certificates a client
-> carries; a chain that does not verify against them is a refusal, not a warning.
+> whoever supplied it. A chain that does not verify is a refusal, not a warning — and the
+> verification belongs **before** anything is encrypted to that key, not after.
+
+**The four roots**, which a client carries rather than fetches. All are self-signed, all share the
+subject `CN=Escrow Service Root CA, OU=Apple Certification Authority, O=Apple Inc., C=US`, and the
+version number is the certificate's **serial number**:
+
+| Version | Not before | SHA-256 fingerprint |
+| --- | --- | --- |
+| 101 | 2015-05-16 | `5644C142208DD4BF7AD770902F70D6730B8571164FD874D9AE5168807B32F766` |
+| 102 | 2016-05-13 | `D4EAA88170B8AEE18FCEFF68698310D4C2AB4CEB48179D99206A53AC73E8A4EB` |
+| 103 | 2021-05-13 | `FDBA6F3365D617B9EB799D2F48851B1A85C62CF366C36797E539B3C4C2C3BDC6` |
+| 500 | 2022-12-09 | `654BFB656D80A715559034C7FE08E637B335E770C84EC05CD90475E8BBC59EB0` |
+
+> **Obtain them from Apple and check them against these fingerprints.** The fingerprints are the
+> useful half: a root delivered by any route is only trustworthy once it matches one of these, and
+> a pinning set assembled without checking is pinning to whatever arrived.
+>
+> Note 500 expires in **2032**, while the three older roots run to 2049. Whichever set is carried,
+> a client should say clearly when a chain fails to verify rather than falling back to the system
+> trust store — the system store holds Apple's public roots, and these are not those.
 
 **Step 2 — `enroll`.** Label is the **specific record's** label, per §4.4. Fields:
 
@@ -340,7 +359,7 @@ in this order:
 | 3 | the **SRP verifier** | computed over the dsid as identity, the password, and that salt, using the 2048-bit group and SHA-256 |
 | 4 | the **encrypted record** | AES-128-CBC under PBKDF2-HMAC-SHA256(password, salt, **10000** iterations, 16 bytes), IV = the salt's **first 16 bytes** |
 | 5 | the **label**, as ASCII | padded to an 80-byte footprint |
-| 6 | the **timestamp**, as ASCII | padded to a 24-byte footprint |
+| 6 | the **timestamp**, as ASCII | `YYYY-MM-DD HH:MM:SS` — a space rather than a `T`, and no zone. Padded to a 24-byte footprint |
 
 > The verifier is what later makes `srp_init` and `recover` (§6) work with this password. The
 > encrypted record and the verifier are derived from the **same** password and the **same** salt,
@@ -367,7 +386,7 @@ A binary property list, base64-encoded:
 | Key | Content |
 | --- | --- |
 | `serial`, `build` | the client's own, as in [Stage 1 §2.2](./01-authentication.md) |
-| `timestamp` | the same string as the blob's section 6 |
+| `timestamp` | the same string as the blob's section 6, in the same `YYYY-MM-DD HH:MM:SS` form |
 | `bottleID` | the bottle's **UUID** — see §4.4 on why this is not the label |
 | `passcodeGeneration` | **[observed]** `13` |
 | `escrowedSPKI` | the escrowed **signing** public key |
