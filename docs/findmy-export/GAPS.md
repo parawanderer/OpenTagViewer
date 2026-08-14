@@ -1420,3 +1420,41 @@ comparison, a missed one costs everything below it.
   rather than by argument.
 - M2 and §8 Q4 remain open: `OwnedDeviceKeyRecord` and `SharingCircleSecret` are still
   unexplained, though N8 established they are protected by the same key as everything else.
+
+## Round O — terms of service
+
+### O1. A five-minute credential across a human reading a contract
+
+§5.2 and §5.3 are consistent and complete, and implementing them turned up one thing the
+document does not mention, which is a property of the two sections combined rather than of
+either.
+
+The setup headers of §5.3 authenticate with the **PET**, which §5.1 puts at about five
+minutes. The flow of §5.2 is fetch, *render, let the user read, let them decide*, accept.
+Reading a terms of service takes longer than five minutes if anyone actually does it — so
+the acceptance in step 3 is posted with a credential that expired while it was being read.
+
+It fails **after** the user has agreed, which is the worst available moment: to them, they
+read a contract, accepted it, and were told to sign in again. An app that then loops them
+back through login has asked for agreement twice for one acceptance.
+
+This implementation re-authenticates immediately before each terms request rather than
+reusing the token the failed delegate request carried. That works, and it is cheap — one
+extra GSA exchange in a flow that already involves a person reading — but it is a decision
+made in the implementation about a property the specification states in two separate
+places without connecting them.
+
+**Worth a sentence in §5.2**, whichever way it is resolved: either that the PET must be
+renewed before the `agreeUrl` POST, or that it need not be and the token from §3 remains
+valid there. This implementation assumed the first, because assuming the second and being
+wrong is unrecoverable for the user without a second acceptance.
+
+### O2. What `localizedError` says for pending terms is still open
+
+Implemented as §5.2 directs: `localizedError` and `description` are surfaced verbatim,
+nothing branches on a guessed value, and the terms flow is offered as a remedy the caller
+chooses rather than one triggered by a string match. The value is also logged at WARNING so
+that the first account to hit it records the answer rather than merely working.
+
+Nothing further is needed from the spec. This is only noted so the round closes with it
+still open: it can be answered by one affected account and by nothing else.
