@@ -330,6 +330,18 @@ Findings are marked `[observed]` in each, and several corrected what reading the
 suggested. Paths that remain untested: SMS two-factor, the 403 attributed to Advanced Data
 Protection, the terms-of-service flow, and the device lifecycle of Stage 2 §7.
 
+> ### `[observed]` presence and `[observed]` absence are not the same claim
+>
+> **Seeing a field proves the format has it. Not seeing one proves nothing about the format** — it
+> is a fact about the account that was looked at, and a second account routinely contradicts it.
+> Two `[observed]` notes disagreeing is how the weaker one gets read as "the format does not have
+> this", which is the reading that makes an implementation drop a field it should carry.
+>
+> So an absence is written as **absent on the account examined**, never as a property of the
+> format, and anything downstream of it must tolerate the field appearing. The same caution
+> applies to any value seen exactly once: a constant observed on one account is a **sample**, not
+> a magic number to match against.
+
 **Stages 3, 4 and 5 are now verified too**, by a second implementation written from these
 documents and run against the same account. Escrow recovery yields a peer, its key shares unwrap,
 the `Manatee` keychain view reads, its service keys open the `BeaconStore` zone, and the zone's
