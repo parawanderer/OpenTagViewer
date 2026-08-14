@@ -237,8 +237,24 @@ So the sequence is: retrieve the zone, unwrap its protection structure with the 
 the EC private keys it yields, and unwrap each record's structure against *those*.
 
 > **Both halves come out of the same structure**, and which half you want depends on the level.
-> Step 6's decryption uses the master keys; the zone level ignores them and uses the EC private
+> Step 7's decryption uses the master keys; the zone level ignores them and uses the EC private
 > keys instead. Taking the same half at both levels is the mistake this table exists to prevent.
+
+> ### The zone's `meta` is the only source of zone keys
+>
+> There is no second place they come from, and no derivation between a zone key and the key a
+> record names. **A record's keyset holds a zone key's public part directly** — the same bytes,
+> compared as the bare x of §2.
+>
+> So if a record names a key the zone did not yield, the zone's `meta` was not read completely.
+> Both levels of step 6 are `SET OF`: `identities` is a set, and each keyset's `keys` is a set.
+> **The plural in "one of the zone keys" comes from there and nowhere else**, so taking the first
+> element of either — or letting one unreadable entry end the loop — silently produces a short
+> list that looks like a complete one.
+>
+> Neither `recordProtectionInfo` nor the key ids inside it feed a record's own keyset. It is
+> decoded *against* the zone keys and produces master keys for records that carry no structure of
+> their own; it is an alternative to a record's keyset, never an input to it.
 
 **When a record carries no `protectionInfo` of its own**, it is covered by the zone's
 `recordProtectionInfo` instead — a second structure on the zone, unwrapped once against the zone
@@ -355,10 +371,30 @@ before anything is decrypted:
 
 - the first 4 bytes of the derived key's **key id** must equal the structure's truncated key id
 - the structure's **HMAC** must verify under the derived key, over the concatenation of three
-  things: the **DER of `keyset`**, then the raw bytes of **`meta`**, then the **DER of
-  `signatureData`** — in that order, and nothing else. Note it is a re-encoding of two sub-
-  structures rather than a span of the original bytes, so a decoder that discards the input after
-  parsing must be able to re-encode faithfully.
+  things, in this order and nothing else:
+
+  | | |
+  | --- | --- |
+  | 1 | the **DER of `keyset`** |
+  | 2 | the **raw bytes of `meta`** |
+  | 3 | the **DER of the `ObjectSignature`** — see below |
+
+  > **The third part is the inner structure, not the `SignatureData` wrapper.** `SignatureData` is
+  > `SEQUENCE { version, data }` and what the HMAC covers is the DER of what `data` *holds* — the
+  > `ObjectSignature` of §3.1. Equivalently, and more simply: **the contents of the `data` OCTET
+  > STRING**, which can be taken as bytes rather than re-encoded at all.
+  >
+  > Encoding the `SignatureData` SEQUENCE instead adds the version and the OCTET STRING's own
+  > header, and the HMAC then fails on **every** structure while the key id still matches — which
+  > is a distinctive symptom, because a wrong key fails both checks and this fails only one.
+
+  Parts 1 and 3 are re-encodings rather than spans of the input, so a decoder that discards its
+  input after parsing must re-encode faithfully.
+
+  > **DER orders a `SET OF` by encoded value**, ascending, not by the order elements arrived in.
+  > `keyset` is a `SET OF` (§3.1), so an encoder that preserves parse order produces different
+  > bytes for a structure whose entries happened to arrive unsorted — and the HMAC fails with no
+  > other symptom. The same applies to the nested keyset's own hash in step 6.
 
 A mismatch means the wrong key, not corrupt data.
 
