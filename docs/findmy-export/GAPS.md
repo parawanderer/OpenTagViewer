@@ -2093,7 +2093,7 @@ which is a read the library already does.
 states. It is optional, so nothing is sent, and the cost of that is at most a fuller
 response.
 
-### U3. Answered by a run, not by the spec — does `get_club_cert` return the chain?
+### U3. Closed — it returns the leaf only, so the roots stay bundled
 
 Only `clubCert` is read. If the reply also carries the issuing chain, the four roots would
 not need bundling at all: they could be fetched, fingerprint-checked and used, which
@@ -2138,3 +2138,68 @@ Three changes came out of it:
 how an established member hands keys to another peer, which is a later job than joining.
 
 **U3 is still the only open item**, and one real `get_club_cert` answers it.
+
+## Round V — what one read-only run settled
+
+`preflight_join.py` against a live account, writing nothing. Five things it answered, four
+of which were open.
+
+### V1. `get_club_cert` returns no chain — U3 closed, unhelpfully
+
+    clubCert=1396B, dsid=11B, message=7B, status=1B, version=1
+
+The leaf and four scalars. So fetching the roots and fingerprint-checking them at runtime is
+not an option Apple offers, and this library carries them. The DEBUG line stays anyway,
+because that is an answer with a shelf life rather than a fact.
+
+### V2. Root 500 is the one in active use — so 2032 is a real deadline
+
+The club certificate verified against **500 and none of the other three**. The issuer DN
+shows the version in the X.520 `serialNumber` attribute (`2.5.4.5=500`), which is what makes
+an issuer match select exactly one of four otherwise identical subjects.
+
+That turns §4.5's note about 500's ten-year life into this library's own end date: 101 to
+103 run to 2049 and are apparently not what is being issued against. Apple will move to a
+root not in the bundled set before December 2032, and the failure that follows is enrolment
+refusing with a message about certificates.
+
+`verify_club_certificate` now warns a year out. Worth considering whether §4.5 should say
+the same to other implementers — a hardcoded pinning set with a known expiry is a thing to
+be told about in advance rather than discovered.
+
+### V3. The signing construction verifies against Apple's own devices
+
+**13/13 permanent infos, 12/12 vouchers, 13/13 signing keys parsing as DER SPKI.**
+
+This is the first external check of §6.9.1's signing rule. Every other test of it signs and
+verifies with the same code, where a wrong type prefix, a wrong digest or a wrong key
+encoding agrees with itself perfectly. A blob Apple's device signed cannot, so this settles
+the ASCII prefix with no separator, ECDSA over SHA-384, and DER SPKI as the key encoding —
+by the same standard the identifier check meets.
+
+Thirteen peers and twelve vouchers is not a gap. **The peer that established the circle
+joined nothing and carries no voucher**, so exactly one unvouched peer is the expected
+shape; its absence would have been the surprise. Counted rather than skipped now, so
+"12/12" does not sit beside thirteen peers unexplained.
+
+### V4. S1 confirmed on real data, 7/7
+
+    ClientMetadata 7/7, clientMetadata 0/7,
+    com.apple.securebackup.timestamp 7/7, timestamp 0/7
+
+Every record uses §5.1's spellings and none uses the ones §4.5.2 originally carried. The
+tolerant reader is now carrying a spelling that has never been observed anywhere — worth
+keeping regardless, since a record written under the earlier text would be undescribable and
+therefore undeletable, but it is unexercised code and should be understood as such.
+
+### V5. The sync token really is a string
+
+Two pages of change feed decoded with `syncToken` declared as `string` rather than `bytes`.
+That is U2's correction meeting real data: had the token not been valid UTF-8, the parse
+would have raised rather than quietly continuing.
+
+---
+
+**Nothing open on my side.** The join is built, checked as far as anything offline can check
+it, and unsent. What remains untested is everything this client puts in its own blobs, which
+by construction has no oracle short of sending one.
