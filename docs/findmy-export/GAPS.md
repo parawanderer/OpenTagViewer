@@ -876,3 +876,79 @@ which fields — are exactly what is unknown. Searching would produce another ro
 authentication failures that say nothing.
 
 So this one is asked rather than attempted. Everything either side of it is built and verified.
+
+---
+
+## K closed — Stage 3 reaches Stage 5's input
+
+**[observed]** `session.service_keys(peer)` returns both P-256 keys, and both are
+*verified* rather than guessed: the key blob carries a public half that the recovered
+scalar reproduces exactly. The chain runs end to end — passcode, escrow recovery, bottle,
+shares, view keys, keychain item, EC key — with **nothing written to the account**.
+
+§6.8.1 is correct as written and needed no amendment. Everything below is detail the
+document could carry, found by implementing it.
+
+### K1. The v2 tag is implicit, which answers D3 [observed]
+
+D3 asked whether `[APPLICATION 5]` being written without `EXPLICIT` was deliberate. It is:
+the tag **replaces** the SEQUENCE's own tag, so the octet string sits directly inside the
+wrapper rather than one level further in. Reading it as explicit fails with "cannot read
+children of a primitive element", which names neither the structure nor the choice.
+
+Both nestings are now read. Worth noting the failure I made getting there: D3 already said
+"both nestings are accepted", and I had written that in this file while implementing only
+one. A claim in a gap report about what the code does is worth nothing unless the same edit
+makes it true.
+
+### K2. A key blob's public half is a bare x coordinate [observed]
+
+The payload's shape, from a real account:
+
+```
+1: { key: 64 bytes, public_structure: 210 bytes }   the encryption key
+2: { key: 64 bytes }                                the signing key
+```
+
+**64 bytes for a P-256 key**, which is the bare **x coordinate** followed by the 32-byte
+scalar — no `0x04` marker and no compressed-point sign byte. So "compressed private key
+bytes" is neither X9.62 form, and a reader that knows only those two checks 33 and 65 bytes
+against a 32-byte prefix and rejects a good key with nothing to say why.
+
+Worth one line in §6.8.1, because the failure is silent in the way this protocol keeps
+being silent: nothing is malformed, the lengths simply do not match anything expected.
+
+The optional DER public structure is present on the encryption key and absent on the
+signing key, which is why the two members differ in size.
+
+### K3. Two things that cost a round each, and the rule they share
+
+Both were mine rather than the document's, and they are the same mistake:
+
+- I had **P-521 in the scalar-length table** speculatively. A 66-byte member of the payload
+  then matched by length alone and was taken as a key it is not. Nothing in this protocol
+  uses P-521.
+- The reader took the **first** plausible scalar and raised when it would not derive, so an
+  unchecked length match outranked a blob whose halves actually agreed.
+
+The rule: **a length match is a guess and a self-checking match is proof, and code must not
+treat them alike.** Widening the set of *public forms* is safe, because each is compared
+against bytes the key itself produces and a wrong one cannot match. Widening the set of
+*scalar lengths* is not, because nothing checks it. The two look like the same kind of
+change and are opposites — which is the same distinction that made the SFIES parameter
+sweep worthless and the bottle-key search sound.
+
+### K4. Not exercised: the additional data's date rendering
+
+No field on any item observed is a date, so the RFC 3339 rendering of §6.8.1 has never run
+against real data and the epoch it assumes is Apple's. Stage 5 §8 Q2 records that the epoch
+is unsettled, and the two questions are the same question. The implementation warns when a
+date participates in the additional data rather than guessing quietly, so if an item ever
+fails to authenticate with that warning present, the epoch is the first thing to doubt.
+
+### K5. [observed] The pointer indirection is the norm, not a special case
+
+The `Manatee` view holds **67 items and 66 pointers** — very nearly one pointer per item.
+So `currentitem` is not a mechanism that exists for this one service key; it is how items
+are addressed generally. That makes the tag lookup of §6.8.1 the ordinary path rather than
+a shortcut, and the `acct` scan the exception.
