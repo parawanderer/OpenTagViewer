@@ -105,7 +105,12 @@ because Stage 5 §4 step 5 and §6 provide integrity checks. The implementation 
 and reports which one worked, at INFO level. **The first successful decryption of a real record
 answers all three at once**, and the answers belong in the document.
 
-### B1. Stage 5 §5: the KDF's fixed input is not specified
+### B1. Stage 5 §5: the KDF's fixed input is not specified [closed]
+
+> **Closed by amendment.** §5 now gives the PRF input exactly --
+> `be32(i) ‖ label ‖ 0x00 ‖ context ‖ be32(L)`, context empty, counter from 1 -- so this is
+> no longer a search and the implementation no longer contains one. What follows is the
+> reasoning as it stood.
 
 > "a **counter-mode KDF with HMAC** (the NIST SP 800-108 shape), with a fixed label and an output
 > the same length as the input key"
@@ -126,7 +131,12 @@ and no encoding widths. Five readings are tried:
 This one matters most: it is used four times over, including for the encryption key, so getting it
 wrong fails everything downstream with no clue as to why.
 
-### B2. Stage 5 §4 step 2: the RFC 6637 parameters are not specified
+### B2. Stage 5 §4 step 2: the RFC 6637 parameters are not specified [closed]
+
+> **Closed by amendment.** §4 step 2 now gives the whole KEK construction: the
+> length-prefixed P-256 OID, ECDH, SHA-256 as KDF hash, AES-128 as the wrap cipher, the
+> twenty-character sender string, and the literal word `fingerprint` zero-padded to twenty
+> bytes. One construction, no search. What follows is the reasoning as it stood.
 
 > "The wrapping is **RFC 6637** … with the fixed parameter string `fingerprint`."
 
@@ -952,3 +962,39 @@ The `Manatee` view holds **67 items and 66 pointers** — very nearly one pointe
 So `currentitem` is not a mechanism that exists for this one service key; it is how items
 are addressed generally. That makes the tag lookup of §6.8.1 the ordinary path rather than
 a shortcut, and the `acct` scan the exception.
+
+---
+
+## L. "Compressed public key" means a bare x coordinate, everywhere [observed]
+
+Stage 5 §2 says `acct` "holds the base64 of a compressed elliptic-curve public key", and §4
+step 1 says to "compress our private key's public part and scan the keyset for an entry
+whose public key matches those bytes". Both readings say *compressed*, and X9.62's
+compressed point is 33 bytes for P-256.
+
+**It is 32.** The service key item's `acct` decodes to 32 bytes beginning `0xb5` — no
+`0x02`/`0x03` sign byte and no `0x04` marker. It is the bare x coordinate. That is the same
+form K2 found in the key blobs, so this is not a quirk of one field: **in this protocol, a
+"compressed public key" is the x coordinate alone.**
+
+The consequence is not cosmetic. §4 step 1's match compares our compressed public key
+against each keyset entry's, and 33 bytes never equals 32, so **every record fails to match
+and reports as protected for someone else**. On this account that was 15 of 15 wanted
+records skipped as "no key held" — a message which asserts something much stronger and more
+discouraging than "the encoding is wrong", and which is what a reader would believe.
+
+Worth stating in §2 and §4 step 1, because the failure is indistinguishable from the
+legitimate case it is supposed to describe.
+
+Two notes on the fix. Matching on a bare x is slightly weaker than matching on a full
+point, since x alone does not fix the sign of y — but that ambiguity is the protocol's own,
+introduced by storing x alone, not by the reader. And the failure now names the entries'
+public-key sizes beside the forms compared against, which distinguishes "really not for us"
+from "compared the wrong bytes" without another run.
+
+### L1. B1 and B2 are closed, and the note pointing at them was stale
+
+The probe ended by asking the operator to write down "the INFO line naming the key wrap and
+KDF", which was the output of the searches those sections describe. §5 and §4 step 2 now
+specify both exactly, the implementation has one construction rather than a search, and no
+such line is emitted. The instruction has been removed and both sections marked closed.
