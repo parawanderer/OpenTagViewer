@@ -1117,6 +1117,144 @@ So success for this stage is not "we are in the circle" but "we can enumerate `M
 an item whose `acct` matches a key referenced by a record's protection structure". That is the
 thing to test against.
 
+### 6.8.1 From a view's keys to its items
+
+§6.7.0 ends holding three keys per view. This is the step that turns them into the dictionary
+§6.8 asks for, and **none of it is a search** — every unknown below is a name or a field number.
+
+**The container is not the one the shares came from.**
+
+| | |
+| --- | --- |
+| Container | `com.apple.security.keychain` — the same as Cuttlefish |
+| Bundle | **`com.apple.securityd`** — *not* `com.apple.security.cuttlefish` |
+| Database | private |
+| Environment | production |
+
+> Same container, different bundle. A client that reuses the Cuttlefish container here is asking
+> the wrong service.
+
+**The zone is the view name.** `Manatee` is a private zone in that container, as is
+`ProtectedCloudStorage`. Enumerate it with the same `RetrieveChanges` paging as
+[Stage 4 §3.7](./04-cloudkit.md), keeping the continuation token per zone.
+
+Two record types matter, and the rest can be ignored:
+
+| Type | What it is |
+| --- | --- |
+| `item` | one encrypted keychain item |
+| `currentitem` | a **named pointer** to an `item` |
+
+#### The pointer is how the Find My key is found
+
+A `currentitem` record carries a single field, `item` — a **weak reference** whose record
+identifier names an `item` record. Its own record identifier is the **tag**, and the tag for this
+project's key is:
+
+```
+com.apple.ProtectedCloudStorage-com.apple.icloud.searchparty
+```
+
+**So the service key is a direct lookup, not a scan**: read that `currentitem` in the `Manatee`
+zone, follow its reference, decrypt that `item`. The `acct` match of §6.8 is the *other* way in —
+used when a record's protection structure names a key and the item holding it must be found — and
+both are worth having, because they fail differently.
+
+#### The `item` record
+
+| Field | Type | |
+| --- | --- | --- |
+| `data` | bytes | the encrypted item |
+| `wrappedkey` | string | base64 — this item's own key, wrapped |
+| `parentkeyref` | reference | **which key unwraps it** |
+| `encver` | int64 | 1 or 2, and it changes the additional data |
+| `gen` | int64 | |
+| `uploadver` | string | |
+| `pcsservice` | int64 | optional |
+| `pcspublickey` | bytes | optional — compressed |
+| `pcspublicidentity` | bytes | optional |
+| `server_wascurrent`, `server_suggestDeletion` | int64 | optional, server-set |
+
+**`parentkeyref` answers "which of the three keys".** Its record identifier is a key **UUID**,
+matched against the `uuid` of the keys §6.7.0 produced — the share's own key and the two class
+keys. It is not a class name, so `classA`/`classB` are not what to match on.
+
+#### Decrypting one
+
+1. **Unwrap the item's own key.** AES-256-CMAC-SIV, keyed with the §6.7.0 key that `parentkeyref`
+   names, over the base64-decoded `wrappedkey`, **no associated data**. Yields 64 bytes.
+2. **Split `data`.** The **first 16 bytes are an initialisation vector**; the ciphertext is the
+   rest.
+3. **Decrypt** with AES-256-CMAC-SIV under the key from step 1. SIV takes a *vector of headers*,
+   and here it is **the IV first, then the additional data values** of the next section, in order.
+4. **Strip the padding.** The plaintext is padded to a multiple of **20 bytes**: walk backwards
+   over trailing zero bytes to the first **`0x80`**, and truncate there. That byte is the marker,
+   not data. Anything else encountered before it means the decryption is wrong.
+5. **Parse** what remains as a **binary property list**. The result is the item dictionary.
+
+#### The additional data, which is where this goes wrong
+
+A sorted map of name to bytes; **only the values are passed**, in order of their names.
+
+For `encver` **1**, exactly four entries. For anything else, those four plus the optional PCS
+fields that are present, plus **every other field on the record**:
+
+| Name | Value |
+| --- | --- |
+| `UUID` | the record's own identifier, as UTF-8 |
+| `encver` | **64-bit little-endian** |
+| `gen` | **64-bit little-endian** |
+| `wrappedkey` | **the parent key's UUID as UTF-8** — *not* the `wrappedkey` field's value |
+| `pcsservice` | 64-bit little-endian, if present |
+| `pcspublicidentity`, `pcspublickey` | as-is, if present |
+
+> **`wrappedkey` in the additional data is not the `wrappedkey` field.** It is the identifier
+> `parentkeyref` points at. The name is reused for two different things one line apart, and using
+> the wrapped key itself produces an authentication failure with nothing to say why.
+
+Every remaining field on the record joins the map under its own name, **except** the ten already
+spoken for — `gen`, `pcspublickey`, `UUID`, `data`, `pcsservice`, `pcspublicidentity`,
+`parentkeyref`, `uploadver`, `wrappedkey`, `encver` — and **except anything beginning with
+`server_`**. Their values are rendered by type:
+
+| Type | Rendering |
+| --- | --- |
+| string | UTF-8 |
+| bytes | as-is |
+| int64 | **64-bit little-endian** |
+| double | **cast to an integer, then 64-bit little-endian** |
+| date | **RFC 3339, whole seconds, `Z`** — e.g. `2026-08-14T09:23:41Z` |
+
+> Little-endian again, as in §6.7.0's signature, and against everything else in this protocol.
+>
+> **The map is sorted by name and the names are then discarded.** Only the values are passed, so
+> the sort is the only thing that puts them in the right order — and a map that preserves
+> insertion order instead produces a wrong order that is stable, repeatable, and wrong on every
+> item.
+
+#### What the dictionary holds
+
+Ordinary keychain attributes — `class`, `acct`, `agrp`, `vwht`, `pdmn`, `atyp`, `labl`, `srvr`,
+`cdat`, `mdat`, `sha1`, `musr`, `tomb` — and **`v_Data`**, which is the payload.
+
+For the service key, `acct` is base64 of the **compressed** public key, `agrp` is
+`com.apple.ProtectedCloudStorage`, `vwht` is `Manatee`, and `v_Data` is a **DER-encoded private
+key structure** — the thing [Stage 5](./05-pcs-decryption.md) needs.
+
+**That structure is a CHOICE of two forms**, and Find My's service uses the second:
+
+| Form | Encoding |
+| --- | --- |
+| V1 | a sequence: the key octets, and optionally the public structure |
+| V2 | **`[APPLICATION 5]`**, wrapping a protobuf carrying an **encryption key** and a **signing key**, each as compressed private key bytes with an optional DER public structure |
+
+**Find My's service key is V2.** Its `com.apple.icloud.searchparty` service is type **82**, view
+hint and zone both `Manatee`.
+
+> **This is the join Stage 5 was missing.** A 64-byte AES-SIV view key never becomes an EC private
+> key, and no derivation turns one into the other. The view key decrypts an *item*; the item's
+> `v_Data` **contains** the EC private key. Two different things, one step apart.
+
 > **Passcode handling.** It must be read, used, and discarded. Never written to disk, never
 > logged, never included in diagnostics, and not retained in memory past the exchange. It is the
 > single most sensitive value this project ever touches: it is the key to the user's entire
