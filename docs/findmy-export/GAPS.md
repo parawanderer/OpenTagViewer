@@ -1219,3 +1219,44 @@ having before anything else is proposed, and it costs nothing.
 `OwnedDeviceKeyRecord` ×8, `SharingCircleSecret` ×5, `OwnerSharingCircle` and
 `OwnerPeerTrust`. §8 Q4's plausible reading — a parallel key hierarchy — would fit a key
 that no keychain view and no zone structure holds. Nothing here establishes it.
+
+### N8. One key protects the whole zone, and no described source holds it [open]
+
+The distinct-key count came back as **one**. Every record in the zone — all 35, of nine
+different types — names the same 32-byte key, `20fb99a6 4463a920`:
+
+```
+BeaconNamingRecord, KeyAlignmentRecord, LeashRecord, MasterBeaconRecord,
+OwnedDeviceKeyRecord, OwnerPeerTrust, OwnerSharingCircle, SafeLocation, SharingCircleSecret
+```
+
+Two things follow, and the second was not expected.
+
+**It is a single zone-wide key, not a key per record.** So whatever is missing is one thing
+obtained once, not a lookup performed per record. That is a smaller gap than it could have
+been.
+
+**M2's parallel-hierarchy reading is dead**, at least as an explanation for this.
+`SharingCircleSecret` and `OwnedDeviceKeyRecord` name the *same key* as `MasterBeaconRecord`
+— they are not a separate key hierarchy, they are more records under the same one. §8 Q4 may
+still be right about what those records are *for*, but they are not the route to this key,
+and neither is anything else in the zone.
+
+**Everything described has now been read, and the key is in none of it:** 133 keychain keys
+across both views, the zone's identity key, and §5's derivation from the zone's master key.
+The zone carries no `recordProtectionInfo` (Stage 4 §3.7 records it as absent), so that is
+not an unread source either.
+
+So the remaining question is narrow and, I think, well posed: **what does a client hold that
+lets it unwrap `20fb99a6…`, given it is not in the keychain and not in the zone's own
+protection structure?**
+
+Two shapes that would fit, offered as shapes rather than as candidates to try:
+
+- Something obtained from a service not yet in this document, at fetch time rather than from
+  stored state.
+- A keychain item this client cannot read. `Manatee` yielded 67 of 67 items, but
+  `ProtectedCloudStorage` yielded **34 of 35** — one item did not decrypt under the keys
+  held. That is expected for items of another class, and it is also the only place on the
+  read path where something exists and was not opened. Worth mentioning only because it is
+  the sole remaining "read something better" possibility, and everything else is exhausted.
