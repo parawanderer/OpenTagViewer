@@ -1537,3 +1537,48 @@ them gets read as "the format does not have this".
 The fixture's key sets are now the oracle for both plist writers, replacing fixtures that
 only agreed with the implementation that produced them: 14 keys for the beacon, 6 for the
 naming record, read off files Apple's own framework wrote.
+
+## Round Q — the write path is verified
+
+### Q1. Stage 4 §4 and Stage 5 §6.1 both work, confirmed the only way they could be
+
+A name written by this implementation displayed correctly in **Apple's own Find My on a
+Mac**. §4.3 and §6.1 both said a success response and a clean read-back prove nothing, and
+they were right to: an untouched Apple device was the only thing that could settle it.
+
+**§4.3 and §6.1's "unverified" can be dropped.** What that one screenshot establishes:
+
+| | Why it follows |
+| --- | --- |
+| §6.1's layout — **tag before ciphertext** | the trap of the whole section. A writer and reader that both appended it would agree perfectly and produce something Apple rejects |
+| The AAD, for a *write* | the same construction as §6's read, but nothing had exercised it in that direction |
+| §4's `record/save`, op **210**, `saveSemantics` **3** | the operation was accepted and took effect |
+| §4.2's `recordProtectionInfoTag` handling | a wrong tag would have been a silently lost update |
+| **§4.1's `merge`, and sending the whole record** | the accessory kept its **emoji** and stayed joined to its beacon. A dropped `associatedBeacon` would have unlinked it; a dropped `emoji` would have shown a default |
+
+That last row was not something I set out to test and is the part I would have been least
+sure of, since §4.1 describes exactly the failure it rules out.
+
+**One thing that reads as a bug and is not.** The name written was `Shane's Backpackk`,
+with a doubled final letter — deliberate on the owner's part, and it round-tripped
+character for character through Find My. A doubled trailing character is also what a
+length or offset error looks like, so it is worth recording that this one was typed rather
+than produced.
+
+**Scope, honestly.** What ran was one `name` field on one naming record. `emoji` was
+preserved but not *written*, `saveSemantics` 2 has never created anything, and no write has
+been attempted against a stale tag to confirm §4.2's lost-update behaviour presents as a
+failure rather than as silence. Those remain untested; the layout underneath them does not.
+
+### Q2. Stage 5 §4 step 0's fallback is built and still unexercised
+
+`recordProtectionInfo` and the `pcsKey` prefix selection now ship, per the reconsidered
+disposition. Nothing on the account examined reaches them: every record carried its own
+structure and none carried a `pcsKey`.
+
+It warns at WARNING twice — once when the zone's defaults are unwrapped, once per record
+decrypted through them — each naming itself as the first thing to suspect. A test asserts
+that line exists, because without it this is an untested branch rather than a labelled one.
+
+An empty `pcsKey` selects the sole default when there is exactly one and nothing when there
+are several: choosing would present as a wrong key rather than as a missing selector.
