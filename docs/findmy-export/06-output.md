@@ -103,7 +103,83 @@ group naming. Its native JSON has somewhere for these to live.
 compatibility path for existing tooling rather than the target. A generator that writes only the
 plist form is discarding data it successfully decrypted.
 
-## 5. What not to export
+## 5. Two sinks, one pipeline
+
+There are two things a caller wants from this, and they share everything expensive — the passcode,
+escrow recovery, the view keys, the PCS key, the fetch and the decryption. Both end at the same
+list of accessories. **So this is one pipeline with two sinks, not two implementations.**
+
+| | **Connected** | **Export** |
+| --- | --- | --- |
+| What it is | a live account, re-synced | a bundle handed to someone else |
+| Notices new accessories | yes | **no — a snapshot** |
+| Key alignment | refreshed each sync | **ages**, see §7 |
+| Revocable | yes — sign out, change the password | **no** |
+| Needs the owner's account afterwards | yes | **no** |
+
+**Connected is the default**, because [Stage 3 §6.7.1](./03-keychain-trust.md) establishes the
+passcode is spent once: after that, syncing costs nothing extra and is what makes this a connection
+rather than an import. Export is a deliberate act taken from that state, not a mode to be in.
+
+### 5.1 What export is actually for
+
+**An Apple account is free; an Apple device is not.** That is the barrier this removes, and being
+exact about it matters because it is easy to overstate:
+
+- The recipient **still needs an Apple account** — locating an accessory means querying the Find My
+  network, and that is authenticated.
+- The recipient **does not need an Apple device**, or a Mac, or the owner's account.
+- The account they use **need not be the owner's**, because a fetch is keyed on hashed
+  advertisement keys rather than on ownership.
+
+So this is "share a tag with a friend who has no Apple hardware", which is the same shape as
+OpenTagViewer's existing macOS export and the reason that route exists at all — with the Mac taken
+out of it.
+
+### 5.2 Export cannot be undone
+
+The last row of the table is the one to design around. **Exported accessory keys are revocable only
+by unpairing the accessory** — the owner cannot withdraw them, and the recipient cannot be made to
+stop. Anyone holding them can locate that accessory indefinitely, from any Apple account.
+
+> Apple's own item sharing is revocable. This is not that, and should not be presented as though it
+> were. Handing over key material is a different act from granting access, and the difference only
+> becomes visible later, when someone wants it back.
+
+Three consequences for the interface:
+
+- **Export takes an explicit list of accessories.** Not a default of everything. Sharing one tag
+  with a friend and handing over a household's entire set are different acts, and a default that
+  makes them the same keystroke is the wrong default.
+- **The export sink must have nowhere to put account material.** Not "it happens not to write the
+  session" — a type that structurally cannot carry a token, a `dsid`, an `adsid` or an Apple ID.
+- **Say what it means at the point of export**, once, plainly: this cannot be taken back.
+
+### 5.3 What must not travel
+
+[§5](#5-two-sinks-one-pipeline) above is about intent; this is about leakage. The pipeline decrypts
+more than it exports, and an export destined for another person is where that becomes a problem
+rather than an untidiness.
+
+- **`SafeLocation` must be discarded at decryption**, per §6 — before anything is serialised, not
+  filtered out afterwards.
+- **`cloudKitMetadata` must not be passed through.** CloudKit's system fields identify the record's
+  creator and last modifier, so real metadata carries the **owner's** identity into a file given to
+  someone else. §2.2 already prefers a placeholder for a different reason; this is the stronger one.
+- **Nothing identifying the owner's account.** The accessory records themselves do not carry it —
+  keep it that way rather than adding a provenance field that does.
+
+### 5.4 A bundle must say when it was made
+
+An export that cannot say how old it is produces the §7 problem months later with nobody able to
+explain it. **Stamp the format, the time and the producer**, the way the macOS exporter's `via:`
+line does — that line is how anyone looking at a zip afterwards works out what built it, and an
+export made this way needs the same.
+
+That is a statement about the bundle, not about the person: a version and a timestamp, not an
+account.
+
+## 6. What not to export
 
 [Stage 4 §3.5.1](./04-cloudkit.md) records that the zone contains more than accessories. Of the
 nine record types returned, most have no place in an export:
@@ -111,7 +187,7 @@ nine record types returned, most have no place in an export:
 | Type | Export? |
 | --- | --- |
 | `MasterBeaconRecord`, `BeaconNamingRecord` | **yes** — this is the payload |
-| `KeyAlignmentRecord` | **yes** — see §6 |
+| `KeyAlignmentRecord` | **yes** — see §7 |
 | `SafeLocation` | **no.** Holds the user's home and work coordinates. |
 | `OwnedDeviceKeyRecord` | no — the user's devices' keys, not accessories' |
 | `OwnerPeerTrust`, `OwnerSharingCircle`, `SharingCircleSecret` | no — trust and sharing state |
@@ -122,7 +198,7 @@ or not, it decrypts with the same keys as everything else, and it contains named
 the user's home. Discard it at the point of decryption. Do not log it, do not persist it, and do
 not let it reach an export file because nobody wrote a filter.
 
-## 6. Key alignment
+## 7. Key alignment
 
 `KeyAlignmentRecord` carries `beaconIdentifier`, `lastIndexObserved` and
 `lastIndexObservationDate`.
@@ -139,7 +215,7 @@ carried it since export format `0.0.2`, and the importer falls back to a probe w
 **[observed] Not every accessory has one** — four records for six accessories. Absence is normal
 and must not be treated as an error.
 
-## 7. Open questions
+## 8. Open questions
 
 1. **Does anything read `cloudKitMetadata`?** §2.2. If nothing does, the key can hold a placeholder
    indefinitely; if something does, this stage is not as thin as it looks.
