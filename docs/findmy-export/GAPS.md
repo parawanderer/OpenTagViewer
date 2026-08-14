@@ -1183,3 +1183,39 @@ The next run reports, for a real record, whether the key it names is among the 1
 keys, among the zone keys, or in neither. **If it is in neither**, no better reading of
 either source finds it and the key comes from somewhere not yet described. That is a cheap
 check and it should settle which of the three above applies.
+
+### N7. The derived key is not it either, and the record's key is in neither set [open]
+
+Both checks ran. Both say no.
+
+| | |
+| --- | --- |
+| Zone keys | **2** — `1df257ad ee267516` from the identity, `50545af9 cd0513b0` derived per §5 |
+| Record names | `20fb99a6 4463a920` |
+| Among the 2 zone keys | **no** |
+| Among the 133 keychain keys | **no** |
+
+So §5's master EC key is not the bridge — thank you for it anyway, since ruling it out cost
+one run and it was the only construction in the document that could have been. And the
+fourth outcome you proposed does not apply either: the key is not a keychain key, so
+records are not naming one directly and step 0 is not a red herring.
+
+**The key a record names is in neither set.** Every source this document describes has now
+been read and none holds it, so it comes from somewhere not yet described rather than from
+somewhere read wrongly. That is a different kind of gap from the previous four, all of
+which were "read it better".
+
+What is confirmed working, so the search space is genuinely only this last step: keychain
+items, both views, the service key, the zone's structure, its HMAC at both levels, its
+`meta` under the empty-context AAD, the identity inside it, and §5's derivation.
+
+**What this side can still supply cheaply.** The next run reports every *distinct* key
+named across all 15 records, and which set each is in. If all fifteen name **one** key, the
+thing being looked for is a single zone-wide key that no described source holds. If they
+name fifteen, it is per-record and the question changes shape. That distinction seems worth
+having before anything else is proposed, and it costs nothing.
+
+**The unexplained records are the obvious suspects**, and M2 is still open: the zone holds
+`OwnedDeviceKeyRecord` ×8, `SharingCircleSecret` ×5, `OwnerSharingCircle` and
+`OwnerPeerTrust`. §8 Q4's plausible reading — a parallel key hierarchy — would fit a key
+that no keychain view and no zone structure holds. Nothing here establishes it.
