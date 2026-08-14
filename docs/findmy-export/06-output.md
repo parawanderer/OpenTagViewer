@@ -76,6 +76,29 @@ placeholder is tolerated where the real thing is unavailable — but prefer the 
 > that is the one part of this blob worth a thought before it goes to another person in §5.3's
 > case. It is a naming convention rather than an account identifier, and it is the owner's call.
 
+### 2.2.1 The three facts survive this route; only the encoding does not
+
+**[observed] All three are carried by the CloudKit record itself**, outside the encrypted fields:
+
+| What the app reads | Where it is on the record |
+| --- | --- |
+| created | `timeStatistics.creation` — field **5**, then **1** |
+| modified | `timeStatistics.modification` — field **5**, then **2** |
+| the device that registered it | `modifiedByDevice` — field **11**, a plain string |
+
+So an export made this way **does not lose the information**. What it cannot cheaply reproduce is
+the `NSKeyedArchiver` blob the plist carries it in, and §2.2's advice against synthesising CloudKit
+metadata still stands: building that archive to satisfy a reader that only wants three values is
+the wrong direction.
+
+**The consequence is worth stating rather than discovering.** A bundle from this route carries the
+placeholder, so any consumer extracting these from `cloudKitMetadata` gets nothing — which is
+already true of the committed fixture, whose blob is stubbed. **Put them where they have a home
+instead**: FindMy.py's format (§4) can hold them, and the plist sink is the one that cannot.
+
+That also removes the §5.3 concern for the JSON sink: a device name is a value to be included or
+omitted deliberately, rather than one buried in an opaque blob nobody inspects.
+
 ### 2.3 `secureLocationsSharedSecret` is the iDevice's secondary secret
 
 The two are alternatives, not unrelated fields. **An accessory carries `secondarySharedSecret`; an
