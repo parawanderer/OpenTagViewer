@@ -336,6 +336,13 @@ the `Manatee` keychain view reads, its service keys open the `BeaconStore` zone,
 keys decrypt every record — ending in named accessories with serials and pairing dates, **with
 nothing written to the account**.
 
+**And the accessories these produce locate.** `fetch_location` returns a position for an accessory
+assembled this way, exactly as it does for one read from a Mac's plist — which is the only check
+that distinguishes *correct* key material from merely well-formed key material, and it retroactively
+confirms every step behind it: the passcode, the escrow exchange, the bottle, the key shares, the
+keychain items, the service key, both PCS unwraps, the field cipher and the rolling-key mapping.
+**The Mac is out of the loop.**
+
 Six corrections came out of that and are folded into the documents rather than listed here; the
 running account is in [GAPS.md](./GAPS.md). The two that were worst were both silent: a GCM tag
 written before its ciphertext, and a private-key blob whose public half comes first, which yields
@@ -345,7 +352,6 @@ a valid key that matches nothing.
 
 | | |
 | --- | --- |
-| Locating an accessory these keys produced | the only thing that proves the key material is *correct* rather than well-formed |
 | The writes of Stage 4 §4 and Stage 5 §6.1 | the rename path |
 | The join of Stage 3 §6.9 | built, never sent, and unnecessary for reading |
 | Stage 6's export sinks | accessories are assembled; nothing writes a bundle yet |
