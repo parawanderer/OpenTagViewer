@@ -697,6 +697,25 @@ Two consequences:
   one needs. A client that keeps the tag it fetched hours ago will fail its second write and
   succeed at its first, which is the worst way round to discover this.
 
+> ### Better still, do not hold a record at all
+>
+> The rule above is a lifecycle to manage, and the cheapest way to get it right is to have nobody
+> managing it. **Look the record up immediately before each write**, from something stable — the
+> accessory's own identifier — rather than keeping one from a previous read.
+>
+> A record fetched an hour ago and a record fetched a second ago are indistinguishable to look at,
+> and only one of them will write. Renames are rare enough that the extra fetch costs nothing
+> against a failure mode this quiet.
+>
+> **[observed] That lookup cannot be done outside the library**, which is what makes it the
+> library's job rather than a caller's convenience: an accessory is named by `associatedBeacon`,
+> and that field is **encrypted**, so finding a record by the accessory it belongs to requires the
+> zone keys.
+>
+> The corollary matters for anything storing state: **a saved record is a return value, not
+> something to persist.** It is there for a caller that wants the fresh tag in the same breath. What
+> belongs in a database is the identifier.
+
 ### 4.3 A success response is not proof
 
 [Stage 3 §7.1](./03-keychain-trust.md) records that the escrow service reports success for a
