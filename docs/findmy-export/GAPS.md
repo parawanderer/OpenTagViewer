@@ -2046,3 +2046,64 @@ reports.
 
 **Still open on your side after this**: nothing specification-shaped that I know of. The four
 root certificates remain the blocker on enrolment, and they are the account owner's to obtain.
+
+## Round U — the join is built, and one thing is still unnamed
+
+Everything §6.9 describes now exists, and `AsyncKeychainSession.join` performs §6.9.4's
+sequence. **Nothing has been sent** — the account owner runs the first real one.
+
+Three things the answers changed rather than added, worth recording because each was live
+code rather than a gap:
+
+- **R4's dynamic info was implemented as written**, so this repo was carrying the
+  `establish` shape on the join path. Replaced with §6.8.2's merge. Two of my first tests
+  for it failed and the code was right: I had written scenarios where the peers offering
+  trust updates were untrusted, and their updates were correctly ignored.
+- **The share signature used 32-bit widths** for `version` and `poisoned`, from the earlier
+  revision of §6.7.0's table. That is the failure the correction describes: both are zero on
+  real shares, so the digest ran four bytes short and every share was skipped, which
+  presents as a peer with nothing to give.
+- **The voucher reason was 0**, the protobuf default, rather than §6.9.4's 1.
+
+The round-trip tests are what I trust here, because in each case the reader was written
+from the receiving side before the writer existed: a sealed bottle opens with nothing but
+its entropy and the account id, and a created share's archive is one the §6.7.0 reader
+trims correctly and decrypts. If the writer and reader disagreed about the overrun, or the
+32-byte IV, or the point-then-scalar layout, neither would come back.
+
+### U1. What message does `joinWithVoucher` return?
+
+§6.9.4 step 9 says to apply the returned trust changes. No message is specified for the
+response, and this is the one place where guessing has a known failure mode already
+documented in this stage: decoding bytes as the wrong protobuf **does not error**, it
+yields a message with every field empty, which reads as a circle with no changes rather
+than as a parse that found nothing. §6.7.0's forty-one empty results are the same mistake.
+
+So `JoinOutcome.response` hands the bytes back undecoded rather than pretending. What would
+close it: whether the reply is a `FetchChangesResponse`, something join-specific, or an
+envelope carrying one.
+
+Not blocking — the join can be sent and its effect confirmed by re-syncing the directory,
+which is a read the library already does.
+
+### U2. Minor — is `restorePoint` the sync token this library holds?
+
+§6.9.4 step 8 says to set it "if one is held". The directory's sync token is **bytes** and
+`restorePoint` is a **string**, so sending it means choosing an encoding that nothing
+states. It is optional, so nothing is sent, and the cost of that is at most a fuller
+response.
+
+### U3. Answered by a run, not by the spec — does `get_club_cert` return the chain?
+
+Only `clubCert` is read. If the reply also carries the issuing chain, the four roots would
+not need bundling at all: they could be fetched, fingerprint-checked and used, which
+survives Apple issuing a 501. The response's shape is now logged at DEBUG — names and sizes
+only, since the values are certificates — so one real call answers it.
+
+The roots ship in the package meanwhile, defaulted rather than asked for, with the
+fingerprint check on the bundled path exactly as on a caller's. Worth recording how they
+reach a wheel: `setuptools-scm` packages what git tracks, so an untracked `.crt` is absent
+from the built artefact while every test in a checkout passes. I found that by building one.
+
+**What is left on my side**: nothing specification-shaped. The join is assembled, tested
+offline, and unsent.
