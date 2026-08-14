@@ -917,15 +917,38 @@ Everything else is omitted.
 
 #### `PeerDynamicInfo`
 
-**A joining peer sends `clock: 0` and nothing else.** Not the circle's membership, not itself.
+> **This section replaces an earlier answer that was wrong.** It previously said a joining peer
+> sends `clock: 0` and nothing else, and that trust is asserted afterwards by `updateTrust`. That
+> is the **`establish`** path — the one this project must never take — and sending it on a join
+> produces a peer that is admitted while claiming to trust nobody, which is precisely the
+> "accepted, then behaves oddly" failure this section exists to prevent. What follows is the join.
 
-> **`includeds` is empty at join time**, which is the opposite of what the field's description
-> suggests. Trust is asserted *afterwards*, by a separate `updateTrust` call once the peer is in
-> the circle and has synced it. A joining peer has nothing to assert yet, and enumerating the
-> circle it is trying to enter is not what the message means.
->
-> The same reset applies later: a client that finds itself **not** in the circle returns its
-> dynamic info to `clock: 0` with everything cleared, rather than keeping what it last asserted.
+A joining peer **inherits its sponsor's trust and then adds itself**. It does not invent a trust
+set, and it does not send an empty one.
+
+1. **Sync first.** The peer directory of §5.3 must be current, because everything below reads it.
+2. **Copy the sponsor's dynamic info** — the recovered peer that signed the voucher. Take its
+   `includeds`, its `excludeds` and its `clock` verbatim as the starting point.
+3. **Fast-forward over any peer with a higher `clock`.** Take them in ascending `clock` order, and
+   for each one: adopt every id in its `includeds` not already held, then apply its `excludeds` —
+   removing each from `includeds` if present before adding it — and take its `clock` as the
+   current one.
+4. **Add this peer's own id to `includeds`** if it is not already there.
+5. **Increment `clock` by one**, so the info sent is newer than anything it was derived from.
+
+> **A peer offering a trust update is not automatically believed.** In step 3, a peer that is not
+> already in `includeds` is only adopted if it carries a voucher whose sponsor this peer already
+> trusts, whose signature verifies under that sponsor, whose `beneficiary` is the peer presenting
+> it, and whose beneficiary is not in `excludeds`. Otherwise its update is ignored. That check is
+> what stops an untrusted peer writing itself into the circle by asserting it belongs.
+
+> **`clock: 0` with everything cleared is still correct in one place**: a client that finds itself
+> **not** in the circle resets to it, rather than keeping what it last asserted. It is the reset,
+> not the join.
+
+> **`updateTrust` is a different call for a different purpose.** It carries a peer id and a set of
+> `TlkShare`s, and it is how an established member hands view keys to *another* peer later. It is
+> not the second half of a join, and a join that relies on it to assert trust asserts none.
 
 ### 6.9 The messages `joinWithVoucher` carries
 
@@ -1154,14 +1177,23 @@ Unwrapping one:
 
    | Order | Field | Encoding |
    | --- | --- | --- |
-   | 1 | `version` | **32-bit little-endian** |
+   | 1 | `version` | **64-bit little-endian** |
    | 2 | `receiver` | UTF-8 bytes |
    | 3 | `sender` | UTF-8 bytes |
    | 4 | `wrappedKey` | the **base64-decoded** bytes, not the string |
    | 5 | `curve` | **64-bit little-endian** |
    | 6 | `epoch` | **64-bit little-endian** |
-   | 7 | `poisoned` | **32-bit little-endian** |
+   | 7 | `poisoned` | **64-bit little-endian** |
 
+   > **All four integers are eight bytes**, `version` and `poisoned` included — even though the
+   > §6.9 *message* declares those two as `uint32` and the CloudKit record carries them as its own
+   > integer type. The signed form is not either of those forms.
+   >
+   > Earlier revisions of this table said 32-bit for those two. That is wrong in the way that costs
+   > most: both are zero on real shares, so the digest is taken over four extra zero bytes, the
+   > check fails, and step 1 **skips the share**. The symptom is a peer that appears to have no
+   > shares to give, not a verification error.
+   >
    > **The integers are little-endian.** Everything else in this protocol — CloudKit, the KeyVault
    > framing, the PCS structures — is big-endian. This one construction is not, and getting it
    > wrong produces a verification failure with no other symptom.
@@ -1176,9 +1208,17 @@ Unwrapping one:
    >
    > | Member | Size | What it is |
    > | --- | --- | --- |
-   > | `SFEphemeralSenderPublicKeyExternalRepresentation` | 97 B | the uncompressed P-384 point |
+   > | `SFEphemeralSenderPublicKeyExternaRepresentation` | 97 B | the uncompressed P-384 point |
    > | `SFCiphertext` | 230 B | the body |
    > | `SFIESAuthenticationCode` | 16 B | the tag |
+   >
+   > **The first name is misspelled, and that spelling is the wire format** — `Externa`, no final
+   > `l`. Apple's own writer produced it and Apple's own reader looks for it. A reader can be
+   > forgiving and match on the fragment `EphemeralSenderPublicKey`; **a writer cannot**, because
+   > the correctly-spelled name is one Apple's unarchiver will not find the ephemeral key under,
+   > and the failure arrives as a share that authenticates against nothing.
+   >
+   > That member is archived as **`NSMutableData`**; the other two are plain `NSData`.
    >
    > **These are Apple's `SFIESCiphertext` from SecurityFoundation**, so the construction is a
    > named framework class rather than anything bespoke to this protocol. **No initialisation
