@@ -31,6 +31,22 @@ See [findmy-export/README.md](./findmy-export/README.md#the-one-thing-left-and-w
 | **Owner, connected** | has an Apple account with tags, wants live tracking on Android | Apple ID, device passcode | **yes** — a peer and an escrow record |
 | **Owner, exporting** | has tags, wants a zip — for themselves or a friend | Apple ID, device passcode | no |
 | **Recipient** | has no tags of their own | a free Apple ID | no |
+| **Sharee** *(not reachable yet)* | has tags **shared to them** through Apple's own sharing | Apple ID, device passcode | no |
+
+**The sharee is a real case and the one thing here that does not work yet.** Someone who was sent
+an AirTag through Apple's own sharing sees the accessory in Find My on an iPhone, and this route
+can see that the share exists — the records come back in the ordinary `BeaconStore` fetch — but a
+shared accessory record **carries no key material**, so nothing can locate or export it. The keys
+sit behind a sharing circle secret, which is a second key hierarchy and is not part of Stages 1
+to 6. See
+[findmy-export/README.md](./findmy-export/README.md#shared-accessories-reachable-and-new) for what
+it would take; the short version is that the records are already in hand, so the remaining work
+is the unwrapping rather than another fetch path.
+
+**Worth knowing because it is the natural workaround people will reach for.** "Just have the owner
+share it with me in Find My" does not substitute for an export today, and the app should say so
+rather than showing a tag it cannot place. Until then, an owner sharing with an Android user
+exports a bundle; Apple's sharing is not a route in.
 
 **The recipient's Apple ID is not optional and is often misremembered as being so.** Fetching
 location reports is authenticated: any Apple ID may fetch reports for any tag's hashed keys, but
