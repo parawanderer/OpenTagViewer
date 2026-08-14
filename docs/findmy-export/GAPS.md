@@ -1334,3 +1334,46 @@ Two unrelated observations from the same run, neither on the path:
 - 34 of 35 items read there; the one that does not is `PCSBound`, whose `v_Data` is not DER.
   So the earlier note that an unread item might hold the missing key is resolved: it is that
   one, and it holds no key structure at all.
+
+### N11. The 32 bytes are not the record's key either — but they may not be a key at all
+
+The blob is `97eb8f96 85a72734…`, and read as a scalar it derives to `1df257ad…`. So it is
+**neither** the key the records name nor its public half, and N10's hypothesis is dead:
+the identity is not naming `20fb99a6…`.
+
+What replaces it is arithmetic rather than a hypothesis. The nested keyset is **112 bytes**,
+and its members per §4 step 6 are a string, `keys`, a set, and a 32-byte `hash`:
+
+| Contents | DER cost |
+| --- | --- |
+| outer SEQUENCE header | 3 |
+| a short name | ~4 |
+| `hash`, SHA-256 | 34 |
+| `SET { SEQUENCE { OCTET STRING(64) } }` | ~72 → **113 total** |
+| `SET { SEQUENCE { OCTET STRING(32) } }` | ~40 → **81 total** |
+
+**112 fits a 64-byte key and leaves 31 bytes unexplained for a 32-byte one.** Every real
+private key on this account is 64 bytes. And a 32-byte value is exactly the size of both a
+P-256 scalar and a SHA-256 digest — so a reader that accepts any 32-byte primitive as a bare
+scalar will happily turn a structure's **checksum** into a key, and nothing about the result
+looks wrong: it is a valid key on the curve with a public x that matches nothing.
+
+That is the same failure the §6.8.1 amendment describes, one level up: not "the halves were
+read the wrong way round" but "something that was never a key was read as one".
+
+**This is a question for the reference rather than a guess to act on**, and it is precise:
+in the zone's identity keyset, is the private key 64 bytes or 32? If 64, this implementation
+is picking up the `hash` and missing the key, and the 112 bytes say where to look. If 32,
+then `97eb8f96…` really is the key material and the record's key comes from somewhere else
+entirely — and N8 stands untouched.
+
+The next run logs the identity's full shape to six levels, so the member sizes will be
+visible directly rather than inferred from a total. I have not changed the reader on the
+strength of the arithmetic.
+
+**A note on my own reasoning here**, since it has now cost two rounds: `scalar_in` accepts
+any 32-byte value as an unverified scalar. That is what the amendment says a 32-byte blob
+is — but the amendment describes a *key blob*, and this reader applies it to any primitive
+it meets while walking a structure. Those are not the same thing, and the check I added at
+the point of parse does not help, because a 32-byte blob is precisely the case it cannot
+check.
