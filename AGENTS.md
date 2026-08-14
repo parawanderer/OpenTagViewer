@@ -144,6 +144,40 @@ The test for whether it belongs here rather than in a comment: would somebody hi
 reading the code that explains it? Anisette's machine-identity binding is the example — it
 presents as auth failing for no reason, hours away from the code responsible.
 
+### 11. The app is one device, and every path must say the same thing
+
+Everything this app does against Apple is attributed to a device identity it invents, and the
+user sees the result: an entry in their Apple account's device list, with a *Remove from Account*
+button next to the words "If you do not recognise this device".
+
+**So the identity has to be one identity.** It is assembled in more than one place — the client
+info string in `anisette/AdiDeviceIdentity.java`, the hardware headers, the serial the FindMy.py
+providers take as a parameter — and paths that disagree do not fail. They register **separate
+devices**, and the user is invited to remove things they cannot identify, which breaks the
+session that was working.
+
+Under the iCloud export route the same identity reaches two further places a person reads: the
+escrow record's metadata, which is the only way to recognise a record in a listing, and the
+peer's `serialNumber` in the keychain trust circle. A serial that differs between them makes one
+client look like several — and by
+[findmy-export §5.2](./docs/findmy-export/03-keychain-trust.md), serials are exactly what
+distinguishes devices there.
+
+Three things follow:
+
+- **One source of truth.** A path that needs the identity reads it; it does not compose its own.
+- **The parts must agree with each other.** Model, OS version, build, CFNetwork and Darwin
+  describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
+  Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
+  never produce.
+- **The serial is a label, and the only field here the user actually sees.** `0PENTAGVIEWR` is
+  confirmed accepted and displayed. Without one, Apple omits the row entirely, leaving an entry
+  with nothing to tell it apart from real hardware.
+
+**Changing it later adds an entry rather than renaming one**, and may require signing in again,
+so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
+user reading their device list can recognise it — see the wiki.
+
 ---
 
 ## Building and testing
