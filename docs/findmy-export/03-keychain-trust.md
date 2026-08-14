@@ -1284,6 +1284,18 @@ One is permanent and invisible; the other is tidy-up. So the sequence is:
    bottle, the shares, and **`keys` empty** — this project never establishes view keys.
 9. Apply the returned changes, persist the dynamic info as sent, and store the keys.
 
+> ### Never retry `joinWithVoucher`
+>
+> **A response that fails to decode is not a call that failed.** The peer is in the circle and the
+> escrow record exists; what was lost is the change set and the sync token, and both come back
+> from re-reading the directory (§5.3).
+>
+> The reflex on a decode error is to retry, and retrying this one **joins twice** — a second peer,
+> a second bottle and a second escrow record, all permanent, none of which the first attempt's
+> failure gives any reason to want. Treat any response at all as the join having happened, and
+> recover by syncing rather than by repeating. The same goes for a timeout, where it is not even
+> known whether a response was sent.
+
 > **Enrolment can fail because a record already exists under that label**, which is the one case
 > worth handling rather than reporting: delete the record at that label and enrol again. Do that
 > only for an error the escrow service *reports* — a transport failure has not established that

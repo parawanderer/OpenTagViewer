@@ -113,6 +113,19 @@ Neither would have been found by a client that quietly discarded what it could n
 neither was guessable from the outside. **Keep the reporting after the fields are modelled**: the
 next gap is in a document nobody has read closely yet.
 
+### The type in these tables is not checked by anything
+
+Reporting unmodelled fields finds fields that are missing. It does not find fields that are
+present and **wrong**, and protobuf makes one class of that invisible: `string` and `bytes` share
+a wire type. A schema that declares one where the document says the other decodes cleanly, reads
+correctly, and passes every test — until the same value has to travel back out through a field
+declared the other way.
+
+This has now happened twice in Stage 3, both times on values that were only ever read before
+something needed to write them. **So a type in these tables is worth transcribing as carefully as
+a field number**, and a round-trip through the writer is the only thing that checks it. Being
+unable to construct one is itself the finding.
+
 ## The stages
 
 The full flow from an Apple ID to accessory private keys is six stages. They are specified
