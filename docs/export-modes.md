@@ -56,6 +56,22 @@ distinguish rather than one to version.
 **Repointing the wizard is the larger user-visible win of the two.** It retires the VM bootstrap
 and the macOS-only packaging, and it is the step people actually complain about.
 
+> ### The wizard persists nothing, and must keep not doing so
+>
+> Today it holds no credential at all: the password it asks for is macOS keychain access, used to
+> unwrap the local plists, and nothing is written anywhere. Every run starts from nothing.
+>
+> **The new route raises the stakes of keeping that property**, because the credential stops being
+> a local keychain password and becomes the user's **Apple ID password**, alongside a device
+> passcode. Both should be read, used, and dropped.
+>
+> This needs saying because FindMy.py's default is the opposite: `to_json()` writes the account —
+> Apple ID password included — to `account.json` in plaintext, and every example script in that
+> library does exactly that. A wizard built by following those examples would start persisting a
+> credential it has never held, on a desktop with no keystore behind it. The app is not exposed to
+> this, because it encrypts the blob under a key held in `AndroidKeyStore` and never writes the
+> library's own file.
+
 ---
 
 ## Joining the trust circle is a separate decision from signing in
@@ -125,9 +141,9 @@ should be explained at the point it happens, not treated as a bug.
 
 - **`sourceUser` in `OPENTAGVIEWER.yml`** names a person and travels inside a bundle that is meant
   to be shared. Keep, drop, or make optional.
-- **Tag selection.** Exports should take an explicit list rather than defaulting to everything —
-  sharing one tag with a friend is the common case, and sharing all of them by accident is the
-  failure to design against.
-- **Where the desktop wizard's Apple ID lives.** The app encrypts its account blob under a
-  key held in `AndroidKeyStore`; the wizard has no equivalent, and FindMy.py's default writes
-  the Apple ID password to `account.json` in plaintext.
+- **Tag selection in the app.** The wizard already does this — `_create_zip` takes a list of
+  beacon ids — so only the Android side is open, and it is a UI question rather than a design one.
+  The platform convention fits: long-press to enter a selection mode, tap to add, act on the
+  selection, as the mail and photo pickers do. **The default must be an explicit list, never
+  everything**, because sharing one tag with a friend is the common case and sharing all of them
+  by accident is the failure worth designing against.
