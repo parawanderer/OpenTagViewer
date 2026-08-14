@@ -2071,7 +2071,7 @@ its entropy and the account id, and a created share's archive is one the §6.7.0
 trims correctly and decrypts. If the writer and reader disagreed about the overrun, or the
 32-byte IV, or the point-then-scalar layout, neither would come back.
 
-### U1. What message does `joinWithVoucher` return?
+### U1. Closed — it returns the message I was already decoding
 
 §6.9.4 step 9 says to apply the returned trust changes. No message is specified for the
 response, and this is the one place where guessing has a known failure mode already
@@ -2086,7 +2086,7 @@ envelope carrying one.
 Not blocking — the join can be sent and its effect confirmed by re-syncing the directory,
 which is a read the library already does.
 
-### U2. Minor — is `restorePoint` the sync token this library holds?
+### U2. Closed — it is that token, and it is a string at both ends
 
 §6.9.4 step 8 says to set it "if one is held". The directory's sync token is **bytes** and
 `restorePoint` is a **string**, so sending it means choosing an encoding that nothing
@@ -2107,3 +2107,34 @@ from the built artefact while every test in a checkout passes. I found that by b
 
 **What is left on my side**: nothing specification-shaped. The join is assembled, tested
 offline, and unsent.
+
+---
+
+**U1 and U2 answered, and they were one question.** The reply is
+`CuttlefishJoinWithVoucherResponse` carrying the same `CuttlefishChanges` as `fetchChanges`,
+and its `syncToken` is the `restorePoint` a later call sends back.
+
+Worth recording *how* I got this wrong, because the reasoning was sound and pointed the
+wrong way. "Decoding as the wrong message yields every field empty rather than erroring" is
+exactly §6.7.0's trap, and it is an argument for decoding as a message that **is**
+specified — not for declining to decode. Applying it to a specified message meant
+discarding both the trust changes the server reports and the token underneath them.
+
+Three changes came out of it:
+
+- `ChangeSet` is now `CuttlefishChanges`, and its `syncToken` is a **string** rather than
+  bytes on the request and the response alike. The two share a protobuf wire type, so the
+  mistake was invisible until the same value had to be sent as a string field — which is
+  the only reason it ever surfaced.
+- `PeerDirectory.updated` is the single place changes are folded in, so `fetchChanges`,
+  `joinWithVoucher` and a future `updateTrust` cannot grow three readings of what a change
+  is.
+- A reply that does not decode now reports that the **join happened**: the peer and the
+  record exist, only the changes and the token are lost, and re-reading the circle recovers
+  both. The instinct on a decode failure is to retry the call, and retrying this one would
+  join twice.
+
+`updateTrust`'s messages are transcribed from §6.8.2's table and nothing calls them. That is
+how an established member hands keys to another peer, which is a later job than joining.
+
+**U3 is still the only open item**, and one real `get_club_cert` answers it.
