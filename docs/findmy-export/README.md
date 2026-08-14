@@ -123,7 +123,7 @@ separately because they are separately testable and separately hard. **All six a
 | 1 | **Apple ID authentication** — Anisette headers, SRP handshake against GSA, two-factor, session tokens | [01-authentication.md](./01-authentication.md) | **Specified and verified** |
 | 2 | **MobileMe delegate** — exchange the short-lived PET for iCloud service tokens | [02-mobileme-delegate.md](./02-mobileme-delegate.md) | **Specified and verified** |
 | 3 | **iCloud Keychain trust circle** — recover keys with a device passcode, read-only | [03-keychain-trust.md](./03-keychain-trust.md) | **Verified** through key recovery; the join of §6.9 built, unsent |
-| 4 | **CloudKit** — open the container, fetch encrypted `BeaconStore` records | [04-cloudkit.md](./04-cloudkit.md) | Reads **verified**; the writes of §4 specified, unexercised |
+| 4 | **CloudKit** — open the container, fetch encrypted `BeaconStore` records | [04-cloudkit.md](./04-cloudkit.md) | Reads **verified**; the record save of §4 **verified** against Apple's own client |
 | 5 | **PCS decryption** — decrypt those records with keychain-held keys | [05-pcs-decryption.md](./05-pcs-decryption.md) | **Verified** |
 | 6 | **Output** — write the layout OpenTagViewer already imports | [06-output.md](./06-output.md) | Accessories **assembled**; export sinks unbuilt |
 
@@ -364,7 +364,6 @@ a valid key that matches nothing.
 
 | | |
 | --- | --- |
-| The writes of Stage 4 §4 and Stage 5 §6.1 | the rename path |
 | The join of Stage 3 §6.9 | built, never sent, and unnecessary for reading |
 | Stage 6's export sinks | accessories are assembled; nothing writes a bundle yet |
 | SMS two-factor, the ADP 403, Stage 2 §7's device lifecycle | narrow paths nothing has hit |
