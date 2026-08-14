@@ -276,6 +276,31 @@ used by Setup Assistant, and it must be parsed as XML:
 Configure the XML reader to **treat CDATA as characters**, or the terms text arrives empty. Take
 the HTML for the page whose id matches the terms requested, and render it.
 
+> ### Renew the PET before accepting, not before fetching only
+>
+> §5.3 authenticates these endpoints with the **PET**, and §5.1 puts a PET at about five minutes.
+> This flow puts *a person reading a contract* in the middle of that. **The token will usually have
+> expired by the time they agree.**
+>
+> The failure lands at the worst possible moment: after the user has read the terms and said yes.
+> To them, they accepted a contract and were told to sign in again — and an app that loops them
+> back through login has asked for agreement twice to record it once.
+>
+> **So re-authenticate immediately before each terms request**, the acceptance especially. It costs
+> one GSA exchange in a flow that already contains a human, and the alternative is unrecoverable
+> without asking them to agree a second time.
+>
+> **This is always possible here, and that is not a coincidence.** Renewing a PET means repeating
+> the SRP exchange, which needs the password — and terms can only block a login that is *in
+> progress*, so the password is necessarily in hand. A session restored from storage has already
+> passed this stage.
+>
+> The exception is the token refresh of §5.1, which repeats this stage unattended a week later. If
+> Apple has published new terms by then and no password is retained, the PET cannot be renewed and
+> there is nothing to do but ask for a fresh sign-in. **Fall back to the token already held rather
+> than failing at the renewal** — that lets the request fail on its own terms, which says more than
+> a pre-emptive error would.
+
 **Step 3 — the user accepts.** Only after they have actually seen it:
 
 ```
