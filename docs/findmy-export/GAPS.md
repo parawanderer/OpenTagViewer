@@ -2286,3 +2286,31 @@ One consequence worth noting for anyone tidying up afterwards: the new record is
 so §7.1's deletion refuses it by default. That is the safeguard working as designed -- it is
 now a live recovery path for a real client, and removing it costs exactly what removing any
 other viable record costs.
+
+## Round X — what makes a bottle non-viable [observed]
+
+**Removing a device from the Apple ID device list makes its bottle non-viable.** Confirmed
+by doing it: the record stayed, stopped being recoverable from, and moved into the
+described-but-not-viable list, where §7.1's deletion offers it.
+
+That completes a picture the earlier observation only half gave. Removing a device does not
+remove its escrow record -- one account held eight records for a single remaining device
+entry -- and it was never clear what the leftover records *were*. They are records whose
+device is gone and whose bottle therefore no longer opens.
+
+Three consequences worth writing down:
+
+- **The residue in a listing has an explicable history**, not a mysterious one. "Described
+  but not viable" is usually "the device this belonged to was removed", which is a much
+  better thing to show a user than a bare unusable flag.
+- **There is a deliberate route to making a record deletable**: remove its device first, then
+  delete the record. That matters for anything this project creates, including its own peer.
+- **It is a plausible mechanism rather than a proven one.** What was observed is device
+  removal followed by non-viability. Whether the cause is the peer leaving the trust circle,
+  or something else that device removal also does, is not established -- and
+  `preflight_join.py` now prints whether each record's peer is still in the circle, which
+  distinguishes the two on data a run already fetches.
+
+Also: the preflight verdict was too long to print every run. A script meant to be run
+repeatedly should say what changed, not restate its reasoning each time, so the standing
+caveat moved into the docstring and the verdict is three lines.
