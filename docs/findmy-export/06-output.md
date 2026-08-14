@@ -155,10 +155,33 @@ BeaconNamingRecord/<beacon-UUID>/<naming-record-UUID>.plist
 > alignment records were returned for one account. Join on `associatedBeacon` and tolerate
 > absence — a beacon record with no naming record is normal and is not an error.
 
-> ### A beacon with no naming record may not be an accessory at all
+> ### A beacon with no naming record is not necessarily an accessory
 >
-> §3 previously said such a record "must still be exported". **That is asserted rather than
-> established, and there is a reason to doubt it.**
+> §3 previously said such a record "must still be exported". **That was asserted rather than
+> established, and it is wrong.**
+>
+> **[observed] The unmatched record on the account examined is one of the owner's own iPads**, and
+> its owner describes it as a stale entry for a device already represented elsewhere rather than
+> as anything live. So the format's zone holds residue the way the rest of this protocol does —
+> see the [README](./README.md) on account-side residue — and an exporter that renders everything
+> it finds will publish it.
+>
+> ### The test to apply is `privateKey`, not the naming record
+>
+> **The macOS exporter already has a rule for this, and it is a better one**: it skips any
+> `OwnedBeacons` record with **no `privateKey` field**, and its own warning calls such a record a
+> *device* rather than an accessory. That rule predates all of this and covers the case directly.
+>
+> Prefer it, for three reasons:
+>
+> - **It tests the thing that matters.** An accessory with no private key cannot be located, so
+>   exporting it produces an entry that can never do anything.
+> - **It needs no taxonomy.** Whether a record is an iPad, a stale duplicate or a kind nobody has
+>   seen, the question "can this be located" has the same answer and the same consequence.
+> - **It already agrees with the two existing implementations**, so a bundle from this route
+>   contains what a bundle from a Mac contains.
+>
+> Treat a missing naming record as **a reason to look**, not as the test itself.
 >
 > `MasterBeaconRecord` covers more than tags. §2.3 shows the discriminator: an accessory carries
 > `sharedSecret2`, while **an iPhone, iPad or Mac carries `secureLocationsSharedSecret` instead**.
@@ -378,8 +401,9 @@ Four details are not guessable from the shape, and each produces a bundle that l
 > That is a real decision this route has to make, because CloudKit **[observed]** returns fewer
 > naming records than beacons — six against five on the account examined.
 >
-> **Settle §3's question first, and until it is settled, omit.** The two mistakes are not
-> equally bad:
+> **§3 settles this: skip a record with no `privateKey`, and treat a missing naming record as a
+> reason to look rather than as the test.** Where a record does have key material and simply
+> lacks a name, the two mistakes are still not equally bad:
 >
 > | Mistake | Cost |
 > | --- | --- |
@@ -387,8 +411,8 @@ Four details are not guessable from the shape, and each produces a bundle that l
 > | **Synthesising a name for the owner's iPad** | a tag the user does not own, in a bundle whose purpose is to be imported and believed |
 >
 > A fabricated accessory is neither visible nor recoverable, and it is produced by the path that
-> looks more helpful. So synthesis is for a record **established** to be an accessory that happens
-> to lack a name — not for an unmatched record of unknown kind.
+> looks more helpful. So synthesis is for a record that **has key material** and happens to lack a
+> name — not for an unmatched record of unknown kind.
 
 `MasterBeacons` is the same directory under an older name, used by macOS 11. A **reader** should
 accept it; a writer has no reason to emit it.
