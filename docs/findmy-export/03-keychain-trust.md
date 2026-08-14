@@ -1311,12 +1311,31 @@ client from the circle. Both are recoverable; neither is silent.
 ### 6.7.2 Losing local state need not cost another passcode
 
 The bottle this client creates for itself (§6.7 step 5) is sealed under a **password the client
-chooses**, not under the user's device passcode. That is the point of it: it is this client's own
-recovery path.
+chooses**, not under the user's device passcode.
 
 So if local state is lost and that password was kept, the client recovers **from its own bottle**
 and the user is never asked for anything. If the password was not kept, or the record was deleted,
 recovery falls back to a first-party device's bottle and the user's device passcode again.
+
+> ### A generated password stored locally is not a recovery path
+>
+> The obvious implementation — generate a random password, keep it with the peer identity — reads
+> as self-recovery and **is not**. The case it exists for is *losing local state*, and the password
+> is in that state. Where the client still holds the password it also still holds the identity, so
+> there is nothing to recover; where it has lost the identity it has lost the password too.
+>
+> **Nothing here is wasted, but it is worth being clear what it buys.** Enrolment is what stops
+> the peer being permanently unrecoverable by *anyone* — §4.5 — so the record earns its place
+> regardless. What it does not do is spare the user a passcode after a reinstall.
+>
+> A password that would survive has to come from outside that state: shown once as a recovery code
+> the user keeps, or derived from something they can re-supply. Both are real options and both cost
+> the user something, so **treat the device passcode as the fallback and say so**, rather than
+> implying a self-recovery that only works in the case where it is not needed.
+>
+> [Stage 1 §13](./01-authentication.md)'s device registration is the reason the fallback is
+> tolerable: re-authenticating is silent, so recovering after a reinstall costs a passcode and not
+> a second-factor round trip.
 
 > **This sharpens the trade in §7.** Deleting the client's own escrow record removes the artefact
 > from the user's account and removes the client's ability to recover itself. Keeping it means one
