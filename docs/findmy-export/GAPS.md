@@ -1852,3 +1852,90 @@ worse than of including them, but it is a choice made against the table rather t
 **Still open on my side**, unchanged: SFIES share creation, then assembling
 `joinWithVoucher`. Enrolment cannot run at all until the four root certificates are obtained
 and handed to `PinnedRoots.load` — the fingerprints alone verify nothing, which is deliberate.
+
+## Round T — what a *writer* needs that the reading rules do not give
+
+Taking stock again, now that enrolment is built. What remains before a join can be assembled
+is two constructions, and both are inversions of readers already written — which is exactly
+the situation where a specification written from the receiving side stops being enough.
+
+Everything below is a question about the **write** direction. None of it is checkable
+locally: each produces something Apple's side either accepts or silently rejects, and the
+symptom of getting one wrong is a share that authenticates against nothing or a bottle that
+cannot be opened — after `joinWithVoucher` has been sent.
+
+### T1. Must a created share reproduce the `SFCiphertext` overrun?
+
+§6.7.0 records that `SFCiphertext` carries the ciphertext followed by 113 bytes of
+uninitialised heap — the producer sizes the buffer for all three parts and archives it
+untrimmed. The reader here derives the trim from the other two members and discards it.
+
+**A writer has to decide whether the overrun is part of the format.** Two readings, and
+nothing on this side distinguishes them:
+
+- Apple's reader trims the same way this one does, in which case a correctly-sized
+  ciphertext is fine and the overrun is pure accident.
+- Apple's reader subtracts `len(point) + len(code)` **unconditionally**, in which case a
+  correctly-sized ciphertext arrives 113 bytes short, fails its tag check, and looks like a
+  wrong key.
+
+The second is not far-fetched. The overrun exists because *some* Apple code always writes
+it, and a reader written against a writer that always overruns has no reason to check. If
+it is the second, the fix is trivial — pad the member by that much with anything — but
+padding on a guess is inventing a field, and not padding on a guess is a silent failure.
+
+**This is the one that most needs an answer from the reference**, because it is the only
+open question whose wrong answer is invisible in both directions.
+
+### T2. What exactly does the archive have to be?
+
+§6.7.0 already gives the three member names, the misspelled `Externa`, and that the point is
+archived as `NSMutableData` while the other two are plain `NSData` — and it says outright
+that a writer cannot be forgiving about the spelling. That is the hard half, and it is
+answered.
+
+What is not stated is the **envelope**: whether Apple's unarchiver requires the top-level
+object to carry a `$class` naming `SFIESCiphertext` with its class hierarchy, or whether a
+plain keyed archive holding three named members under any class is accepted. A reader that
+looks up members by name — as this one does — never has to know.
+
+### T3. Which values does a *created* `TlkShare` carry?
+
+The reader takes `curve`, `epoch`, `version` and `poisoned` off the record and only uses
+them to rebuild the signed data. A writer has to choose them. `poisoned` is presumably 0,
+and `curve` presumably names P-384 — but the enumeration is not given, and §6.7.0 notes the
+signed form of these integers is neither the message's declared width nor the record's.
+
+Also unstated: the `TlkShare` message carries `service` and `keyId`, which the CloudKit
+record does **not**. So both have to be sourced from somewhere else when creating one, and
+§6.7.0's note that neither is on the record is a statement about reading.
+
+### T4. What `keyType` goes in an `OTPrivateKey`?
+
+`OTInternalBottle` holds `signingKey` and `encryptionKey`, each an `OTPrivateKey` of
+`keyType` (1) and `keyData` (2). The reader tolerates whatever arrives and parses the key
+material; a writer has to name the type. The enumeration is not in §6.9, and reading one
+value off a real bottle would only prove that value is *a* valid one — the absence rule from
+the README applies.
+
+### T5. Who signs a bottle being created, and what does `escrowedSPKI` have to agree with?
+
+§6.7 step 3 gives the verification: `escrowedKeySignature` under the escrowed signing key,
+`peerKeySignature` under "the sponsoring peer's signing key", both over the raw serialised
+`OTBottle`. Read in the create direction, the natural reading is that a bottle for a **new**
+identity is signed by the escrowed key derived from its own entropy and by the **new** peer's
+own signing key — the peer the bottle belongs to, not the sponsor that vouched for it.
+
+That is an inference from a verification rule, which is the thing this round is about. Worth
+one sentence either way, and the same sentence can settle whether §4.5.2's `escrowedSPKI` is
+the public half of the HKDF-derived escrowed **signing** key — i.e. the same value as
+`OTBottle.escrowedSigningKey` — which is what ties the escrow record to the bottle it
+accompanies.
+
+---
+
+**What I will build while these are open**: nothing that depends on them. T1 and T2 gate
+share creation and T4 and T5 gate the bottle, which between them are the whole of what is
+left. The identity layer and enrolment are done, and the remaining blocker on enrolment is
+not a specification question at all — it is the four root certificates, which have to be
+obtained before `PinnedRoots.load` will accept anything.
