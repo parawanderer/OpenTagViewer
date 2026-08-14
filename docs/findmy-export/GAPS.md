@@ -771,31 +771,46 @@ Fixed here by rendering two's complement into the fixed width, and by making ver
 unreadable share as unverified rather than raising. The second is the more important half: one
 malformed share must not be able to hide the others.
 
-### J5. §6.7.0 step 2's "ECIES ciphertext structure" — the parts are named [open]
+### J5. §6.7.0 steps 2–4 — closed, and the search was never going to find it [closed]
 
-The archive holds the parts as **separate members**, and they name themselves. Every share on this
-account:
+**21 of 21 shares unwrap, across every view including `Manatee`, and each yields three 64-byte
+keys.** The amended §6.7.0 is correct as written and is implemented exactly; the 1,280-combination
+search is deleted.
 
-```
-SFEphemeralSenderPublicKeyExternaRepresentation.NS.data = 97 bytes
-SFCiphertext                                            = 227–245 bytes
-SFIESAuthenticationCode                                 = 16 bytes
-```
+The part worth recording is why two rounds of searching failed while the answer was *inside* the
+space being searched. `SFCiphertext` overruns the ciphertext by exactly the size of the other two
+members, and the excess is uninitialised heap. A GCM tag rejects trailing rubbish precisely as it
+rejects a wrong key or a wrong parameter — so a correct implementation of the correct construction
+produced the identical failure to every incorrect one.
 
-That settles the framing, and the document could state it — a reader taking "expands to an ECIES
-ciphertext" at face value pulls out the largest member and hands it to a point parser, which is
-what I did.
+That is the general lesson, and it is worth more than the parameters: **a search over parameters
+cannot distinguish a wrong parameter from a right parameter applied to the wrong bytes.** Widening
+the space was the wrong instinct at every point, because the space was never the problem. Two
+things would have caught it earlier — noticing that the ciphertext member's length had no
+relationship to any plausible plaintext, and treating "the key is confirmed" as evidence that the
+fault was structural rather than as licence to search harder.
 
-**The construction is still unspecified.** "An ECIES ciphertext" leaves open: which hash the X9.63
-KDF uses, whether the derived material is 16 or 32 bytes, whether the GCM nonce is 12 or 16 bytes
-and whether it is derived or all-zero, whether the KDF's shared info is the ephemeral point or
-empty, and whether the point is also the AAD. Every wrong combination fails identically, as a tag
-that does not check.
+Three implementation notes, none of which need amendment but all of which cost time:
 
-I have not guessed. The implementation tries all 64 combinations and **logs the name of whichever
-authenticates**, so the next run either hands you the answer to record or establishes that the
-construction is outside that space. Each attempt is one AES-GCM over ~230 bytes; the sweep is free,
-whereas verifying a single guess costs a passcode-authenticated run.
+- **Apple's archived key is misspelled.** The member reads
+  `SFEphemeralSenderPublicKeyExternaRepresentation` — no final `l`. §6.7.0 spells it correctly, so
+  a reader matching the documented name exactly finds nothing on real data. Matching the fragment
+  `EphemeralSenderPublicKey` works against both.
+- **The trim must be derived, not written as 113.** It is `len(point) + len(code)`, which is a
+  P-384 number; a different curve makes it a different one. There is a P-256 test that fails
+  against a hardcoded 113.
+- **The top-level key is 64 bytes**, which settles that "AES-256-CMAC-SIV" means two 32-byte
+  halves rather than a 32-byte key.
+
+### J5.1 What this closes, which is larger than one cipher
+
+The keys arrive **with nothing written to the account**: no peer created, no voucher signed, no
+escrow record enrolled, nothing sent to Cuttlefish. §6.7.0's own note — that this "may remove every
+write from the flow" — is now observed rather than hypothesised, for the read path at least.
+
+§6.9's join messages remain built and untested, and should stay that way. They are what a client
+would need to *stay* in the circle across key rotations, which is a real cost deferred rather than
+avoided. But nothing in the read path needs them.
 
 ### J6. A diagnostic the record already supported and I was not using
 
