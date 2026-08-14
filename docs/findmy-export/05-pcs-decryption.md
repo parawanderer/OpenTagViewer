@@ -430,6 +430,49 @@ The key is `KDF(master_key, "encryption key key m")`, 16 bytes for AES-128.
 > Note the tag length: **12 bytes, not GCM's default 16.** A library configured with the default
 > will reject every message, and the failure looks like corruption rather than misconfiguration.
 
+## 6.1 Field *encryption*, for a rename
+
+The same key encrypts. Nothing further has to be recovered to write a field — which is what makes
+renaming an accessory possible at all, and also what makes it easy to write something Apple's own
+devices cannot read.
+
+Producing a field value:
+
+1. **Build the header.** Six bytes, and the length byte is not optional even though it is constant
+   here:
+
+   | Offset | Size | Value |
+   | --- | --- | --- |
+   | 0 | 1 | `03` — the version |
+   | 1 | 2 | key id, first two bytes |
+   | 3 | 1 | `02` — the length of what follows |
+   | 4 | 2 | key id, bytes 2 and 3 |
+
+2. **Generate a fresh 12-byte IV.** Random, per field, never reused — GCM under a repeated
+   nonce and the same key leaks the plaintexts, and a record with several encrypted fields is
+   exactly where a single IV gets reused by accident.
+3. **Encrypt** with AES-128-GCM under `KDF(master_key, "encryption key key m")`, a **12-byte tag**,
+   and `AAD = header ‖ "<zoneName>-<recordName>-<fieldName>"` — §6's construction unchanged.
+4. **Lay the result out**, and note the order:
+
+```
+header ‖ IV ‖ tag ‖ ciphertext
+```
+
+> **The tag precedes the ciphertext.** Almost every AEAD interface in every language returns it
+> appended, so the natural way to write this produces a value that decrypts as garbage and fails
+> authentication — and §6's reader, written to the same layout, will happily round-trip it. **A
+> field this client wrote and can read back is not evidence that Apple can read it.**
+
+### What that means for verifying a write
+
+A round trip through this implementation proves the layout is self-consistent, not that it is
+right. The check that means something is that the write **preserves what it did not intend to
+change** and that an untouched Apple device shows the new value.
+
+Until that has been confirmed once, treat writing as unverified regardless of how cleanly it reads
+back.
+
 ## 7. Interpreting the plaintext
 
 Stage 4 §3.6 establishes that a field's declared `type` describes its **plaintext**. What the

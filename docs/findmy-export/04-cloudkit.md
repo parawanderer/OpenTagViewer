@@ -641,7 +641,85 @@ This is the boundary of Stage 4. Everything above yields records whose interesti
 ciphertext plus a `ProtectionInfo` describing how to unlock them; turning that into plaintext is
 Stage 5 and needs the keychain from Stage 3.
 
-## 4. Open questions
+## 4. Writing a record
+
+Everything above reads. This is the one write this project has a use for: **renaming an accessory
+on the owner's own account**, which means saving a `BeaconNamingRecord`.
+
+> **Unexercised.** Nothing here has been run. §2 and §3 were verified against a live account; this
+> section was written from the same sources and has not been.
+
+| | |
+| --- | --- |
+| Endpoint | `/ckdatabase/api/client/record/save` |
+| Operation type | **210** |
+| Request field | `recordSaveRequest`, **210** |
+| Response field | `recordSaveResponse`, **210** |
+
+**`RecordSaveRequest`:**
+
+| # | Field | |
+| --- | --- | --- |
+| 1 | `record` | the record, with its fields already encrypted per [Stage 5 §6.1](./05-pcs-decryption.md) |
+| 2 | `merge` | **true** — see below |
+| 6 | `saveSemantics` | **2 to create, 3 to update** |
+| 7 | `zoneProtectionInfoTag` | the zone's protection tag |
+| 8 | `recordProtectionInfoTag` | **the tag the record currently carries**, when updating |
+
+**`RecordSaveResponse`** carries `serverFields` at field **4** — the record as the server now holds
+it.
+
+A save operation also sets a **locale** on the request, which reads are not observed to need.
+
+### 4.1 `merge` decides what happens to fields you did not send
+
+With `merge` true the server keeps fields the request does not mention. **This is not a
+convenience — it is the difference between renaming an accessory and deleting everything else about
+it.** A `BeaconNamingRecord` carries `name`, `emoji`, `associatedBeacon` and `roleId`; a rename that
+sends only `name` without merging discards the other three, and `associatedBeacon` is the join key
+that makes the record findable at all.
+
+Send the whole record anyway. Merging is the safety net, not the plan.
+
+### 4.2 The protection tag is how a write is serialised
+
+`recordProtectionInfoTag` carries the tag from the protection info the record **currently** has, and
+the save both checks it and replaces it: a fresh record protection is generated for the write, and
+its tag is what the next update must present.
+
+Two consequences:
+
+- **A stale tag is a lost update, not an error you can ignore.** Re-fetch the record, take its
+  current tag, and rebuild the write — do not retry with the tag that failed.
+- **Track the new tag after every successful save**, because the value returned is what the next
+  one needs. A client that keeps the tag it fetched hours ago will fail its second write and
+  succeed at its first, which is the worst way round to discover this.
+
+### 4.3 A success response is not proof
+
+[Stage 3 §7.1](./03-keychain-trust.md) records that the escrow service reports success for a
+deletion that addressed nothing. Assume the same here: **re-fetch the record and decrypt it** rather
+than trusting the response.
+
+And re-fetching is still the weaker check. [Stage 5 §6.1](./05-pcs-decryption.md) explains why —
+a value this client wrote and can read back proves the layout is self-consistent, not that Apple's
+implementation agrees. **The write that matters is the one an untouched Apple device displays
+correctly.** Until that has been seen once, this path is unverified.
+
+### 4.4 What may be written, and what may not
+
+| | |
+| --- | --- |
+| `BeaconNamingRecord` | **yes** — `name`, `emoji`, `roleId`. This is the whole feature |
+| `MasterBeaconRecord` | **no.** It holds the accessory's key material. There is no rename that needs it, and a botched write costs the accessory |
+| `KeyAlignmentRecord` | no — it is Apple's observation, not this client's to assert |
+| Anything else in the zone | no |
+
+> **Renaming is the owner's own account only.** A recipient of an export holds accessory keys, not
+> a right to modify someone else's iCloud records — and [Stage 6 §5](./06-output.md) keeps account
+> material out of an export precisely so that this is not reachable from one.
+
+## 5. Open questions
 
 **Answered by the runs of 2026-08-13:**
 
