@@ -1465,3 +1465,41 @@ that the first account to hit it records the answer rather than merely working.
 
 Nothing further is needed from the spec. This is only noted so the round closes with it
 still open: it can be answered by one affected account and by nothing else.
+
+## Round P — what an unnamed master beacon is
+
+### P1. The check is one run away, not free — and one existing note is unreliable
+
+The hypothesis is worth taking seriously and I cannot settle it from anything already in
+hand. Two corrections to what "data you already hold" covers:
+
+**The committed macOS fixture cannot answer it.** `app/src/test/resources/19032025/` holds
+exactly one beacon and one naming record, and they match. A bundle with no unmatched record
+says nothing about what an unmatched record contains.
+
+**Nothing recorded the secret, because the discard happens first.** `accessories_from_records`
+drops an unnamed beacon before `accessory_from_record` reads any secret from it, so no run so
+far has reported which of the two it carried. The model was recorded — `iPad13,18` — and that
+is the whole of the evidence to date.
+
+So the discard now logs the discriminator: model, plus which of `sharedSecret2` and
+`secureLocationsSharedSecret` is present, for each record dropped. It is one INFO line on the
+next ordinary run, no probe and no extra request. Nothing branches on it.
+
+**A note in my own docstrings was wrong and is corrected.** Two of them said the `iPad13,18`
+entry came from "an account with no iPad". That was my inference, not an observation, and the
+account owner's remark at the time — that they do not have *two* iPads — indicates they have
+one. If so it strengthens the hypothesis rather than weakening it: the record is their real
+iPad, findable, in the zone, and unnamed because a device takes its name from the device. But
+it is now stated as what was seen rather than as what it implied.
+
+### P2. If it holds, §5.5's synthesis is the dangerous half
+
+Worth separating, because the two consequences are not equally reversible.
+`accessories_from_records` discarding an unnamed record is at worst an omission the user can
+notice. §5.5's advice to **synthesise** a naming record for a beacon that has none would put
+a tag in the export that the user does not own — an iPad rendered as an AirTag, in a bundle
+whose whole purpose is to be imported somewhere and trusted.
+
+An omission is visible and recoverable. A fabricated accessory is neither, and it would be
+produced by the path that looks like the more helpful one.
