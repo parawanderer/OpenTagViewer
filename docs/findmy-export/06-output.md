@@ -39,10 +39,10 @@ in [Stage 5](./05-pcs-decryption.md) *are* the export, modulo naming.
 | `systemVersion` | `systemVersion` | |
 | `pairingDate` | `pairingDate` | |
 | `batteryLevel` | `batteryLevel` | |
-| `stableIdentifier` | `stableIdentifier` | string in CloudKit, **a list** in the plist |
+| `stableIdentifier` | `stableIdentifier` | string in CloudKit, **a list** in the plist; see §2.4 |
 | — | `identifier` | the record's own identifier, from `recordIdentifier` |
 | — | `cloudKitMetadata` | CloudKit system fields; see §2.2 |
-| `secureLocationsSharedSecret` | — | **[observed] absent** on the account examined |
+| `secureLocationsSharedSecret` | — | an iDevice's secondary secret; see §2.3 |
 | `groupIdentifier` | — | no home in this format; see §4 |
 
 ### 2.1 Key material is wrapped
@@ -75,6 +75,33 @@ placeholder is tolerated where the real thing is unavailable — but prefer the 
 > **The device is named, so a person may be.** Devices are commonly called *someone's* laptop, and
 > that is the one part of this blob worth a thought before it goes to another person in §5.3's
 > case. It is a naming convention rather than an account identifier, and it is the owner's call.
+
+### 2.3 `secureLocationsSharedSecret` is the iDevice's secondary secret
+
+The two are alternatives, not unrelated fields. **An accessory carries `secondarySharedSecret`; an
+iPhone, iPad or Mac carries `secureLocationsSharedSecret`**, and they occupy the same position in
+key derivation — FindMy.py reads whichever is present as its secondary secret.
+
+That it was **[observed] absent** on the account examined is therefore expected: that account's
+records were accessories. A client that exports the owner's *devices* as well as their tags needs
+it, and one that only reads `secondarySharedSecret` silently exports nothing usable for them.
+
+### 2.4 `stableIdentifier` holds the hardware serial
+
+The list's **first entry** is a structured string, and the serial is the part after the last `~#`:
+
+| Kind | Shape |
+| --- | --- |
+| AirTag | `2006~#<hardware-id>~#<serial>` |
+| Third-party accessory | `a:/<uuid>~#<serial>` |
+| AirPods | `a:/<uuid>~#¶<model>§<hardware-id>§<serial as hex ASCII>§<position>` |
+
+For the AirPods form the tail begins `¶` (U+00B6), sections are separated by `§` (U+00A7), and the
+third section is the serial **hex-encoded rather than plain** — decode it to ASCII. The fourth is
+which unit: `0` and `1` are the left and right buds, `2` is the case.
+
+> **This is why `groupIdentifier` matters** and why §4 treats it as the field with nowhere to go: a
+> set of AirPods is three of these sharing one group.
 
 ## 3. The naming mapping
 
@@ -110,9 +137,45 @@ belong to a set, such as the two halves of a pair of AirPods, and there is **now
 FindMy.py gained support for exactly that in 0.10.0, along with serial-number extraction and
 group naming. Its native JSON has somewhere for these to live.
 
-**So emit FindMy.py's format as the primary output**, and treat the plist layout as a
-compatibility path for existing tooling rather than the target. A generator that writes only the
-plist form is discarding data it successfully decrypted.
+### 4.1 Neither format contains the other
+
+**The JSON is not a re-encoding of the plists — it is a lossy derived view.** It holds what key
+derivation consumes, not what Apple's record held:
+
+| JSON key | Derived from |
+| --- | --- |
+| `master_key` | `privateKey`, **its last 28 bytes only** |
+| `skn` | `sharedSecret` |
+| `sks` | `secondarySharedSecret` — or **`secureLocationsSharedSecret`**, see §2.3 |
+| `paired_at` | `pairingDate` |
+| `model`, `identifier`, `group_identifier` | the same fields |
+| `serial_number` | **parsed out of** `stableIdentifier`, see §2.4 |
+| `name` | the naming record |
+| `alignment_date`, `alignment_index` | the alignment record, flattened to two scalars |
+
+**Only the plists carry:** `publicKey` (which nothing reads), `batteryLevel`, `isZeus`, `productId`,
+`vendorId`, `systemVersion`, `roleId`, `emoji`, `cloudKitMetadata`, and `stableIdentifier` itself
+once its serial has been taken.
+
+**Only the JSON carries:** `group_identifier` and `serial_number` — and the second of those is
+recoverable from the first format, since it is derived rather than fetched.
+
+> **So "prefer FindMy.py's format" is about where new fields have somewhere to live, not about one
+> format superseding the other.** Emitting only the plists loses `groupIdentifier`. Emitting only
+> the JSON loses nine fields to gain one, including everything descriptive: the emoji a user chose,
+> the battery level, and every hardware identifier.
+>
+> **Emit both.** They are cheap, they come from one decryption, and a consumer of either is not
+> served by the other.
+
+### 4.2 What that means for a live view
+
+The dropped fields are exactly the ones that make a connected client better than an import.
+`batteryLevel` changes, `emoji` and the naming record change when a user renames a tag, and
+`KeyAlignmentRecord` moves every time Apple observes the accessory.
+
+A client re-syncing an account has all of them and should keep them. A bundle built only from the
+JSON has thrown them away before the recipient ever sees one.
 
 ## 5. Two sinks, one pipeline
 
@@ -230,11 +293,12 @@ and must not be treated as an error.
 
 ## 8. Open questions
 
-1. **What is `stableIdentifier` a list of** in the plist, given CloudKit returns a single string? A
-   one-element list is the obvious guess and is unconfirmed.
-2. **What does `isZeus` mean?** Carried faithfully by both formats and understood by neither.
-3. **Is `secureLocationsSharedSecret` needed for anything?** Absent on the account examined, and no
-   consumer of it has been identified.
+1. **What does `isZeus` mean?** Carried by the plist and understood by nobody. The JSON drops it,
+   which is a decision rather than an answer.
+2. **Why is `master_key` the last 28 bytes of `privateKey`?** The truncation is what FindMy.py
+   does and it works, so the leading bytes are structure rather than key — but what structure is
+   unestablished.
+3. **What is `roleId`?** `999` on the record examined. Carried by the plist, dropped by the JSON.
 
 **Unexercised:** this stage has never run, because it needs decrypted records. Its *mapping* is
 confirmed against real CloudKit records and the committed macOS fixtures; its output is not.
