@@ -1294,3 +1294,43 @@ though neither changes the conclusion: whatever shape it is, it is not `20fb99a6
 
 **N8's question stands unchanged**: one key protects all 35 records, and it is in neither
 the 133 keychain keys nor the zone's structure.
+
+### N10. The zone identity's blob is 32 bytes — the only one on the account [observed]
+
+With the blob shapes reported, one line stands out of 134:
+
+| | |
+| --- | --- |
+| All 133 keychain key blobs | **64 bytes**, halves agree, every one |
+| The zone identity's blob | **32 bytes**, no public half |
+
+§6.8.1 says a 32-byte blob is "the scalar alone with no public half", and this reads it that
+way — deriving `1df257ad…`. But **nothing checks that reading**, by definition: a blob with
+no public half carries nothing to verify against, which is exactly the case the amendment
+notes has nothing to check.
+
+So there is a reading of this that no evidence here excludes: **those 32 bytes may be a
+public x rather than a private scalar.** An identity that names a key rather than carrying
+one would look precisely like this, and would explain N8 exactly — the zone tells a client
+*which* key protects its records, and the private half comes from somewhere else.
+
+It is testable in one line and the next run does it: the log now reports the blob's own
+leading bytes beside what they derive to. **If those 32 bytes are `20fb99a6…`, the question
+is answered** — the identity carries the public half of the very key all 35 records name,
+this has been deriving a key from a public coordinate, and what is missing is wherever the
+private half lives. If they are something else, the reading is wrong and N8 stands as it is.
+
+Worth asking regardless of that result: **is a 32-byte blob in an identity's keyset really
+a private scalar?** Every actual private key on this account is 64 bytes and carries its
+public half. A lone 32-byte value in a structure whose purpose is to identify parties reads
+more naturally as an identifier than as a secret — and the amendment's "at 32 bytes there is
+nothing to check against" is a statement about verification, not evidence that what is there
+is private.
+
+Two unrelated observations from the same run, neither on the path:
+
+- Two `ProtectedCloudStorage` items are named `default` and `PCSBound` rather than by a key,
+  and hold no readable `v_Data`. The base64 fallback handled them correctly.
+- 34 of 35 items read there; the one that does not is `PCSBound`, whose `v_Data` is not DER.
+  So the earlier note that an unread item might hold the missing key is resolved: it is that
+  one, and it holds no key structure at all.
