@@ -166,10 +166,18 @@ BeaconNamingRecord/<beacon-UUID>/<naming-record-UUID>.plist
 > and [§5.5](#55-the-zip-layout-exactly)'s advice to synthesise a naming record would manufacture
 > its name as well.
 >
-> **The check is free and offline**, on data already in hand: look at which secondary secret the
-> unmatched record carries, and at its `model`. Until it is done, treat this as unresolved —
-> **keep such a record when joining, and decide what it is before rendering it.** Discarding it in
-> the join throws away the evidence; rendering it blindly invents an accessory.
+> **[observed] The one unmatched record seen so far reports `model: iPad13,18`.** That is an
+> Apple *device* model identifier, of the `<family><major>,<minor>` form devices use and
+> accessories do not — the AirTag in the committed fixture carries an empty `model`, identifying
+> itself through `productId` and `vendorId` instead. On its own that is close to decisive.
+>
+> **Confirming it needs one ordinary run, not a probe**: log which of `sharedSecret2` and
+> `secureLocationsSharedSecret` the unmatched record carries. It cannot be read from anything
+> already captured, because a discard happens before any secret is read — so a client that drops
+> these silently can never answer the question it raises.
+>
+> Until then: **keep such a record when joining, and decide what it is before rendering it.**
+> Discarding it in the join throws away the evidence; rendering it blindly invents an accessory.
 
 ## 4. Prefer FindMy.py's own format
 
@@ -363,11 +371,19 @@ Four details are not guessable from the shape, and each produces a bundle that l
 > accessory it cannot pair with a naming record rather than exporting it nameless.
 >
 > That is a real decision this route has to make, because CloudKit **[observed]** returns fewer
-> naming records than beacons — six against five on the account examined. **Settle §3's question
-> first**: if the unmatched record is one of the owner's own devices rather than an accessory, the
-> answer is to omit it, not to name it. If it is genuinely an accessory, synthesise a minimal
-> naming record with an empty `name` and the correct `associatedBeacon`, so it survives and the
-> user can name it themselves — dropping it silently is the worse option.
+> naming records than beacons — six against five on the account examined.
+>
+> **Settle §3's question first, and until it is settled, omit.** The two mistakes are not
+> equally bad:
+>
+> | Mistake | Cost |
+> | --- | --- |
+> | Omitting an accessory that should have been exported | visible, and recoverable by exporting again |
+> | **Synthesising a name for the owner's iPad** | a tag the user does not own, in a bundle whose purpose is to be imported and believed |
+>
+> A fabricated accessory is neither visible nor recoverable, and it is produced by the path that
+> looks more helpful. So synthesis is for a record **established** to be an accessory that happens
+> to lack a name — not for an unmatched record of unknown kind.
 
 `MasterBeacons` is the same directory under an older name, used by macOS 11. A **reader** should
 accept it; a writer has no reason to emit it.
