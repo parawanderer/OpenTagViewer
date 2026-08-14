@@ -222,6 +222,29 @@ If the account has unaccepted iCloud terms, this stage fails until they are acce
 implemented in the app**, because sending the user to an Apple device to do it is a dead end for
 the very users this feature exists for.
 
+#### How the failure arrives
+
+The delegate response carries **two independent error channels**, and the one that matters here is
+the one a reader is least likely to check:
+
+| Where | Key | |
+| --- | --- | --- |
+| **Top level** of the response | `localizedError` | a short machine-ish string. `UNAUTHORIZED` is one known value |
+| alongside it | `description` | the human-readable explanation |
+| Top level | `status` | non-zero for a failure |
+| Inside `delegates.com.apple.mobileme` | `status`, `status-message` | the per-delegate result |
+
+**Check `localizedError` before `status`.** A reader that only looks at the two `status` fields —
+which is the obvious implementation, since those are what a success is defined by — will report a
+generic failure for a response that said exactly what was wrong in a field it never read.
+
+> **[unestablished] Which `localizedError` value means "terms pending" is not known**, only that
+> this is the channel it arrives on and that `UNAUTHORIZED` is a different value on the same
+> channel. Do not branch on a guessed string. Surface `localizedError` and `description` verbatim,
+> and offer the terms flow below as a remedy the user can choose — that behaves correctly whether
+> or not the guess would have been right, and it records the real value the first time an account
+> hits it.
+
 The one rule that makes this acceptable: **the terms are fetched and displayed, and the user
 performs the acceptance.** The protocol returns the terms text, so there is no reason to accept
 on their behalf, and doing so would be agreeing to a contract on someone else's account without

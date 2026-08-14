@@ -349,4 +349,5 @@ a valid key that matches nothing.
 | The writes of Stage 4 §4 and Stage 5 §6.1 | the rename path |
 | The join of Stage 3 §6.9 | built, never sent, and unnecessary for reading |
 | Stage 6's export sinks | accessories are assembled; nothing writes a bundle yet |
-| SMS two-factor, the ADP 403, the terms flow, Stage 2 §7's device lifecycle | narrow paths nothing has hit |
+| SMS two-factor, the ADP 403, Stage 2 §7's device lifecycle | narrow paths nothing has hit |
+| The terms flow of Stage 2 §5.2 | specified; which `localizedError` signals it is unestablished |
