@@ -122,10 +122,10 @@ separately because they are separately testable and separately hard. **All six a
 | --- | --- | --- | --- |
 | 1 | **Apple ID authentication** — Anisette headers, SRP handshake against GSA, two-factor, session tokens | [01-authentication.md](./01-authentication.md) | **Specified and verified** |
 | 2 | **MobileMe delegate** — exchange the short-lived PET for iCloud service tokens | [02-mobileme-delegate.md](./02-mobileme-delegate.md) | **Specified and verified** |
-| 3 | **iCloud Keychain trust circle** — join via escrow recovery, using a device passcode | [03-keychain-trust.md](./03-keychain-trust.md) | Listing **verified**; recovery and join unverified |
-| 4 | **CloudKit** — open the container, fetch encrypted `BeaconStore` records | [04-cloudkit.md](./04-cloudkit.md) | §2 **verified**; §3 specified, unverified |
-| 5 | **PCS decryption** — decrypt those records with keychain-held keys | [05-pcs-decryption.md](./05-pcs-decryption.md) | Specified, unverified |
-| 6 | **Output** — write the layout OpenTagViewer already imports | [06-output.md](./06-output.md) | Mapping **confirmed**; unexercised |
+| 3 | **iCloud Keychain trust circle** — recover keys with a device passcode, read-only | [03-keychain-trust.md](./03-keychain-trust.md) | **Verified** through key recovery; the join of §6.9 built, unsent |
+| 4 | **CloudKit** — open the container, fetch encrypted `BeaconStore` records | [04-cloudkit.md](./04-cloudkit.md) | Reads **verified**; the writes of §4 specified, unexercised |
+| 5 | **PCS decryption** — decrypt those records with keychain-held keys | [05-pcs-decryption.md](./05-pcs-decryption.md) | **Verified** |
+| 6 | **Output** — write the layout OpenTagViewer already imports | [06-output.md](./06-output.md) | Accessories **assembled**; export sinks unbuilt |
 
 Stage 1 is specified first because it is self-contained, because it is the stage that the app's
 existing native Anisette work already feeds, and because finishing one stage is the only honest
@@ -330,6 +330,23 @@ Findings are marked `[observed]` in each, and several corrected what reading the
 suggested. Paths that remain untested: SMS two-factor, the 403 attributed to Advanced Data
 Protection, the terms-of-service flow, and the device lifecycle of Stage 2 §7.
 
-**Stages 2 to 6 are not written and nothing about them has been executed.** They will be derived
-by reading implementations that their authors report working. Each needs the same validation
-against a real account before any claim that it works.
+**Stages 3, 4 and 5 are now verified too**, by a second implementation written from these
+documents and run against the same account. Escrow recovery yields a peer, its key shares unwrap,
+the `Manatee` keychain view reads, its service keys open the `BeaconStore` zone, and the zone's
+keys decrypt every record — ending in named accessories with serials and pairing dates, **with
+nothing written to the account**.
+
+Six corrections came out of that and are folded into the documents rather than listed here; the
+running account is in [GAPS.md](./GAPS.md). The two that were worst were both silent: a GCM tag
+written before its ciphertext, and a private-key blob whose public half comes first, which yields
+a valid key that matches nothing.
+
+**What remains unexercised**, and is marked as such where it appears:
+
+| | |
+| --- | --- |
+| Locating an accessory these keys produced | the only thing that proves the key material is *correct* rather than well-formed |
+| The writes of Stage 4 §4 and Stage 5 §6.1 | the rename path |
+| The join of Stage 3 §6.9 | built, never sent, and unnecessary for reading |
+| Stage 6's export sinks | accessories are assembled; nothing writes a bundle yet |
+| SMS two-factor, the ADP 403, the terms flow, Stage 2 §7's device lifecycle | narrow paths nothing has hit |
