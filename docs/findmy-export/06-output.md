@@ -115,13 +115,18 @@ The list's **first entry** is a structured string, and the serial is the part af
 
 | Kind | Shape |
 | --- | --- |
-| AirTag | `2006~#<hardware-id>~#<serial>` |
+| AirTag | `<prefix>~#<hardware-id>~#<serial>` — **[observed]** `2006` and `2001` |
 | Third-party accessory | `a:/<uuid>~#<serial>` |
 | AirPods | `a:/<uuid>~#¶<model>§<hardware-id>§<serial as hex ASCII>§<position>` |
 
 For the AirPods form the tail begins `¶` (U+00B6), sections are separated by `§` (U+00A7), and the
 third section is the serial **hex-encoded rather than plain** — decode it to ASCII. The fourth is
 which unit: `0` and `1` are the left and right buds, `2` is the case.
+
+> **The leading number is not a kind marker — do not match on it.** Two accounts show two values
+> for what is otherwise the same AirTag shape. Nothing here needs it: the serial is whatever
+> follows the **last** `~#`, so the prefix is never parsed, and a reader that tests for one value
+> to recognise an AirTag rejects real ones.
 
 > **This is why `groupIdentifier` matters** and why §4 treats it as the field with nowhere to go: a
 > set of AirPods is three of these sharing one group.
@@ -135,7 +140,7 @@ which unit: `0` and `1` are the left and right buds, `2` is the case.
 | `name` | `name` |
 | `associatedBeacon` | `associatedBeacon` |
 | `roleId` | `roleId` |
-| `emoji` | `emoji` — **[observed] absent** on the account examined |
+| `emoji` | `emoji` — **[observed]** present on one account, absent on another |
 
 Plus `identifier` and `cloudKitMetadata` as above.
 
