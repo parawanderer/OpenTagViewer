@@ -1582,3 +1582,40 @@ that line exists, because without it this is an untested branch rather than a la
 
 An empty `pcsKey` selects the sole default when there is exactly one and nothing when there
 are several: choosing would present as a wrong key rather than as a missing selector.
+
+### Q3. The keyset checksum does not verify, and the keys are right anyway
+
+Round N12 left this open: *"The nested keyset's own `hash` — SHA-256 over its DER with
+`hash` removed — is still not verified. It is the checksum this was mistaking for a key,
+and checking it would have named the mistake immediately."*
+
+It is now implemented, and **[observed] it fails on every real keyset.** The shape is
+exactly §3.2's `ShareProtectionKeySet`:
+
+```
+16{12(0B), 17{16{4(64B)}}, 17{}, 4(32B)}
+```
+
+— `name` empty, `keys` holding one 64-byte blob, an empty `set`, and a 32-byte `hash`.
+
+**The keys out of it are correct.** The zone unwraps, all records decrypt, and a field
+encrypted under this material displayed correctly on an Apple device. So this is not a
+data problem — the digest's construction is what is unestablished. Two candidates, and I
+have not searched between them, because a search over hash inputs cannot tell a wrong
+construction from a right one applied to the wrong bytes:
+
+1. **The re-encoding is not byte-identical** to what Apple hashed. Stripping a member and
+   re-serialising reproduces the original only if every length and tag round-trips
+   exactly, and the outer length changes when a member is removed.
+2. **It covers something other than "the structure with `hash` removed"** — the `keys`
+   member alone, say, or the structure with `hash` present but zeroed.
+
+Nothing acts on the result and nothing will until a real keyset passes: the function's
+docstring says so explicitly, so it cannot quietly become a check that rejects live data.
+
+**Worth answering only if it is cheap on the reference side.** It buys a diagnostic rather
+than a capability — the one that would have named N12's bug in a line instead of three
+rounds — so it is not worth much effort now that the bug it would have caught is fixed.
+Recording it because "implemented and it fails" is a more useful state to leave behind
+than "still not verified", and because a later reader finding a False here should not
+conclude the keys are bad.
