@@ -242,9 +242,15 @@ the EC private keys it yields, and unwrap each record's structure against *those
 
 > ### The zone's `meta` is the only source of zone keys
 >
-> There is no second place they come from, and no derivation between a zone key and the key a
-> record names. **A record's keyset holds a zone key's public part directly** — the same bytes,
-> compared as the bare x of §2.
+> There is no second place they come from. **A record's keyset holds a zone key's public part
+> directly** — the same bytes, compared as the bare x of §2.
+>
+> One qualification, because "no derivation exists" would be too strong: §5's **master EC key** is
+> derived from a *PCS master key* rather than being one of these, and it is the only construction
+> in this protocol that turns a zone-level secret into an elliptic-curve key. It exists to verify
+> signatures (§4 step 4). If a record names a key that is in neither the zone's identities nor the
+> keychain, deriving it from the zone's master keys is the cheap thing to rule out — the code is
+> already there.
 >
 > So if a record names a key the zone did not yield, the zone's `meta` was not read completely.
 > Both levels of step 6 are `SET OF`: `identities` is a set, and each keyset's `keys` is a set.
