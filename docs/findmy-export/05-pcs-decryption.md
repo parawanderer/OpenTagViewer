@@ -51,6 +51,28 @@ com.apple.ProtectedCloudStorage-com.apple.icloud.searchparty
 which holds the **base64 of a compressed elliptic-curve public key**. That is how a protection
 structure's key references are resolved against the keychain: match on `acct`.
 
+> ### "Compressed" here means the bare x coordinate — 32 bytes, not 33
+>
+> **[observed]** An `acct` decodes to **32 bytes**, with no `02`/`03` sign byte and no `04`
+> marker. X9.62's compressed form for P-256 is 33 bytes, and this is not that: it is the x
+> coordinate alone. The same form is used for the public keys inside a protection structure's
+> keyset, so it is the protocol's convention rather than a quirk of one field.
+>
+> **A 33-byte comparison therefore never matches anything**, and the failure presents as "no key
+> is held for this record" — a far stronger and more discouraging claim than "the wrong bytes were
+> compared", and indistinguishable from the legitimate case it is supposed to describe. Report the
+> sizes being compared alongside any such failure.
+>
+> Matching on x alone is slightly weaker than matching a full point, since x does not fix the sign
+> of y. That ambiguity is the protocol's, not the reader's.
+
+> ### The service key does not open a record
+>
+> **It opens the zone.** The keychain service key is what a *zone's* protection structure names;
+> the zone yields keys of its own, and those are what a record's protection structure names. A
+> reader that scans a record's keyset for the service key finds nothing, however correct
+> everything else is — see [§4 step 0](#4-unwrapping-step-by-step).
+
 ## 3. The protection structure
 
 Every record carries a `protectionInfo` (Stage 4 §3.7), whose `protectionInfo` field is a byte
@@ -197,10 +219,43 @@ ShareProtectionKeySet ::= [APPLICATION 2] EXPLICIT SEQUENCE {
 
 ## 4. Unwrapping, step by step
 
-**Step 1 — find the entry that belongs to us.** Compress our private key's public part and scan
-the keyset for an entry whose public key matches those bytes. That entry's ciphertext is the
-wrapped key intended for us. If none matches, we do not hold a key for this record and no amount
-of retrying will change that — report it as a missing key, not as a decryption failure.
+> **There are two levels of this, not one.** Steps 1 to 6 below describe unwrapping *a* protection
+> structure. They are performed **twice**: once on the zone's, with the keychain service key, and
+> then once on the record's, with the keys the zone produced. Step 0 is what makes the difference.
+
+**Step 0 — unwrap the zone first.**
+
+A record's keyset does **not** name the keychain service key. It names a **zone key**, and zone
+keys come from the zone's own protection structure:
+
+| | Whose keyset names it | What you take from the result |
+| --- | --- | --- |
+| **Zone** — `protectionInfo` on the zone, from a zone retrieve | the **keychain service key** of §2 | the **EC private keys** — see §4 step 6's note |
+| **Record** — `protectionInfo` on the record | one of the **zone keys** | the **PCS master keys**, which decrypt the fields |
+
+So the sequence is: retrieve the zone, unwrap its protection structure with the service key, keep
+the EC private keys it yields, and unwrap each record's structure against *those*.
+
+> **Both halves come out of the same structure**, and which half you want depends on the level.
+> Step 6's decryption uses the master keys; the zone level ignores them and uses the EC private
+> keys instead. Taking the same half at both levels is the mistake this table exists to prevent.
+
+**When a record carries no `protectionInfo` of its own**, it is covered by the zone's
+`recordProtectionInfo` instead — a second structure on the zone, unwrapped once against the zone
+keys to give a set of default record keys. The record's own `pcsKey` field is then a **key-id
+prefix** naming which of them applies: compare it against the leading bytes of each key's key id
+(§5). A record with neither its own structure nor a matching default key is genuinely not
+readable.
+
+**Step 1 — find the entry that belongs to us.** Take the public part of the key for this level —
+the service key at the zone, a zone key at the record — as its **bare 32-byte x coordinate**, and
+scan the keyset for an entry whose public key equals those bytes. That entry's ciphertext is the
+wrapped key intended for us.
+
+If none matches, we do not hold a key at this level. **Before reporting that, check the level.**
+The overwhelmingly likely cause of no match on a record is that the zone step was skipped and the
+service key was compared against a keyset that never names it — which looks identical to being
+locked out, and is not.
 
 **Step 2 — unwrap it.** The wrapping is **RFC 6637**, the ECDH key-wrap construction from
 OpenPGP. It has three parts, and each has a detail worth stating.
@@ -307,7 +362,44 @@ before anything is decrypted:
 
 A mismatch means the wrong key, not corrupt data.
 
-**Step 6 — decrypt the fields.**
+**Step 6 — decrypt `meta`, which is where the keys actually are.**
+
+Steps 1 to 5 yield **one** key: the master key wrapped to us. That is not the set of keys the
+structure carries — those live in `meta`, encrypted under it.
+
+Decrypt `meta` with the master key using §6's field cipher, **with an empty context string** — the
+AAD is the header alone, since a structure member has no zone, record or field name to bind to.
+This is the one place §6's AAD rule does not apply, and it is the exception rather than a
+contradiction.
+
+The plaintext is DER:
+
+| Tag | Member | |
+| --- | --- | --- |
+| `[0]` | `symmKeys` | SET OF OCTET STRING, optional — **additional PCS master keys** |
+| `[1]` | — | two unnamed fields, carried and not understood |
+| `[2]` | `identities` | SET OF `{ integer, keyset }`, optional — where the EC keys are |
+
+Each `identities` entry holds a `keyset` **OCTET STRING that is itself DER**, one level down:
+
+| Member | |
+| --- | --- |
+| a string | unnamed |
+| `keys` | SET OF the **same private-key CHOICE** as a keychain item's `v_Data` — [Stage 3 §6.8.1](./03-keychain-trust.md) |
+| a set | unnamed, of unconstrained type |
+| `hash` | SHA-256 **over this structure's own DER with `hash` absent** — remove it, re-encode, compare |
+
+So the two outputs of a fully unwrapped structure are:
+
+- **PCS master keys** — the one from step 2, followed by each of `symmKeys`. These decrypt fields.
+- **EC private keys** — every `keys` entry across every identity. These unwrap the *next* level
+  down, and are what step 0 keeps at the zone.
+
+> The nested `keyset` is an OCTET STRING holding DER rather than an inline structure, and its
+> checksum is computed over a re-encoding of itself minus one field. Both mean a decoder that
+> parses and discards cannot verify it — the same re-encoding requirement as step 5's HMAC.
+
+**Step 7 — decrypt the fields.**
 
 ## 5. Key derivation
 
@@ -517,7 +609,7 @@ exporting it.
 
 ## 8. Open questions
 
-**Answered by the runs of 2026-08-13:**
+**Answered:**
 
 1. ~~Is a decrypted field raw bytes, or the `EncryptedValue` message?~~ **Both, chosen by declared
    type** — see §7.
@@ -527,10 +619,9 @@ exporting it.
 2. **Does the date count from 2001 or from the Unix epoch?** §7. The `Date` message holds a double
    and nothing observed distinguishes the two. Reject an implausible result rather than exporting
    it.
-3. **Does the zone's `protectionInfo` play any role?** Every record carries its own (§3.7), and the
-   zone's was present but `recordProtectionInfo` absent. Whether a record's structure is unwrapped
-   under a zone key or directly under the keychain service key is not established, and it changes
-   what §4 step 1 matches against.
+3. ~~Does the zone's `protectionInfo` play any role?~~ **Yes — it is the level above.** A record's
+   structure is unwrapped under a *zone* key, never under the keychain service key directly. See
+   §4 step 0, which the answer added.
 4. **What are the `SharingCircleSecret` records for?** [Stage 4 §3.5.1](./04-cloudkit.md) observes
    five in the zone, each with a `secretType`, a `sharingCircleIdentifier` and a `secretData` blob.
    The plausible reading is a parallel key hierarchy for accessories shared with others — see the
