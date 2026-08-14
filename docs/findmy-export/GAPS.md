@@ -838,3 +838,41 @@ So the paging loop I built from the summary was correct and would still have ret
 same discipline as not reading the reference implementation: the value of a written specification is
 that it is the single artefact both halves work from, and substituting a description of it
 reintroduces exactly the drift it exists to prevent.
+
+---
+
+## K — the one remaining gap, now narrowed to a single step
+
+A2 said there was "no route from recovery to an item in the `Manatee` view whose `acct` matches".
+That gap has closed at both ends and now consists of exactly one step in the middle.
+
+**What is now held.** For every keychain view including `Manatee`: a 64-byte top-level key and two
+64-byte class keys, obtained read-only and confirmed against a real account.
+
+**What Stage 5 §2 asks for.** Not those keys — a **keychain item**. Specifically the item labelled
+`com.apple.ProtectedCloudStorage-com.apple.icloud.searchparty`, read as a dictionary, matched on
+its `acct` attribute, which holds base64 of a compressed EC public key.
+
+**What is unspecified: how a view key becomes an item.** The two are different kinds of thing and
+the type signature makes it concrete — this library's PCS layer takes
+`Sequence[EllipticCurvePrivateKey]`, because a protection structure is unwrapped by RFC 6637 ECDH
+against an EC private key. A 64-byte AES-SIV key is not one and cannot be coerced into one. So
+something must sit between them: the view keys decrypt keychain *items*, and one of those items
+contains the EC private key that PCS actually wants.
+
+Nothing in Stages 3, 4 or 5 describes that step. Concretely, what is missing is:
+
+| Unknown | Why it cannot be guessed |
+| --- | --- |
+| Which zone or container holds a view's items, and how they are enumerated | Stage 4 §3 specifies the `searchparty` container's zones; a keychain view is elsewhere and no document says where |
+| The item record's shape — which fields hold the wrapped item and which the class reference | A wrong field yields empty rather than an error, as `tlkshare` and `fetchChanges` both did |
+| Which of the three keys unwraps an item, and how the item names it | `classA` and `classB` exist precisely because items differ in this, and picking wrong is an authentication failure with nothing to say why |
+| The item encryption itself | AES-SIV as the class keys use, or something else; and the "empty vector of headers" distinction of §6.7.0 step 4 suggests headers may carry meaning here |
+| How a decrypted item becomes a dictionary with an `acct` attribute | §6.8 says "items readable as dictionaries" without saying in what encoding |
+
+**This is not a search.** The J5 lesson applies directly: a parameter search cannot distinguish a
+wrong parameter from a right one applied to the wrong bytes, and here the *bytes* — which records,
+which fields — are exactly what is unknown. Searching would produce another round of uniform
+authentication failures that say nothing.
+
+So this one is asked rather than attempted. Everything either side of it is built and verified.
