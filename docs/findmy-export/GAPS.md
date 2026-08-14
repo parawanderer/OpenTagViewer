@@ -1619,3 +1619,43 @@ rounds — so it is not worth much effort now that the bug it would have caught 
 Recording it because "implemented and it fails" is a more useful state to leave behind
 than "still not verified", and because a later reader finding a False here should not
 conclude the keys are bad.
+
+### Q3 follow-up. Not the empty members — checked, and they survive
+
+The named candidate does not apply to this implementation. `parse_all` keeps zero-length
+elements, and `rebuild_without` re-emits each member's **raw bytes** rather than
+re-encoding from parsed values, precisely so that a decoder which discards its input
+cannot fail to reproduce it.
+
+Demonstrated on a synthetic keyset of exactly the reported shape:
+
+```
+16{12(0B), 17{16{4(64B)}}, 17{}, 4(32B)}
+```
+
+The rebuild is byte-identical to the hashed input and the rule verifies. A test now pins
+the empty `name` and the empty `set` surviving the rebuild, so the failure mode you named
+cannot appear here later without something going red.
+
+**So the remaining difference is which element "the structure" means**, and it is the
+level-confusion shape this protocol has produced at every other layer. `ShareProtectionKeySet`
+arrives **explicitly** application-tagged — `APP 2` wrapping a `SEQUENCE` — and §4 step 6
+says the digest covers "the structure with `hash` omitted". Two readings:
+
+| Framing | Bytes hashed |
+| --- | --- |
+| `sequence` | the inner `SEQUENCE`, rebuilt without `hash` — **what this implementation was doing** |
+| `wrapper` | that, re-wrapped in its `APP 2` tag |
+
+They differ by four bytes of tag and length. Both are now computed on every keyset and the
+matching one is logged by name; neither gates anything.
+
+**Trying both is sound here in a way trying key layouts was not**, and the distinction is
+worth keeping: the oracle is an exact 32-byte digest match, so a wrong framing cannot
+produce one without a preimage collision. A candidate search is only untrustworthy when
+its oracle is "something plausible came out" — which is exactly what made the key-blob
+search worthless and is why I refused that one.
+
+**One ordinary run answers it**, on this account or the reference's, and needs nothing new:
+if either framing matches, the run says which. If the reference implementation is to hand,
+looking at whether it hashes the wrapper or its contents is cheaper still.
