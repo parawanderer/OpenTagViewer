@@ -1762,7 +1762,7 @@ and cross-checks its serial number against the version — and `verify_club_cert
 raises if none was supplied, rather than falling through to the system trust store. So the
 last operational step before a first enrolment is obtaining four certificates.
 
-### S1. §4.5.2 and §5.1 spell three metadata keys differently
+### S1. Closed — §4.5.2 was wrong, and §5.1 had it right
 
 The write side says `clientMetadata`, `timestamp` and `multipleICSC`. The read side, marked
 **[observed]** on real records, says `ClientMetadata`, `com.apple.securebackup.timestamp`
@@ -1788,7 +1788,7 @@ Meanwhile the writer follows §4.5.2 exactly and the reader accepts both, which 
 way round — a tolerant reader costs one `or`, and a writer that hedges by sending both
 spellings would put a guess into permanent account state.
 
-### S2. How is the SRP verifier encoded?
+### S2. Closed — padded, and for a better reason than the one I had
 
 §4.5.1 says section 3 is "the SRP verifier" and does not say how the integer is rendered.
 The natural big-endian encoding of `g^x mod N` is one byte shorter about **one time in
@@ -1802,7 +1802,7 @@ successfully, and the record is only found to be unrecoverable when someone need
 one user in 256, with a failure that reads as a wrong passcode. Nothing local catches it and
 no amount of testing on one account would find it.
 
-### S3. What must the encrypted record contain?
+### S3. Closed — §4.5.3 now says, so the check is a refusal
 
 §4.5.1 calls section 4 "the encrypted record" without saying what a record is. §6.5 unwraps
 the same section, and §6.7 then reads `BottledPeerEntropy` out of the plist inside it — so
@@ -1818,7 +1818,7 @@ What would close it: whether the other fields observed in recovered material
 (`SecureBackupIDMSData`, `DoubleEnrollmentPassword`, `BackupBagPassword`, the versions and
 timestamp) are required by anything, or are what an Apple client happens to include.
 
-### S4. Minor — does `enroll` want the certificate versions?
+### S4. Closed — `enroll` sends no certificate versions
 
 §4.5's field table for `enroll` lists `blob`, `blobDigest`, `dsid` and `metadata`, and does
 not mention `baseRootCertVersions`/`trustedRootCertVersions`. The club machinery is
@@ -1828,3 +1828,27 @@ is missing.
 
 They are sent. Extra fields are ordinarily ignored and the failure mode of omitting them is
 worse than of including them, but it is a choice made against the table rather than from it.
+
+---
+
+**Round S answered.** All four, and the code follows.
+
+- **S1** — the three keys are now `com.apple.securebackup.timestamp`, `ClientMetadata` and
+  `SecureBackupUsesMultipleiCSCs`, the last with a lower-case `i` in `iCSCs`. A test asserts
+  the metadata's whole key set literally rather than checking a field survives a round trip:
+  six keys in one dictionary spanning camelCase, reverse-DNS and PascalCase, none derivable
+  from its neighbours, is not a shape any convention will reproduce. The reader still takes
+  both spellings — records written under the earlier text exist, and a record this listing
+  cannot describe is one nobody can safely delete — and the DEBUG counts stay.
+- **S2** — padding kept, and the docstring now carries your argument rather than mine.
+  "Right under both readings, wrong under one if omitted" is a reason that survives the
+  observation being reinterpreted; §6.2's `B` was only ever evidence about what Apple emits.
+- **S3** — `build_record` builds §4.5.3's three keys and generates the 72 bytes, and
+  `require_usable` now refuses rather than warns. `enrol_record` takes the entropy and builds
+  the record itself, which also removes the way a caller could have let the timestamp drift
+  between the four places it appears.
+- **S4** — dropped.
+
+**Still open on my side**, unchanged: SFIES share creation, then assembling
+`joinWithVoucher`. Enrolment cannot run at all until the four root certificates are obtained
+and handed to `PinnedRoots.load` — the fingerprints alone verify nothing, which is deliberate.
