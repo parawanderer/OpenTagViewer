@@ -1728,3 +1728,103 @@ four unanswered questions than a peer id I inferred.
 
 **What I will build while these are open**: SFIES encryption and share creation (R's second
 bullet), since they are specified and are reusable regardless of how R1–R4 resolve.
+
+## Round S — enrolment is built, and three things about it are unsettled
+
+§4.5 is implemented in `findmy/keychain/enrolment.py`: the pinned roots and their
+fingerprint check, the club certificate's verification, both layers of the blob, the binary
+metadata, and the two requests sharing one `transactionUUID`. `AsyncEscrowProxy` gained
+`get_club_cert` and `enroll`. **Nothing has been sent** — as with the join, the account
+owner runs the first real one.
+
+Two things came out better than expected, and both are checks rather than assertions:
+
+- **The inner message round-trips through the reader.** §4.5.1 describes it as a writer and
+  §6.5 describes the same message as a reader, and the two were implemented from opposite
+  directions without reference to each other. `unwrap_inner_blob(build_inner_message(…))`
+  returns the record, which settles the section ordering, the iteration count's position in
+  the header, the salt doubling as the CBC IV, and the PBKDF2 parameters all at once.
+- **The verifier is checked by running the exchange it exists for**, against the same SRP
+  library the recovery path uses, with the identity in the private-key hash as §6.3
+  requires. A verifier computed with that flag the wrong way is accepted by the service and
+  then fails every future recovery, indistinguishably from a wrong passcode.
+
+The three digests are named per purpose (`_BLOB_DIGEST`, `_OAEP_DIGEST`,
+`_INTEGRITY_DIGEST`) with the comment you asked for, and each is pinned by a test that
+computes it independently rather than referring to the constant. Changing `_OAEP_DIGEST` to
+SHA-256 — the plausible tidy-up — fails a test; I checked by making the change and watching
+it go red rather than assuming the coverage was real.
+
+**Enrolment refuses to run without the root certificates.** The fingerprints are carried;
+the certificates are not, because this side has no way to obtain them that would not defeat
+the point. `PinnedRoots.load` takes them from the caller, checks each against a fingerprint,
+and cross-checks its serial number against the version — and `verify_club_certificate`
+raises if none was supplied, rather than falling through to the system trust store. So the
+last operational step before a first enrolment is obtaining four certificates.
+
+### S1. §4.5.2 and §5.1 spell three metadata keys differently
+
+The write side says `clientMetadata`, `timestamp` and `multipleICSC`. The read side, marked
+**[observed]** on real records, says `ClientMetadata`, `com.apple.securebackup.timestamp`
+and `SecureBackupUsesMultipleiCSCs`.
+
+The service stores this plist verbatim and hands it back in `metadataList`, so these cannot
+both be a description of the same client. Either Apple's own clients write the long
+spellings and the reference implementation writes the short ones, or one of the two
+sections has been normalised.
+
+It matters concretely rather than cosmetically: a record enrolled by §4.5.2 would be one
+that §5.1's own reader cannot describe — no device name, no serial, no date — and escrow
+records are only ever seen through a listing like that one. A record nobody can identify is
+a record nobody can safely delete.
+
+**This is checkable offline, on data already held.** The account's twelve records include
+some written by the export route the residue rules were written about. Decode each
+`metadata` and report the key names: if any record carries `clientMetadata`, §4.5.2 is a
+second real shape; if every one carries `ClientMetadata`, §4.5.2 is describing the
+reference's spelling and a record written that way will be invisible in listings.
+
+Meanwhile the writer follows §4.5.2 exactly and the reader accepts both, which is the right
+way round — a tolerant reader costs one `or`, and a writer that hedges by sending both
+spellings would put a guess into permanent account state.
+
+### S2. How is the SRP verifier encoded?
+
+§4.5.1 says section 3 is "the SRP verifier" and does not say how the integer is rendered.
+The natural big-endian encoding of `g^x mod N` is one byte shorter about **one time in
+256**, and shorter still, more rarely.
+
+Padded to the group's 256 bytes here, because that is what the service does in the other
+direction — §6.2 observes `B` arriving as exactly 256 bytes.
+
+Worth settling from the reference because of *when* it fails. A wrong choice enrols
+successfully, and the record is only found to be unrecoverable when someone needs it, for
+one user in 256, with a failure that reads as a wrong passcode. Nothing local catches it and
+no amount of testing on one account would find it.
+
+### S3. What must the encrypted record contain?
+
+§4.5.1 calls section 4 "the encrypted record" without saying what a record is. §6.5 unwraps
+the same section, and §6.7 then reads `BottledPeerEntropy` out of the plist inside it — so
+the shape is knowable from the read side, but only the one field is.
+
+Implemented as: the caller supplies the bytes, and a plist that parses and carries no
+`BottledPeerEntropy` logs a warning rather than being refused. Refusing would encode an
+inference as a rule; saying nothing would let a record be enrolled that recovers
+successfully and yields nothing usable — the same failure shape as joining with no key
+shares, and permanent in the same way.
+
+What would close it: whether the other fields observed in recovered material
+(`SecureBackupIDMSData`, `DoubleEnrollmentPassword`, `BackupBagPassword`, the versions and
+timestamp) are required by anything, or are what an Apple client happens to include.
+
+### S4. Minor — does `enroll` want the certificate versions?
+
+§4.5's field table for `enroll` lists `blob`, `blobDigest`, `dsid` and `metadata`, and does
+not mention `baseRootCertVersions`/`trustedRootCertVersions`. The club machinery is
+plainly in play, since the blob is sealed to the club certificate, and §4.4 notes that
+omitting them elsewhere leaves the club handler failing internally rather than saying what
+is missing.
+
+They are sent. Extra fields are ordinarily ignored and the failure mode of omitting them is
+worse than of including them, but it is a choice made against the table rather than from it.
