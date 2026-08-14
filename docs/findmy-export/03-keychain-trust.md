@@ -312,6 +312,11 @@ Send `baseRootCertVersions` and `trustedRootCertVersions` as the same list of ac
 **[observed]** `[101, 500, 103, 102]`. The response carries `clubCert`, base64 of a DER
 certificate.
 
+> **[observed] The reply is `clubCert` and four scalars, and carries no chain.** So the issuing
+> root cannot be fetched here and fingerprint-checked against the table below — a client has to
+> carry the roots. Worth stating because it is the obvious idea, it would be strictly better than
+> bundling, and it does not work.
+
 > **Verify that certificate against a pinned set of roots before using it.** It is the key the
 > user's escrow blob is encrypted to, so accepting an unverified one hands the material to
 > whoever supplied it. A chain that does not verify is a refusal, not a warning — and the
@@ -342,9 +347,31 @@ version number is the certificate's **serial number**:
 > four certificates gets them pasted in unverified, which is worse than shipping them, because it
 > looks like someone made a security decision when nobody did.
 >
-> Note 500 expires in **2032**, while the three older roots run to 2049. Whichever set is carried,
-> a client should say clearly when a chain fails to verify rather than falling back to the system
-> trust store — the system store holds Apple's public roots, and these are not those.
+> ### [observed] 500 is the one in use, and it expires in 2032
+>
+> On a real account, the club certificate verified against **root 500 and none of the other
+> three**, and its issuer DN carries `2.5.4.5=500` — the X.520 `serialNumber` attribute, which is
+> what makes an issuer match select one of four otherwise identical subjects. All four share
+> `CN=Escrow Service Root CA`, so a matcher that ignores that attribute has four candidates and
+> no way to choose.
+>
+> **That turns 500's expiry into this specification's deadline.** 101, 102 and 103 run to 2049 and
+> are apparently not what Apple issues against; 500 runs out in **December 2032**, so Apple moves
+> to a root outside this set before then. A pinning set with a known end date is something to be
+> told in advance rather than discovered, because the way it surfaces is enrolment refusing with a
+> certificate error, months after anyone could have shipped a fix.
+>
+> **So warn early.** A client should say something when the root it is verifying against is within
+> a year of expiry, and treat a club certificate that verifies against none of the four as "Apple
+> has rotated" rather than as a broken account.
+>
+> One account, one call — this is where the set stood when it was looked at, not a promise about
+> what Apple issues tomorrow. Carry all four regardless: the cost is four kilobytes, and the
+> alternative is a client that breaks on a rotation it could have absorbed.
+
+> Whichever set is carried, a client should say clearly when a chain fails to verify rather than
+> falling back to the system trust store — the system store holds Apple's public roots, and these
+> are not those.
 
 **Step 2 — `enroll`.** Label is the **specific record's** label, per §4.4. Fields:
 
@@ -620,6 +647,15 @@ checks below verify against.
 
 **Keep the final `syncToken`** and pass it next time; the feed is incremental, and a client that
 always starts from nothing re-reads the whole circle on every run.
+
+> **[observed] Exactly one peer in a circle carries no voucher**, and it is not an anomaly: the
+> peer that **established** the circle joined nothing, so there was nobody to vouch for it.
+> Thirteen peers with twelve vouchers is the expected shape, and thirteen with thirteen would be
+> the surprise.
+>
+> Worth knowing before a check over the directory reports it as a gap. Count the unvouched rather
+> than skipping them — one is right, none means the establishing peer has been removed, and more
+> than one is worth looking at.
 
 **Handle a rejected token.** If a call fails with a CloudKit error whose description is
 `.changeTokenExpired`, the stored token is no longer valid — someone has reset the circle. Discard
