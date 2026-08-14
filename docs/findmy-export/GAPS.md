@@ -1503,3 +1503,37 @@ whose whole purpose is to be imported somewhere and trusted.
 
 An omission is visible and recoverable. A fabricated accessory is neither, and it would be
 produced by the path that looks like the more helpful one.
+
+### P3. The model claim checks out, and the fixture answers more than it was asked
+
+Verified against `app/src/test/resources/19032025/`, which is free and offline in a way P1
+was not. The accessory there carries:
+
+| Field | Value |
+| --- | --- |
+| `model` | `''` — **empty** |
+| `productId` / `vendorId` | `21760` / `76` |
+| secondary secret | `secondarySharedSecret`, and no `secureLocationsSharedSecret` |
+
+So both halves hold: an accessory's model is empty and its identity is the product ids,
+while `iPad13,18` is the `<family><major>,<minor>` form devices use for themselves. Agreed
+that this makes the model close to decisive and the secret a confirmation. Both are now
+logged; neither is branched on.
+
+Two things the same fixture says that the specification does not:
+
+**§2.4's `2006` is not universal.** The table gives an AirTag's `stableIdentifier` as
+`2006~#<hardware-id>~#<serial>`. This one is `2001~#<hardware-id>~#<serial>`. Nothing breaks
+— the serial is taken after the *last* `~#`, so the prefix is never parsed — but a reader
+that matched on `2006` to identify an AirTag would reject a real one. Worth softening the
+table to say the leading number varies, or establishing what it means.
+
+**§3's `emoji` absence is an account property, not a format one.** The table marks it
+`[observed] absent`; this record carries `🐈`. Both are tolerated, and the writer treats every
+field as optional, so this changes nothing in the implementation. It is worth noting only
+because two `[observed]` notes from two accounts disagreeing is exactly the case where one of
+them gets read as "the format does not have this".
+
+The fixture's key sets are now the oracle for both plist writers, replacing fixtures that
+only agreed with the implementation that produced them: 14 keys for the beacon, 6 for the
+naming record, read off files Apple's own framework wrote.
