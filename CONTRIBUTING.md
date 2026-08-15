@@ -402,7 +402,11 @@ python scripts/add_strings.py --check         # fail if any locale is missing on
 
 ## Running the export wizard on a Mac
 
-Testing an export means a real Mac signed into iCloud, usually a VM. A fresh macOS install
+**This covers the macOS-local route only.** Exporting through iCloud needs no Mac and no VM —
+see [Running the exporter from the CLI](./docs/how-to-export-with-the-cli.md). What follows is
+for testing the path that reads Find My's own files, which still runs on macOS and nowhere else.
+
+Testing that export means a real Mac signed into iCloud, usually a VM. A fresh macOS install
 has **neither git nor python3** — both arrive with the Xcode Command Line Tools — so
 `scripts/bootstrap_macos.sh` does the lot: installs the tools, clones, creates a virtualenv,
 installs the dependencies and launches the wizard. It is safe to re-run.
