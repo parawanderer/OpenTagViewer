@@ -147,6 +147,59 @@ nothing is created that would need protecting.
 
 ---
 
+## What this actually supports
+
+> **Status column, because half of this is not built.** *Shipped* means it works in a released
+> app today. *Built* means the exporter does it and the app cannot read it yet. *Planned* is
+> [android-import-handover.md](./android-import-handover.md) item 5.
+
+### There are two kinds of "live", and conflating them is the usual confusion
+
+**Location updates** are one thing: where a tag was last seen. They come from Apple's Find My
+network, are fetched by hashed key, and need **any** Apple ID — not the owner's. Anyone holding
+the keys gets them, forever, with no further contact with the owner.
+
+**iCloud state** is the other: which tags exist, what they are called in Apple's Find My, and
+which have been removed. That lives in the owner's account and needs access to it. A bundle is a
+**snapshot** of it.
+
+So a recipient's map keeps updating indefinitely while their *list of tags* is frozen at the
+moment of export. A tag bought afterwards never appears; a rename made in Apple's Find My never
+arrives.
+
+| Person | Locations | New tags appear | Apple's names sync | Rename back to Apple | Passcode | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Owner, connected** — signed into iCloud in the app, joined the trust circle | yes | yes | yes | yes | once | planned |
+| **Owner, signed in without joining** | yes | yes | yes | yes | again after each key rotation | planned |
+| **Owner, exporting from the desktop** | yes | at the next export | at the next export | no | each run | shipped |
+| **Recipient of a bundle** | yes | **no** | **no** — local rename only | no | never | shipped |
+| **Sharee** — a tag shared to their Apple ID by its owner, in Apple's Find My | **no** | — | — | — | — | **not supported** |
+
+**The sharee is the one real gap.** The records are visible in the account and carry **no key
+material**, so nothing can locate the tag; the keys sit behind a sharing circle secret, which is a
+second key hierarchy on top of PCS. See
+[findmy-export/README.md](./findmy-export/README.md#shared-accessories-reachable-and-new). Until
+then the answer is that the owner runs the exporter, which produces a bundle rather than a share.
+
+### Which tags
+
+| Kind | Locatable | Has an iCloud name | Status |
+| --- | --- | --- | --- |
+| **AirTag** | yes | yes, from a `BeaconNamingRecord` | shipped |
+| **The owner's own iPhone, iPad, Mac** | yes | yes, but from the device rather than a naming record | built — see the privacy note in [06-output.md](./findmy-export/06-output.md) §3 |
+| **AirPods and other Find My accessories** | where the record carries a private key | yes | built, lightly exercised |
+| **OpenHaystack / self-generated** | yes | **no — there is no iCloud record at all** | built in the exporter, [not readable by the app yet](https://github.com/parawanderer/OpenTagViewer/issues/45) |
+| **A tag shared to you by another Apple ID** | no | — | not supported |
+
+> **A self-generated tag has no name to sync, and that is structural rather than missing.** It was
+> never paired to an Apple account, so no `BeaconNamingRecord` exists, nothing in iCloud knows it,
+> and no rename can be written back. Its name is whatever the importing app calls it — which makes
+> the local rename the *only* name it will ever have, rather than a stopgap until the real one
+> arrives.
+>
+> This is worth surfacing in the UI rather than leaving as a surprise: for these tags, renaming is
+> authoritative; for an AirTag on a connected account, a local rename is shadowed by Apple's.
+
 ## Edge cases worth handling deliberately
 
 **An account with no circle at all.** An Apple ID that has never had an Apple device has nothing
