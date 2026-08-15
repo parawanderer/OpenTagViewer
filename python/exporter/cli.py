@@ -29,10 +29,10 @@ import time
 from pathlib import Path
 from typing import Sequence
 
-from findmy import LoginState, MobileMeDelegateError, TermsError
+from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, TermsError
 from findmy.errors import UnhandledProtocolError
 
-from exporter import icloud, prompts, terms
+from exporter import icloud, localsource, prompts, source, terms
 from exporter.custom_tags import (
     CustomTagError,
     PreparedTag,
@@ -107,6 +107,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Agree to any pending iCloud terms without reading them. For a run nobody is watching."
             " What is being agreed to is still named, and it is still a contract."
+        ),
+    )
+    parser.add_argument(
+        "--source",
+        choices=source.CHOICES,
+        default=source.AUTO,
+        help=(
+            "Where to read from. `auto` uses this Mac's own Find My files when it can - which asks"
+            " for no Apple ID password and registers no device on your account - and iCloud"
+            " otherwise, which is every other machine and every macOS 15 or newer."
         ),
     )
     parser.add_argument(
@@ -274,6 +284,12 @@ async def sign_in(arguments: argparse.Namespace):
 
         if not await accept_terms(account, without_reading=arguments.accept_terms):
             raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
+    except BaseException:
+        # The account owns an HTTP session, and a sign-in that fails leaves it open - which
+        # surfaces as "Unclosed client session" from asyncio, after the real error, where it reads
+        # like a second fault. Only `run` closes it on the way out, and only once this returns.
+        await account.close()
+        raise
     finally:
         del password  # used inside the call above and wanted no longer
 
@@ -463,29 +479,57 @@ def write(bundle, output: Path, passcode: str | None) -> None:
 # ---------------------------------------------------------------------------------------------
 
 
-async def run(arguments: argparse.Namespace) -> int:
-    """The whole flow, from signing in to a written bundle."""
-    prepared = await read_key_files(arguments.add_keys)
+async def read_local():
+    """
+    Read this Mac's own Find My files.
 
+    No account, no sign-in, no device registered on it - macOS did all of that already, and this
+    reads what it left behind. It does ask for the login password, twice, in a dialog this program
+    neither draws nor controls, which is worth saying before it appears.
+    """
+    print("\nmacOS will ask for your login password, twice, so this can read the key that",
+          file=sys.stderr)
+    print("decrypts its Find My files. That prompt is macOS's own.\n", file=sys.stderr)
+
+    return localsource.fetch(localsource.read_key())
+
+
+async def read_icloud(arguments: argparse.Namespace):
+    """Sign in and read the account. None if the keychain could not be unlocked."""
     account = await sign_in(arguments)
 
     try:
         async with await icloud.open_client(account) as client:
             if not await unlock(client):
-                return 1
+                return None
 
-            fetched = await icloud.fetch(client)
-
-            for skipped in fetched.skipped:
-                print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
-
-            if not fetched.candidates:
-                print("\nNothing on this account can be exported.", file=sys.stderr)
-                return 1
-
-            exports = await name_the_nameless(await choose(fetched.candidates))
+            return await icloud.fetch(client)
     finally:
         await account.close()
+
+
+async def run(arguments: argparse.Namespace) -> int:
+    """The whole flow, from a source to a written bundle."""
+    prepared = await read_key_files(arguments.add_keys)
+
+    # Decided rather than asked. Signing in is the bigger ask of the two routes, and it should not
+    # be made of somebody whose Mac still keeps the records on disk.
+    route = source.resolve(arguments.source)
+    where = "this Mac" if route.is_local else "iCloud"
+    print(f"\nReading from {where}, because {route.reason}.", file=sys.stderr)
+
+    fetched = await read_local() if route.is_local else await read_icloud(arguments)
+    if fetched is None:
+        return 1
+
+    for skipped in fetched.skipped:
+        print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
+
+    if not fetched.candidates:
+        print(f"\nNothing on {where} can be exported.", file=sys.stderr)
+        return 1
+
+    exports = await name_the_nameless(await choose(fetched.candidates))
 
     exports.extend(tag.to_export() for tag in prepared)
 
@@ -517,6 +561,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     except prompts.Abandoned:
         print("\nStopped. Nothing was written.", file=sys.stderr)
         return 130
+    except InvalidCredentialsError as e:
+        # Apple rejected the credentials. Reported on its own because its message names the
+        # password even when it arrives at the verification-code step, which reads as though the
+        # wrong thing was wrong - so the message is printed verbatim and then placed.
+        print(f"\nApple would not accept that sign-in:\n\n  {e}\n", file=sys.stderr)
+        print("If that appeared after you entered a verification code, the code and the", file=sys.stderr)
+        print("password are both worth checking - a code expires quickly, and Apple reports", file=sys.stderr)
+        print("either as a credentials failure at this point. Nothing was written.", file=sys.stderr)
+        return 1
     except (ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError) as e:
         print(f"\n{e}", file=sys.stderr)
         return 1
