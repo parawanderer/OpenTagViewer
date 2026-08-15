@@ -172,6 +172,11 @@ jobs:
       working-directory: ./python
       run: uv sync --frozen --no-default-groups --group build
 
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
     - name: Run PyInstaller (macOS, ${{ matrix.arch }})
       if: matrix.os == 'macos'
       working-directory: ./python
@@ -182,9 +187,15 @@ jobs:
           --name "OpenTagViewer" \
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
+          --collect-all unicorn \
           --noconfirm \
           ./exporter/wizard.py
 
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
     - name: Run PyInstaller (Windows)
       if: matrix.os == 'windows'
       working-directory: ./python
@@ -194,11 +205,17 @@ jobs:
           --windowed `
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
+          --collect-all unicorn `
           --noconfirm `
           ./exporter/wizard.py
 
     # No --windowed on Linux: it means "no console window" on the platforms that have that
     # concept, and there is no bundle format here for it to produce either way.
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
     - name: Run PyInstaller (Linux)
       if: matrix.os == 'linux'
       working-directory: ./python
@@ -206,6 +223,7 @@ jobs:
         uv run --frozen pyinstaller \
           --onefile \
           --name "OpenTagViewer" \
+          --collect-all unicorn \
           --noconfirm \
           ./exporter/wizard.py
 
@@ -218,12 +236,17 @@ jobs:
       if: matrix.os == 'macos'
       run: python3 scripts/check_macos_min_version.py python/dist
 
-    # Smoke test for the platforms with nothing equivalent: start the binary and have it print its
-    # version. It is not a substitute for running the thing, but it does catch a bundle missing an
-    # import - which is the failure PyInstaller actually produces, and it produces it at startup.
+    # Start the binary and have it print its version. Not a substitute for running the thing, but
+    # it catches a bundle missing an import - which is the failure PyInstaller actually produces,
+    # and it produces it at startup.
+    #
+    # **This ran everywhere except macOS, which is exactly where it was needed.** The first build
+    # of the iCloud exporter was missing unicorn's native library, built cleanly, and died at
+    # import; nothing in this workflow would have noticed. It costs a second, so it runs on all of
+    # them now.
     - name: Check the built binary starts
-      if: matrix.os != 'macos'
       working-directory: ./python/dist
+      shell: bash
       run: ./OpenTagViewer --version
 
     - name: Package (macOS)
