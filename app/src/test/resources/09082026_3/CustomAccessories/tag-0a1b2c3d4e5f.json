@@ -1,0 +1,10 @@
+{
+  "identifier": "tag-0a1b2c3d4e5f",
+  "name": "Bike (OpenHaystack)",
+  "private_keys": [
+    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b",
+    "28292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+    "505152535455565758595a5b5c5d5e5f606162636465666768696a6b"
+  ],
+  "type": "custom_rolling_key_accessory"
+}

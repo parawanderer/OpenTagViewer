@@ -1,0 +1,63 @@
+[project]
+name = "opentagviewer-exporter"
+requires-python = ">=3.10"
+
+# `version` is required by the packaging format and is deliberately meaningless here.
+#
+# The exporter's version is VERSION in main/version.py, and rule 9 in AGENTS.md makes that the
+# single source of truth: it reaches the window title and every export's `via:` field, and
+# scripts/release_version.py refuses a release tag that disagrees with it. A real version string
+# in this file would be a second place to change and a second place to forget.
+#
+# Nothing builds a distribution from this directory (`package = false` below), so this number
+# reaches no artifact and names nothing.
+version = "0"
+
+dependencies = [
+    # The macOS-local export route: decrypts the plists under ~/Library/com.apple.icloud.searchpartyd.
+    "pycryptodome==3.22.0",
+    # OPENTAGVIEWER.yml.
+    "PyYAML==6.0.2",
+    # AES-encrypted zip output. The stdlib's zipfile can only *read* legacy ZipCrypto, so
+    # writing an encrypted bundle needs this. Pulls pycryptodomex, which is the same library
+    # as pycryptodome above under a different namespace - both end up installed.
+    "pyzipper==0.4.0",
+    # The iCloud export route. A branch rather than a release: the iCloud keychain export work
+    # is unreleased. This becomes a plain `FindMy==<x>` pin once it lands on PyPI.
+    #
+    # Unlike the Chaquopy pin in app/build.gradle.kts, this one is reproducible anyway - uv.lock
+    # records the resolved commit, so two builds of the same commit of this repository install
+    # the same FindMy.py. Moving to a newer one is `uv lock --upgrade-package FindMy`.
+    "FindMy",
+    # Checkboxes and arrow-key selection for the CLI. Pure Python, no native code, and it works
+    # on Windows - which rules out curses. See main/prompts.py for what happens without a
+    # terminal, which is not "it falls back": prompt_toolkit waits for keystrokes that never come.
+    "questionary>=2.1.1",
+]
+
+[tool.uv]
+# Not a distributable package: `main/` is a program that is run, and the shared sink is
+# consumed by path (PyInstaller here, a Chaquopy source set in the app). Nothing pip-installs
+# this directory, so there is nothing to build and no version to declare.
+package = false
+
+[tool.uv.sources]
+FindMy = { git = "https://github.com/parawanderer/FindMy.py", branch = "feat/icloud-keychain-export" }
+
+[dependency-groups]
+# Only the release build installs this, with `uv sync --no-default-groups --group build`. It is
+# here rather than installed ad hoc in CI so the tool that freezes the binary is pinned by the
+# lockfile like everything the binary contains.
+build = [
+    "pyinstaller>=6.11.0,<7.0.0",
+]
+
+
+# Not installed by `uv sync --no-dev`, which is what the release build uses: none of this
+# belongs in a PyInstaller bundle handed to a user.
+dev = [
+    "pytest==8.4.1",
+    "pytest-cov==6.2.1",
+    "flake8>=7.0.0",
+    "pyright>=1.1.390",
+]

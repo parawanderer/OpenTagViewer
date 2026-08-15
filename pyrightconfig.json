@@ -1,0 +1,15 @@
+{
+  "//": [
+    "app/src/main/python/main.py imports the shared export package out of python/, which is not",
+    "installed - Chaquopy packages it by path and the exporter runs it from the source tree. So",
+    "without this pyright reports every one of those imports as unresolved, and the check that is",
+    "supposed to catch real mistakes drowns them in noise instead.",
+    "",
+    "Kept here rather than in the workflow so the command CONTRIBUTING.md tells contributors to run",
+    "locally is the same one CI runs, and so Pylance resolves it in an editor too.",
+    "",
+    "python/ itself is deliberately not checked: it has pre-existing errors and needs its own",
+    "cleanup first. This only makes it importable."
+  ],
+  "extraPaths": ["python"]
+}

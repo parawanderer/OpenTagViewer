@@ -9,4 +9,8 @@ import platform
 DARWIN = "Darwin"
 LINUX = "Linux"
 SYSTEM: str = platform.system()
-MACOS_VER: tuple[int, int] | None = tuple(map(int, platform.mac_ver()[0].split('.'))) if SYSTEM == DARWIN else None
+# A tuple of however many parts the version has - `14.7.4` is three, `26.0` is two - so this is
+# not annotated as a pair. It is read by index, and only ever index 0.
+MACOS_VER: tuple[int, ...] | None = (
+    tuple(map(int, platform.mac_ver()[0].split('.'))) if SYSTEM == DARWIN else None
+)
