@@ -42,13 +42,30 @@ class Asker:
 
     def __init__(self, root: tk.Misc) -> None:
         self._root = root
+        self._cancelled = threading.Event()
+
+    def cancel(self) -> None:
+        """
+        Stop answering questions, because the user closed the window.
+
+        Called from the main thread; read from the worker. The worker does not stop when the
+        window does - a sign-in half way through still wants a verification code - and that
+        dialog is a question about work the user has already abandoned.
+        """
+        self._cancelled.set()
 
     def ask(self, dialog: Callable[[], Any]) -> Any:
         """
         Run `dialog` on the main thread and return what it returned.
 
         :param dialog: Called with no arguments, on the main thread. Anything Tk.
+        :raises Cancelled: If the user has closed the progress window. Raised on the worker
+            thread, where it unwinds whatever was in progress instead of drawing over a window
+            that is no longer there.
         """
+        if self._cancelled.is_set():
+            raise Cancelled
+
         answer: queue.Queue = queue.Queue(maxsize=1)
 
         def _on_main_thread() -> None:
@@ -108,16 +125,27 @@ def run_with_progress(
             result.append(outcome.get_nowait())
         except queue.Empty:
             if window.winfo_exists():
-                window.after(_POLL_MS, _poll)
-            else:
-                result.append((False, Cancelled()))
+                root.after(_POLL_MS, _poll)
+                return
+
+            # The user closed it. Nothing will poll again and nothing will call `quit` later, so
+            # the wait ends here - and the worker is told, so the next thing it asks is refused
+            # rather than drawn over a window that has gone.
+            asker.cancel()
+            result.append((False, Cancelled()))
+            root.quit()
             return
 
         if window.winfo_exists():
             window.destroy()
         root.quit()
 
-    window.after(_POLL_MS, _poll)
+    # On `root`, not on `window`, and that is the difference between cancelling and hanging.
+    # tkinter registers an `after` callback as a Tcl command owned by the widget it was scheduled
+    # on, and destroying a widget deletes its commands - so a poll scheduled on the progress
+    # window stops being called at the exact moment it is needed. The branch above that notices
+    # the window has gone could never run, and `mainloop` never returned.
+    root.after(_POLL_MS, _poll)
     root.mainloop()
 
     succeeded, value = result[0]
