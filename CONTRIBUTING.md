@@ -130,7 +130,8 @@ wizard).
 | Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
-| Desktop wizard tests | `python/test/` | pytest | no |
+| Desktop exporter tests | `python/test/` | pytest | no |
+| Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
 
 ### Run everything
@@ -295,17 +296,28 @@ enforces that.
 Fixtures live in `app/src/test/resources/` — a redacted copy of a real export. See the
 README there for what was redacted and why.
 
-### Desktop wizard tests
+### Desktop exporter tests
 
-For the macOS export wizard under `python/`.
+For the exporter under `python/` — the CLI, the windowed wizard, and the shared export package
+they both write bundles with. Dependencies are managed with [uv](https://docs.astral.sh/uv/),
+which installs a suitable Python itself:
 
 ```bash
 cd python
-python -m pip install -r requirements.txt flake8 pytest
+uv sync
 
-python -m pytest ./test
-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+uv run pytest ./test ./opentagviewer_export
+uv run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
+
+**Both paths, always.** `python/test/` covers the exporter — the iCloud mapping, the key-file
+readers, the CLI's own decisions — and `python/opentagviewer_export/tests/` covers the shared
+package that writes the bundle. The second is the one the Android app also depends on, and its
+strongest test rebuilds the committed export fixtures in `app/src/test/resources/`
+**byte for byte**, so a change in how a record is serialised fails here rather than on a phone.
+
+Two things it deliberately does not cover, because they need an Apple account: signing in, and
+everything the account then yields. What happens to the records afterwards is covered in full.
 
 ### Tooling tests
 
@@ -416,13 +428,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 4. Run it.
-PYTHONPATH=. python3 main/wizard.py
+PYTHONPATH=. python3 exporter/wizard.py
 ```
 
 </details>
 
-`PYTHONPATH=.` is not optional: `wizard.py` does `from main.airtag_decryptor import ...`, and
-running the file directly puts `python/main` on `sys.path` rather than `python/`, so the
+`PYTHONPATH=.` is not optional: `wizard.py` does `from exporter.airtag_decryptor import ...`, and
+running the file directly puts `python/exporter` on `sys.path` rather than `python/`, so the
 import fails. It is the same thing the CI workflow sets.
 
 Then check the export actually contains what it should:
@@ -517,8 +529,8 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 | --- | --- | --- |
 | `build-debug.yml` | push/PR to `main` | Translation check, pyright, string tooling tests, instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
-| `macos-scripts-python.yml` | `python/**` changes | Wizard tests across Python 3.10–3.13 on macOS 14 |
-| `macos-exporter-python.yml` | on release | Tag/version check, wizard tests, the PyInstaller build for both architectures |
+| `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
+| `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 
@@ -528,9 +540,9 @@ emulator definition in CI to keep in step with `app/build.gradle.kts`.
 
 ---
 
-## Releasing the macOS exporter
+## Releasing the exporter
 
-The exporter's version lives in exactly one place — `VERSION` in `python/main/wizard.py`:
+The exporter's version lives in exactly one place — `VERSION` in `python/exporter/version.py`:
 
 ```python
 VERSION = "1.0.5"
@@ -543,7 +555,7 @@ be true.
 
 **Nothing rewrites it at build time.** The release tag names the zip and the GitHub release;
 the app keeps whatever was committed. That is deliberate rather than an oversight — the wizard
-also runs straight from source (the VM bootstrap below, `python main/wizard.py`), and those
+also runs straight from source (the VM bootstrap below, `python -m exporter.wizard`), and those
 runs stamp `via:` as well. If CI patched the tag into the source, a binary and a from-source
 export built from the same commit would claim different versions, which is the same drift in a
 place nobody would think to look.
@@ -552,8 +564,8 @@ So a release is two steps, in this order:
 
 ```bash
 # 1. Bump it, commit it, push it
-#    (edit python/main/wizard.py -> VERSION = "1.0.6")
-git commit -am "Bump the macOS exporter to 1.0.6"
+#    (edit python/exporter/version.py -> VERSION = "1.1.1")
+git commit -am "Bump the exporter to 1.1.1"
 git push origin main
 
 # 2. Write the changes for this version, then create the release as a draft
@@ -579,23 +591,28 @@ same for the app releases.
 The draft is deliberate: the release workflow triggers on `published`, so nothing builds or
 ships until someone clicks the button.
 
-The tag must be `macos-exporter-v` followed by exactly what `VERSION` says. Before either
-build job starts, `test-release-version` runs:
+The tag must be `exporter-v` followed by exactly what `VERSION` says. Before any build job
+starts, `test-release-version` runs:
 
 ```bash
-python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6
+python scripts/release_version.py --kind exporter --tag exporter-v1.1.0
 ```
 
 which fails the release, with instructions, if the two disagree — so the mistake costs a
-minute rather than an incorrectly labelled build on the releases page. Both build jobs then
-take the version from that job's output instead of parsing the tag themselves, so the zip
+minute rather than an incorrectly labelled build on the releases page. Every build job then
+takes the version from that job's output instead of parsing the tag themselves, so the zip
 name, the release title, and the version the app reports cannot come apart.
+
+> **The tag used to be `macos-exporter-v`, and still resolves.** The exporter reads accessories
+> out of iCloud now and builds for Windows and Linux as well, so the name stopped being true —
+> but tags already published keep theirs forever, and nobody's habits update with a rename. Use
+> `exporter-v` for anything new.
 
 You can run the same check locally before tagging:
 
 ```bash
-python scripts/release_version.py --kind exporter --print               # what the source declares
-python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6   # would this tag be accepted?
+python scripts/release_version.py --kind exporter --print              # what the source declares
+python scripts/release_version.py --kind exporter --tag exporter-v1.1.0   # would this tag be accepted?
 ```
 
 If you tagged before bumping, the fix is to push the bump, delete the release and its tag, and

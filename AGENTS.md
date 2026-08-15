@@ -108,23 +108,31 @@ rather than copying file contents into your own commit. Credit them in the PR de
 
 ### 9. Bump the exporter's `VERSION` before tagging a release
 
-`VERSION` in `python/main/wizard.py` is the only place the macOS exporter's version is
+`VERSION` in `python/exporter/version.py` is the only place the desktop exporter's version is
 written. It reaches the window title and, more importantly, every export it produces, as
-`via: OpenTagViewer.app:<version>` in `OPENTAGVIEWER.yml` — which is how anyone looking at a
-zip later works out which exporter built it.
+`via: <producer>:<version>` in `OPENTAGVIEWER.yml` — which is how anyone looking at a zip later
+works out what built it.
+
+**There is more than one producer, and they must not claim to be each other.** The windowed
+exporter stamps `OpenTagViewer.app:<version>`, its CLI stamps `OpenTagViewer.cli:<version>`, and
+the Android app will stamp its own. They share `VERSION` because they ship together; the name in
+front of it is what makes a bug report answerable. The shared writer takes `via` as a parameter
+and never invents one — see `python/opentagviewer_export/bundle.py`.
 
 Nothing patches it at build time, and nothing should: the wizard also runs from source (the
-VM bootstrap, `python main/wizard.py`), and those exports stamp `via:` too, so a build-time
+VM bootstrap, `python -m exporter.wizard`), and those exports stamp `via:` too, so a build-time
 patch would make two artifacts from one commit disagree.
 
 So releasing is two steps, in this order:
 
 1. Commit the `VERSION` bump to `main`
-2. Tag that commit `macos-exporter-v<the same version>` and publish the release
+2. Tag that commit `exporter-v<the same version>` and publish the release
 
 `scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`
-before either build job. A tag that disagrees fails the release rather than shipping a build
-that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
+before any build job. A tag that disagrees fails the release rather than shipping a build that
+lies about itself. `macos-exporter-v` is the old spelling and still resolves, because tags already
+published keep their name — but it stopped being true when the exporter started building for
+Windows and Linux. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-exporter).
 
 ### 10. Update the docs that index what you added
 

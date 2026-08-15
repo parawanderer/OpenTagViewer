@@ -100,7 +100,7 @@ device joins your keychain's trust circle. Your passcode is used inside a single
 ![Choosing which accessories to export](./assets/cli-choose-accessories.png)
 
 ```
-? Which accessories should go in the bundle?  (space to select, a for all, enter to confirm)
+? What should go in the bundle?  (space to select, a for all, enter to confirm)
 ❯ ○ 🐈 cat                    AirTag, serial A02BCDEFG1AB, paired 2025-02-27
   ○ 🔑 keys                   AirTag, serial C91XZZQ44TAB, paired 2024-11-02 - no alignment record: slow first locate
   ○ unnamed                   AirPods (case), serial H4KLM0PQRS, paired 2023-06-14
@@ -117,6 +117,12 @@ ticked to begin with** — see the warning below for why that is deliberate rath
 > [!NOTE]
 > Piping the CLI's output somewhere, or running it where there is no terminal, falls back to a
 > numbered list you type numbers at. Same questions, same answers, no arrow keys.
+
+> [!WARNING]
+> **`a` selects everything, including your own devices.** If your selection includes an iPhone,
+> iPad or Mac, the CLI names it and asks again before going on — a bundle holding your MacBook
+> lets whoever receives it locate *you*, not a wallet, for as long as its keys are valid. Answer
+> no and it drops the devices and keeps the tags.
 
 > [!WARNING]
 > **Exporting a tag cannot be undone.** The zip holds the tag's keys, and the only way to revoke
