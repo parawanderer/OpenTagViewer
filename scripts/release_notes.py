@@ -98,7 +98,10 @@ def _version(kind: str) -> str:
 # release_version.py, so there is one place that decides what a release is called.
 KINDS = {
     "exporter": {
-        "title": "OpenTagViewer MacOS AirTag Exporter v{version}",
+        # No "MacOS" in it since 1.1.0: the exporter reads from iCloud and ships for Windows and
+        # Linux too, so the word named one of three platforms. Releases already published keep
+        # their names, exactly as their tags do.
+        "title": "OpenTagViewer AirTag Exporter v{version}",
         "bump": 'python/exporter/version.py  ->  VERSION = "..."',
     },
     "android": {
@@ -109,7 +112,19 @@ KINDS = {
 
 
 def _prefix(kind: str) -> str:
+    """The prefix a *new* tag gets. Always the canonical one."""
     return release_version.KINDS[kind]["prefix"]
+
+
+def _prefixes(kind: str) -> tuple[str, ...]:
+    """Every prefix this kind answers to, for *finding* releases that already exist.
+
+    Wider than `_prefix` on purpose. The exporter's tags were `macos-exporter-v` until it
+    stopped being macOS-only, and published tags keep their names - so the release being
+    superseded by the first `exporter-v` one is spelled the old way. Looking only for the
+    canonical prefix finds nothing and reports it as though no release had ever been made.
+    """
+    return release_version._prefixes(release_version.KINDS[kind])
 
 
 # ---------------------------------------------------------------------------------------
@@ -213,22 +228,26 @@ def _gh(*args: str) -> str:
     return result.stdout
 
 
-def published_releases(prefix: str) -> list[dict]:
-    """Published releases whose tag starts with `prefix`, newest first."""
+def published_releases(prefixes: str | tuple[str, ...]) -> list[dict]:
+    """Published releases whose tag starts with any of `prefixes`, newest first."""
+    if isinstance(prefixes, str):
+        prefixes = (prefixes,)
+
     raw = _gh("release", "list", "--limit", "100", "--json",
               "tagName,name,createdAt,isDraft")
     releases = [r for r in json.loads(raw)
-                if r["tagName"].startswith(prefix) and not r["isDraft"]]
+                if r["tagName"].startswith(prefixes) and not r["isDraft"]]
 
     if not releases:
-        raise ReleaseError(f"No published release found with a tag starting '{prefix}'")
+        spelled = "' or '".join(prefixes)
+        raise ReleaseError(f"No published release found with a tag starting '{spelled}'")
 
     return sorted(releases, key=lambda r: r["createdAt"], reverse=True)
 
 
-def latest_release(prefix: str) -> dict:
-    """The most recent published release whose tag starts with `prefix`."""
-    return published_releases(prefix)[0]
+def latest_release(prefixes: str | tuple[str, ...]) -> dict:
+    """The most recent published release whose tag starts with any of `prefixes`."""
+    return published_releases(prefixes)[0]
 
 
 def check_version_is_new(tag: str, existing_tags: list[str], bump_hint: str) -> None:
@@ -291,7 +310,7 @@ def command_draft(args) -> int:
     raw = _gh("release", "list", "--limit", "100", "--json", "tagName")
     check_version_is_new(tag, [r["tagName"] for r in json.loads(raw)], kind["bump"])
 
-    previous = latest_release(_prefix(args.kind))
+    previous = latest_release(_prefixes(args.kind))
     body = build_new_body(release_body(previous["tagName"]), changes)
 
     print(f"Previous release : {previous['tagName']}")
@@ -320,7 +339,7 @@ def command_demote(args) -> int:
     if args.tag:
         tag = args.tag
     else:
-        releases = published_releases(_prefix(args.kind))
+        releases = published_releases(_prefixes(args.kind))
         superseded = pick_superseded(releases)
         tag = superseded["tagName"]
         print(f"Current release  : {releases[0]['tagName']}  (keeps its wrapper)")
