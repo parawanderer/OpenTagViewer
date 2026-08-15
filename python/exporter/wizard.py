@@ -26,7 +26,7 @@ import tkinter as tk
 import webbrowser
 from pathlib import Path
 from tkinter import messagebox, ttk
-from typing import Sequence
+from typing import Callable, Sequence
 from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
 from exporter import icloud, localsource, source
@@ -56,6 +56,8 @@ WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-A
 
 # Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
+
+VERIFICATION_CODE_LENGTH = 6
 
 TICKED = "\u2611"
 UNTICKED = "\u2610"
@@ -229,7 +231,13 @@ class WizardApp(tk.Tk):
                     asker.ask(lambda: _ask_choice(self, "Verification", "How should Apple send the code?", methods)),
                 ),
                 get_code=lambda: _async(
-                    asker.ask(lambda: _ask_string(self, "Verification", "The code Apple sent:")),
+                    asker.ask(lambda: _ask_string(
+                        self,
+                        "Verification",
+                        f"The {VERIFICATION_CODE_LENGTH}-digit code Apple sent:",
+                        valid=is_verification_code,
+                        transform=verification_code,
+                    )),
                 ),
             )
 
@@ -469,13 +477,24 @@ def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:
     answer: dict[str, tuple[str, str]] = {}
 
     def _accept() -> None:
+        if not (email.get().strip() and password.get()):
+            return
         answer["value"] = (email.get().strip(), password.get())
         window.destroy()
 
     buttons = ttk.Frame(frame)
     buttons.grid(row=3, column=0, columnspan=2, sticky="e", pady=(16, 0))
     ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="right", padx=(8, 0))
-    ttk.Button(buttons, text="Sign in", command=_accept).pack(side="right")
+    sign_in = ttk.Button(buttons, text="Sign in", command=_accept)
+    sign_in.pack(side="right")
+
+    # Half a credential is not worth a round trip to Apple to be told so.
+    def _revalidate(*_args) -> None:
+        sign_in.configure(state="normal" if email.get().strip() and password.get() else "disabled")
+
+    email.trace_add("write", _revalidate)
+    password.trace_add("write", _revalidate)
+    _revalidate()
 
     # Enter moves on from the first field and submits from the second, which is what every other
     # sign-in form does.
@@ -490,12 +509,42 @@ def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:
     return answer.get("value", ("", ""))
 
 
-def _ask_string(parent: tk.Tk, title: str, prompt: str, initial: str = "", *, secret: bool = False) -> str:
+def verification_code(typed: str) -> str:
+    """
+    Read a verification code out of whatever was typed.
+
+    Apple sends six digits, and people paste them with a space or a hyphen in the middle because
+    that is how the notification shows them. Taking the digits is kinder than rejecting the paste.
+    """
+    return "".join(character for character in typed if character.isdigit())
+
+
+def is_verification_code(typed: str) -> bool:
+    """Whether that is a code worth sending. Apple's are six digits."""
+    return len(verification_code(typed)) == VERIFICATION_CODE_LENGTH
+
+
+def _ask_string(
+    parent: tk.Tk,
+    title: str,
+    prompt: str,
+    initial: str = "",
+    *,
+    secret: bool = False,
+    valid: Callable[[str], bool] = bool,
+    transform: Callable[[str], str] = str.strip,
+) -> str:
     """
     Ask for one line of text, in a modal window.
 
     Hand-rolled rather than `tkinter.simpledialog`, which cannot hide what is typed - and one of
-    the two things this asks for is an Apple ID password.
+    the things this asks for is an Apple ID password.
+
+    :param valid: Whether what has been typed can be sent. **OK stays disabled until it is**, so
+        an empty box or a half-typed code cannot be submitted - which otherwise costs a round trip
+        to Apple to be told what the dialog already knew. Defaults to "not empty".
+    :param transform: Applied before validating and before returning, so the two cannot disagree
+        about what was entered.
     """
     window = tk.Toplevel(parent)
     window.title(title)
@@ -516,13 +565,22 @@ def _ask_string(parent: tk.Tk, title: str, prompt: str, initial: str = "", *, se
     answer: dict[str, str] = {}
 
     def _accept() -> None:
-        answer["value"] = value.get().strip()
+        if not valid(transform(value.get())):
+            return
+        answer["value"] = transform(value.get())
         window.destroy()
 
     buttons = ttk.Frame(frame)
     buttons.pack(fill="x", pady=(12, 0))
     ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="right", padx=(8, 0))
-    ttk.Button(buttons, text="OK", command=_accept).pack(side="right")
+    ok = ttk.Button(buttons, text="OK", command=_accept)
+    ok.pack(side="right")
+
+    def _revalidate(*_args) -> None:
+        ok.configure(state="normal" if valid(transform(value.get())) else "disabled")
+
+    value.trace_add("write", _revalidate)
+    _revalidate()
 
     window.bind("<Return>", lambda _event: _accept())
     window.bind("<Escape>", lambda _event: window.destroy())

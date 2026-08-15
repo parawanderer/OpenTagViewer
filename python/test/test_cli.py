@@ -216,3 +216,27 @@ class TestIncludingYourOwnDevices:
 
         with pytest.raises(Exception, match="Nothing left to export"):
             asyncio.run(cli._confirm_devices([mac]))
+
+
+class TestVerificationCodes:
+    """
+    What counts as a code, in the window and on the CLI.
+
+    Blocking OK until it is one saves a round trip to Apple to be told what the dialog already
+    knew - and a rejected code is not a free question: the next one has to be sent again.
+    """
+
+    @pytest.mark.parametrize("typed", ["123456", "123 456", "123-456", " 123456 "])
+    def test_accepts_six_digits_however_they_were_pasted(self, typed):
+        # People paste them with a space or a hyphen, because that is how the notification shows
+        # them. Taking the digits is kinder than rejecting the paste.
+        from exporter.wizard import is_verification_code, verification_code
+
+        assert is_verification_code(typed)
+        assert verification_code(typed) == "123456"
+
+    @pytest.mark.parametrize("typed", ["", "   ", "12345", "1234567", "abcdef", "12345a"])
+    def test_refuses_anything_that_is_not_six_digits(self, typed):
+        from exporter.wizard import is_verification_code
+
+        assert not is_verification_code(typed)
