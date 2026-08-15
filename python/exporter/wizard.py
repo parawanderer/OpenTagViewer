@@ -55,7 +55,10 @@ from opentagviewer_export.hardware import is_own_device
 logger = logging.getLogger(__name__)
 
 GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
-WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
+# The "Need Help?" link. It points at the page covering both routes: the older `…-From-Mac` page
+# keeps its name because binaries already released open it, but a copy shipping now should send
+# people to the one that describes what it actually does.
+WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags"
 
 # Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
