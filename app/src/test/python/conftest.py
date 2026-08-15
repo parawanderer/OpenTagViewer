@@ -11,7 +11,13 @@ from pathlib import Path
 APP_PYTHON = Path(__file__).resolve().parents[2] / "main" / "python"
 RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 
+# The shared export package, which Chaquopy adds as a second source directory - see the
+# `sourceSets` block in app/build.gradle.kts. Added here for the same reason: it is packaged into
+# the APK alongside app/src/main/python, so the tests have to see it the way the app does.
+SHARED_PYTHON = Path(__file__).resolve().parents[4] / "python"
+
 sys.path.insert(0, str(APP_PYTHON))
+sys.path.insert(0, str(SHARED_PYTHON))
 
 
 def pytest_configure(config):

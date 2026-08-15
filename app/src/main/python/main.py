@@ -872,3 +872,45 @@ def getReports(
         err = traceback.format_exc()
         print(f"Failed to fetch all reports due to error: {err}")
         return None
+
+
+def identifyHardware(plistXml: str) -> str | None:
+    """
+    Say what an accessory is, from the `OwnedBeacons` plist the app already holds.
+
+    **The heuristic lives in `opentagviewer_export.hardware`, not here and not in Java.** It is
+    guesswork over half a dozen fields - product and vendor ids, the model, the shape of
+    `stableIdentifier` - and the same guesswork runs in the desktop exporter when it asks which
+    accessories to export. Two copies of it would drift, and the symptom of drift is one tag
+    described as an AirTag in one place and as a hex number in the other.
+
+    Returns None when nothing recognises the record, which is a real answer: the caller should
+    then show what it already has rather than a guess.
+
+    :param plistXml: The accessory's plist, as the app stores it.
+    """
+    try:
+        from opentagviewer_export.hardware import identify
+
+        return identify(util_files.read_data_plist(plistXml.encode("utf-8")))
+    except Exception:
+        # Never fatal: this is a label. An import failing here should cost a nicer row in a list,
+        # not the accessory.
+        print(f"identifyHardware failed, carrying on without it: {traceback.format_exc()}")
+        return None
+
+
+def whereToLookUpHardware(plistXml: str) -> str | None:
+    """
+    How the user could find out what an unrecognised accessory is, in one line.
+
+    Offered rather than guessed at - see `opentagviewer_export.hardware.where_to_look_up`. Returns
+    None when there is nothing worth saying, which is the common case.
+    """
+    try:
+        from opentagviewer_export.hardware import where_to_look_up
+
+        return where_to_look_up(util_files.read_data_plist(plistXml.encode("utf-8")))
+    except Exception:
+        print(f"whereToLookUpHardware failed, carrying on without it: {traceback.format_exc()}")
+        return None
