@@ -185,10 +185,21 @@ uv sync --no-default-groups --group build
 
 uv run pyinstaller --onefile --windowed --name "OpenTagViewer" \
     --osx-bundle-identifier "dev.wander.opentagviewer" \
-    --icon=OpenTagViewer.icns --noconfirm ./exporter/wizard.py
+    --icon=OpenTagViewer.icns --collect-all unicorn --noconfirm ./exporter/wizard.py
 ```
 
 Windows uses `--icon=OpenTagViewer.ico`; Linux takes neither `--windowed` nor an icon.
+
+> [!IMPORTANT]
+> **`--collect-all unicorn` is not optional.** unicorn loads its native library through ctypes at
+> runtime, so PyInstaller never sees it: without this the build succeeds and the binary dies at
+> startup with *Failed to load the Unicorn dynamic library*. Always run the result once —
+> `./dist/OpenTagViewer --version` — because that is the only thing that catches it.
+
+The result is around **34 MB** as a binary, **68 MB** zipped, against 22 MB for the macOS-only
+1.0.5. Almost all of the difference is unicorn, at 41 MB on disk: it emulates Apple's ADI library
+so that signing in works without a third-party Anisette server. Excluding the Bluetooth stack
+FindMy.py brings in saves 1.6 MB, which is not worth the failure mode it introduces.
 
 ### Versioning
 
