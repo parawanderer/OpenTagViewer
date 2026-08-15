@@ -191,6 +191,23 @@ You are asked to name each one, with a suggestion derived from the tag's *public
 it broadcasts anyway. If a file states its advertisement key, the CLI checks that the private key
 actually produces it, which catches the two fields being the wrong way round.
 
+### Exporting only these, with no Apple account
+
+Add `--source none` and nothing is signed into:
+
+```bash
+uv run python -m exporter.cli --source none --no-password --add-keys ~/tags/bike.keys -o my-tags.zip
+```
+
+The command above asks one question — what to call the tag — and writes the zip. Without it, the
+run reads an account first: an Apple ID password, a device registered on your account, and a
+screen-lock passcode, in order to fetch a list nothing is going to be taken from. A tag you
+generated yourself was never in an Apple account and does not need one to leave.
+
+`--source none` refuses to run without at least one `--add-keys` file, since there would be
+nothing at all to put in the bundle. In the window, this is simply what happens: it opens with an
+empty list, and *+ Add from key file…* sits next to *Sign in to Apple…* rather than behind it.
+
 > [!NOTE]
 > **The app cannot import these yet.** They go into the bundle as `CustomAccessories/*.json`, which
 > today's importer skips. The bundle also declares format `0.0.3` when it holds one, so a future
@@ -226,7 +243,7 @@ would fall in seconds.
 | `--add-keys FILE` | Add a self-generated tag from a key file. Repeatable |
 | `--source-user` | What the recipient sees as "exported by". Defaults to your machine's username |
 | `--accept-terms` | Agree to pending iCloud terms without displaying them |
-| `--source` | `auto` (the default), `icloud` or `local`. `auto` reads this Mac's own files where it can |
+| `--source` | `auto` (the default), `icloud`, `local` or `none`. `auto` reads this Mac's own files where it can; `none` reads no account at all, for a bundle of nothing but `--add-keys` tags |
 | `--anisette-url` | Use a remote Anisette server instead of running one locally |
 | `--anisette-libs` | Cache Apple's ADI libraries in a file, so a later run does not download them |
 | `-v`, `--verbose` | Show what the library is doing. Worth having on the first run |

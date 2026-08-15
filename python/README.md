@@ -67,6 +67,15 @@ OpenHaystack and Macless Haystack tags are not in iCloud, so they come from a fi
 from key file…** button in the window, or `--add-keys` on the CLI. Four formats are read — see the
 [full instructions](../docs/how-to-export-with-the-cli.md#adding-tags-that-were-never-in-an-apple-account).
 
+**These need no Apple account at all**, and neither entry point asks for one to export them. The
+window opens with an empty list and two buttons — *Sign in to Apple…* and *+ Add from key file…* —
+so nothing is signed into until you ask for it. The CLI wants that said out loud, since it cannot
+show you a screen with no button pressed on it:
+
+```shell
+uv run python -m exporter.cli --source none --add-keys tags.json --no-password -o bundle.zip
+```
+
 ---
 
 ## What an export leaves on your Apple account
