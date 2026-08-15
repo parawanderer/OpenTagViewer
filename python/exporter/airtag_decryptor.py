@@ -366,7 +366,6 @@ def _determine_key_to_use(args: argparse.Namespace) -> bytearray:
 
 def _assert_output_path_valid(output_to: str) -> None:
     if not os.path.exists(output_to):
-        print("foo")
         return  # Valid because doesn't exist yet, we can just init it, probably
 
     if os.path.isdir(output_to):
