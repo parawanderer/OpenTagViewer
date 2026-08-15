@@ -285,6 +285,43 @@ there is nothing to export. Only the owner of a tag can export it. See
 
 ---
 
+## What this leaves on your Apple account
+
+**One entry in your device list**, if you used the iCloud route. Signing in registers a device,
+and Apple shows it wherever you look at your devices — Settings on an iPhone, System Settings on a
+Mac, or appleid.apple.com:
+
+| | |
+| --- | --- |
+| Model | **MacBook Pro** (`MacBookPro18,3`) |
+| Version | **macOS 13.4.1** |
+| Serial Number | **`0PENTAGXPORT`** |
+
+**It is not a Mac and you do not own one of these.** The model and OS come from FindMy.py, which
+has always presented itself as a MacBook Pro and authenticates fine that way; the serial is this
+exporter's, chosen to be legible and deliberately implausible as real hardware. That serial is the
+part to recognise it by — `0PENTAGXPORT` is the exporter, and `0PENTAGVIEWR` is the Android app if
+you also use that.
+
+**It is one entry, not one per export.** The identity is stable, so running this again reuses it.
+
+**You can remove it, and you do not need an Apple device to do it.** Sign in at
+[account.apple.com](https://account.apple.com), open **Devices**, pick the entry, and choose
+**Remove from Account**. Apple's own instructions name Windows, Android and "don't have any Apple
+devices" as exactly the case that page is for —
+[View and remove your devices](https://support.apple.com/en-us/118412),
+[Check your Apple Account device list](https://support.apple.com/en-us/102649).
+
+Nothing here depends on the entry surviving: a later export signs in again and it comes back.
+Removing it ends that session, which is the point of removing it.
+
+> [!NOTE]
+> **On macOS 14 or older, this does not happen** — nothing signs in, so nothing is registered.
+> Anything already in your device list there is your Mac's own doing, from when it signed into
+> iCloud, and removing it is a different decision entirely.
+
+---
+
 ## Related
 
 - [How To: Export AirTags From Mac](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac) — the older route, which still works and still needs a Mac
