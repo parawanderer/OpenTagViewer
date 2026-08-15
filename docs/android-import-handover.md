@@ -116,7 +116,50 @@ Today's importer skips the unknown directory silently. What it needs:
 - **A Room migration** if the schema moves - rule 1, and there is no going back from getting that
   wrong.
 
-## 5. Two smaller things
+## 5. The app becomes an exporter too — and then most people stop needing an export
+
+Everything above is about the app *importing* better. This is the other direction, and it changes
+what the zip is for.
+
+**The app can run this whole pipeline itself.** It already embeds FindMy.py through Chaquopy, and
+the iCloud route is pure Python with no desktop in it: sign in, recover the keychain from an escrow
+record, fetch, decrypt. The desktop exporter is a UI over `exporter/icloud.py`, and that module
+imports nothing the app cannot have.
+
+Two consequences, and the second is the bigger one.
+
+**A third producer.** The app exports bundles of its own, for sharing a tag with somebody else. It
+stamps its own `via:` — `OpenTagViewer.android:<versionName>`, beside the desktop's
+`OpenTagViewer.wizard` and `OpenTagViewer.cli` — and it writes them through
+`opentagviewer_export`, the same shared package, so there is still one implementation of the
+format. That is most of why the package exists.
+
+**And an owner does not need an export at all.** Today every user imports a zip, including people
+exporting their own tags to their own phone — a round trip through a desktop for data the phone
+could fetch directly. Once the app can read the account, that step disappears for anyone who owns
+the tags:
+
+| Who | Needs an export today | Needs one after |
+| --- | --- | --- |
+| **Owner, own phone** | yes — desktop, zip, transfer, import | **no.** Sign in and the tags are there |
+| **Owner, sharing with somebody** | yes | yes — the zip *is* the sharing mechanism |
+| **Recipient** | yes | yes — they have no account with those tags on it |
+
+So the zip stops being a prerequisite and becomes what it always should have been: **how you give
+a tag to another person.** [export-modes.md](./export-modes.md) calls these the *connected* and
+*export* roles and says why connected is the default — the device passcode is spent once, so after
+it syncing costs nothing and is what makes this a connection rather than an import.
+
+**Do not document any of this until it works.** The wiki currently tells every user to export, and
+that is correct until the app can do without one. The paragraph to change is the prerequisite on
+the wiki's Home page, and it should change when the feature ships and not before.
+
+Worth knowing while building it: the app must present `0PENTAGVIEWR` and not the exporter's
+`0PENTAGXPORT` (§2 above, and rule 11), and a connected app writes to the account in a way the
+exporter never does — it may enrol as a peer rather than only recovering. That is the one place
+this stops being read-only, and it deserves its own decision rather than arriving as a side effect.
+
+## 6. Two smaller things
 
 **The FindMy pin is out of step with itself.** `app/build.gradle.kts` installs the
 `feat/icloud-keychain-export` branch, while `app/src/test/python/requirements.txt` pins
