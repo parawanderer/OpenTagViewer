@@ -1,369 +1,451 @@
+"""
+The windowed exporter: pick your tags, get a zip.
+
+Same work as `exporter.cli`, in a window. It reads from whichever source this machine can use -
+see :mod:`exporter.source` - asks which accessories to export, and writes a bundle through the
+shared writer in :mod:`opentagviewer_export`. Nothing about the format lives here.
+
+**The window is the only thing this file is for.** Everything it does is in `icloud.py`,
+`localsource.py` and the shared package, all of which the CLI drives too; what is here is Tk. That
+split is deliberate and worth keeping: the parts worth testing are testable without a display, and
+the part that needs a person to look at it does not hide anything else inside it.
+
+Long work happens off the main thread, through :mod:`exporter.asyncui`, so the window keeps
+drawing while a sign-in runs. On macOS a window that stops answering events gets the spinning
+cursor and eventually an offer to force-quit, in the middle of a network call.
+"""
+
 from __future__ import annotations
 
-import os
-import sys
 import datetime
-import tempfile
+import getpass
+import logging
+import sys
 import time
-import yaml
-import shlex
-import webbrowser
-from zipfile import ZipFile
 import tkinter as tk
-from tkinter import NSEW, ttk
-from tkinter.filedialog import asksaveasfilename
+import webbrowser
+from pathlib import Path
+from tkinter import messagebox, ttk
+from typing import Sequence
+from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
-from tkinter import messagebox
-
-from exporter.airtag_decryptor import (
-    BEACON_NAMING_RECORD,
-    KEY_ALIGNMENT_RECORDS,
-    KEYCHAIN_LABEL,
-    INPUT_PATH,
-    MASTER_BEACONS,
-    OWNED_BEACONS,
-    WHITELISTED_DIRS,
-    decrypt_plist,
-    get_key_fallback,
-    make_output_path,
-    dump_plist
+from exporter import icloud, localsource, source
+from exporter.asyncui import Asker, Cancelled, run_with_progress
+from exporter.custom_tags import (
+    CustomTagError,
+    PreparedTag,
+    check_advertisement_key,
+    suggested_identifier,
+    suggested_name,
 )
-from exporter.utils import MACOS_VER
-# The version lives in its own module so that the headless CLI and the release check can read it
-# without importing tkinter - see exporter/version.py and rule 9 in AGENTS.md.
-from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION  # noqa: F401 - VERSION is re-exported
+from exporter.icloud import Candidate, ExportSourceError
+from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION
+from opentagviewer_export import (
+    ExportError,
+    KeyFileError,
+    build_export,
+    parse_key_file,
+    write_zip,
+)
+from opentagviewer_export.hardware import is_own_device
 
-# Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
+logger = logging.getLogger(__name__)
 
-DROPDOWN_DESCRIPTION = "Choose devices to export:"
 GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
-GITHUB_EXPORT_AIRTAGS_WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
+WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-From-Mac"
 
-EXPORT_METADATA_FILENAME = "OPENTAGVIEWER.yml"
-EXPORT_METADATA_VERSION = "0.0.2"
+# Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
 
-
-class PListFileInfo:
-    def __init__(self, filepath: str, data: dict):
-        self.filepath = filepath
-        self.data = data
-
-
-class BeaconData:
-    def __init__(
-            self,
-            owned_beacon: PListFileInfo,
-            beacon_naming_record: PListFileInfo = None,
-            beacon_name: str = None,
-            beacon_emoji: str = None,
-            key_alignment_record: PListFileInfo = None):
-        self.owned_beacon = owned_beacon
-        self.beacon_naming_record = beacon_naming_record
-        self.beacon_name = beacon_name
-        self.beacon_emoji = beacon_emoji
-        # Optional: macOS does not always have one, and older macOS versions predate it.
-        self.key_alignment_record = key_alignment_record
+_KEY_FILE_TYPES = [
+    ("Key files", "*.json *.keys *.txt"),
+    ("All files", "*.*"),
+]
 
 
 class WizardApp(tk.Tk):
-    def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
+    """
+    The window: a list of accessories, and a button that writes them.
+
+    Everything slow is handed to :func:`~exporter.asyncui.run_with_progress`, which keeps this
+    window drawing and hops any question it needs to ask back here.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         self.title(APP_TITLE)
-        self.geometry("480x267")
-        self.minsize(480, 267)
-        self.maxsize(720, 400)
+        self.geometry("720x460")
+        self.minsize(640, 420)
 
-        self.container = ttk.Frame(self)
-        self.container.pack(side="top", fill="both", expand=True)
-        self.container.grid_rowconfigure(0, weight=1)
-        self.container.grid_columnconfigure(0, weight=1)
+        self.candidates: list[Candidate] = []
+        self.custom_tags: list[PreparedTag] = []
+        self.route = source.detect()
 
-        self.label = tk.Label(self.container, text=DROPDOWN_DESCRIPTION, font=("Arial", 11))
-        self.label.grid(row=0, column=0, columnspan=3, sticky=NSEW, pady=2)
+        self._build()
+        # After the window exists, so a failure has somewhere to report itself.
+        self.after(100, self._load)
 
-        self._assert_macos_ver()
+    # -- layout ---------------------------------------------------------------------------
 
-        self.beacon_data: dict[str, BeaconData] = self._retrieve_beacon_data()
+    def _build(self) -> None:
+        container = ttk.Frame(self, padding=12)
+        container.pack(fill="both", expand=True)
+        container.grid_rowconfigure(2, weight=1)
+        container.grid_columnconfigure(0, weight=1)
 
-        self.choices_select = tk.Listbox(
-            self.container,
-            selectmode="multiple"
-        )
+        self.heading = ttk.Label(container, text="Reading your accessories…", font=("Arial", 13, "bold"))
+        self.heading.grid(row=0, column=0, columnspan=3, sticky="w")
 
-        self.options = [f"{'' if b.beacon_emoji is None else b.beacon_emoji + ' '}{b.beacon_name} - {bid}" for bid, b in self.beacon_data.items()]  # noqa: E501
-        self.options.sort()
+        self.explanation = ttk.Label(container, text=self._route_line(), wraplength=680, foreground="#555")
+        self.explanation.grid(row=1, column=0, columnspan=3, sticky="w", pady=(2, 10))
 
-        self.choices_select.insert(1, *self.options)
-        self.choices_select.grid(row=1, column=0, columnspan=3, rowspan=3, sticky=NSEW, pady=4)
+        self.choices = tk.Listbox(container, selectmode="multiple", activestyle="none", font=("Menlo", 11))
+        self.choices.grid(row=2, column=0, columnspan=3, sticky="nsew")
 
-        self.help_label = tk.Label(self.container, text="Need Help?", font='Arial 10 underline', cursor="hand2")
-        self.help_label.grid(row=4, column=0, sticky='SW', padx=10, pady=4)
-        self.help_label.bind("<Button-1>", lambda e: self._send_to_wiki())
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.choices.yview)
+        scrollbar.grid(row=2, column=3, sticky="ns")
+        self.choices.configure(yscrollcommand=scrollbar.set)
 
-        self.cancel_button = tk.Button(self.container, text="Cancel", command=self.handle_cancel)
-        self.cancel_button.grid(row=4, column=1, padx=10, pady=4)
-        self.confirm_button = tk.Button(self.container, text="Confirm", command=self.handle_confirm)
-        self.confirm_button.grid(row=4, column=2, padx=10, pady=4)
+        self.note = ttk.Label(container, text="", wraplength=680, foreground="#555")
+        self.note.grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 6))
 
-    def _assert_macos_ver(self):
-        if MACOS_VER is None:
+        buttons = ttk.Frame(container)
+        buttons.grid(row=4, column=0, columnspan=4, sticky="ew")
+        buttons.grid_columnconfigure(1, weight=1)
+
+        # The "+" is for tags that were never in an Apple account - OpenHaystack and the like.
+        # They cannot be fetched, because there is nothing to fetch them from.
+        self.add_button = ttk.Button(buttons, text="+ Add from key file…", command=self._add_key_file)
+        self.add_button.grid(row=0, column=0, sticky="w")
+
+        help_label = ttk.Label(buttons, text="Need help?", cursor="hand2", foreground="#0645AD")
+        help_label.grid(row=0, column=1)
+        help_label.bind("<Button-1>", lambda _event: webbrowser.open(WIKI_LINK, new=2, autoraise=True))
+
+        ttk.Button(buttons, text="Cancel", command=self.destroy).grid(row=0, column=2, padx=(0, 8))
+        self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
+        self.confirm_button.grid(row=0, column=3)
+
+    def _route_line(self) -> str:
+        where = "this Mac's own Find My files" if self.route.is_local else "your iCloud account"
+        return f"Reading from {where}, because {self.route.reason}."
+
+    # -- loading --------------------------------------------------------------------------
+
+    def _load(self) -> None:
+        """Read whichever source this machine can use, and fill the list."""
+        try:
+            fetched = (
+                run_with_progress(self, "Reading this Mac's Find My files…", self._read_local)
+                if self.route.is_local
+                else run_with_progress(self, "Signing in to iCloud…", self._read_icloud)
+            )
+        except Cancelled:
+            self.destroy()
+            return
+        except (ExportSourceError, ExportError) as e:
+            messagebox.showerror("Could not read your accessories", str(e))
+            self.destroy()
+            return
+        except Exception as e:  # noqa: BLE001 - anything else is still the user's problem to see
+            logger.exception("Reading accessories failed")
             messagebox.showerror(
-                "Unsupported OS",
-                "This application only works on MacOS <= 14"
+                "Could not read your accessories",
+                f"{e}\n\nIf this looks like a bug, please report it:\n{GITHUB_ISSUES_LINK}",
             )
-            raise Exception("Unsupported OS")
+            self.destroy()
+            return
 
-        if MACOS_VER[0] >= 15:
-            messagebox.showwarning(
-                "Unsupported MacOS Version",
-                "This application is only confirmed to work on MacOS <= 14. \n\nCheck the Wiki for alternative approaches for MacOS >= 15!"  # noqa: E501
+        self.candidates = fetched.candidates
+        self._show(fetched.skipped)
+
+    async def _read_local(self, _asker: Asker):
+        """The local route needs nothing from the user that macOS does not ask for itself."""
+        return localsource.fetch(localsource.read_key())
+
+    async def _read_icloud(self, asker: Asker):
+        """
+        Sign in, unlock the keychain and fetch.
+
+        Every question is drawn on the main thread through `asker`, because Tk is not thread-safe
+        and this coroutine is not on it.
+        """
+        account = icloud.make_account()
+
+        try:
+            email = asker.ask(lambda: _ask_string(self, "Apple ID", "Your Apple ID:"))
+            password = asker.ask(lambda: _ask_string(self, "Password", "Apple ID password:", secret=True))
+
+            await icloud.log_in(
+                account,
+                email,
+                password,
+                choose_second_factor=lambda methods: _async(
+                    asker.ask(lambda: _ask_choice(self, "Verification", "How should Apple send the code?", methods)),
+                ),
+                get_code=lambda: _async(
+                    asker.ask(lambda: _ask_string(self, "Verification", "The code Apple sent:")),
+                ),
             )
-            # I'll actually keep the app operational on MacOs >= 15 in case somebody figures out a workaround. But yeah!
 
-    def _send_to_wiki(self):
-        print(f"Going to open webbrowser to {GITHUB_EXPORT_AIRTAGS_WIKI_LINK}...")
-        webbrowser.open(GITHUB_EXPORT_AIRTAGS_WIKI_LINK, new=2, autoraise=True)
-
-    def _retrieve_beacon_data(self) -> dict[str, BeaconData]:
-        do_proceed: bool = messagebox.askokcancel(
-            "Keystore Access Required",
-            f"OpenTagViewer requires access to your keystore for '{KEYCHAIN_LABEL}' in order to export your AirTags. \n\nProceed?"  # noqa: E501
-        )
-
-        if do_proceed:
-            return self._create_beacon_data_map()
-        else:
-            self.quit()
-            raise Exception("User does not want to give password access to keystore!")
-
-    def _read_all_plists(
-            self,
-            beacon_store_key: bytearray
-    ) -> tuple[list[PListFileInfo], list[PListFileInfo], list[PListFileInfo]]:
-        owned_beacons: list[PListFileInfo] = []
-        beacon_naming_records: list[PListFileInfo] = []
-        key_alignment_records: list[PListFileInfo] = []
-
-        for path, folders, _ in os.walk(INPUT_PATH):
-            for foldername in folders:
-
-                if foldername not in WHITELISTED_DIRS:
-                    continue
-
-                plists = self._extract_plists(
-                    path,
-                    foldername,
-                    beacon_store_key
-                )
-
-                if foldername == OWNED_BEACONS or foldername == MASTER_BEACONS:
-                    # MasterBeacons is the legacy name (see: https://github.com/parawanderer/OpenTagViewer/issues/24)
-                    owned_beacons = plists
-                elif foldername == BEACON_NAMING_RECORD:
-                    beacon_naming_records = plists
-                elif foldername == KEY_ALIGNMENT_RECORDS:
-                    key_alignment_records = plists
-            break
-
-        return (owned_beacons, beacon_naming_records, key_alignment_records)
-
-    def _create_beacon_data_map(self) -> dict[str, BeaconData]:
-        # get key: prompts password entry
-        beacon_store_key: bytearray = get_key_fallback(KEYCHAIN_LABEL)
-
-        if not beacon_store_key:
-            messagebox.showerror(
-                "Permission Refused Error",
-                f"Permission to access '{KEYCHAIN_LABEL}' was not granted, which means the app cannot function at this time. \n\nIf this was a mistake, restart the app and try entering your password TWICE again."  # noqa: E501
-            )
-            raise Exception(f"Failure to authenticate for '{KEYCHAIN_LABEL}' access!")
-
-        # get needed files
-        owned_beacons, beacon_naming_records, key_alignment_records = self._read_all_plists(beacon_store_key)
-        # map them by beaconId
-        m: dict[str, BeaconData] = {}
-
-        # map OwnedBeacons
-        for owned_beacon in owned_beacons:
-            beacon_id: str = owned_beacon.data["identifier"]
-
-            has_private_key: bool = "privateKey" in owned_beacon.data
-            if has_private_key:
-                m[beacon_id] = BeaconData(owned_beacon, None)
-            else:
-                messagebox.showwarning(
-                    "Non-Exportable Device found",
-                    f"The device at {owned_beacon.filepath} could not be exported, because its OwnedBeacon file did not include a privateKey field. This Device will be skipped. \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"  # noqa: E501
-                )
-
-        # join them with their BeaconNamingRecords
-        for beacon_naming_record in beacon_naming_records:
-            beacon_id: str = beacon_naming_record.data["associatedBeacon"]
-            if beacon_id not in m:  # this case shouldn't really happen
-                messagebox.showwarning(
-                    "Unkexpected Naming Record",
-                    f"Found an unexpected naming record at {beacon_naming_record.filepath}! \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"  # noqa: E501
-                )
-                continue
-
-            m[beacon_id].beacon_naming_record = beacon_naming_record
-            m[beacon_id].beacon_name = beacon_naming_record.data.get("name", "")
-            m[beacon_id].beacon_emoji = beacon_naming_record.data.get("emoji", None)
-
-        # join them with their KeyAlignmentRecords.
-        # Layout is KeyAlignmentRecords/<accessory-uuid>/<record-uuid>.record, so unlike
-        # naming records - which carry an "associatedBeacon" field - the beacon id comes
-        # from the parent directory name.
-        for key_alignment_record in key_alignment_records:
-            beacon_id: str = os.path.basename(os.path.dirname(key_alignment_record.filepath))
-            if beacon_id not in m:
-                # Alignment data for a beacon we are not exporting; nothing to do.
-                continue
-            m[beacon_id].key_alignment_record = key_alignment_record
-
-        # cleanup any bad ones:
-        for beacon_id in list(m.keys()):
-            if m[beacon_id].beacon_naming_record is None:
-                # shouldn't happen, but clean up just in case
-                del m[beacon_id]
-                messagebox.showwarning(
-                    "Unexpected NamingRecord for Device",
-                    f"Device {beacon_id} had an OwnedBeacon file but no BeaconNamingRecord file could be matched for it. This device is being skipped. \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"  # noqa: E501
-                )
-
-        return m
-
-    def _extract_plists(self, input_base_path: str, subfolder: str, key: bytearray) -> list[PListFileInfo]:
-        search_path: str = os.path.join(input_base_path, subfolder)
-
-        res: list[PListFileInfo] = []
-
-        for path, folders, files in os.walk(search_path):
-            for filename in files:
-                try:
-                    file_fullpath: str = os.path.join(path, filename)
-                    plist: dict = decrypt_plist(file_fullpath, key)
-                    res.append(PListFileInfo(file_fullpath, plist))
-                except Exception:
-                    messagebox.showwarning(
-                        "Error Decrypting Airtag Data",
-                        f"A non-fatal error occurred when trying to decrypt plist file '{file_fullpath}'. \n\nReport this bug on Github: {GITHUB_ISSUES_LINK}"  # noqa: E501
+            async with await icloud.open_client(account) as client:
+                options = await client.recovery_options()
+                if not options.recoverable:
+                    raise ExportSourceError(
+                        "No device on this account can currently be recovered from, so its keychain"
+                        " cannot be unlocked.",
                     )
 
-        return res
+                index = asker.ask(lambda: _ask_choice(
+                    self,
+                    "Unlock",
+                    "Which device's screen-lock passcode do you have?\n"
+                    "That is its PIN or login password, not your Apple ID password.",
+                    [record.describe() for record in options.recoverable],
+                ))
+                chosen = options.recoverable[index]
 
-    def handle_confirm(self):
-        current_selection = self.choices_select.curselection()
-        print(f"Current selection on clicking confirm was: {current_selection}")
-        if len(current_selection) == 0:
-            return  # no items selected = nothing to do
+                passcode = asker.ask(lambda: _ask_string(
+                    self, "Unlock", f"Screen-lock passcode for {chosen.serial}:", secret=True,
+                ))
 
-        # get which ones:
-        beacon_ids: list[str] = []
-        for i in current_selection:
-            opt: str = self.options[i]
-            beacon_id = opt[-36:]
-            beacon_ids.append(beacon_id)
+                await client.unlock(chosen, passcode)
 
-        initial_filename = f"OpenTagViewer_export_{datetime.datetime.now().strftime('%S%M%H%d%m%Y')}.zip"
-        save_filename: str | None = asksaveasfilename(
-            initialfile=initial_filename,
+                return await icloud.fetch(client)
+        finally:
+            await account.close()
+
+    # -- the list -------------------------------------------------------------------------
+
+    def _show(self, skipped: list) -> None:
+        """Fill the list, and say what was set aside."""
+        self.choices.delete(0, "end")
+
+        for candidate in self.candidates:
+            self.choices.insert("end", _row(candidate.label, candidate.details, candidate.has_alignment))
+
+        for tag in self.custom_tags:
+            self.choices.insert("end", _row(tag.name, "added from a key file", has_alignment=True))
+
+        self.heading.configure(text="Choose what to export")
+        self.confirm_button.configure(state="normal" if self.choices.size() else "disabled")
+
+        notes = []
+        if skipped:
+            notes.append(f"{len(skipped)} record(s) could not be exported: they carry no key material.")
+        notes.append("Nothing is selected to begin with. What you export cannot be taken back.")
+        self.note.configure(text="  ".join(notes))
+
+    def _add_key_file(self) -> None:
+        """Read a self-generated tag out of a file, and add it to the list."""
+        paths = askopenfilenames(title="Add tags from key files", filetypes=_KEY_FILE_TYPES)
+
+        for path in paths or ():
+            try:
+                for tag in parse_key_file(Path(path).read_bytes(), filename=Path(path).name):
+                    check_advertisement_key(tag)
+
+                    suggestion = suggested_name(tag)
+                    name = _ask_string(self, "Name this tag", "What should this tag be called?", suggestion)
+                    if not name:
+                        continue
+
+                    self.custom_tags.append(PreparedTag(
+                        tag=tag, name=name, identifier=suggested_identifier(tag),
+                    ))
+            except (KeyFileError, CustomTagError, OSError) as e:
+                messagebox.showwarning("Could not read that file", str(e))
+
+        self._show([])
+
+    # -- exporting ------------------------------------------------------------------------
+
+    def _selected(self) -> tuple[list[Candidate], list[PreparedTag]]:
+        """Split the selection back into where each row came from."""
+        indices = list(self.choices.curselection())
+        boundary = len(self.candidates)
+
+        return (
+            [self.candidates[i] for i in indices if i < boundary],
+            [self.custom_tags[i - boundary] for i in indices if i >= boundary],
+        )
+
+    def _export(self) -> None:
+        chosen, custom = self._selected()
+
+        if not chosen and not custom:
+            messagebox.showinfo("Nothing selected", "Tick the accessories you want in the bundle.")
+            return
+
+        chosen = self._confirm_devices(chosen)
+        if chosen is None:
+            return
+
+        exports = []
+        for candidate in chosen:
+            name = candidate.name
+            if candidate.naming_record is None:
+                # The importer drops any accessory it cannot pair with a name, so an unnamed one
+                # would be quietly missing from the bundle rather than visibly absent.
+                name = _ask_string(self, "Name this accessory", f"{candidate.beacon_id}\nhas no name. Call it:")
+                if not name:
+                    return
+
+            exports.append(icloud.to_export(candidate, name=name))
+
+        exports.extend(tag.to_export() for tag in custom)
+
+        path = asksaveasfilename(
+            initialfile=f"OpenTagViewer_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
             defaultextension=".zip",
-            filetypes=[("Zip Archives", "*.zip")]
+            filetypes=[("Zip Archives", "*.zip")],
+        )
+        if not path:
+            return
+
+        try:
+            bundle = build_export(
+                exports,
+                via=EXPORT_VIA_WIZARD,
+                # getpass.getuser() rather than os.getenv("USER"), which is empty on Windows.
+                source_user=getpass.getuser(),
+                exported_at_ms=int(time.time() * 1000),
+            )
+        except ExportError as e:
+            messagebox.showerror("That selection cannot be exported", str(e))
+            return
+
+        # No password from the window yet: nothing that imports these can open a locked one, so
+        # offering it here would produce a file the recipient cannot use. See the CLI's
+        # --no-password, and docs/android-import-handover.md.
+        write_zip(bundle, path, password=None)
+
+        messagebox.showinfo(
+            "Exported",
+            f"{len(exports)} accessory(s) written to:\n{path}\n\n"
+            "Anyone who has this file can locate them, and that cannot be undone.",
+        )
+        self.destroy()
+
+    def _confirm_devices(self, chosen: list[Candidate]) -> list[Candidate] | None:
+        """
+        Ask again when the selection includes one of the owner's own devices.
+
+        Not on every export - a warning that fires when nothing is wrong is one people learn to
+        dismiss. Only for the case that is not what "select all" reads like.
+        """
+        devices = [candidate for candidate in chosen if is_own_device(candidate.owned_beacon)]
+
+        if not devices:
+            return chosen
+
+        named = ", ".join(candidate.label for candidate in devices)
+        keep = messagebox.askyesno(
+            "That includes your own devices",
+            f"Your selection includes {named}.\n\n"
+            "Those are your own devices, not tags. Anyone you give this bundle to can locate them"
+            " for as long as their keys are valid, and that cannot be undone.\n\n"
+            "Include them anyway?",
         )
 
-        print(f"Filename choice was: {save_filename}")
-        if save_filename is None:
-            return  # cancelled
+        if keep:
+            return chosen
 
-        self._create_zip(save_filename, beacon_ids)
-        print("Bye!")
-        self.quit()
+        kept = [candidate for candidate in chosen if not is_own_device(candidate.owned_beacon)]
 
-    def _create_zip(self, output_zip_path: str, whitelisted_beacon_ids: list[str]):
-        with tempfile.TemporaryDirectory() as tmpdirname:
+        return kept or None
 
-            # dump plist files to tmpdir
-            for beacon_id in whitelisted_beacon_ids:
-                beacon = self.beacon_data[beacon_id]
 
-                output_file1: str = make_output_path(
-                    tmpdirname,
-                    beacon.beacon_naming_record.filepath,
-                    INPUT_PATH,
-                    rename_legacy=True
-                )
-                print(f"Now dumping '{beacon.beacon_naming_record.filepath}' to {output_file1}...")
-                dump_plist(beacon.beacon_naming_record.data, output_file1)
+# -- small dialogs ------------------------------------------------------------------------
 
-                output_file2: str = make_output_path(
-                    tmpdirname,
-                    beacon.owned_beacon.filepath,
-                    INPUT_PATH,
-                    rename_legacy=True
-                )
-                print(f"Now dumping '{beacon.owned_beacon.filepath}' to {output_file2}...")
-                dump_plist(beacon.owned_beacon.data, output_file2)
 
-                # Optional: macOS does not always have one, and it is absent entirely on
-                # versions that predate key alignment. Without it FindMy.py starts an
-                # accessory at index 0 from its pairing date, making the first fetch after
-                # import search the tag's whole lifetime of keys.
-                if beacon.key_alignment_record is not None:
-                    output_file3: str = make_output_path(
-                        tmpdirname,
-                        beacon.key_alignment_record.filepath,
-                        INPUT_PATH,
-                        rename_legacy=True
-                    )
-                    print(f"Now dumping '{beacon.key_alignment_record.filepath}' to {output_file3}...")
-                    dump_plist(beacon.key_alignment_record.data, output_file3)
+def _row(label: str, details: str, has_alignment: bool) -> str:
+    """One line of the list: what it is, then what is worth knowing before choosing it."""
+    warning = "" if has_alignment else "  ⚠ no alignment record: slow first locate"
 
-            # We need to make an export metadata file in the root dir...
-            export_metadata = {
-                "version": EXPORT_METADATA_VERSION,
-                "exportTimestamp": int(time.time() * 1000),
-                "sourceUser": os.getenv("USER"),
-                "via": EXPORT_METADATA_VIA_NAME
-            }
+    return f"{label:<28}{details}{warning}"
 
-            metadata_file = os.path.join(tmpdirname, EXPORT_METADATA_FILENAME)
-            with open(metadata_file, 'w') as fmeta:
-                yaml.dump(export_metadata, fmeta, default_flow_style=False)
-                print(f"Created metadata file: {metadata_file}")
 
-            # zip to desired target file:
-            print(f"Now writing compressed zip file to '{output_zip_path}'...")
-            with ZipFile(output_zip_path, 'w') as zip_obj:
-                for folder, subfolders, filenames in os.walk(tmpdirname):
-                    for filename in filenames:
-                        filename_path = os.path.join(folder, filename)
-                        print(f"Now zipping '{filename_path}'")
-                        zip_obj.write(filename_path, os.path.relpath(filename_path, tmpdirname))
+def _ask_string(parent: tk.Tk, title: str, prompt: str, initial: str = "", *, secret: bool = False) -> str:
+    """
+    Ask for one line of text, in a modal window.
 
-            if os.path.exists(output_zip_path):
-                print(f"Successfully created zip at '{output_zip_path}'")
-                os.system(f"open {shlex.quote(os.path.dirname(output_zip_path))}")
-            else:
-                messagebox.showerror(
-                    "Export Error",
-                    f"Failed to create export zip at {output_zip_path}! \n\nReport this as a bug on Github: {GITHUB_ISSUES_LINK}"  # noqa: E501
-                )
+    Hand-rolled rather than `tkinter.simpledialog`, which cannot hide what is typed - and one of
+    the two things this asks for is an Apple ID password.
+    """
+    window = tk.Toplevel(parent)
+    window.title(title)
+    window.transient(parent)
+    window.resizable(width=False, height=False)
 
-    def handle_cancel(self):
-        self.quit()
+    frame = ttk.Frame(window, padding=16)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text=prompt, wraplength=380, justify="left").pack(anchor="w", pady=(0, 8))
+
+    value = tk.StringVar(value=initial)
+    entry = ttk.Entry(frame, textvariable=value, width=44, show="•" if secret else "")
+    entry.pack(fill="x")
+    entry.focus_set()
+    entry.select_range(0, "end")
+
+    answer: dict[str, str] = {}
+
+    def _accept() -> None:
+        answer["value"] = value.get().strip()
+        window.destroy()
+
+    buttons = ttk.Frame(frame)
+    buttons.pack(fill="x", pady=(12, 0))
+    ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="right", padx=(8, 0))
+    ttk.Button(buttons, text="OK", command=_accept).pack(side="right")
+
+    window.bind("<Return>", lambda _event: _accept())
+    window.bind("<Escape>", lambda _event: window.destroy())
+
+    window.grab_set()
+    parent.wait_window(window)
+
+    return answer.get("value", "")
+
+
+def _ask_choice(parent: tk.Tk, title: str, prompt: str, options: Sequence[str]) -> int:
+    """Pick one of several, by position. Returns 0 if the window is closed."""
+    window = tk.Toplevel(parent)
+    window.title(title)
+    window.transient(parent)
+
+    frame = ttk.Frame(window, padding=16)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text=prompt, wraplength=420, justify="left").pack(anchor="w", pady=(0, 8))
+
+    chosen = tk.IntVar(value=0)
+    for index, option in enumerate(options):
+        ttk.Radiobutton(frame, text=option, variable=chosen, value=index).pack(anchor="w")
+
+    ttk.Button(frame, text="OK", command=window.destroy).pack(pady=(12, 0))
+
+    window.grab_set()
+    parent.wait_window(window)
+
+    return chosen.get()
+
+
+async def _async(value):
+    """Wrap an already-computed answer, for the awaitable callbacks `icloud.log_in` expects."""
+    return value
 
 
 if __name__ == "__main__":
-    # What the release build's smoke test runs. It does not avoid tkinter - the imports at the
-    # top of this module have already happened - and that is the point: it proves the frozen
-    # bundle can import everything it was built with, including Tk, without needing a display to
-    # do it. A bundle missing an import fails here rather than on a user's desktop.
+    # What the release build's smoke test runs. It does not avoid tkinter - the imports above have
+    # already happened - and that is the point: it proves the frozen bundle can import everything
+    # it was built with, including Tk, without needing a display to do it.
     if "--version" in sys.argv[1:]:
         print(VERSION)
         sys.exit(0)
 
-    app = WizardApp()
-    app.mainloop()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(name)s: %(message)s")
+
+    WizardApp().mainloop()
