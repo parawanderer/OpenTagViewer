@@ -1,5 +1,13 @@
 # Test resources
 
+**Export bundles** — the zip contents the Android app imports. Shared deliberately: the Java tests
+read them as the thing being imported, and the shared export package's tests in
+`python/opentagviewer_export/tests/` rebuild them to prove the writer still produces exactly this.
+
+What does *not* belong here is anything the exporter reads on the way in — the sample OpenHaystack
+and Macless Haystack key files live in `python/test/resources/keyfiles/`, because a key file is
+raw material consumed before a bundle exists and Java never sees one.
+
 ## `19032025/`
 
 A redacted copy of a real OpenTagViewer export (`OPENTAGVIEWER.yml` reports
