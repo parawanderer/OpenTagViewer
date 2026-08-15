@@ -319,6 +319,17 @@ strongest test rebuilds the committed export fixtures in `app/src/test/resources
 Two things it deliberately does not cover, because they need an Apple account: signing in, and
 everything the account then yields. What happens to the records afterwards is covered in full.
 
+**Two files need a display and skip without one**, which includes CI — `test_asyncui.py`, for what
+happens when somebody closes the progress window, and `test_wizard_list.py`, for the list of
+accessories. Both drive real Tk widgets, because what they cover *is* the event loop and the
+widget: a cancelled progress window used to leave the wizard hung for ever, and that is not
+reproducible against a stand-in. So run the exporter suite on a desktop before trusting a green
+CI run over the wizard — locally they run, and `-rs` says whether they were skipped:
+
+```bash
+uv run pytest ./test -rs
+```
+
 ### Tooling tests
 
 ```bash

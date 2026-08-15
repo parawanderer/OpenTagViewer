@@ -94,13 +94,19 @@ class WizardApp(tk.Tk):
 
         self.candidates: list[Candidate] = []
         self.custom_tags: list[PreparedTag] = []
+        # What the source could not export, kept rather than passed around: the list is redrawn
+        # whenever a key file is added, and that redraw knows nothing about the original read.
+        self.skipped: list = []
         self.route = source.detect()
 
         self._build()
         centre_on_screen(self)
 
-        # After the window exists, so a failure has somewhere to report itself.
-        self.after(100, self._load)
+        # The list starts empty and nothing is read until asked for. It used to sign in the moment
+        # the window appeared, which made an Apple account the price of opening the program: a
+        # failed sign-in closed it, and the button for tags that were never in an Apple account -
+        # OpenHaystack and the like - was on the screen that failure never reached.
+        self._show([])
 
     # -- layout ---------------------------------------------------------------------------
 
@@ -110,7 +116,7 @@ class WizardApp(tk.Tk):
         container.grid_rowconfigure(2, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
-        self.heading = ttk.Label(container, text="Reading your accessories…", font=("Arial", 13, "bold"))
+        self.heading = ttk.Label(container, text="Choose what to export", font=("Arial", 13, "bold"))
         self.heading.grid(row=0, column=0, columnspan=3, sticky="w")
 
         self.explanation = ttk.Label(container, text=self._route_line(), wraplength=680, foreground="#555")
@@ -155,29 +161,46 @@ class WizardApp(tk.Tk):
 
         buttons = ttk.Frame(container)
         buttons.grid(row=4, column=0, columnspan=4, sticky="ew")
-        buttons.grid_columnconfigure(1, weight=1)
+        buttons.grid_columnconfigure(2, weight=1)
+
+        # Reading the account is a button rather than something that happens to you, and the label
+        # says which of the two routes it will take: one asks for an Apple ID password and
+        # registers a device on the account, the other asks for neither.
+        self.read_button = ttk.Button(buttons, text=self._read_label(), command=self._load)
+        self.read_button.grid(row=0, column=0, sticky="w")
 
         # The "+" is for tags that were never in an Apple account - OpenHaystack and the like.
         # They cannot be fetched, because there is nothing to fetch them from.
         self.add_button = ttk.Button(buttons, text="+ Add from key file…", command=self._add_key_file)
-        self.add_button.grid(row=0, column=0, sticky="w")
+        self.add_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
 
         help_label = ttk.Label(buttons, text="Need help?", cursor="hand2", foreground="#0645AD")
-        help_label.grid(row=0, column=1)
+        help_label.grid(row=0, column=2)
         help_label.bind("<Button-1>", lambda _event: webbrowser.open(WIKI_LINK, new=2, autoraise=True))
 
-        ttk.Button(buttons, text="Cancel", command=self.destroy).grid(row=0, column=2, padx=(0, 8))
+        ttk.Button(buttons, text="Cancel", command=self.destroy).grid(row=0, column=3, padx=(0, 8))
         self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
-        self.confirm_button.grid(row=0, column=3)
+        self.confirm_button.grid(row=0, column=4)
+
+    def _read_label(self) -> str:
+        """What the button that reads the account says, which is not the same on both routes."""
+        return "Read this Mac's Find My files" if self.route.is_local else "Sign in to Apple…"
 
     def _route_line(self) -> str:
         where = "this Mac's own Find My files" if self.route.is_local else "your iCloud account"
-        return f"Reading from {where}, because {self.route.reason}."
+        return f"Reads {where}, because {self.route.reason}."
 
     # -- loading --------------------------------------------------------------------------
 
     def _load(self) -> None:
-        """Read whichever source this machine can use, and fill the list."""
+        """
+        Read whichever source this machine can use, and add what it holds to the list.
+
+        **Nothing closes the window from here.** This runs when a button is pressed rather than
+        when the program starts, so a sign-in that fails, or one the user changes their mind about
+        half way through, leaves them where they were - with whatever they had already added from
+        a key file still in the list, and the button still there to try again.
+        """
         try:
             fetched = (
                 run_with_progress(self, "Reading this Mac's Find My files…", self._read_local)
@@ -185,11 +208,10 @@ class WizardApp(tk.Tk):
                 else run_with_progress(self, "Signing in to iCloud…", self._read_icloud)
             )
         except Cancelled:
-            self.destroy()
+            # They closed the progress window, which says stop this - not close everything.
             return
         except (ExportSourceError, ExportError) as e:
             messagebox.showerror("Could not read your accessories", str(e))
-            self.destroy()
             return
         except Exception as e:  # noqa: BLE001 - anything else is still the user's problem to see
             logger.exception("Reading accessories failed")
@@ -202,10 +224,12 @@ class WizardApp(tk.Tk):
                 f"The details are in:\n{log_file()}\n\n"
                 f"If this looks like a bug, please report it with that file:\n{GITHUB_ISSUES_LINK}",
             )
-            self.destroy()
             return
 
         self.candidates = fetched.candidates
+        # Read once. A second read would sign in again, register nothing new and rebuild the list
+        # under the ticks somebody has already made.
+        self.read_button.configure(state="disabled")
         self._show(fetched.skipped)
 
     async def _read_local(self, _asker: Asker):
@@ -289,16 +313,28 @@ class WizardApp(tk.Tk):
 
     # -- the list -------------------------------------------------------------------------
 
-    def _show(self, skipped: list) -> None:
-        """Fill the table, and say what was set aside."""
+    def _show(self, skipped: list | None = None) -> None:
+        """
+        Fill the table, and say what was set aside.
+
+        **Ticks survive this**, because it is not only called once. Adding a key file rebuilds the
+        list to show the new row, and a rebuild that starts everything from unticked throws away a
+        decision the user has already made - on the screen whose whole job is to state what is
+        about to be handed over, without saying that it did.
+
+        :param skipped: What could not be exported, when this is showing a fresh read. None keeps
+            whatever was said last time, since a rebuild does not un-skip anything.
+        """
+        if skipped is not None:
+            self.skipped = skipped
+
         self.choices.delete(*self.choices.get_children())
-        self.ticked.clear()
 
         for index, candidate in enumerate(self.candidates):
             self.choices.insert(
                 "", "end", iid=f"c{index}",
                 values=(
-                    UNTICKED,
+                    TICKED if f"c{index}" in self.ticked else UNTICKED,
                     candidate.label,
                     candidate.hardware or "",
                     candidate.serial_number or "",
@@ -310,16 +346,38 @@ class WizardApp(tk.Tk):
         for index, tag in enumerate(self.custom_tags):
             self.choices.insert(
                 "", "end", iid=f"k{index}",
-                values=(UNTICKED, tag.name, "self-generated tag", "", "", "from a key file"),
+                values=(
+                    TICKED if f"k{index}" in self.ticked else UNTICKED,
+                    tag.name, "self-generated tag", "", "", "from a key file",
+                ),
             )
 
-        self.heading.configure(text="Choose what to export")
-        self.confirm_button.configure(state="normal" if self.choices.get_children() else "disabled")
+        # Rows are only ever added, so this drops nothing in practice - but a tick for a row that
+        # is no longer there would export whatever later took its place.
+        self.ticked &= set(self.choices.get_children())
+
+        has_rows = bool(self.choices.get_children())
+
+        self.heading.configure(text="Choose what to export" if has_rows else "Nothing to export yet")
+        self.confirm_button.configure(state="normal" if has_rows else "disabled")
 
         notes = []
-        if skipped:
-            notes.append(f"{len(skipped)} record(s) could not be exported: they carry no key material.")
-        notes.append("Nothing is selected to begin with. What you export cannot be taken back.")
+        if self.skipped:
+            notes.append(
+                f"{len(self.skipped)} record(s) could not be exported: they carry no key material.",
+            )
+
+        if has_rows:
+            notes.append("Nothing is selected to begin with. What you export cannot be taken back.")
+        else:
+            # The empty list is the first thing anybody sees now, so it has to say what the two
+            # buttons are for - including that the second one needs no Apple account, which is the
+            # whole reason somebody with only self-generated tags can get anywhere here.
+            notes.append(
+                f"“{self._read_label()}” reads the accessories on your account."
+                " “+ Add from key file…” adds a tag you generated yourself, which needs no account.",
+            )
+
         self.note.configure(text="  ".join(notes))
 
     def _add_key_file(self) -> None:
@@ -342,7 +400,9 @@ class WizardApp(tk.Tk):
             except (KeyFileError, CustomTagError, OSError) as e:
                 messagebox.showwarning("Could not read that file", str(e))
 
-        self._show([])
+        # No argument: nothing here changes what could not be exported, and passing an empty list
+        # would replace that note with silence.
+        self._show()
 
     # -- exporting ------------------------------------------------------------------------
 
@@ -352,12 +412,16 @@ class WizardApp(tk.Tk):
         if not row:
             return
 
-        if row in self.ticked:
-            self.ticked.discard(row)
-            self.choices.set(row, "tick", UNTICKED)
-        else:
+        self._set_tick(row, row not in self.ticked)
+
+    def _set_tick(self, row: str, ticked: bool) -> None:
+        """Tick or untick one row: the set and the mark on screen, which must not disagree."""
+        if ticked:
             self.ticked.add(row)
-            self.choices.set(row, "tick", TICKED)
+        else:
+            self.ticked.discard(row)
+
+        self.choices.set(row, "tick", TICKED if ticked else UNTICKED)
 
     def _selected(self) -> tuple[list[Candidate], list[PreparedTag]]:
         """Split what is ticked back into where each row came from."""
