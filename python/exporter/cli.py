@@ -257,8 +257,14 @@ async def sign_in(arguments: argparse.Namespace):
         str(arguments.anisette_libs) if arguments.anisette_libs else None,
     )
 
-    print("\nSigning in registers this exporter as a device on your Apple account.", file=sys.stderr)
-    print("It appears in your device list as '0PENTAGXPORT', and can be removed there.\n", file=sys.stderr)
+    # Named as it will actually appear. The model and OS come from FindMy.py, which presents as a
+    # MacBook Pro, so somebody who was only told the serial goes looking for a device they own.
+    print("\nSigning in registers this exporter as a device on your Apple account. It appears in",
+          file=sys.stderr)
+    print("your device list as a MacBook Pro on macOS 13.4.1, serial 0PENTAGXPORT - that is this",
+          file=sys.stderr)
+    print("program, not a Mac you own. Remove it any time at account.apple.com > Devices.\n",
+          file=sys.stderr)
 
     email = await prompts.text("Apple ID")
     password = await prompts.password("Password")

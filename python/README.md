@@ -176,3 +176,18 @@ python ../scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.6
 Not to be confused with `EXPORT_METADATA_VERSION`, a few lines below it: that is the version
 of the *export format* the Android app parses, and it changes only when the contents of the
 zip change. Full procedure: [CONTRIBUTING.md](../CONTRIBUTING.md#releasing-the-macos-exporter).
+
+## What an export leaves on your Apple account
+
+Nothing, on macOS 14 or older: that route reads the files macOS already keeps and never signs in.
+
+Everywhere else, signing in registers a device, and it shows up in your Apple device list as a
+**MacBook Pro** (`MacBookPro18,3`) running **macOS 13.4.1**, with serial number **`0PENTAGXPORT`**.
+You do not own that Mac. The model and OS strings come from FindMy.py, which presents itself as one
+and authenticates fine that way; the serial is this exporter's own and is what makes the entry
+recognisable rather than something you are invited to remove because you cannot place it.
+
+One entry, not one per export — the identity is stable. Remove it whenever you like at
+[account.apple.com](https://account.apple.com) → **Devices** → **Remove from Account**, which works
+in any browser and needs no Apple device; a later export signs in again. See
+[docs/how-to-export-with-the-cli.md](../docs/how-to-export-with-the-cli.md#what-this-leaves-on-your-apple-account).

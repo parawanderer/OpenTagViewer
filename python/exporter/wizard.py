@@ -174,6 +174,17 @@ class WizardApp(tk.Tk):
         account = icloud.make_account()
 
         try:
+            # Said before the password is asked for, and naming the entry as it will appear: the
+            # model and OS come from FindMy.py, which presents as a MacBook Pro, so somebody told
+            # only the serial goes looking for a Mac they own.
+            asker.ask(lambda: messagebox.showinfo(
+                "Signing in registers a device",
+                "Signing in adds an entry to your Apple account's device list: a MacBook Pro on"
+                " macOS 13.4.1, serial 0PENTAGXPORT.\n\n"
+                "That is this program, not a Mac you own. You can remove it at any time at"
+                " account.apple.com under Devices, from any browser.",
+            ))
+
             email = asker.ask(lambda: _ask_string(self, "Apple ID", "Your Apple ID:"))
             password = asker.ask(lambda: _ask_string(self, "Password", "Apple ID password:", secret=True))
 
