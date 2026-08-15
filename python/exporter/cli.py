@@ -295,28 +295,37 @@ async def sign_in(arguments: argparse.Namespace):
     password = await prompts.password("Password")
 
     try:
-        await icloud.log_in(
-            account,
-            email,
-            password,
-            choose_second_factor=lambda methods: ask_choice("How should Apple send the code?", methods),
-            get_code=_ask_verification_code,
-        )
-    except MobileMeDelegateError as e:
-        # Authentication itself worked; the exchange that follows it did not. Unaccepted terms are
-        # the one cause of that with a remedy here, and which error value means "terms pending" is
-        # not established - so this says what Apple said and then offers, rather than assuming.
-        print(f"\nSigning in got as far as your account and then stopped:\n\n  {e}\n", file=sys.stderr)
-        print("If that is about terms of service, they can be shown and accepted here.", file=sys.stderr)
-        print("If it is about something else, accepting terms will not fix it.\n", file=sys.stderr)
+        # Nested rather than another `except` clause beside the one below, and that is not a style
+        # choice: an exception raised inside an `except` block is not caught by a sibling `except`
+        # on the same `try`. Written flat, every way out of the terms handler skipped the close -
+        # which is exactly the case the close exists for.
+        try:
+            await icloud.log_in(
+                account,
+                email,
+                password,
+                choose_second_factor=lambda methods: ask_choice("How should Apple send the code?", methods),
+                get_code=_ask_verification_code,
+            )
+        except MobileMeDelegateError as e:
+            # Authentication itself worked; the exchange that follows it did not. Unaccepted terms
+            # are the one cause of that with a remedy here, and which error value means "terms
+            # pending" is not established - so this says what Apple said and then offers, rather
+            # than assuming.
+            print(f"\nSigning in got as far as your account and then stopped:\n\n  {e}\n", file=sys.stderr)
+            print("If that is about terms of service, they can be shown and accepted here.", file=sys.stderr)
+            print("If it is about something else, accepting terms will not fix it.\n", file=sys.stderr)
 
-        if not arguments.accept_terms and not await prompts.confirm("Fetch the terms of service?"):
-            raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
+            if not arguments.accept_terms and not await prompts.confirm("Fetch the terms of service?"):
+                raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
 
-        if not await accept_terms(account, without_reading=arguments.accept_terms):
-            raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
-        # Signing in registered a device; remembering which one is what stops the next export
-        # registering another.
+            if not await accept_terms(account, without_reading=arguments.accept_terms):
+                raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
+
+        # Signing in registered a device, whichever of the two ways it got here; remembering which
+        # one is what stops the next export registering another. Out here rather than inside the
+        # handler, where it only ran for an account that had terms pending - so the ordinary
+        # sign-in, which is nearly every run, stored nothing and registered a fresh Mac each time.
         icloud.remember(account)
     except BaseException:
         # The account owns an HTTP session, and a sign-in that fails leaves it open - which
