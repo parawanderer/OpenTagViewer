@@ -1,4 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# Lints and tests everything under python/: the desktop exporter and the shared export package.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: MacOS Scripts
@@ -24,45 +24,49 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        # 3.9 is what the Xcode Command Line Tools install, so it is the interpreter anyone
-        # running the wizard from source on a stock Mac actually gets. Dropping it means
-        # 3.10-only syntax can land and the wizard dies at import on a fresh machine, which
-        # is exactly how it broke once.
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        # 3.9 used to be here, because it is what the Xcode Command Line Tools install and so what
+        # anyone running the wizard from source on a stock Mac gets. It is gone because FindMy.py
+        # requires 3.10, and the iCloud export route is the whole point of this exporter now.
+        #
+        # The consequence is real and belongs in the wiki rather than only here: running from
+        # source - the VM bootstrap - now needs a Python installed first. The built .app is
+        # unaffected; it bundles its own interpreter.
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    # --frozen: install exactly what uv.lock records and fail if it disagrees with pyproject.toml,
+    # rather than quietly resolving something else. That is what makes the lock mean anything -
+    # FindMy.py is pinned there by commit, since it is a branch rather than a release.
     - name: Install dependencies
       working-directory: ./python
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        pip install -r requirements.txt
+      run: uv sync --frozen --python ${{ matrix.python-version }}
 
     - name: Lint with flake8
-      working-directory: . # run flake8 from repository root
+      working-directory: . # run flake8 from repository root, so it picks up .flake8
       run: |
-        # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
         # stop the build if there are Python syntax errors or undefined names
-        flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 ./python --count --exit-zero --statistics
+        uv run --project python flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
+        uv run --project python flake8 ./python --count --exit-zero --statistics
 
+    # Both suites: the wizard's own, and the shared export package's, which live with the package.
     - name: Test with pytest
       working-directory: ./python
-      run: |
-        pytest ./test
+      run: uv run --frozen pytest ./test ./opentagviewer_export
 
-    # The release check reads VERSION out of wizard.py by parsing the module, so a refactor
-    # that makes it unreadable - moving it into a class, computing it from parts - would
-    # otherwise only surface when a release failed. This is that same read, run whenever
-    # python/ changes.
+    # The release check reads VERSION out of main/version.py by parsing the module, so a refactor
+    # that makes it unreadable - moving it into a class, computing it from parts - would otherwise
+    # only surface when a release failed. This is that same read, run whenever python/ changes.
     - name: Check the exporter version is still readable
       working-directory: .
       run: |

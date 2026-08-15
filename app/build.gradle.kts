@@ -267,7 +267,24 @@ chaquopy {
         pip {
             // SEE: https://chaquo.com/chaquopy/doc/current/android.html#android-requirements
             install(unicornStubWheel.get().asFile.absolutePath)
-            install("FindMy==0.9.8")
+
+            // TEMPORARY: a fork, until the iCloud keychain export work is merged upstream
+            // and released to PyPI. Then this goes back to a plain `install("FindMy==<x>")`.
+            //
+            // A branch, deliberately, while that branch is under active development - a
+            // commit pin would need moving on every change to it. The cost is that the build
+            // is not reproducible: two builds of the same commit of *this* repo can ship
+            // different Python. Acceptable now, not acceptable to release.
+            //
+            // **Pin to a commit before any build that leaves this machine**, by appending
+            // `@<sha>` in place of the branch name.
+            //
+            // Note for whoever bumps it: 0.10.x adds protobuf, which publishes a native
+            // wheel for desktop platforms and a pure-Python `py3-none-any` one as well.
+            // There is no Android wheel, so pip falls back to the pure-Python build - which
+            // is correct but markedly slower. The messages here are small enough not to care.
+            install("git+https://github.com/parawanderer/FindMy.py@feat/icloud-keychain-export")
+
             install("NSKeyedUnArchiver==1.5")
         }
     }
