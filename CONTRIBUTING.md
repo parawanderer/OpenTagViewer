@@ -547,7 +547,8 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `build-debug.yml` | push/PR to `main` | Translation check, pyright, string tooling tests, instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK |
+| `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, string tooling tests. Seconds, no Android |
+| `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
