@@ -33,6 +33,11 @@ from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
 from exporter import icloud, localsource, source
 from exporter.asyncui import Asker, Cancelled, run_with_progress
+from exporter.codes import (
+    VERIFICATION_CODE_LENGTH,
+    is_verification_code,
+    verification_code,
+)
 from exporter.tkutil import centre_on_screen, centre_over
 from exporter.custom_tags import (
     CustomTagError,
@@ -62,8 +67,6 @@ WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-A
 
 # Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
-
-VERIFICATION_CODE_LENGTH = 6
 
 TICKED = "\u2611"
 UNTICKED = "\u2610"
@@ -524,21 +527,6 @@ def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:
     parent.wait_window(window)
 
     return answer.get("value", ("", ""))
-
-
-def verification_code(typed: str) -> str:
-    """
-    Read a verification code out of whatever was typed.
-
-    Apple sends six digits, and people paste them with a space or a hyphen in the middle because
-    that is how the notification shows them. Taking the digits is kinder than rejecting the paste.
-    """
-    return "".join(character for character in typed if character.isdigit())
-
-
-def is_verification_code(typed: str) -> bool:
-    """Whether that is a code worth sending. Apple's are six digits."""
-    return len(verification_code(typed)) == VERIFICATION_CODE_LENGTH
 
 
 def _ask_string(

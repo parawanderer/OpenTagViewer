@@ -33,6 +33,11 @@ from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, T
 from findmy.errors import UnhandledProtocolError
 
 from exporter import icloud, localsource, prompts, source, terms
+from exporter.codes import (
+    VERIFICATION_CODE_LENGTH,
+    is_verification_code,
+    verification_code,
+)
 from exporter.custom_tags import (
     CustomTagError,
     PreparedTag,
@@ -177,6 +182,26 @@ async def ask_choice(question: str, options: Sequence[str]) -> int:
     )
 
 
+async def _ask_verification_code() -> str:
+    """
+    Ask for the code Apple sent, and keep asking until it could be one.
+
+    The same check the window makes, for the same reason: a code Apple rejects costs another
+    send and another wait, so "12345" is worth catching before it goes anywhere. What is
+    returned is the digits alone, since people paste the hyphen the notification shows them.
+    """
+    while True:
+        typed = await prompts.text(f"Verification code ({VERIFICATION_CODE_LENGTH} digits)")
+
+        if is_verification_code(typed):
+            return verification_code(typed)
+
+        print(
+            f"That is not a {VERIFICATION_CODE_LENGTH}-digit code. Spaces and hyphens are fine.",
+            file=sys.stderr,
+        )
+
+
 # ---------------------------------------------------------------------------------------------
 # The flow
 # ---------------------------------------------------------------------------------------------
@@ -275,7 +300,7 @@ async def sign_in(arguments: argparse.Namespace):
             email,
             password,
             choose_second_factor=lambda methods: ask_choice("How should Apple send the code?", methods),
-            get_code=lambda: prompts.text("Verification code"),
+            get_code=_ask_verification_code,
         )
     except MobileMeDelegateError as e:
         # Authentication itself worked; the exchange that follows it did not. Unaccepted terms are
