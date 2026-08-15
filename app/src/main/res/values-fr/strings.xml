@@ -137,4 +137,6 @@
     <string name="anisette_local_status_checking">Vérification…</string>
     <string name="anisette_login_needs_server">Cet appareil n\'a pas pu configurer la connexion par lui-même, un serveur s\'en charge donc cette fois-ci. Vous pourrez changer cela plus tard dans les réglages.</string>
     <string name="anisette_provider">Fournisseur Anisette</string>
+    <string name="use_system_colors">Utiliser les couleurs du système</string>
+    <string name="use_system_colors_description">Colore l’application d’après votre fond d’écran. Nécessite Android 12 ou version ultérieure.</string>
 </resources>

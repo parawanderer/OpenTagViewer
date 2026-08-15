@@ -13,9 +13,9 @@
         app:helperTextEnabled="true"
         app:helperText="@string/url_to_an_anisette_server"
         app:errorEnabled="true"
-        app:errorTextColor="@color/md_theme_error"
+        app:errorTextColor="?attr/colorError"
         app:errorIconDrawable="@drawable/exclamation_24"
-        app:errorIconTint="@color/md_theme_error"
+        app:errorIconTint="?attr/colorError"
         >
 
         <com.google.android.material.textfield.MaterialAutoCompleteTextView

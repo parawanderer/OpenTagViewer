@@ -137,4 +137,6 @@
     <string name="anisette_local_status_checking">正在检查…</string>
     <string name="anisette_login_needs_server">此设备无法自行完成登录准备，因此这次将使用服务器。你可以稍后在设置中更改。</string>
     <string name="anisette_provider">Anisette 提供方</string>
+    <string name="use_system_colors">使用系统配色</string>
+    <string name="use_system_colors_description">根据壁纸为应用配色。需要 Android 12 或更高版本。</string>
 </resources>

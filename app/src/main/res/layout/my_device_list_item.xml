@@ -37,7 +37,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:src="@drawable/apple"
-                    android:tint="@color/md_theme_outline"
+                    android:tint="?attr/colorOutline"
                     android:visibility="visible"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
@@ -60,7 +60,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/nunito_medium"
                         android:text="Device Name"
-                        android:textColor="@color/md_theme_onSurface"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp" />
 
                     <ImageView
@@ -79,7 +79,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/nunito_medium"
                     android:text="@string/last_updated_x"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>

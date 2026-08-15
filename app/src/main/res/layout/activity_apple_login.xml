@@ -66,7 +66,7 @@
                     android:fontFamily="@font/nunito_bold"
                     android:gravity="center"
                     android:text="@string/welcome"
-                    android:textColor="@color/md_theme_onSurface"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="24sp" />
 
             </LinearLayout>
@@ -101,7 +101,7 @@
                         android:enabled="@{allowServerConfNext}"
                         android:onClick="onClickToLoginAccount"
                         app:icon="@drawable/arrow_forward_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
 
                 </LinearLayout>
 
@@ -127,7 +127,7 @@
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="8dp"
                     android:background="@drawable/layout_rounded_less"
-                    android:backgroundTint="@color/md_theme_errorContainer"
+                    android:backgroundTint="?attr/colorErrorContainer"
                     android:visibility="invisible"
                     tools:visibility="visible">
 
@@ -138,7 +138,7 @@
                         android:fontFamily="@font/nunito_medium"
                         android:padding="8dp"
                         android:text="@string/login_failed_x"
-                        android:textColor="@color/md_theme_onErrorContainer"
+                        android:textColor="?attr/colorOnErrorContainer"
                         android:textSize="14sp"
                         tools:visibility="visible" />
                 </FrameLayout>
@@ -193,7 +193,7 @@
                         android:layout_weight="0"
                         android:onClick="onClickBackToAnisetteSettings"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -256,11 +256,11 @@
                         android:paddingTop="12dp"
                         android:paddingBottom="12dp"
                         android:text="@string/auth_by_trusted_device"
-                        android:textColor="@color/md_theme_onSurfaceVariant_mediumContrast"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="18sp"
                         app:icon="@drawable/devices_24px"
                         app:iconSize="24dp"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -280,7 +280,7 @@
                         android:layout_height="wrap_content"
                         android:onClick="onClickBackToLogin"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
 
                 </LinearLayout>
 
@@ -438,7 +438,7 @@
                     android:layout_height="match_parent"
                     android:layout_margin="8dp"
                     android:background="@drawable/layout_rounded_less"
-                    android:backgroundTint="@color/md_theme_errorContainer"
+                    android:backgroundTint="?attr/colorErrorContainer"
                     android:visibility="invisible"
                     tools:visibility="visible">
 
@@ -449,7 +449,7 @@
                         android:fontFamily="@font/nunito_medium"
                         android:padding="8dp"
                         android:text="@string/twofactor_failed_x"
-                        android:textColor="@color/md_theme_onErrorContainer"
+                        android:textColor="?attr/colorOnErrorContainer"
                         android:textSize="14sp" />
                 </FrameLayout>
 
@@ -469,7 +469,7 @@
                         android:layout_height="wrap_content"
                         android:onClick="onClickBackTo2FAMethodChoice"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="@color/md_theme_onSurfaceVariant_mediumContrast" />
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
 
                 </LinearLayout>
 
@@ -493,7 +493,7 @@
                     android:indeterminate="true"
                     app:hideAnimationBehavior="inward"
                     app:showAnimationBehavior="inward"
-                    app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                    app:trackColor="?attr/colorSurfaceVariant"
                     app:trackCornerRadius="2dp" />
 
                 <TextView
