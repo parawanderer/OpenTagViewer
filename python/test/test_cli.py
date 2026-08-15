@@ -16,8 +16,10 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from findmy import InvalidCredentialsError, MobileMeDelegateError
 
 from exporter import cli, prompts
+from exporter.icloud import ExportSourceError
 from exporter.version import EXPORT_VIA_CLI
 from opentagviewer_export import ExportBundle, generate_passcode
 
@@ -151,6 +153,155 @@ class TestWhatItStampsOnAnExport:
         # Same version, different program: a bug report that says which is worth more than one
         # that says "the exporter".
         assert EXPORT_VIA_CLI.startswith("OpenTagViewer.cli:")
+
+
+class FakeAccount:
+    """Enough of an `AsyncAppleAccount` for the sign-in flow: it can be closed, and it says so."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@pytest.fixture
+def apple(monkeypatch):
+    """
+    The account, the sign-in and the identity store, faked.
+
+    Nothing here reaches Apple, so what can be tested is what the CLI does around the sign-in:
+    whether it remembers the device it just registered, and whether it hands the session back.
+    """
+    account = FakeAccount()
+    remembered: list = []
+    outcome: list = [None]  # what `log_in` does: None to succeed, or an exception to raise
+
+    async def _log_in(*_args, **_kwargs):
+        if outcome[0] is not None:
+            raise outcome[0]
+
+    async def _password(_question: str) -> str:
+        return "hunter2"
+
+    async def _text(_question: str, default: str = "") -> str:
+        return "someone@example.com"
+
+    monkeypatch.setattr(cli.icloud, "make_account", lambda *_args, **_kwargs: account)
+    monkeypatch.setattr(cli.icloud, "log_in", _log_in)
+    monkeypatch.setattr(cli.icloud, "remember", remembered.append)
+    monkeypatch.setattr(prompts, "password", _password)
+    monkeypatch.setattr(prompts, "text", _text)
+
+    class Apple:
+        def __init__(self) -> None:
+            self.account = account
+            self.remembered = remembered
+
+        def fails_with(self, error: BaseException) -> None:
+            outcome[0] = error
+
+    return Apple()
+
+
+def signing_in(**overrides):
+    arguments = cli.build_parser().parse_args([])
+    for name, value in overrides.items():
+        setattr(arguments, name, value)
+    return arguments
+
+
+class TestRememberingTheDevice:
+    """
+    Every sign-in registers a device on the user's Apple account, and it should be the same one.
+
+    Forgetting to store the identity is not a slow leak of disk space: the account's device list
+    gains another "MacBook Pro, 0PENTAGXPORT" per export, each looking like a different machine
+    that happens to share a serial - next to a button offering to remove a device the user does
+    not recognise. See `exporter.device`.
+    """
+
+    def test_an_ordinary_sign_in_is_remembered(self, apple):
+        # The path almost every run takes, and the one that was storing nothing: the call sat in
+        # the terms handler, so only an account with unaccepted terms kept its identity.
+        account = asyncio.run(cli.sign_in(signing_in()))
+
+        assert apple.remembered == [account]
+
+    def test_a_sign_in_that_needed_the_terms_accepting_is_remembered_once(self, apple, monkeypatch):
+        apple.fails_with(MobileMeDelegateError(localized_error="TERMS"))
+
+        async def _accepted(*_args, **_kwargs):
+            return True
+
+        async def _yes(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(cli, "accept_terms", _accepted)
+        monkeypatch.setattr(prompts, "confirm", _yes)
+
+        account = asyncio.run(cli.sign_in(signing_in()))
+
+        assert apple.remembered == [account]
+
+    def test_a_failed_sign_in_registered_nothing_to_remember(self, apple):
+        apple.fails_with(InvalidCredentialsError("no"))
+
+        with pytest.raises(InvalidCredentialsError):
+            asyncio.run(cli.sign_in(signing_in()))
+
+        assert apple.remembered == []
+
+
+class TestHandingBackTheSession:
+    """
+    A sign-in that fails leaves an open aiohttp session behind.
+
+    asyncio reports that as "Unclosed client session" *after* the real error, where it reads like
+    a second, worse fault - so every way out of `sign_in` other than success closes it. The terms
+    handler is the one that did not: an exception raised inside an `except` clause is not caught
+    by a sibling `except` on the same `try`.
+    """
+
+    def test_a_rejected_password_closes_it(self, apple):
+        apple.fails_with(InvalidCredentialsError("no"))
+
+        with pytest.raises(InvalidCredentialsError):
+            asyncio.run(cli.sign_in(signing_in()))
+
+        assert apple.account.closed
+
+    def test_declining_to_fetch_the_terms_closes_it(self, apple, monkeypatch):
+        apple.fails_with(MobileMeDelegateError(localized_error="TERMS"))
+
+        async def _no(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(prompts, "confirm", _no)
+
+        with pytest.raises(ExportSourceError):
+            asyncio.run(cli.sign_in(signing_in()))
+
+        assert apple.account.closed
+
+    def test_stopping_at_the_terms_themselves_closes_it(self, apple, monkeypatch):
+        apple.fails_with(MobileMeDelegateError(localized_error="TERMS"))
+
+        async def _declined(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(cli, "accept_terms", _declined)
+
+        with pytest.raises(ExportSourceError):
+            asyncio.run(cli.sign_in(signing_in(accept_terms=True)))
+
+        assert apple.account.closed
+
+    def test_a_successful_sign_in_hands_the_session_over_still_open(self, apple):
+        # The caller does the fetching and closes it afterwards; closing it here would end the
+        # export at the moment it became possible.
+        assert asyncio.run(cli.sign_in(signing_in())) is apple.account
+        assert not apple.account.closed
 
 
 class TestIncludingYourOwnDevices:
