@@ -19,6 +19,7 @@ being written without a display, because what is being tested *is* the event loo
 from __future__ import annotations
 
 import asyncio
+import gc
 import queue
 import threading
 import time
@@ -33,6 +34,28 @@ from exporter.asyncui import Cancelled, run_with_progress  # noqa: E402 - after 
 # slow machine is not called a hang; short enough that a suite with the bug still finishes.
 _GIVE_UP_MS = 5000
 
+# How long teardown waits for a worker to finish before giving up on it. See `_let_workers_finish`.
+_JOIN_TIMEOUT = 5
+
+
+def _let_workers_finish() -> None:
+    """
+    Wait for the threads a test started, before anything Tk is destroyed or collected.
+
+    **Not tidiness - the suite aborts without it.** `run_with_progress` runs its coroutine on a
+    daemon thread and never joins it, which is right for the program: the thread may be half way
+    through a network call and the window must not wait for it. In a test it means the *next* test
+    can start while this one's worker is still exiting, and a garbage collection that lands on
+    that thread frees Tk objects from a thread Tcl was not created on. Tcl aborts the process for
+    that rather than raising, so it arrives as SIGABRT in whichever test happened to be running.
+
+    Which is exactly what CI caught: `Fatal Python error: Aborted`, in `Garbage-collecting`, on a
+    thread belonging to a test that had already passed.
+    """
+    for thread in threading.enumerate():
+        if thread is not threading.main_thread() and thread.is_alive():
+            thread.join(_JOIN_TIMEOUT)
+
 
 @pytest.fixture
 def root():
@@ -43,12 +66,28 @@ def root():
         pytest.skip(f"no display to draw on: {e}")
 
     window.withdraw()
+    started_with = set(threading.enumerate())
+
     yield window
+
+    _let_workers_finish()
+    leftover = [
+        thread for thread in threading.enumerate()
+        if thread not in started_with and thread.is_alive()
+    ]
 
     try:
         window.destroy()
     except tk.TclError:
         pass
+
+    # On the main thread, deliberately: it is the one Tcl was created on, and leaving this to
+    # whenever CPython feels like it is what puts a widget's finalizer on a worker.
+    gc.collect()
+
+    # Said out loud rather than left to chance. A test that ends with its worker still running is
+    # not this test's problem - it is the *next* one's, as an abort with an unrelated name on it.
+    assert not leftover, f"a worker outlived the test that started it: {leftover}"
 
 
 def close_the_progress_window(root) -> None:
@@ -78,10 +117,15 @@ class TestCancelling:
         root.after(200, lambda: close_the_progress_window(root))
         root.after(_GIVE_UP_MS, lambda: (timed_out.append(True), root.quit()))
 
-        with pytest.raises(Cancelled):
-            run_with_progress(root, "Working…", never_finishes)
+        try:
+            with pytest.raises(Cancelled):
+                run_with_progress(root, "Working…", never_finishes)
+        finally:
+            # In a `finally` because the worker loops until it is set: a failed assertion that
+            # skipped this would leave a thread running into the next test, which is the way this
+            # file aborts a whole suite rather than failing one case.
+            finish.set()
 
-        finish.set()
         assert not timed_out, "closing the progress window left the main loop running"
 
     def test_a_question_asked_after_cancelling_is_refused(self, root):
@@ -108,10 +152,11 @@ class TestCancelling:
         root.after(200, lambda: close_the_progress_window(root))
         root.after(_GIVE_UP_MS, root.quit)
 
-        with pytest.raises(Cancelled):
-            run_with_progress(root, "Working…", asks_after_it_was_cancelled)
-
-        released.set()
+        try:
+            with pytest.raises(Cancelled):
+                run_with_progress(root, "Working…", asks_after_it_was_cancelled)
+        finally:
+            released.set()  # as above: the worker is blocked on it, and teardown joins the worker
 
         # Anything the worker hands to the main thread runs in an event loop, so one has to be
         # turning for the unfixed version to get its dialog drawn. This is that loop.
