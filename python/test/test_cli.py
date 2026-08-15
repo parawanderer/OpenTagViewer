@@ -155,6 +155,132 @@ class TestWhatItStampsOnAnExport:
         assert EXPORT_VIA_CLI.startswith("OpenTagViewer.cli:")
 
 
+class TestKeyFilesReachTheBundle:
+    """
+    A tag from `--add-keys` is not in any Apple account, and nothing else can produce it again.
+
+    It is read, named by the user, and then - until this was fixed - dropped without a word if the
+    account half of the run had nothing to contribute, because the key-file tags were only added
+    to the export after the point where an empty account gave up. The windowed exporter has always
+    allowed a bundle of nothing but key-file tags; this makes the CLI agree.
+    """
+
+    def key_file(self, tmp_path: Path) -> Path:
+        path = tmp_path / "devices.json"
+        path.write_text(json.dumps([{
+            "id": 7,
+            "name": "bike",
+            "privateKey": base64.b64encode(KEY).decode(),
+            "additionalKeys": [],
+        }]))
+        return path
+
+    def arguments(self, tmp_path: Path):
+        return cli.build_parser().parse_args([
+            "--add-keys", str(self.key_file(tmp_path)),
+            "--source", "icloud",
+            "--no-password",
+            "--output", str(tmp_path / "export.zip"),
+        ])
+
+    def fetched(self, monkeypatch, value) -> None:
+        """What the account produced - or None, for a sign-in or unlock that did not get there."""
+        async def _read(*_args, **_kwargs):
+            return value
+
+        monkeypatch.setattr(cli, "read_icloud", _read)
+
+    def exported_names(self, tmp_path: Path) -> list[str]:
+        with zipfile.ZipFile(tmp_path / "export.zip") as archive:
+            return archive.namelist()
+
+    def test_an_account_with_nothing_in_it_still_exports_the_key_file_tag(self, tmp_path, answers, monkeypatch):
+        from exporter.icloud import Fetched
+
+        answers.append("")  # accept the suggested name
+        self.fetched(monkeypatch, Fetched(candidates=[], skipped=[]))
+
+        assert asyncio.run(cli.run(self.arguments(tmp_path))) == 0
+        assert any("bike" in name or "tag-" in name for name in self.exported_names(tmp_path))
+
+    def test_a_run_with_no_key_files_and_nothing_to_export_still_fails(self, tmp_path, monkeypatch):
+        # Unchanged: an empty account and nothing else asked for is a run that produced nothing,
+        # and writing an empty bundle would be worse than saying so.
+        from exporter.icloud import Fetched
+
+        arguments = self.arguments(tmp_path)
+        arguments.add_keys = []
+        self.fetched(monkeypatch, Fetched(candidates=[], skipped=[]))
+
+        assert asyncio.run(cli.run(arguments)) == 1
+        assert not (tmp_path / "export.zip").exists()
+
+    def test_a_sign_in_that_never_got_there_keeps_the_tag_and_still_reports_failure(
+        self, tmp_path, answers, monkeypatch, capsys,
+    ):
+        """
+        Two things are true at once, and the run says both.
+
+        The keychain could not be unlocked, so what was asked for did not all happen - that is the
+        exit code. The key-file tag was read and named and is in no danger of being recoverable
+        later, so it is written - and the message says what the bundle does not contain, because a
+        file that is quietly missing half its contents is worse than one that is missing them
+        loudly.
+        """
+        answers.append("")
+        self.fetched(monkeypatch, None)
+
+        assert asyncio.run(cli.run(self.arguments(tmp_path))) == 1
+        assert (tmp_path / "export.zip").exists()
+        assert "key file" in capsys.readouterr().err
+
+    def test_no_account_is_read_at_all_when_that_is_what_was_asked_for(self, tmp_path, answers, monkeypatch):
+        """
+        `--source none`: the tags are already on disk, so nothing is signed into.
+
+        Both readers are replaced with something that fails the test if it is called, because the
+        cost being avoided is not time - it is an Apple ID password, a device registered on the
+        account, and a keychain unlock, to fetch a list nothing was going to be taken from.
+        """
+        async def _should_not_be_read(*_args, **_kwargs):
+            raise AssertionError("--source none read a source")
+
+        monkeypatch.setattr(cli, "read_icloud", _should_not_be_read)
+        monkeypatch.setattr(cli, "read_local", _should_not_be_read)
+
+        answers.append("")
+        arguments = self.arguments(tmp_path)
+        arguments.source = "none"
+
+        assert asyncio.run(cli.run(arguments)) == 0
+        assert self.exported_names(tmp_path)
+
+    def test_reading_no_account_with_no_key_files_says_what_is_missing(self, tmp_path, monkeypatch):
+        # It would otherwise write an empty bundle, or read the account it was told not to.
+        arguments = self.arguments(tmp_path)
+        arguments.source = "none"
+        arguments.add_keys = []
+
+        with pytest.raises(ExportSourceError, match="--add-keys"):
+            asyncio.run(cli.run(arguments))
+
+        assert not (tmp_path / "export.zip").exists()
+
+    def test_ticking_nothing_still_exports_the_key_file_tag(self, tmp_path, answers, monkeypatch):
+        from exporter.icloud import Fetched
+
+        answers.append("")
+        self.fetched(monkeypatch, Fetched(candidates=[], skipped=[]))
+
+        async def _nothing_ticked(*_args, **_kwargs):
+            return []
+
+        monkeypatch.setattr(prompts, "checkbox", _nothing_ticked)
+
+        assert asyncio.run(cli.run(self.arguments(tmp_path))) == 0
+        assert self.exported_names(tmp_path)
+
+
 class FakeAccount:
     """Enough of an `AsyncAppleAccount` for the sign-in flow: it can be closed, and it says so."""
 
@@ -369,3 +495,15 @@ class TestIncludingYourOwnDevices:
 
         with pytest.raises(Exception, match="Nothing left to export"):
             asyncio.run(cli._confirm_devices([mac]))
+
+    def test_dropping_them_all_is_allowed_when_key_files_are_being_exported_too(self, monkeypatch):
+        # Then "none of these" is an answer rather than an empty run: the bundle still has the
+        # tags read from the key files, which is what `or_nothing` is told about.
+        _, mac = self.candidates()
+
+        async def _no(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(prompts, "confirm", _no)
+
+        assert asyncio.run(cli._confirm_devices([mac], or_nothing=True)) == []

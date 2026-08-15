@@ -121,7 +121,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Where to read from. `auto` uses this Mac's own Find My files when it can - which asks"
             " for no Apple ID password and registers no device on your account - and iCloud"
-            " otherwise, which is every other machine and every macOS 15 or newer."
+            " otherwise, which is every other machine and every macOS 15 or newer. `none` reads no"
+            " account at all, for a bundle of nothing but --add-keys tags."
         ),
     )
     parser.add_argument(
@@ -372,13 +373,16 @@ async def unlock(client) -> bool:
     return True
 
 
-async def choose(candidates: list[Candidate]) -> list[Candidate]:
+async def choose(candidates: list[Candidate], *, or_nothing: bool = False) -> list[Candidate]:
     """
     Ask which accessories to export.
 
     **Nothing is ticked to begin with.** Handing over one tag and handing over a household's whole
     set are different acts, and what is handed over cannot be withdrawn afterwards - so a list that
     arrived pre-selected would make those the same keystroke.
+
+    :param or_nothing: Whether taking none of them is a valid answer. True when the run already
+        has key-file tags to export, where "none of these" is a choice rather than an empty run.
     """
     for candidate in candidates:
         # Only where nothing here recognised the maker, and only once per run: a real registry
@@ -410,12 +414,14 @@ async def choose(candidates: list[Candidate]) -> list[Candidate]:
     )
 
     if not chosen:
+        if or_nothing:
+            return []
         raise ExportSourceError("Nothing was selected, so there is nothing to export.")
 
-    return await _confirm_devices(chosen)
+    return await _confirm_devices(chosen, or_nothing=or_nothing)
 
 
-async def _confirm_devices(chosen: list[Candidate]) -> list[Candidate]:
+async def _confirm_devices(chosen: list[Candidate], *, or_nothing: bool = False) -> list[Candidate]:
     """
     Say what including one of the owner's own devices means, and only then.
 
@@ -446,7 +452,7 @@ async def _confirm_devices(chosen: list[Candidate]) -> list[Candidate]:
     # they end up pressing 'a' a second time.
     kept = [candidate for candidate in chosen if not is_own_device(candidate.owned_beacon)]
 
-    if not kept:
+    if not kept and not or_nothing:
         raise ExportSourceError("Nothing left to export once your own devices were left out.")
 
     print(f"\nLeaving them out. Exporting {len(kept)}.", file=sys.stderr)
@@ -559,22 +565,47 @@ async def run(arguments: argparse.Namespace) -> int:
     # be made of somebody whose Mac still keeps the records on disk.
     route = source.resolve(arguments.source)
     where = "this Mac" if route.is_local else "iCloud"
-    print(f"\nReading from {where}, because {route.reason}.", file=sys.stderr)
 
-    fetched = await read_local() if route.is_local else await read_icloud(arguments)
-    if fetched is None:
-        return 1
+    fetched = None
 
-    for skipped in fetched.skipped:
-        print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
+    if route.reads_nothing:
+        if not prepared:
+            raise ExportSourceError(
+                "There is nothing to export: --source none reads no Apple account, so the bundle"
+                " can only hold tags given with --add-keys, and none were.",
+            )
+        print(f"\nReading no account, because {route.reason}.", file=sys.stderr)
+    else:
+        print(f"\nReading from {where}, because {route.reason}.", file=sys.stderr)
+        fetched = await read_local() if route.is_local else await read_icloud(arguments)
 
-    if not fetched.candidates:
-        print(f"\nNothing on {where} can be exported.", file=sys.stderr)
-        return 1
+    # A tag from `--add-keys` was read from a file and named by hand, and it is in no Apple
+    # account - so an empty account, or one that could not be reached, is a reason to export less
+    # rather than to throw away what the user already provided. Returning here dropped it silently
+    # and asked for the names again on the next run.
+    exports = []
+    missed_the_source = fetched is None and not route.reads_nothing
 
-    exports = await name_the_nameless(await choose(fetched.candidates))
+    if fetched is not None:
+        for skipped in fetched.skipped:
+            print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
+
+        if fetched.candidates:
+            exports = await name_the_nameless(await choose(fetched.candidates, or_nothing=bool(prepared)))
+        else:
+            print(f"\nNothing on {where} can be exported.", file=sys.stderr)
 
     exports.extend(tag.to_export() for tag in prepared)
+
+    if not exports:
+        return 1
+
+    if missed_the_source:
+        # Both halves of what happened, because either alone misleads: a bundle was written, and
+        # it holds none of the accessories on the account. The exit code reports the failure; this
+        # says what the file beside it is.
+        print("\nOnly the tags from your key file(s) are in this bundle - nothing was read", file=sys.stderr)
+        print(f"from {where}.", file=sys.stderr)
 
     bundle = build_export(
         exports,
@@ -586,7 +617,10 @@ async def run(arguments: argparse.Namespace) -> int:
     passcode = None if arguments.no_password else generate_passcode()
     write(bundle, arguments.output or _default_output(), passcode)
 
-    return 0
+    # Not 0 when the account could not be read: the bundle is real and worth keeping, but part of
+    # what was asked for did not happen, and a script reading the exit code should hear that.
+    # Reading nothing on purpose is not that case - there, nothing was missed.
+    return 1 if missed_the_source else 0
 
 
 def _default_output() -> Path:

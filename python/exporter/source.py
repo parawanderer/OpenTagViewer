@@ -32,8 +32,20 @@ from exporter.utils import MACOS_VER
 ICLOUD = "icloud"
 LOCAL = "local"
 AUTO = "auto"
+NONE = "none"
+"""
+Read no account at all: the export is whatever `--add-keys` produced.
 
-CHOICES = (AUTO, ICLOUD, LOCAL)
+Self-generated tags - OpenHaystack and the like - are in no Apple account and never were, so
+fetching one to export them is asking for an Apple ID password, a device on the account and a
+keychain unlock in order to read a list nothing will be taken from.
+
+**Only ever chosen by name.** :func:`detect` never returns it, because a run that reads no account
+is a thing somebody decides, not something to be handed to them because their machine looked a
+certain way.
+"""
+
+CHOICES = (AUTO, ICLOUD, LOCAL, NONE)
 
 LAST_SUPPORTED_MACOS = 14
 """
@@ -54,6 +66,11 @@ class Route:
     @property
     def is_local(self) -> bool:
         return self.kind == LOCAL
+
+    @property
+    def reads_nothing(self) -> bool:
+        """Whether this route reads no account at all - see :data:`NONE`."""
+        return self.kind == NONE
 
 
 def detect() -> Route:
@@ -101,6 +118,11 @@ def resolve(requested: str) -> Route:
 
     if requested == ICLOUD:
         return Route(ICLOUD, "you asked for the iCloud route")
+
+    # Before the local check below, and unconditional: this is the one answer that does not depend
+    # on what the machine can do, because there is nothing for it to do.
+    if requested == NONE:
+        return Route(NONE, "you asked for no account to be read")
 
     detected = detect()
     if detected.is_local:

@@ -94,3 +94,36 @@ class TestBeingAsked:
         mac((14, 7))
 
         assert source.resolve(source.AUTO).kind == source.detect().kind
+
+
+class TestReadingNoAccountAtAll:
+    """
+    `--source none` is for a bundle of self-generated tags, which are in no Apple account.
+
+    They come off disk with `--add-keys`, and until this existed the CLI still signed in first to
+    fetch a list nothing was going to be taken from - an Apple ID password, a device registered on
+    the account, and a keychain unlock, to export tags that never touched any of it.
+    """
+
+    def test_it_reads_nothing_and_says_so(self, mac):
+        mac((14, 7))  # a Mac that could have read locally: what was asked for wins
+
+        route = source.resolve(source.NONE)
+
+        assert route.reads_nothing
+        assert not route.is_local
+        assert "you asked" in route.reason
+
+    def test_no_other_route_reads_nothing(self, mac):
+        for version in [(14, 7), (15, 0), None]:
+            mac(version)
+            assert not source.detect().reads_nothing
+            for requested in [source.AUTO, source.ICLOUD, source.LOCAL]:
+                assert not source.resolve(requested).reads_nothing
+
+    def test_it_has_to_be_asked_for_by_name(self, mac):
+        # Never something detection can land on: a run that reads no account is a thing to choose,
+        # not something to be given because a machine looked a certain way.
+        for version in [(14, 7), (15, 0), None]:
+            mac(version)
+            assert source.detect().kind != source.NONE
