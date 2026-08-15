@@ -21,7 +21,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/anisette_mode_local_summary"
-        android:textColor="@color/md_theme_outline"
+        android:textColor="?attr/colorOutline"
         android:textSize="13sp" />
 
     <LinearLayout
@@ -54,7 +54,7 @@
             android:layout_marginEnd="6dp"
             android:visibility="gone"
             app:srcCompat="@drawable/check_circle_24px_fill"
-            app:tint="@color/md_theme_outline" />
+            app:tint="?attr/colorOutline" />
 
         <ImageView
             android:id="@+id/anisetteLocalErrorIcon"
@@ -63,7 +63,7 @@
             android:layout_marginEnd="6dp"
             android:visibility="gone"
             app:srcCompat="@drawable/warning_24px_fill"
-            app:tint="@color/md_theme_error" />
+            app:tint="?attr/colorError" />
 
         <TextView
             android:id="@+id/anisetteLocalStatus"
@@ -71,7 +71,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/nunito_bold"
             android:text="@string/anisette_local_status_pending"
-            android:textColor="@color/md_theme_outlineVariant_mediumContrast"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="13sp" />
 
     </LinearLayout>
@@ -92,7 +92,7 @@
             android:id="@+id/anisetteOwnApkExplanation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/md_theme_outline"
+            android:textColor="?attr/colorOutline"
             android:textSize="13sp" />
 
         <!--
@@ -106,7 +106,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:textColor="@color/md_theme_error"
+            android:textColor="?attr/colorError"
             android:textSize="13sp"
             android:visibility="gone" />
 

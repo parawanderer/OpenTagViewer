@@ -137,4 +137,6 @@
     <string name="anisette_local_status_checking">Проверка…</string>
     <string name="anisette_login_needs_server">Это устройство не смогло настроить вход самостоятельно, поэтому в этот раз используется сервер. Позже это можно изменить в настройках.</string>
     <string name="anisette_provider">Источник Anisette</string>
+    <string name="use_system_colors">Использовать системные цвета</string>
+    <string name="use_system_colors_description">Раскрашивает приложение по цветам обоев. Требуется Android 12 или новее.</string>
 </resources>
