@@ -114,7 +114,7 @@ written. It reaches the window title and, more importantly, every export it prod
 works out what built it.
 
 **There is more than one producer, and they must not claim to be each other.** The windowed
-exporter stamps `OpenTagViewer.app:<version>`, its CLI stamps `OpenTagViewer.cli:<version>`, and
+exporter stamps `OpenTagViewer.wizard:<version>`, its CLI stamps `OpenTagViewer.cli:<version>`, and
 the Android app will stamp its own. They share `VERSION` because they ship together; the name in
 front of it is what makes a bug report answerable. The shared writer takes `via` as a parameter
 and never invents one — see `python/opentagviewer_export/bundle.py`.

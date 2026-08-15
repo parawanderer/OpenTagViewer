@@ -9,6 +9,7 @@ and the bundle says so.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -24,7 +25,7 @@ from opentagviewer_export import (
 )
 from opentagviewer_export.tests.records import BEACON_ID, alignment_record, naming_record, owned_beacon
 
-VIA = "OpenTagViewer.app:1.1.0"
+VIA = "OpenTagViewer.wizard:1.1.0"
 EXPORTED_AT_MS = 1786282770586
 
 KEY_A = bytes(range(28)).hex()
@@ -159,3 +160,43 @@ class TestWhatItRefuses:
     def test_refuses_something_that_is_neither_kind_of_accessory(self):
         with pytest.raises(ExportError, match="not something this can export"):
             build({"type": CUSTOM_ACCESSORY_TYPE})
+
+
+class TestTheCommittedFixture:
+    """
+    `app/src/test/resources/09082026_3` - a bundle with one of each kind in it.
+
+    Produced by this writer rather than by a Mac, which no Mac could have written: the plist
+    layout has no way to hold a self-generated tag. It is here so the Android importer has
+    something to build against, and so a change to what 0.0.3 means fails here first.
+    """
+
+    FIXTURE = Path(__file__).parents[3] / "app" / "src" / "test" / "resources" / "09082026_3"
+
+    needs_fixture = pytest.mark.skipif(not FIXTURE.is_dir(), reason="fixture not present")
+
+    @needs_fixture
+    def test_holds_both_kinds_side_by_side(self):
+        present = {
+            str(path.relative_to(self.FIXTURE)).replace("\\", "/")
+            for path in self.FIXTURE.rglob("*")
+            if path.is_file() and path.name != ".DS_Store"
+        }
+
+        assert "OwnedBeacons/725A989D-D871-49A7-B2FE-948C24F356AB.plist" in present
+        assert "CustomAccessories/tag-0a1b2c3d4e5f.json" in present
+
+    @needs_fixture
+    def test_declares_the_version_that_says_it_holds_one(self):
+        document = yaml.safe_load((self.FIXTURE / "OPENTAGVIEWER.yml").read_text())
+
+        assert document["version"] == EXPORT_FORMAT_VERSION_WITH_CUSTOM
+
+    @needs_fixture
+    def test_the_custom_accessory_is_what_findmy_reads_back(self):
+        written = json.loads((self.FIXTURE / "CustomAccessories/tag-0a1b2c3d4e5f.json").read_text())
+
+        assert written["type"] == CUSTOM_ACCESSORY_TYPE
+        assert written["name"] == "Bike (OpenHaystack)"
+        # Three keys, each a 28-byte SECP224R1 private key written as hex.
+        assert [len(bytes.fromhex(key)) for key in written["private_keys"]] == [28, 28, 28]

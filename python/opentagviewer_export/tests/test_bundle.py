@@ -28,7 +28,7 @@ from opentagviewer_export.tests.records import (
     wrapped,
 )
 
-VIA = "OpenTagViewer.app:1.1.0"
+VIA = "OpenTagViewer.wizard:1.1.0"
 SOURCE_USER = "someone"
 EXPORTED_AT_MS = 1786282770586
 
