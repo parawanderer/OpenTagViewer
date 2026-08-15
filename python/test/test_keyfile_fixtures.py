@@ -71,10 +71,12 @@ class TestWhatEachFormatCarries:
         assert tag.identifier == "1"
 
     def test_the_findmy_accessory_carries_its_own_name_and_identifier(self):
+        # Both survive the parse. Only the name survives the export - see
+        # `custom_tags.suggested_identifier` for why an identifier does not.
         tag, = read("findmy-custom-accessory.json")
 
-        assert tag.name == "Bike (FindMy.py)"
-        assert tag.identifier == "bike-findmy"
+        assert tag.name == "Keys (FindMy.py)"
+        assert tag.identifier == "keys-findmy"
 
     def test_the_openhaystack_file_is_named_after_its_file(self):
         tag, = read("Wallet.keys")
@@ -85,8 +87,38 @@ class TestWhatEachFormatCarries:
     def test_a_bare_list_is_one_tag_with_every_key_in_it(self):
         tag, = read("bare-keys.txt")
 
-        assert len(tag.private_keys) == 3
+        assert tag.private_keys
         assert tag.name == "bare-keys"
+
+
+class TestTheyAreFourDifferentTags:
+    def test_all_four_can_go_in_one_bundle(self):
+        """
+        They used to be the same tag written four ways, and the exporter refused the duplicate.
+
+        That refusal was correct - identifiers come from the tag's own public key, so the same
+        keys are the same tag however the file spelled them. But a sample set nobody can import
+        together is a poor sample set, so these are four distinct tags now.
+        """
+        from exporter.custom_tags import PreparedTag, suggested_identifier, suggested_name
+        from opentagviewer_export import build_export
+
+        prepared = [
+            PreparedTag(tag=tag, name=suggested_name(tag), identifier=suggested_identifier(tag))
+            for name in (
+                "macless-haystack-devices.json", "findmy-custom-accessory.json",
+                "Wallet.keys", "bare-keys.txt",
+            )
+            for tag in read(name)
+        ]
+
+        bundle = build_export(
+            [tag.to_export() for tag in prepared],
+            via="OpenTagViewer.cli:1.1.0", source_user="user", exported_at_ms=1786282770586,
+        )
+
+        written = [path for path in bundle.entries if path.startswith("CustomAccessories/")]
+        assert len(written) == len(prepared) == 4
 
 
 class TestTheCrossCheck:

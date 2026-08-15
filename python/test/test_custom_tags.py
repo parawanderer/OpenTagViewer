@@ -76,12 +76,30 @@ class TestSuggestingAName:
 
 
 class TestSuggestingAnIdentifier:
-    def test_keeps_the_one_the_file_carried(self):
-        assert suggested_identifier(ParsedTag(private_keys=[PRIVATE], identifier="1234")) == "1234"
+    def test_is_derived_from_the_public_key(self):
+        assert suggested_identifier(ParsedTag(private_keys=[PRIVATE])).startswith("tag-")
 
-    def test_derives_one_from_the_public_key_rather_than_from_the_name(self):
-        # It becomes the filename in the bundle, and a name is exactly what two tags collide on.
-        assert suggested_identifier(ParsedTag(private_keys=[PRIVATE], name="bike")).startswith("tag-")
+    def test_ignores_the_one_the_file_carried(self):
+        # Macless Haystack numbers devices from one, so the first tag anybody exports from it is
+        # called "1" - a fine label in that tool's own list, and a collision waiting to happen in
+        # somebody else's app.
+        assert suggested_identifier(ParsedTag(private_keys=[PRIVATE], identifier="1")).startswith("tag-")
+
+    def test_two_tags_cannot_share_one(self):
+        # The advertisement key *is* the tag: two accessories with the same one would be the same
+        # accessory, which is what makes it safe to identify by.
+        one = suggested_identifier(ParsedTag(private_keys=[PRIVATE], identifier="1"))
+        other = suggested_identifier(ParsedTag(private_keys=[OTHER_PRIVATE], identifier="1"))
+
+        assert one != other
+
+    def test_the_name_is_still_the_files_to_choose(self):
+        # Not symmetrical on purpose: a name is a label for a person and belongs to whoever wrote
+        # it; an identifier names a file and has to be unique to be worth anything.
+        tag = ParsedTag(private_keys=[PRIVATE], name="bike", identifier="1")
+
+        assert suggested_name(tag) == "bike"
+        assert suggested_identifier(tag).startswith("tag-")
 
 
 class TestRendering:

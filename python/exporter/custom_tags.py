@@ -92,15 +92,21 @@ def suggested_name(tag: ParsedTag) -> str:
 
 def suggested_identifier(tag: ParsedTag) -> str:
     """
-    An identifier for a tag whose file did not carry one, on the same terms as the name.
+    An identifier for a tag, derived from its own public key.
 
-    It becomes the tag's filename inside the bundle, so it is the advertisement key's first bytes
-    rather than anything the user typed: two tags a user happens to name the same thing must not
-    collide, and a name is exactly the thing people reuse.
+    **Always derived, even when the file carried one.** An identifier in a key file is a label
+    local to whatever tool wrote it, and those tools do not coordinate: Macless Haystack numbers
+    devices from one, so the first tag anybody exports from it is called `1`. That is a fine name
+    for a row in that tool's own list and a poor identity to carry into somebody else's app, where
+    two people's first tags would collide.
+
+    The advertisement key cannot collide, because it *is* the tag - it is what the Find My network
+    is queried by, and two tags with the same one would be the same tag.
+
+    Deliberately not symmetrical with :func:`suggested_name`, which keeps whatever the file said. A
+    name is a label for a person and belongs to whoever wrote it; an identifier names a file inside
+    a bundle and has to be unique to be worth anything.
     """
-    if tag.identifier:
-        return tag.identifier
-
     derived = KeyPair(private_key=tag.private_keys[-1]).adv_key_bytes
 
     return f"tag-{derived[:6].hex()}"

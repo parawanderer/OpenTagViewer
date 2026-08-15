@@ -82,7 +82,9 @@ class TestReadingKeyFiles:
         prepared, = asyncio.run(cli.read_key_files([self.macless_haystack(tmp_path)]))
 
         assert prepared.name == "bike"
-        assert prepared.identifier == "7"
+        # The file said `7`; identifiers are derived from the tag's own public key instead, since
+        # a number local to another tool collides the moment two people export from it.
+        assert prepared.identifier.startswith("tag-")
 
     def test_a_typed_name_wins_over_the_suggestion(self, tmp_path, answers):
         answers.append("the good bike")
