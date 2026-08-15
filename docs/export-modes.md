@@ -107,6 +107,18 @@ device passcode again. A member is handed the new keys and notices nothing.
 So the choice is between *one passcode prompt, occasionally, at an unpredictable moment* and
 *permanent artefacts on the user's Apple account*. That is a real trade, not an obvious one.
 
+> ### The route being replaced already joined, and nobody called it that
+>
+> The macOS export is easy to think of as the local, private, offline option. It is not. It reads
+> files macOS wrote, and macOS wrote them by signing into iCloud, **joining the keychain trust
+> circle as a peer**, and syncing the records down. The VM bootstrap does exactly that with a Mac
+> that does not exist.
+>
+> So the status quo leaves a **full device peer and its escrow record** on the user's account —
+> more than anything planned here — and it was invisible only because Apple's own software created
+> it rather than ours. An export-only flow that writes nothing is a genuine improvement on that,
+> not a compromise against it.
+
 ### The decision
 
 **Join only when the user has asked for the connected experience.** Export is a read and must not
