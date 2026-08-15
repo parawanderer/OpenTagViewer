@@ -22,13 +22,16 @@ VERSION = "1.1.0"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
-EXPORT_VIA_WIZARD = f"OpenTagViewer.app:{VERSION}"
+EXPORT_VIA_WIZARD = f"OpenTagViewer.wizard:{VERSION}"
 """
 What a bundle written by the windowed exporter says produced it.
 
-Unchanged in shape from every export this project has ever written, deliberately: `via:` is how a
-zip is traced back, and renaming the producer would make bundles from before and after this
-version look like they came from different programs when only the source of the data changed.
+**Was `OpenTagViewer.app` up to 1.0.5, and changed on purpose.** There is an Android app now, and
+it will stamp its own `via:` - so "app" was the one word that could not stay, because it named the
+wrong one of the three producers. `wizard` and `cli` say which of the two desktop entry points ran.
+
+Nothing is lost by the change: bundles from 1.0.5 and earlier still say `OpenTagViewer.app`, and
+that is still exactly what produced them.
 """
 
 EXPORT_VIA_CLI = f"OpenTagViewer.cli:{VERSION}"

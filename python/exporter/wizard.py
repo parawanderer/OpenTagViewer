@@ -57,6 +57,9 @@ WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-A
 # Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
 
+TICKED = "\u2611"
+UNTICKED = "\u2610"
+
 _KEY_FILE_TYPES = [
     ("Key files", "*.json *.keys *.txt"),
     ("All files", "*.*"),
@@ -100,12 +103,39 @@ class WizardApp(tk.Tk):
         self.explanation = ttk.Label(container, text=self._route_line(), wraplength=680, foreground="#555")
         self.explanation.grid(row=1, column=0, columnspan=3, sticky="w", pady=(2, 10))
 
-        self.choices = tk.Listbox(container, selectmode="multiple", activestyle="none", font=("Menlo", 11))
+        # A table rather than a Listbox of padded strings. Padding to a column count only lines up
+        # if every character is one column wide, and a tag called "🎒 Backpack" is not - so the
+        # first attempt stairstepped exactly where somebody had used an emoji, which is most
+        # accounts. Columns are laid out by the widget and cannot come apart.
+        self.choices = ttk.Treeview(
+            container,
+            columns=("tick", "name", "what", "serial", "paired", "note"),
+            show="headings",
+            selectmode="none",
+        )
+        self.choices.heading("tick", text="")
+        self.choices.column("tick", width=30, anchor="center", stretch=False)
+
+        for column, heading, width in (
+            ("name", "Name", 190),
+            ("what", "What it is", 150),
+            ("serial", "Serial", 130),
+            ("paired", "Paired", 90),
+            ("note", "", 200),
+        ):
+            self.choices.heading(column, text=heading)
+            self.choices.column(column, width=width, anchor="w", stretch=(column == "note"))
+
         self.choices.grid(row=2, column=0, columnspan=3, sticky="nsew")
+        self.choices.bind("<Button-1>", self._toggle)
 
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.choices.yview)
         scrollbar.grid(row=2, column=3, sticky="ns")
         self.choices.configure(yscrollcommand=scrollbar.set)
+
+        # Which rows are ticked. Tk's own selection is turned off: it needs modifier keys for a
+        # multiple selection, which is not discoverable, and this list must be explicit.
+        self.ticked: set[str] = set()
 
         self.note = ttk.Label(container, text="", wraplength=680, foreground="#555")
         self.note.grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 6))
@@ -185,8 +215,11 @@ class WizardApp(tk.Tk):
                 " account.apple.com under Devices, from any browser.",
             ))
 
-            email = asker.ask(lambda: _ask_string(self, "Apple ID", "Your Apple ID:"))
-            password = asker.ask(lambda: _ask_string(self, "Password", "Apple ID password:", secret=True))
+            # One dialog, both fields. They are one credential as far as the user is concerned,
+            # and asking twice makes the second window look like the first one failed.
+            email, password = asker.ask(lambda: _ask_credentials(self))
+            if not email or not password:
+                raise ExportSourceError("Signing in was cancelled.")
 
             await icloud.log_in(
                 account,
@@ -230,17 +263,31 @@ class WizardApp(tk.Tk):
     # -- the list -------------------------------------------------------------------------
 
     def _show(self, skipped: list) -> None:
-        """Fill the list, and say what was set aside."""
-        self.choices.delete(0, "end")
+        """Fill the table, and say what was set aside."""
+        self.choices.delete(*self.choices.get_children())
+        self.ticked.clear()
 
-        for candidate in self.candidates:
-            self.choices.insert("end", _row(candidate.label, candidate.details, candidate.has_alignment))
+        for index, candidate in enumerate(self.candidates):
+            self.choices.insert(
+                "", "end", iid=f"c{index}",
+                values=(
+                    UNTICKED,
+                    candidate.label,
+                    candidate.hardware or "",
+                    candidate.serial_number or "",
+                    f"{candidate.paired_at:%Y-%m-%d}" if candidate.paired_at else "",
+                    "" if candidate.has_alignment else "\u26a0 slow first locate",
+                ),
+            )
 
-        for tag in self.custom_tags:
-            self.choices.insert("end", _row(tag.name, "added from a key file", has_alignment=True))
+        for index, tag in enumerate(self.custom_tags):
+            self.choices.insert(
+                "", "end", iid=f"k{index}",
+                values=(UNTICKED, tag.name, "self-generated tag", "", "", "from a key file"),
+            )
 
         self.heading.configure(text="Choose what to export")
-        self.confirm_button.configure(state="normal" if self.choices.size() else "disabled")
+        self.confirm_button.configure(state="normal" if self.choices.get_children() else "disabled")
 
         notes = []
         if skipped:
@@ -272,14 +319,24 @@ class WizardApp(tk.Tk):
 
     # -- exporting ------------------------------------------------------------------------
 
-    def _selected(self) -> tuple[list[Candidate], list[PreparedTag]]:
-        """Split the selection back into where each row came from."""
-        indices = list(self.choices.curselection())
-        boundary = len(self.candidates)
+    def _toggle(self, event: tk.Event) -> None:
+        """Tick or untick whichever row was clicked. One click, no modifier keys."""
+        row = self.choices.identify_row(event.y)
+        if not row:
+            return
 
+        if row in self.ticked:
+            self.ticked.discard(row)
+            self.choices.set(row, "tick", UNTICKED)
+        else:
+            self.ticked.add(row)
+            self.choices.set(row, "tick", TICKED)
+
+    def _selected(self) -> tuple[list[Candidate], list[PreparedTag]]:
+        """Split what is ticked back into where each row came from."""
         return (
-            [self.candidates[i] for i in indices if i < boundary],
-            [self.custom_tags[i - boundary] for i in indices if i >= boundary],
+            [self.candidates[int(row[1:])] for row in sorted(self.ticked) if row.startswith("c")],
+            [self.custom_tags[int(row[1:])] for row in sorted(self.ticked) if row.startswith("k")],
         )
 
     def _export(self) -> None:
@@ -371,11 +428,66 @@ class WizardApp(tk.Tk):
 # -- small dialogs ------------------------------------------------------------------------
 
 
-def _row(label: str, details: str, has_alignment: bool) -> str:
-    """One line of the list: what it is, then what is worth knowing before choosing it."""
-    warning = "" if has_alignment else "  ⚠ no alignment record: slow first locate"
+def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:
+    """
+    Ask for an Apple ID and its password together, in one window.
 
-    return f"{label:<28}{details}{warning}"
+    One dialog rather than two: they are a single credential to the person typing them, and a
+    second window appearing after the first reads as though the first one was rejected.
+
+    Hand-rolled for the same reason :func:`_ask_string` is - `tkinter.simpledialog` cannot hide
+    what is typed, and half of what this asks for is a password.
+    """
+    window = tk.Toplevel(parent)
+    window.title("Sign in to iCloud")
+    window.transient(parent)
+    window.resizable(width=False, height=False)
+
+    frame = ttk.Frame(window, padding=20)
+    frame.pack(fill="both", expand=True)
+    frame.grid_columnconfigure(1, weight=1)
+
+    ttk.Label(
+        frame,
+        text="Your Apple ID and password are used to sign in and are not saved anywhere.",
+        wraplength=320,
+        justify="left",
+        foreground="#555",
+    ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 14))
+
+    email = tk.StringVar()
+    password = tk.StringVar()
+
+    ttk.Label(frame, text="Apple ID").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=4)
+    email_entry = ttk.Entry(frame, textvariable=email, width=28)
+    email_entry.grid(row=1, column=1, sticky="ew", pady=4)
+
+    ttk.Label(frame, text="Password").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=4)
+    password_entry = ttk.Entry(frame, textvariable=password, width=28, show="\u2022")
+    password_entry.grid(row=2, column=1, sticky="ew", pady=4)
+
+    answer: dict[str, tuple[str, str]] = {}
+
+    def _accept() -> None:
+        answer["value"] = (email.get().strip(), password.get())
+        window.destroy()
+
+    buttons = ttk.Frame(frame)
+    buttons.grid(row=3, column=0, columnspan=2, sticky="e", pady=(16, 0))
+    ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="right", padx=(8, 0))
+    ttk.Button(buttons, text="Sign in", command=_accept).pack(side="right")
+
+    # Enter moves on from the first field and submits from the second, which is what every other
+    # sign-in form does.
+    email_entry.bind("<Return>", lambda _event: password_entry.focus_set())
+    password_entry.bind("<Return>", lambda _event: _accept())
+    window.bind("<Escape>", lambda _event: window.destroy())
+
+    email_entry.focus_set()
+    window.grab_set()
+    parent.wait_window(window)
+
+    return answer.get("value", ("", ""))
 
 
 def _ask_string(parent: tk.Tk, title: str, prompt: str, initial: str = "", *, secret: bool = False) -> str:
@@ -396,7 +508,7 @@ def _ask_string(parent: tk.Tk, title: str, prompt: str, initial: str = "", *, se
     ttk.Label(frame, text=prompt, wraplength=380, justify="left").pack(anchor="w", pady=(0, 8))
 
     value = tk.StringVar(value=initial)
-    entry = ttk.Entry(frame, textvariable=value, width=44, show="•" if secret else "")
+    entry = ttk.Entry(frame, textvariable=value, width=30, show="\u2022" if secret else "")
     entry.pack(fill="x")
     entry.focus_set()
     entry.select_range(0, "end")

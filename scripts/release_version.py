@@ -7,7 +7,7 @@ about the source that nothing verifies unless something like this does.
 
 `VERSION` in `python/exporter/version.py` is the single source of truth for the exporter. It is
 shown in the window title and, more importantly, stamped into every export it produces as
-`via: OpenTagViewer.app:<version>`. That field is how anyone looking at a zip afterwards -
+`via: <producer>:<version>`. That field is how anyone looking at a zip afterwards -
 a maintainer triaging a bug report, `check_export_compatibility.py`, a future importer -
 works out which exporter built it, so a version that lies about itself costs real debugging
 time.
@@ -146,7 +146,7 @@ KINDS = {
         "docs": "CONTRIBUTING.md -> Releasing the exporter",
         "why": (
             "Its VERSION is shown in the window title and stamped into every export as\n"
-            "`via: OpenTagViewer.app:<version>`, including exports made by running the wizard\n"
+            "`via: <producer>:<version>`, including exports made by running the wizard\n"
             "from source - which no build step can rewrite."
         ),
     },

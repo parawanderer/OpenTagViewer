@@ -197,7 +197,7 @@ version is written. It reaches the window title and every export it produces, as
 `via: <producer>:<version>` in `OPENTAGVIEWER.yml` — which is how a zip is traced back to what
 built it.
 
-**There is more than one producer.** The window stamps `OpenTagViewer.app:<version>`, the CLI
+**There is more than one producer.** The window stamps `OpenTagViewer.wizard:<version>`, the CLI
 stamps `OpenTagViewer.cli:<version>`, and the Android app will stamp its own. They share `VERSION`
 because they ship together; the name in front of it is what makes a bug report answerable.
 
