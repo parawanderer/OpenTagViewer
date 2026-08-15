@@ -137,4 +137,6 @@
     <string name="anisette_local_status_checking">確認中…</string>
     <string name="anisette_login_needs_server">この端末だけではサインインの準備ができなかったため、今回はサーバーを使用します。後で設定から変更できます。</string>
     <string name="anisette_provider">Anisette の提供元</string>
+    <string name="use_system_colors">システムの配色を使用</string>
+    <string name="use_system_colors_description">壁紙に合わせてアプリを配色します。Android 12 以降が必要です。</string>
 </resources>

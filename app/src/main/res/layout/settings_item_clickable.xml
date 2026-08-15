@@ -44,7 +44,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_semi_bold"
                 android:text="@{title}"
-                android:textColor="@color/md_theme_onSurface"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp"
                 tools:text="Settings Title" />
 
@@ -53,7 +53,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@{sectionSubtitle}"
-                android:textColor="@color/md_theme_outlineVariant_highContrast"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 tools:text="Setting Subtitle With More Details" />
         </LinearLayout>
 

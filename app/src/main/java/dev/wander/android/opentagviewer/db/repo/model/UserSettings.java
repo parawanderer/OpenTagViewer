@@ -7,6 +7,28 @@ import lombok.Data;
 @Data
 public class UserSettings {
     private Boolean useDarkTheme;
+
+    /**
+     * Whether to colour the app from the user's wallpaper (Material You) instead of the
+     * app's own palette.
+     *
+     * <p><b>Null is meaningful and must not be defaulted away</b>, for the same reason it is
+     * on {@link #anisetteMode}: "nobody has decided yet" is not "decided no". The two cases it
+     * separates want opposite answers. Somebody installing for the first time should get a app
+     * that matches their phone - the first thing they see is the login screen, which they
+     * cannot reach Settings from, so a default of off means their first impression never
+     * matches. Somebody updating should get exactly what they had yesterday, because an
+     * unannounced restyle on update is its own kind of bug.
+     *
+     * <p>So the decision belongs where the context is known - whether this install has ever
+     * been updated - rather than in a getter. See
+     * {@code OpenAirTagApplication.setupSystemColors()}, which resolves it once and stores the
+     * answer, after which this is a plain boolean.
+     *
+     * <p>Only has an effect on Android 12+, where the system exposes wallpaper-derived
+     * colours. Below that the setting is hidden rather than shown and ignored.
+     */
+    private Boolean useSystemColors;
     private String anisetteServerUrl;
     private String language;
     private Boolean enableDebugData;

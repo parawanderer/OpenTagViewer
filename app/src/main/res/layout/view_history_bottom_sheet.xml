@@ -6,7 +6,7 @@
     style="@style/Widget.Material3.BottomSheet"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    app:backgroundTint="@color/md_theme_background"
+    app:backgroundTint="?android:attr/colorBackground"
     app:behavior_hideable="false"
     app:behavior_peekHeight="74dp"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
@@ -16,7 +16,7 @@
         android:id="@+id/drag_handle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:tint="@color/md_theme_outlineVariant" />
+        app:tint="?attr/colorOutlineVariant" />
 
 
     <!-- Bottom sheet contents. -->

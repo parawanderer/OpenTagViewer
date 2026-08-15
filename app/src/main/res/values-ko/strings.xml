@@ -137,4 +137,6 @@
     <string name="anisette_local_status_checking">확인 중…</string>
     <string name="anisette_login_needs_server">이 기기에서 로그인을 직접 준비하지 못해 이번에는 서버를 사용합니다. 나중에 설정에서 변경할 수 있습니다.</string>
     <string name="anisette_provider">Anisette 제공자</string>
+    <string name="use_system_colors">시스템 색상 사용</string>
+    <string name="use_system_colors_description">배경화면에 맞춰 앱 색상을 지정합니다. Android 12 이상이 필요합니다.</string>
 </resources>

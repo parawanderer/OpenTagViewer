@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    A solid circle, meant to be tinted by whatever uses it.
+
+    Distinct from @drawable/circle, which is 5% black: tinting that only ever produces a faint
+    neutral, because the alpha is baked into the shape. A tonal button needs the container
+    colour at full strength, so the fill is opaque here and the caller supplies the colour.
+-->
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@android:color/white" />
+</shape>
