@@ -32,6 +32,7 @@ import androidx.databinding.DataBindingUtil;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.color.DynamicColors;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.progressindicator.CircularProgressIndicatorSpec;
 import com.google.android.material.progressindicator.IndeterminateDrawable;
@@ -154,6 +155,9 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
+        this.binding.setIsSystemColorsSupported(DynamicColors.isDynamicColorAvailable());
+        this.binding.setIsSystemColorsEnabled(
+                this.currentSettings.getUseSystemColors() == Boolean.TRUE);
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
@@ -161,6 +165,9 @@ public class SettingsActivity extends AppCompatActivity {
 
         MaterialSwitch switcher = this.findViewById(R.id.settings_app_debug_data_enabled);
         switcher.setOnCheckedChangeListener(this::onDebugDataEnabledChange);
+
+        MaterialSwitch systemColors = this.findViewById(R.id.settings_app_use_system_colors);
+        systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
 
         this.setupUserInfo();
 
@@ -199,6 +206,35 @@ public class SettingsActivity extends AppCompatActivity {
             this.binding.setIsDebugDataEnabled(isChecked);
             this.saveSettings();
         }
+    }
+
+    /**
+     * Turns wallpaper colouring on or off, and rebuilds the screen so the change is visible
+     * immediately.
+     *
+     * <p>A theme overlay is chosen when an activity is created, so this one has to be
+     * recreated to show the new palette. Everything behind it is recreated by Android when it
+     * returns to the foreground, having already been through {@code onStop}, so the stack
+     * ends up consistent without restarting the app.
+     *
+     * <p>The in-memory flag and the stored setting are both updated, so a recreate now and a
+     * cold start later agree.
+     */
+    private void onUseSystemColorsChange(CompoundButton buttonView, boolean isChecked) {
+        final boolean oldChoice = this.currentSettings.getUseSystemColors() == Boolean.TRUE;
+        if (oldChoice == isChecked) {
+            return;
+        }
+
+        this.currentSettings.setUseSystemColors(isChecked);
+        this.binding.setIsSystemColorsEnabled(isChecked);
+        this.saveSettings();
+
+        OpenAirTagApplication.setUseSystemColors(isChecked);
+
+        Log.i(TAG, "Updating system colours choice to " + isChecked);
+
+        this.recreate();
     }
 
     private String getCurrentThemeUiString() {

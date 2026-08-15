@@ -57,7 +57,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Extra data"
-                android:textColor="@color/md_theme_outline"
+                android:textColor="?attr/colorOutline"
                 android:textSize="12sp"
                 android:visibility="gone"
                 tools:visibility="gone" />
@@ -67,7 +67,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="At 00:00"
-                android:textColor="@color/md_theme_outline"
+                android:textColor="?attr/colorOutline"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>

@@ -9,6 +9,7 @@ import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStor
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.MAP_PROVIDER;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_DARK_THEME;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_SYSTEM_COLORS;
 
 import androidx.datastore.preferences.core.MutablePreferences;
 import androidx.datastore.preferences.core.Preferences;
@@ -32,6 +33,7 @@ public class UserSettingsRepository {
                 String anisetteServerUrl = settings.get(ANISETTE_SERVER_URL);
                 String language = settings.get(LANGUAGE);
                 Boolean useDarkTheme = settings.get(USE_DARK_THEME);
+                Boolean useSystemColors = settings.get(USE_SYSTEM_COLORS);
                 Boolean enableDebugData = settings.get(ENABLE_DEBUG_DATA);
                 String mapProvider = settings.get(MAP_PROVIDER);
                 String amapApiKey = settings.get(AMAP_API_KEY);
@@ -43,6 +45,7 @@ public class UserSettingsRepository {
                         .anisetteServerUrl(anisetteServerUrl)
                         .language(language)
                         .useDarkTheme(useDarkTheme)
+                        .useSystemColors(useSystemColors)
                         .enableDebugData(enableDebugData)
                         .mapProvider(mapProvider)
                         .amapApiKey(amapApiKey)
@@ -55,6 +58,21 @@ public class UserSettingsRepository {
             .blockingFirst();
     }
 
+    /**
+     * Writes only the system-colours choice.
+     *
+     * <p>Separate from {@link #storeUserSettings} because this is called at application start,
+     * to record a decision that was never made explicitly, and writing the whole settings
+     * object there would persist whatever else happened to be in memory at the time.
+     */
+    public Completable storeUseSystemColors(final boolean useSystemColors) {
+        return Completable.fromSingle(userSettingsStore.updateDataAsync(settings -> {
+            MutablePreferences mutablePreferences = settings.toMutablePreferences();
+            mutablePreferences.set(USE_SYSTEM_COLORS, useSystemColors);
+            return Single.just(mutablePreferences);
+        }));
+    }
+
     public Completable storeUserSettings(UserSettings userSettings) {
         return userSettingsStore.updateDataAsync(settings -> {
             MutablePreferences mutablePreferences = settings.toMutablePreferences();
@@ -63,6 +81,9 @@ public class UserSettingsRepository {
             mutablePreferences.set(ANISETTE_SERVER_URL, userSettings.getAnisetteServerUrl());
             mutablePreferences.set(LANGUAGE, userSettings.getLanguage());
             mutablePreferences.set(USE_DARK_THEME, userSettings.getUseDarkTheme());
+            // Null means "never chosen", which reads the same as off - the app's own palette.
+            mutablePreferences.set(USE_SYSTEM_COLORS,
+                    userSettings.getUseSystemColors() == Boolean.TRUE);
             mutablePreferences.set(ENABLE_DEBUG_DATA, userSettings.getEnableDebugData());
             mutablePreferences.set(MAP_PROVIDER, userSettings.getMapProvider());
             // Null would throw; an empty string reads back as "no key supplied".

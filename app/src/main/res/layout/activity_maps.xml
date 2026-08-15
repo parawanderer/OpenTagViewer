@@ -13,7 +13,7 @@
         android:id="@+id/map"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/md_theme_background"
+        android:background="?android:attr/colorBackground"
         tools:context=".MapsActivity" />
 
     <!-- clipChildren/clipToPadding are both off so the cards' 8dp elevation shadow can draw
@@ -63,7 +63,7 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:background="@drawable/ripple_background"
-            android:backgroundTint="@color/md_theme_background"
+            android:backgroundTint="?android:attr/colorBackground"
             android:clickable="true"
             android:cropToPadding="false"
             android:elevation="8dp"
@@ -88,7 +88,7 @@
         android:layout_marginTop="45dp"
         android:layout_toLeftOf="@id/more_dropdown_top_right"
         android:background="@drawable/layout_rounded"
-        android:backgroundTint="@color/md_theme_background"
+        android:backgroundTint="?android:attr/colorBackground"
         android:elevation="8dp"
         android:fontFamily="@font/nunito_medium"
         android:paddingLeft="14dp"
@@ -96,7 +96,7 @@
         android:paddingRight="14dp"
         android:paddingBottom="10dp"
         android:text="@string/resolving_tags_banner"
-        android:textColor="@color/md_theme_onBackground"
+        android:textColor="?attr/colorOnBackground"
         android:textSize="12sp"
         android:visibility="gone"
         tools:visibility="visible" />
@@ -129,7 +129,7 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:background="@drawable/ripple_background"
-            android:backgroundTint="@color/md_theme_background"
+            android:backgroundTint="?android:attr/colorBackground"
             android:clickable="true"
             android:cropToPadding="false"
             android:elevation="8dp"
@@ -147,7 +147,7 @@
             android:layout_marginLeft="10dp"
             android:layout_weight="1"
             android:background="@drawable/ripple_background"
-            android:backgroundTint="@color/md_theme_background"
+            android:backgroundTint="?android:attr/colorBackground"
             android:clickable="true"
             android:cropToPadding="false"
             android:elevation="8dp"
