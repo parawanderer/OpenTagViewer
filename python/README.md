@@ -185,16 +185,33 @@ uv sync --no-default-groups --group build
 
 uv run pyinstaller --onefile --windowed --name "OpenTagViewer" \
     --osx-bundle-identifier "dev.wander.opentagviewer" \
-    --icon=OpenTagViewer.icns --collect-all unicorn --noconfirm ./exporter/wizard.py
+    --icon=OpenTagViewer.icns --collect-all unicorn \
+    --collect-data findmy --collect-data anisette --noconfirm ./exporter/wizard.py
 ```
+
+Or, more simply, `uv run pyinstaller OpenTagViewer.spec` — the spec carries all of that.
 
 Windows uses `--icon=OpenTagViewer.ico`; Linux takes neither `--windowed` nor an icon.
 
 > [!IMPORTANT]
-> **`--collect-all unicorn` is not optional.** unicorn loads its native library through ctypes at
-> runtime, so PyInstaller never sees it: without this the build succeeds and the binary dies at
-> startup with *Failed to load the Unicorn dynamic library*. Always run the result once —
-> `./dist/OpenTagViewer --version` — because that is the only thing that catches it.
+> **The three `--collect-*` flags are not optional, and neither is running the result.**
+> PyInstaller bundles code it can see being imported, which leaves out two things here:
+>
+> - **unicorn's native library**, loaded through `ctypes` at runtime. Without it the binary dies at
+>   startup: *Failed to load the Unicorn dynamic library*.
+> - **Apple's pinned root certificates**, which FindMy.py keeps as files beside its code, and
+>   anisette's `apple-root.pem`. Without them the binary starts, signs in, and *then* dies with
+>   `[Errno 2] No such file or directory` — several minutes and one Apple ID into the flow.
+>
+> So always run both checks on the result:
+>
+> ```shell
+> ./dist/OpenTagViewer --version      # it starts
+> ./dist/OpenTagViewer --self-test    # it can reach its data files
+> ```
+>
+> The release workflow runs both on every platform. Anything else that starts reading files rather
+> than modules belongs in `self_test()`.
 
 The result is around **34 MB** as a binary, **68 MB** zipped, against 22 MB for the macOS-only
 1.0.5. Almost all of the difference is unicorn, at 41 MB on disk: it emulates Apple's ADI library
