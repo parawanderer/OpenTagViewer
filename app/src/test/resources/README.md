@@ -43,6 +43,35 @@ That is what `_narrowAlignmentIfNeeded` in `main.py` exists to avoid.
 These files are committed to a public repo. The filler bytes are not derived from
 the originals; only lengths carried over.
 
+## `09082026_2/`
+
+A second redacted export, `version: 0.0.2`, `via: OpenTagViewer.app:1.0.5`. Same layout as
+`19032025/` plus the directory that version added:
+
+```
+09082026_2/
+  OPENTAGVIEWER.yml
+  OwnedBeacons/<beacon-uuid>.plist
+  BeaconNamingRecord/<beacon-uuid>/<record-uuid>.plist
+  KeyAlignmentRecords/<beacon-uuid>/<record-uuid>.plist
+```
+
+**It exists for the key alignment record**, which `19032025/` predates. Without one, an imported
+accessory searches its whole key history on first locate; with one, a few hundred indices. Both
+fixtures are read by `python/opentagviewer_export/tests/test_macos_fixture.py`, which rebuilds
+them from their own contents and compares **bytes**, so the pair covers the format with and
+without alignment.
+
+### Two things were corrected in these fixtures
+
+- **`19032025`'s key blobs were not valid canonical base64.** Redaction substituted characters
+  from the base64 alphabet while preserving length, which leaves padding bits set — the blob
+  decodes and re-encodes to something different, so nothing could round-trip it. They have been
+  re-encoded; the decoded bytes are unchanged, so every reader sees exactly what it saw before.
+- **`09082026_2`'s naming record named a different beacon** than the directory it sits in. The
+  importer keys off the directory so it imported fine, but the record contradicted its own
+  filing. `associatedBeacon` now matches.
+
 ## `beacons/`
 
 Reserved for additional fixtures of differing tag ages, for testing how the
