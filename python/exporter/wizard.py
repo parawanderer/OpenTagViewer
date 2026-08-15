@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import datetime
 import tempfile
 import time
@@ -14,7 +15,7 @@ from tkinter.filedialog import asksaveasfilename
 
 from tkinter import messagebox
 
-from main.airtag_decryptor import (
+from exporter.airtag_decryptor import (
     BEACON_NAMING_RECORD,
     KEY_ALIGNMENT_RECORDS,
     KEYCHAIN_LABEL,
@@ -27,17 +28,12 @@ from main.airtag_decryptor import (
     make_output_path,
     dump_plist
 )
-from main.utils import MACOS_VER
+from exporter.utils import MACOS_VER
+# The version lives in its own module so that the headless CLI and the release check can read it
+# without importing tkinter - see exporter/version.py and rule 9 in AGENTS.md.
+from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION  # noqa: F401 - VERSION is re-exported
 
 # Wrapper around the main decryptor implementation that allows to filter which beacon files get exported/zipped
-
-# The single source of truth for the exporter's version: it appears in the window title and
-# is stamped into every export as `via: OpenTagViewer.app:<version>`. Releases are tagged
-# macos-exporter-v<this>, and CI refuses to publish a release whose tag disagrees - see
-# scripts/release_version.py and CONTRIBUTING.md -> Releasing the macOS exporter.
-VERSION = "1.0.5"
-
-APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
 DROPDOWN_DESCRIPTION = "Choose devices to export:"
 GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
@@ -45,7 +41,7 @@ GITHUB_EXPORT_AIRTAGS_WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer
 
 EXPORT_METADATA_FILENAME = "OPENTAGVIEWER.yml"
 EXPORT_METADATA_VERSION = "0.0.2"
-EXPORT_METADATA_VIA_NAME = f"OpenTagViewer.app:{VERSION}"
+EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
 
 
 class PListFileInfo:
@@ -361,5 +357,13 @@ class WizardApp(tk.Tk):
 
 
 if __name__ == "__main__":
+    # What the release build's smoke test runs. It does not avoid tkinter - the imports at the
+    # top of this module have already happened - and that is the point: it proves the frozen
+    # bundle can import everything it was built with, including Tk, without needing a display to
+    # do it. A bundle missing an import fails here rather than on a user's desktop.
+    if "--version" in sys.argv[1:]:
+        print(VERSION)
+        sys.exit(0)
+
     app = WizardApp()
     app.mainloop()

@@ -51,7 +51,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
     ```
 - Run the script:
     ```bash
-    python main/airtag_decryptor.py --rename-legacy
+    python exporter/airtag_decryptor.py --rename-legacy
     ```
     Default output path is: `~/plist_decrypt_output`.
 
@@ -63,7 +63,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
     If you'd like to provide an alternative output path, use optional argument `--path`
      ```bash
-    python main/airtag_decryptor.py --rename-legacy --path='/your/alternative/path'
+    python exporter/airtag_decryptor.py --rename-legacy --path='/your/alternative/path'
     ```
     </details>
 
@@ -75,7 +75,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
 
      ```bash
-    python main/airtag_decryptor.py --rename-legacy --key='SGVsbG8gV29ybGQ='
+    python exporter/airtag_decryptor.py --rename-legacy --key='SGVsbG8gV29ybGQ='
     ```
     </details>
 
@@ -85,7 +85,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
     If you'd like to decrypt all `.plist` files and not just the ones in `OwnedBeacons` and `BeaconNamingRecord`, you can use the `--all` flag
      ```bash
-    python main/airtag_decryptor.py --rename-legacy --all
+    python exporter/airtag_decryptor.py --rename-legacy --all
     ```
     </details>
 
@@ -95,7 +95,7 @@ Reasoning for this: I don't know Swift (and I don't even use MacOS) and I need t
 
     For more help and options, run the script with `--help`:
     ```bash
-    python main/airtag_decryptor.py --help
+    python exporter/airtag_decryptor.py --help
     ```
     </details>
 
@@ -118,7 +118,7 @@ pip install -r requirements.txt
 
 Then:
 ```shell
-python main/wizard.py
+python exporter/wizard.py
 ```
 
 ### Build Icons (on MacOS)
@@ -145,7 +145,7 @@ pyinstaller \
     --name "OpenTagViewer" \
     --osx-bundle-identifier "dev.wander.opentagviewer" \
     --icon=OpenTagViewer.icns \
-    main/wizard.py
+    exporter/wizard.py
 ```
 
 Zip up result (MacOS):
@@ -159,7 +159,7 @@ zip -r OpenTagViewer-ExportWizardMacOS-$APP_VERSION.zip OpenTagViewer.app/ OpenT
 
 ### Versioning
 
-`VERSION` in [`main/wizard.py`](./main/wizard.py) is the only place the exporter's version is
+`VERSION` in [`exporter/wizard.py`](./exporter/wizard.py) is the only place the exporter's version is
 written. It reaches the window title and every export it produces, as
 `via: OpenTagViewer.app:<version>` in `OPENTAGVIEWER.yml` — which is how a zip can be traced
 back to the exporter that built it afterwards.

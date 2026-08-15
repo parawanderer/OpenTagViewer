@@ -10,7 +10,7 @@ import traceback
 from pathlib import Path
 from Crypto.Cipher import AES
 
-from main.utils import MACOS_VER
+from exporter.utils import MACOS_VER
 
 
 # Author: Shane B. <shane@wander.dev>

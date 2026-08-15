@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main/wizard.py'],
+    ['exporter/wizard.py'],
     pathex=[],
     binaries=[],
     datas=[],
