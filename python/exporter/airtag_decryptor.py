@@ -29,7 +29,7 @@ from exporter.utils import MACOS_VER
 KEYCHAIN_LABEL = "BeaconStore"
 
 BASE_FOLDER = "com.apple.icloud.searchpartyd"
-HOME = '' if os.getenv('HOME') is None else os.getenv('HOME')
+HOME = os.getenv('HOME') or ''
 INPUT_PATH = os.path.join(HOME, 'Library', BASE_FOLDER)
 
 OWNED_BEACONS = "OwnedBeacons"
@@ -328,7 +328,8 @@ def _red(text: str) -> str:
     return f"\033[91m{text}\n\033[0m"
 
 
-def _parse_b64_key(key: str) -> bytearray:
+def _parse_b64_key(key: str) -> bytearray | None:
+    """The key from --key, or None if it is empty or not base64."""
     if len(key) == 0:
         return None
 
@@ -344,14 +345,16 @@ def _determine_key_to_use(args: argparse.Namespace) -> bytearray:
 
     if args.key is not None:
 
-        key = _parse_b64_key(args.key)
+        parsed = _parse_b64_key(args.key)
 
-        if key is None:
+        if parsed is None:
             print(_red("Invalid base64 key provided via --key argument"))
             exit(1)
+
+        key = parsed
     else:
 
-        if MACOS_VER[0] >= 15:
+        if MACOS_VER is not None and MACOS_VER[0] >= 15:
             print(_red(f"For MacOS >= 15, extracting the '{KEYCHAIN_LABEL}' key automatically is not supported due to newly introduced OS keychain access limitations. \n\nPlease consider using the --key argument (see --help) and see alternative key retrieval strategies here:\n\n\thttps://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Manually-Export-AirTags"))  # noqa: E501
             exit(1)
 

@@ -12,9 +12,9 @@ local files are read out of your iCloud account instead. It runs on macOS, Windo
 
 | You need | Notes |
 | --- | --- |
-| An **Apple ID with your AirTags on it** | The account that *owns* the tags. A tag shared to you through Apple's own sharing cannot be exported — see [Shared tags](#shared-tags-do-not-work) |
-| Its **password** | Typed into this program. It is used once and never written anywhere |
-| The **screen-lock passcode of one Apple device** on that account | An iPhone's PIN, or a Mac's login password. **Not** your Apple ID password |
+| An **Apple ID with your AirTags on it** | The account that *owns* the tags. A tag shared to you through Apple's own sharing cannot be exported — see [Shared tags](#shared-tags-do-not-work). **Not needed on macOS 14 or older**, which reads its own files instead |
+| Its **password** | Typed into this program. It is used once and never written anywhere. Not needed on macOS 14 or older |
+| The **screen-lock passcode of one Apple device** on that account | An iPhone's PIN, or a Mac's login password. **Not** your Apple ID password. Not needed on macOS 14 or older |
 | **Python 3.10 or newer** | If you use `uv` below it fetches a suitable one itself, so this matters only if you install by hand. macOS's built-in `python3` is 3.9 and will not do |
 | Two-factor authentication by **SMS or a trusted device** | The only two this handles |
 
@@ -54,6 +54,22 @@ virtualenv of your own. uv is only doing dependency resolution; nothing here nee
 </details>
 
 ## 3. 🚀 Run it
+
+> [!NOTE]
+> **On a Mac running macOS 14 or older, steps 4 and 5 do not happen.** That Mac already has the
+> records on disk, so the exporter reads those instead: no Apple ID, no password, no verification
+> code, no device registered on your account. macOS asks for your login password twice — its own
+> prompt, not this program's — and then you are at step 6.
+>
+> It picks that route by itself and says which it chose and why. `--source icloud` forces the long
+> way if you want it; `--source local` asks for the short one, and is answered rather than obeyed
+> where it cannot work.
+>
+> It is **not** an offline route, and this is worth being exact about: those local files got there
+> because macOS signed into iCloud, joined your keychain's trust circle as a device and synced them
+> down. It needs a signed-in Mac and it leaves *more* on your account than the iCloud route does —
+> a full device peer and its escrow record, created by Apple's own software. What it genuinely
+> saves you is typing your Apple ID password into this program.
 
 ```bash
 uv run python -m exporter.cli --no-password --output my-tags.zip
@@ -210,6 +226,7 @@ would fall in seconds.
 | `--add-keys FILE` | Add a self-generated tag from a key file. Repeatable |
 | `--source-user` | What the recipient sees as "exported by". Defaults to your machine's username |
 | `--accept-terms` | Agree to pending iCloud terms without displaying them |
+| `--source` | `auto` (the default), `icloud` or `local`. `auto` reads this Mac's own files where it can |
 | `--anisette-url` | Use a remote Anisette server instead of running one locally |
 | `--anisette-libs` | Cache Apple's ADI libraries in a file, so a later run does not download them |
 | `-v`, `--verbose` | Show what the library is doing. Worth having on the first run |
