@@ -4,8 +4,9 @@ The exporter's version, and the strings that carry it into an export.
 **This is the single source of truth** - see rule 9 in AGENTS.md. It reaches the wizard's window
 title and, more importantly, every export as `via: <producer>:<version>`, which is how anyone
 looking at a zip afterwards works out what built it. Releases are tagged
-`macos-exporter-v<this>`, and `scripts/release_version.py` refuses to publish a release whose tag
-disagrees.
+`exporter-v<this>` - `macos-exporter-v` is the older spelling and still resolves, because tags
+already published keep their name - and `scripts/release_version.py` refuses to publish a release
+whose tag disagrees.
 
 **It lives here rather than in wizard.py so that reading it costs nothing.** The CLI is headless
 and the release check runs on a lint runner; importing the wizard for a version string would pull
