@@ -39,8 +39,12 @@ Print the version the source declares:
 
 Check a release tag against it. Accepts a bare tag or a full ref, so `$GITHUB_REF` works:
 
-    python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.5
+    python scripts/release_version.py --kind exporter --tag exporter-v1.1.0
     python scripts/release_version.py --kind android --tag refs/tags/android-app-v1.0.5
+
+The exporter also answers to `macos-exporter-v`, which is what its tags were called while it
+only ran on macOS. Published tags keep their names, so that spelling has to keep resolving -
+but it is not the one to reach for when tagging something new.
 
 On success it prints the version, so a workflow can use it directly:
 
