@@ -182,7 +182,6 @@ jobs:
       working-directory: ./python
       run: |
         uv run --frozen pyinstaller \
-          --onefile \
           --windowed \
           --name "OpenTagViewer" \
           --osx-bundle-identifier "dev.wander.opentagviewer" \
@@ -203,7 +202,6 @@ jobs:
       working-directory: ./python
       run: |
         uv run --frozen pyinstaller `
-          --onefile `
           --windowed `
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
@@ -225,7 +223,6 @@ jobs:
       working-directory: ./python
       run: |
         uv run --frozen pyinstaller \
-          --onefile \
           --name "OpenTagViewer" \
           --collect-all unicorn \
           --collect-data findmy \
@@ -260,8 +257,10 @@ jobs:
       working-directory: ./python/dist
       shell: bash
       run: |
-        ./OpenTagViewer --version
-        ./OpenTagViewer --self-test
+        BINARY="./OpenTagViewer/OpenTagViewer"
+        [ "${{ matrix.os }}" = "macos" ] && BINARY="./OpenTagViewer.app/Contents/MacOS/OpenTagViewer"
+        "$BINARY" --version
+        "$BINARY" --self-test
 
     - name: Package (macOS)
       if: matrix.os == 'macos'
@@ -269,7 +268,9 @@ jobs:
       shell: bash
       run: |
         ASSET="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-macos-${{ matrix.arch }}.zip"
-        zip -r "$ASSET" OpenTagViewer.app/ OpenTagViewer
+        # The .app only. In onedir mode COLLECT and BUNDLE each hold a full copy, so zipping both
+        # ships every file twice.
+        zip -qr "$ASSET" OpenTagViewer.app
         mkdir -p "${{ github.workspace }}/output"
         mv "$ASSET" "${{ github.workspace }}/output/$ASSET"
         echo "UPLOAD_ASSET=$ASSET" >> $GITHUB_ENV
@@ -281,7 +282,9 @@ jobs:
       shell: bash
       run: |
         ASSET="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-windows-${{ matrix.arch }}.zip"
-        7z a "$ASSET" OpenTagViewer.exe
+        # The whole directory: onedir keeps the interpreter and the libraries beside the .exe, and
+        # the .exe alone does nothing.
+        7z a "$ASSET" OpenTagViewer
         mkdir -p "${{ github.workspace }}/output"
         mv "$ASSET" "${{ github.workspace }}/output/$ASSET"
         echo "UPLOAD_ASSET=$ASSET" >> $GITHUB_ENV

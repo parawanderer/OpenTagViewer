@@ -51,9 +51,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='OpenTagViewer',
     debug=False,
     bootloader_ignore_signals=False,
@@ -68,8 +67,17 @@ exe = EXE(
     entitlements_file=None,
     icon=['OpenTagViewer.icns'],
 )
-app = BUNDLE(
+coll = COLLECT(
     exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='OpenTagViewer',
+)
+app = BUNDLE(
+    coll,
     name='OpenTagViewer.app',
     icon='OpenTagViewer.icns',
     bundle_identifier='dev.wander.opentagviewer',
