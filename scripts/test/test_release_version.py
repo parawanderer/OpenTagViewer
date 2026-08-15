@@ -62,11 +62,31 @@ def test_reports_a_missing_file_rather_than_raising_oserror(tmp_path: Path):
 # --- parsing the tag --------------------------------------------------------------------
 
 @pytest.mark.parametrize("tag", [
+    "exporter-v1.0.5",
+    "refs/tags/exporter-v1.0.5",
     "macos-exporter-v1.0.5",
     "refs/tags/macos-exporter-v1.0.5",
 ])
 def test_accepts_a_bare_tag_and_a_full_ref(tag: str):
     assert release_version.version_from_tag(tag) == "1.0.5"
+
+
+def test_still_accepts_the_macos_only_spelling_of_the_exporter_tag():
+    """
+    The exporter was macOS-only and its tags said so; it builds for Windows and Linux now.
+
+    Both resolve, because tags already published keep their name forever - a check that stopped
+    understanding them would make every existing release unverifiable - and because a rename does
+    not reach anyone's muscle memory.
+    """
+    assert release_version.version_from_tag("macos-exporter-v1.0.5") == "1.0.5"
+    assert release_version.version_from_tag("exporter-v1.0.5") == "1.0.5"
+
+
+def test_the_canonical_prefix_is_the_one_the_error_message_recommends():
+    """A tag that is not one of ours should be pointed at the current name, not the old one."""
+    with pytest.raises(release_version.VersionError, match=r"tagged exporter-v<version>"):
+        release_version.version_from_tag("nonsense-v1.0.5")
 
 
 def test_accepts_a_four_part_version():
@@ -206,9 +226,9 @@ def test_both_kinds_have_a_distinct_tag_prefix():
             assert a == b or not a.startswith(b), f"{a} and {b} overlap"
 
 
-# --- the real wizard --------------------------------------------------------------------
+# --- the real version module ------------------------------------------------------------
 
-def test_the_real_wizard_still_declares_a_readable_version():
+def test_the_real_version_module_still_declares_a_readable_version():
     """Guards the assumption the whole check rests on: VERSION is a module-level literal."""
     version, lineno = release_version.read_version()
     assert release_version.VERSION_PATTERN.match(version), f"{version!r} is not a version number"

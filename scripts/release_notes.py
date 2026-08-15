@@ -99,7 +99,7 @@ def _version(kind: str) -> str:
 KINDS = {
     "exporter": {
         "title": "OpenTagViewer MacOS AirTag Exporter v{version}",
-        "bump": 'python/main/wizard.py  ->  VERSION = "..."',
+        "bump": 'python/exporter/version.py  ->  VERSION = "..."',
     },
     "android": {
         "title": "OpenTagViewer Android App v{version}",
