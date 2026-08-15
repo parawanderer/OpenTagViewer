@@ -251,6 +251,9 @@ class WizardApp(tk.Tk):
                 ),
             )
 
+            # Registered a device by now; remembering it stops the next export registering another.
+            icloud.remember(account)
+
             async with await icloud.open_client(account) as client:
                 options = await client.recovery_options()
                 if not options.recoverable:
@@ -695,10 +698,14 @@ def self_test() -> int:
     roots = PinnedRoots.bundled().by_version
     print(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
 
-    anisette_root = Path(sys.modules["anisette"].__file__).parent / "apple-root.pem"
-    print(f"anisette root: {'present' if anisette_root.is_file() else 'MISSING'}")
+    # A namespace package would have no __file__, and a build that produced one would be broken in
+    # a way worth reporting rather than crashing on.
+    anisette_module = sys.modules["anisette"].__file__
+    anisette_root = Path(anisette_module).parent / "apple-root.pem" if anisette_module else None
+    found = anisette_root is not None and anisette_root.is_file()
+    print(f"anisette root: {'present' if found else 'MISSING'}")
 
-    if not roots or not anisette_root.is_file():
+    if not roots or not found:
         return 1
 
     print("self-test passed")

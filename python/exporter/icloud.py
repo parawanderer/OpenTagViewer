@@ -17,8 +17,10 @@ inside one call each and dropped. A run starts from nothing, every time.
 
 from __future__ import annotations
 
+import base64
 import logging
 import uuid
+from io import BytesIO
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Sequence
@@ -46,6 +48,7 @@ from findmy.cloudkit.client import AsyncCloudKitClient
 from findmy.icloud import AsyncFindMyClient
 from findmy.keychain.session import AsyncKeychainSession
 
+from exporter import device
 from exporter.identity import CLOUDKIT_DEVICE_NAME, EXPORTER_SERIAL
 from opentagviewer_export import AccessoryExport
 from opentagviewer_export.hardware import identify
@@ -128,7 +131,13 @@ class Fetched:
 
 def make_account(anisette_url: str | None = None, libs_path: str | None = None) -> AsyncAppleAccount:
     """
-    Build an account that presents this exporter's identity.
+    Build an account that presents this exporter's identity - the same one as last time.
+
+    **The identity is more than the serial.** `AsyncAppleAccount` invents a device UUID when it is
+    not given one, so building a fresh account every run made every export look to Apple like a
+    different machine that happened to share a serial - and an account's device list gained an
+    entry per export. :mod:`exporter.device` keeps the two ids and the Anisette provisioning
+    between runs so that stops happening. No credential is stored; see there.
 
     :param anisette_url: A remote Anisette server, or None to run Anisette locally. Local is the
         default because it keeps the login between this machine and Apple; a server sees the
@@ -136,13 +145,65 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
     :param libs_path: Where to cache Apple's ADI libraries, so a later run does not fetch them
         again. They are downloaded on first use when this is None.
     """
-    provider = (
-        LocalAnisetteProvider(libs_path=libs_path, serial=EXPORTER_SERIAL)
-        if anisette_url is None
-        else RemoteAnisetteProvider(anisette_url, serial=EXPORTER_SERIAL)
-    )
+    stored = device.load()
 
-    return AsyncAppleAccount(provider)
+    provider = _make_provider(anisette_url, libs_path, stored)
+
+    if stored is None:
+        return AsyncAppleAccount(provider)
+
+    # Only the ids are restored. The rest of the shape has to be there because the library reads
+    # it, and every field of it is empty on purpose - this is a logged-out account that happens to
+    # know what device it is.
+    state: Any = {
+        "type": "account",
+        "ids": {"uid": stored["uid"], "devid": stored["devid"]},
+        "account": {"username": None, "password": None, "info": None},
+        "login": {"state": LoginState.LOGGED_OUT.value, "data": None},
+        "anisette": provider.to_json(),
+    }
+
+    logger.info("Reusing the stored device identity, so this is not a new device to Apple")
+
+    return AsyncAppleAccount(provider, state_info=state)
+
+
+def _make_provider(
+    anisette_url: str | None,
+    libs_path: str | None,
+    stored: dict[str, Any] | None,
+) -> LocalAnisetteProvider | RemoteAnisetteProvider:
+    """Build the Anisette provider, restoring its provisioning data if there is any."""
+    if anisette_url is not None:
+        return RemoteAnisetteProvider(anisette_url, serial=EXPORTER_SERIAL)
+
+    saved = (stored or {}).get("anisette")
+    state_blob = None
+
+    if isinstance(saved, dict) and saved.get("type") == "aniLocal" and saved.get("prov_data"):
+        # Provisioning is what makes this the same machine to Apple's servers, so a fresh one is
+        # part of what made every run a new device.
+        try:
+            state_blob = BytesIO(base64.b64decode(saved["prov_data"]))
+        except (ValueError, TypeError):
+            logger.warning("The stored Anisette provisioning could not be read; starting fresh")
+
+    return LocalAnisetteProvider(libs_path=libs_path, serial=EXPORTER_SERIAL, state_blob=state_blob)
+
+
+def remember(account: AsyncAppleAccount) -> None:
+    """
+    Store this account's device identity, so the next export is the same device.
+
+    Called once signing in has worked, rather than at the end: the device is registered by then,
+    and an export that is abandoned afterwards should not leave an entry nothing can reuse.
+    """
+    # The account's own serialisation, with only the two harmless parts taken out of it. It also
+    # carries the username, the password and the login state - which is exactly why this picks
+    # fields rather than handing the whole mapping to `device.save`.
+    state = account.to_json()
+
+    device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
 
 
 async def log_in(
