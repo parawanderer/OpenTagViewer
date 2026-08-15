@@ -290,6 +290,9 @@ async def sign_in(arguments: argparse.Namespace):
 
         if not await accept_terms(account, without_reading=arguments.accept_terms):
             raise ExportSourceError("Signing in stopped at the delegate exchange.") from None
+        # Signing in registered a device; remembering which one is what stops the next export
+        # registering another.
+        icloud.remember(account)
     except BaseException:
         # The account owns an HTTP session, and a sign-in that fails leaves it open - which
         # surfaces as "Unclosed client session" from asyncio, after the real error, where it reads
