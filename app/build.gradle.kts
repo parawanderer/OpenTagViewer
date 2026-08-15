@@ -46,6 +46,12 @@ android {
                 // that move between APK builds, so they are dlopen'd and resolved at runtime
                 // rather than bound as JNI methods. See app/src/main/cpp/.
                 cppFlags += "-std=c++17"
+
+                // Align our own libraries to 16 KB pages, which Android 15+ devices with
+                // 16 KB page sizes require. This is explicit because r27 does NOT do it by
+                // default - measured, not assumed: an r27 build without this flag produces
+                // PT_LOAD segments at 0x1000. r28 makes it the default and this can go.
+                arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
             }
         }
 
@@ -66,9 +72,9 @@ android {
         }
     }
 
-    // NDK r27 is the first that aligns shared libraries to 16 KB pages by default, which
-    // Android 15 devices with 16 KB page sizes require. Pinning it keeps that guarantee from
-    // depending on whichever NDK a given machine happens to have installed.
+    // Pinned so the toolchain does not depend on whichever NDK a given machine happens to
+    // have installed. Note r27 does not align to 16 KB pages on its own - the linker flag in
+    // defaultConfig.externalNativeBuild does that. See #47.
     ndkVersion = "27.0.12077973"
 
     // Makes the exported schemas readable by instrumented tests at runtime, which is
