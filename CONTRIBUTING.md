@@ -319,16 +319,21 @@ strongest test rebuilds the committed export fixtures in `app/src/test/resources
 Two things it deliberately does not cover, because they need an Apple account: signing in, and
 everything the account then yields. What happens to the records afterwards is covered in full.
 
-**Two files need a display and skip without one**, which includes CI — `test_asyncui.py`, for what
-happens when somebody closes the progress window, and `test_wizard_list.py`, for the list of
-accessories. Both drive real Tk widgets, because what they cover *is* the event loop and the
-widget: a cancelled progress window used to leave the wizard hung for ever, and that is not
-reproducible against a stand-in. So run the exporter suite on a desktop before trusting a green
-CI run over the wizard — locally they run, and `-rs` says whether they were skipped:
+**Two files need Tk and skip without it** — `test_asyncui.py`, for what happens when somebody
+closes the progress window, and `test_wizard_list.py`, for the list of accessories. Both drive
+real Tk widgets, because what they cover *is* the event loop and the widget: a cancelled progress
+window used to leave the wizard hung for ever, and that is not reproducible against a stand-in.
+
+**CI runs them on one job in four.** The matrix is 3.10 to 3.13 on `macos-14`, and only its 3.13
+has `_tkinter` — the other three skip both files at collection, so a green square there says
+nothing about the window. `-rs` is what tells you which you got:
 
 ```bash
 uv run pytest ./test -rs
 ```
+
+`361 passed, 4 skipped` means Tk was missing and neither file ran. `378 passed, 2 skipped` means
+they did, and the two remaining skips are the macOS-14-only decryptor tests.
 
 ### Tooling tests
 
