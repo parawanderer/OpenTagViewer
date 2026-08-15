@@ -275,7 +275,16 @@ def exportToString(account: AppleAccount) -> str:
     Replaces the old account.export() pattern. In FindMy 0.9.x, AppleAccount uses to_json/from_json.
     The returned dict (AccountStateMapping) embeds the anisette provider state, so the
     server URL no longer needs to be supplied at restore time.
+
+    The login state is logged on the way out. A stored account that is not LOGGED_IN fails
+    every later fetch inside FindMy.py's own state check, before any request reaches Apple -
+    see issue #43, where an account was somehow persisted as REQUIRE_2FA and stayed that way
+    across a reinstall. Logging it here and at restore is what tells a bad *write* apart from
+    a bad *read*, and it is the only evidence anyone can produce: the stored account holds the
+    Apple ID password and is encrypted under a key that never leaves the device, so a user
+    cannot hand it over and should not be asked to. A state name is not sensitive.
     """
+    print(f"Storing account, login state: {account.login_state}")
     return json.dumps(account.to_json())
 
 
@@ -394,7 +403,15 @@ def getAccount(
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)
 
-        print(f"Login State: {acc.login_state}")
+        print(f"Restored account, login state: {acc.login_state}")
+        if acc.login_state != LoginState.LOGGED_IN:
+            # Worth saying plainly rather than leaving to the traceback that follows minutes
+            # later from somewhere else entirely. This is the state that makes every fetch
+            # raise InvalidStateError with nothing sent.
+            print(
+                "Restored account is NOT logged in - every report fetch will fail its state "
+                "check before any request is made. See issue #43."
+            )
 
         return acc
     except Exception:
