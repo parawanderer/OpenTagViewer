@@ -1,5 +1,10 @@
 # Sample key files
 
+> **Why these are not in `app/src/test/resources/`**, where the export fixtures live: those are
+> *bundles* — the zip contents the Android importer reads, which is why both sides' tests share
+> them. These are exporter **inputs**, consumed before a bundle exists. Java never sees a `.keys`
+> file and has no reason to.
+
 Self-generated tags — OpenHaystack and friends — in every format the exporter reads. Drop one on
 the wizard's **+ Add from key file…** button, or pass it to the CLI:
 
