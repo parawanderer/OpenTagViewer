@@ -11,7 +11,7 @@
 # The release workflow passes flags rather than using this file, because it needs three different
 # invocations for three platforms. The two must agree, and the flags there carry the same comment.
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 # unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis never sees
 # it. Without this the build succeeds and the binary dies at startup with "Failed to load the
@@ -20,6 +20,13 @@ from PyInstaller.utils.hooks import collect_all
 # lets signing in work without a third-party Anisette server.
 unicorn_datas, unicorn_binaries, unicorn_hiddenimports = collect_all('unicorn')
 
+# FindMy.py keeps Apple's pinned root certificates as `.crt` files beside its code, and anisette
+# keeps `apple-root.pem` beside its own. PyInstaller bundles code, not the files next to it - so
+# without these the binary starts, signs in, and dies opening the keychain session with
+# "[Errno 2] No such file or directory", several minutes and one Apple ID into the flow.
+findmy_datas = collect_data_files('findmy')
+anisette_datas = collect_data_files('anisette')
+
 
 a = Analysis(
     ['exporter/wizard.py'],
@@ -27,7 +34,7 @@ a = Analysis(
     # puts only the script's own directory on the path, and every import in it fails.
     pathex=['.'],
     binaries=unicorn_binaries,
-    datas=unicorn_datas,
+    datas=unicorn_datas + findmy_datas + anisette_datas,
     hiddenimports=unicorn_hiddenimports,
     hookspath=[],
     hooksconfig={},

@@ -21,7 +21,9 @@ import datetime
 import getpass
 import logging
 import sys
+import tempfile
 import time
+import traceback
 import tkinter as tk
 import webbrowser
 from pathlib import Path
@@ -187,7 +189,12 @@ class WizardApp(tk.Tk):
             logger.exception("Reading accessories failed")
             messagebox.showerror(
                 "Could not read your accessories",
-                f"{e}\n\nIf this looks like a bug, please report it:\n{GITHUB_ISSUES_LINK}",
+                # The type, not just the message: "[Errno 2] No such file or directory" with
+                # nothing else is a real message this produced, and it says nothing about what
+                # was being opened or by whom.
+                f"{type(e).__name__}: {e}\n\n"
+                f"The details are in:\n{log_file()}\n\n"
+                f"If this looks like a bug, please report it with that file:\n{GITHUB_ISSUES_LINK}",
             )
             self.destroy()
             return
@@ -625,7 +632,85 @@ async def _async(value):
     return value
 
 
+def log_file() -> Path:
+    """
+    Where this writes its log.
+
+    **A windowed application has nowhere else to write.** PyInstaller builds one with no console,
+    so `sys.stderr` is None and every log line and traceback goes nowhere at all - which is how
+    this app came to report "[Errno 2] No such file or directory" with nothing to say what file.
+
+    macOS has a conventional place for this and every other platform gets a temporary directory,
+    which is not tidy but is findable, and findable is the whole point.
+    """
+    if sys.platform == "darwin":
+        directory = Path.home() / "Library" / "Logs" / "OpenTagViewer"
+    else:
+        directory = Path(tempfile.gettempdir()) / "OpenTagViewer"
+
+    directory.mkdir(parents=True, exist_ok=True)
+
+    return directory / "exporter.log"
+
+
+def configure_logging() -> None:
+    """Log to a file always, and to the console as well when there is one."""
+    handlers: list[logging.Handler] = [logging.FileHandler(log_file(), encoding="utf-8")]
+
+    # `sys.stderr` is None in a windowed build, and handing that to StreamHandler produces its own
+    # failure on the first log line - inside the error handling, which is the worst place for one.
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler(sys.stderr))
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+
+    # Anything that escapes Tk's callback handling as well, which otherwise vanishes the same way.
+    def _report(exc_type, value, tb) -> None:
+        logger.error("Unhandled: %s", "".join(traceback.format_exception(exc_type, value, tb)))
+
+    sys.excepthook = _report
+
+
+def self_test() -> int:
+    """
+    Prove a frozen build can reach everything it needs, without a network or an account.
+
+    **Starting is not enough of a smoke test**, and this exists because relying on it shipped a
+    binary that signed in successfully and then died: FindMy.py keeps Apple's pinned root
+    certificates as data files beside its code, and PyInstaller bundles code. The failure was
+    `[Errno 2] No such file or directory`, several minutes and one Apple ID into the flow.
+
+    So this touches the things that live in files rather than in modules. Anything else that
+    starts doing so belongs here too.
+    """
+    from findmy.keychain.enrolment import PinnedRoots  # noqa: PLC0415
+
+    # Reads every `.crt` beside the library's code and checks each against its own fingerprint,
+    # so this proves the files are both present and intact.
+    roots = PinnedRoots.bundled().by_version
+    print(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
+
+    anisette_root = Path(sys.modules["anisette"].__file__).parent / "apple-root.pem"
+    print(f"anisette root: {'present' if anisette_root.is_file() else 'MISSING'}")
+
+    if not roots or not anisette_root.is_file():
+        return 1
+
+    print("self-test passed")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--self-test" in sys.argv[1:]:
+        import anisette  # noqa: F401, PLC0415 - imported for its path, above
+
+        sys.exit(self_test())
+
     # What the release build's smoke test runs. It does not avoid tkinter - the imports above have
     # already happened - and that is the point: it proves the frozen bundle can import everything
     # it was built with, including Tk, without needing a display to do it.
@@ -633,6 +718,7 @@ if __name__ == "__main__":
         print(VERSION)
         sys.exit(0)
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(name)s: %(message)s")
+    configure_logging()
+    logger.info("Starting %s", APP_TITLE)
 
     WizardApp().mainloop()

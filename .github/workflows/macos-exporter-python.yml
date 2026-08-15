@@ -188,6 +188,8 @@ jobs:
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
           --collect-all unicorn \
+          --collect-data findmy \
+          --collect-data anisette \
           --noconfirm \
           ./exporter/wizard.py
 
@@ -206,6 +208,8 @@ jobs:
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
           --collect-all unicorn `
+          --collect-data findmy `
+          --collect-data anisette `
           --noconfirm `
           ./exporter/wizard.py
 
@@ -224,6 +228,8 @@ jobs:
           --onefile \
           --name "OpenTagViewer" \
           --collect-all unicorn \
+          --collect-data findmy \
+          --collect-data anisette \
           --noconfirm \
           ./exporter/wizard.py
 
@@ -244,10 +250,18 @@ jobs:
     # of the iCloud exporter was missing unicorn's native library, built cleanly, and died at
     # import; nothing in this workflow would have noticed. It costs a second, so it runs on all of
     # them now.
-    - name: Check the built binary starts
+    #
+    # `--self-test` is the other half, and starting was not enough of a check on its own: the
+    # second build started, signed in, and *then* died, because FindMy.py keeps Apple's pinned
+    # root certificates as files beside its code and PyInstaller bundles code. That failure was
+    # several minutes and one Apple ID into the flow. The self-test reaches the same files with
+    # no network and no account.
+    - name: Check the built binary starts and can reach its data files
       working-directory: ./python/dist
       shell: bash
-      run: ./OpenTagViewer --version
+      run: |
+        ./OpenTagViewer --version
+        ./OpenTagViewer --self-test
 
     - name: Package (macOS)
       if: matrix.os == 'macos'
