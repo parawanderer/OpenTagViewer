@@ -175,3 +175,11 @@ should be explained at the point it happens, not treated as a bug.
   selection, as the mail and photo pickers do. **The default must be an explicit list, never
   everything**, because sharing one tag with a friend is the common case and sharing all of them
   by accident is the failure worth designing against.
+
+  **[observed] This is sharper than it first looked.** The owner's own iPhone, iPad and Mac are in
+  the same zone as the tags, they carry private keys, and they are locatable — so they pass the
+  export rule and can end up in a bundle. Finding your own phone from your own Android phone is a
+  feature; handing a friend the ability to follow it is not. **The selection must therefore show
+  which entries are devices**, using the discriminators in
+  [findmy-export/06-output.md](./findmy-export/06-output.md) §3, so the choice is informed rather
+  than inferred from a name.

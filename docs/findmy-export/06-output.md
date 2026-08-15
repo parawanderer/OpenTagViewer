@@ -169,8 +169,23 @@ BeaconNamingRecord/<beacon-UUID>/<naming-record-UUID>.plist
 > ### The test to apply is `privateKey`, not the naming record
 >
 > **The macOS exporter already has a rule for this, and it is a better one**: it skips any
-> `OwnedBeacons` record with **no `privateKey` field**, and its own warning calls such a record a
-> *device* rather than an accessory. That rule predates all of this and covers the case directly.
+> `OwnedBeacons` record with **no `privateKey` field**. That rule predates all of this and covers
+> the case directly.
+>
+> > ### [observed] It does not mean "device", and this section used to say it did
+> >
+> > The macOS exporter's own warning calls a record with no private key a *device*, and the
+> > paragraphs below reason from an account where the one unmatched record was both. **That
+> > inference does not hold.** On another account, the owner's **iPads and a MacBook Air all carry
+> > a `privateKey`** and pass the test.
+> >
+> > So the rule separates **locatable from not locatable**, which is what it should do and what
+> > its first justification below already says. It does not separate devices from accessories —
+> > for that, the discriminator is the secret field and the model, further down.
+> >
+> > A record with no private key is therefore best read as **residue**: an entry for something
+> > that cannot be found, of no particular kind. The iPad in the earlier observation was a stale
+> > duplicate, and being an iPad was incidental.
 >
 > Prefer it, for three reasons:
 >
@@ -206,6 +221,25 @@ BeaconNamingRecord/<beacon-UUID>/<naming-record-UUID>.plist
 >
 > Until then: **keep such a record when joining, and decide what it is before rendering it.**
 > Discarding it in the join throws away the evidence; rendering it blindly invents an accessory.
+>
+> ### So an export can contain the owner's phone, and that is a privacy decision
+>
+> The devices carry private keys, so the `privateKey` rule **admits them**. Everything downstream
+> follows: they are locatable from Android, they will appear in a listing, and they can be written
+> into a bundle.
+>
+> That is arguably a feature for the owner — their own iPhone, findable from their own Android
+> phone, with no Apple device involved. **It is not a feature in a bundle handed to somebody
+> else.** A zip is a set of keys, and a recipient who has one can locate whatever is in it, for as
+> long as the keys remain valid. Exporting "everything" would hand a friend the ability to follow
+> the owner's phone, which is not what anybody thinks they are agreeing to when they share a tag.
+>
+> Two requirements follow, and they are stronger than a preference:
+>
+> - **Selection must be explicit**, never defaulting to everything — see
+>   [export-modes.md](../export-modes.md).
+> - **A device must be identifiable as one in that selection**, using the `secureLocationsSharedSecret`
+>   and `model` discriminators above, so the choice is informed rather than a guess from a name.
 
 ## 4. Prefer FindMy.py's own format
 
