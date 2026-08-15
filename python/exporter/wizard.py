@@ -68,8 +68,22 @@ WIKI_LINK = "https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-A
 # Kept for anything still importing them from here.
 EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
 
-TICKED = "\u2611"
-UNTICKED = "\u2610"
+# Squares rather than the ballot boxes \u2610/\u2611, which are drawn small and low against the row's text
+# and change width when ticked. These are one shape, filled or not, so a column of them lines up
+# and only the fill moves.
+TICKED = "\u25a0"
+UNTICKED = "\u25a1"
+
+TICKED_ROW = "ticked"
+"""
+The tag that colours a ticked row, using this platform's own selection colour.
+
+**The list said this by colour before it was a table.** It was a `tk.Listbox` with
+`selectmode="multiple"`, so the platform coloured selected rows itself. The table replaced that
+with `selectmode="none"` and a glyph in a 30px column - which is a very small difference between
+a tag that is leaving your account and one that is not, on the one screen where that distinction
+is the entire point.
+"""
 
 _KEY_FILE_TYPES = [
     ("Key files", "*.json *.keys *.txt"),
@@ -147,6 +161,9 @@ class WizardApp(tk.Tk):
 
         self.choices.grid(row=2, column=0, columnspan=3, sticky="nsew")
         self.choices.bind("<Button-1>", self._toggle)
+
+        background, foreground = _selection_colours()
+        self.choices.tag_configure(TICKED_ROW, background=background, foreground=foreground)
 
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.choices.yview)
         scrollbar.grid(row=2, column=3, sticky="ns")
@@ -333,6 +350,7 @@ class WizardApp(tk.Tk):
         for index, candidate in enumerate(self.candidates):
             self.choices.insert(
                 "", "end", iid=f"c{index}",
+                tags=(TICKED_ROW,) if f"c{index}" in self.ticked else (),
                 values=(
                     TICKED if f"c{index}" in self.ticked else UNTICKED,
                     candidate.label,
@@ -346,6 +364,7 @@ class WizardApp(tk.Tk):
         for index, tag in enumerate(self.custom_tags):
             self.choices.insert(
                 "", "end", iid=f"k{index}",
+                tags=(TICKED_ROW,) if f"k{index}" in self.ticked else (),
                 values=(
                     TICKED if f"k{index}" in self.ticked else UNTICKED,
                     tag.name, "self-generated tag", "", "", "from a key file",
@@ -360,16 +379,26 @@ class WizardApp(tk.Tk):
 
         self.heading.configure(text="Choose what to export" if has_rows else "Nothing to export yet")
         self.confirm_button.configure(state="normal" if has_rows else "disabled")
+        self._say_where_things_stand()
 
+    def _say_where_things_stand(self) -> None:
+        """
+        The line under the list: what was set aside, and how much is about to leave.
+
+        **The count is not decoration.** "Nothing is selected to begin with" was a fixed string,
+        which passed unnoticed while a 30px glyph was the only sign of a selection; under a list
+        of coloured rows it is a caption contradicting the picture above it. It also gives the
+        one number that matters at the moment of pressing Export, next to the warning about what
+        that cannot be undone.
+        """
         notes = []
+
         if self.skipped:
             notes.append(
                 f"{len(self.skipped)} record(s) could not be exported: they carry no key material.",
             )
 
-        if has_rows:
-            notes.append("Nothing is selected to begin with. What you export cannot be taken back.")
-        else:
+        if not self.choices.get_children():
             # The empty list is the first thing anybody sees now, so it has to say what the two
             # buttons are for - including that the second one needs no Apple account, which is the
             # whole reason somebody with only self-generated tags can get anywhere here.
@@ -377,6 +406,10 @@ class WizardApp(tk.Tk):
                 f"“{self._read_label()}” reads the accessories on your account."
                 " “+ Add from key file…” adds a tag you generated yourself, which needs no account.",
             )
+        elif self.ticked:
+            notes.append(f"{len(self.ticked)} selected. What you export cannot be taken back.")
+        else:
+            notes.append("Nothing is selected to begin with. What you export cannot be taken back.")
 
         self.note.configure(text="  ".join(notes))
 
@@ -415,13 +448,21 @@ class WizardApp(tk.Tk):
         self._set_tick(row, row not in self.ticked)
 
     def _set_tick(self, row: str, ticked: bool) -> None:
-        """Tick or untick one row: the set and the mark on screen, which must not disagree."""
+        """
+        Tick or untick one row: the set, the mark and the colour, which must not disagree.
+
+        Three representations of one fact, which is two more than anybody wants - but the set is
+        what exports, the mark is what a person reads, and the colour is what they see without
+        reading. Keeping them in one method is what stops a redraw restoring two of them.
+        """
         if ticked:
             self.ticked.add(row)
         else:
             self.ticked.discard(row)
 
         self.choices.set(row, "tick", TICKED if ticked else UNTICKED)
+        self.choices.item(row, tags=(TICKED_ROW,) if ticked else ())
+        self._say_where_things_stand()
 
     def _selected(self) -> tuple[list[Candidate], list[PreparedTag]]:
         """Split what is ticked back into where each row came from."""
@@ -517,6 +558,32 @@ class WizardApp(tk.Tk):
 
 
 # -- small dialogs ------------------------------------------------------------------------
+
+
+def _selection_colours() -> tuple[str, str]:
+    """
+    The colours this desktop already uses for a selected row, as (background, foreground).
+
+    Looked up from the theme rather than written down here, so a ticked row is coloured the way
+    every other list on the machine colours one - including greying out when the window loses
+    focus, which Tk does itself by resolving the named system colour.
+
+    ttk states arrive as a bare string on the aqua theme and as a tuple of them elsewhere, so this
+    looks for one containing `selected` rather than indexing. The fallbacks are a plain blue and
+    white, for a theme that maps neither: a colour that looks slightly wrong is recoverable, and a
+    row that does not colour at all is the thing this exists to prevent.
+    """
+    style = ttk.Style()
+
+    def _for_selected(option: str, fallback: str) -> str:
+        for state, value in style.map("Treeview", option):
+            states = (state,) if isinstance(state, str) else tuple(state)
+            if "selected" in states and isinstance(value, str) and value:
+                return value
+
+        return fallback
+
+    return _for_selected("background", "#3875d7"), _for_selected("foreground", "white")
 
 
 def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:

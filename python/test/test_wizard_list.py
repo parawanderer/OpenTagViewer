@@ -229,6 +229,83 @@ class TestOpeningWithoutAnAppleAccount:
         assert str(app.read_button.cget("state")) == "disabled"
 
 
+class TestShowingWhatIsTicked:
+    """
+    A ticked row is coloured as well as marked, which is how the list read before it was a table.
+
+    The `tk.Listbox` it replaced was `selectmode="multiple"`, so the platform coloured the rows
+    itself and a glance told you how much you were about to hand over. The table lost that: with
+    `selectmode="none"` the only difference between a row that is leaving your account and one
+    that is not was one small glyph in a 30px column.
+    """
+
+    def test_a_ticked_row_is_coloured_and_an_unticked_one_is_not(self, app):
+        app._show([])
+
+        app._set_tick("c0", True)
+        assert wizard.TICKED_ROW in app.choices.item("c0", "tags")
+        assert wizard.TICKED_ROW not in app.choices.item("c1", "tags")
+
+        app._set_tick("c0", False)
+        assert wizard.TICKED_ROW not in app.choices.item("c0", "tags")
+
+    def test_the_colour_is_the_platform_s_own(self, app):
+        # Looked up from the theme rather than written here, so it is the colour this desktop
+        # already uses for a selected row - and it greys out with the window like every other list.
+        # An empty value means the lookup found nothing and the row would silently not colour.
+        assert str(app.choices.tag_configure(wizard.TICKED_ROW, "background"))
+        assert str(app.choices.tag_configure(wizard.TICKED_ROW, "foreground"))
+
+    def test_redrawing_keeps_the_colour_with_the_tick(self, app, key_file):
+        # The mark, the set and the colour are three representations of one thing, and a redraw
+        # that restored two of them would leave a row that looks unticked and exports anyway.
+        app._show([])
+        app._set_tick("c1", True)
+
+        app._add_key_file()
+
+        assert app.ticked == {"c1"}
+        assert ticks(app) == ["c1"]
+        assert wizard.TICKED_ROW in app.choices.item("c1", "tags")
+
+    def test_the_note_counts_what_is_ticked(self, app):
+        """
+        "Nothing is selected to begin with" stops being true the moment something is.
+
+        It was a fixed string, which nobody noticed while the only sign of a selection was one
+        small glyph. Now that ticked rows are coloured, a line saying nothing is selected sits
+        directly under four rows that visibly are.
+        """
+        app._show([])
+        assert "Nothing is selected" in app.note.cget("text")
+
+        app._set_tick("c0", True)
+        app._set_tick("c1", True)
+        assert "2 selected" in app.note.cget("text")
+        # The warning is the half that must never go missing, whatever the count.
+        assert "cannot be taken back" in app.note.cget("text")
+
+        app._set_tick("c0", False)
+        assert "1 selected" in app.note.cget("text")
+
+        app._set_tick("c1", False)
+        assert "Nothing is selected" in app.note.cget("text")
+
+    def test_counting_does_not_drop_what_could_not_be_exported(self, app):
+        # It is the only place that number is shown, and ticking a row is not news about it.
+        app._show([Skipped(beacon_id="C", reason="no key material")])
+
+        app._set_tick("c0", True)
+
+        assert "could not be exported" in app.note.cget("text")
+        assert "1 selected" in app.note.cget("text")
+
+    def test_the_marks_are_not_the_emoji_ballot_boxes(self, app):
+        # ☐/☑ fall back to a small boxy glyph that sits low against the row's text. Squares are
+        # the same size ticked or not, so nothing shifts as you go down the list.
+        assert (wizard.UNTICKED, wizard.TICKED) == ("□", "■")
+
+
 class TestTheListItself:
     def test_a_row_can_be_ticked_and_unticked(self, app):
         app._show([])
