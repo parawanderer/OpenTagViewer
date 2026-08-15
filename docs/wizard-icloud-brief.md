@@ -110,8 +110,14 @@ comment saying it becomes a version pin once released.
   make it optional? It is currently the POSIX username.
 - **The exporter's serial.** The app has its own; the exporter is a different client and arguably
   wants a different legible serial so the two are distinguishable in a device list.
-- **Whether to keep the macOS-local path.** It works, needs no Apple ID and no passcode, and costs
-  nothing to keep as an offline option for Mac owners.
+- **Whether to keep the macOS-local path.** It works today and costs nothing to keep as a fallback.
+  Be accurate about what it is, though: **it is not an offline route.** It reads files macOS
+  populated, and macOS populated them by signing into iCloud, joining the keychain trust circle as
+  a peer, and syncing the records down. The VM route does the same thing with a Mac that does not
+  exist. So it needs a signed-in Mac, and it leaves *more* on the account than the new route does —
+  a full device peer and its escrow record, created by Apple's own software rather than by us.
+  Its one genuine advantage is that the Apple ID password is typed into macOS rather than into
+  this program.
 
 ## Testing, and what you cannot claim
 
