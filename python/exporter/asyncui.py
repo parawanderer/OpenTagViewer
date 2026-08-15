@@ -25,6 +25,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, Coroutine
 
+from exporter.tkutil import centre_over
+
 # How often the main thread looks at the worker. Fast enough to feel immediate, slow enough not to
 # be a busy loop.
 _POLL_MS = 50
@@ -140,6 +142,7 @@ def _progress_window(root: tk.Tk, message: str) -> tk.Toplevel:
     bar.pack()
     bar.start(12)
 
+    centre_over(window, root)
     window.grab_set()
     window.update_idletasks()
 

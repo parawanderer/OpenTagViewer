@@ -31,6 +31,7 @@ from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
 from exporter import icloud, localsource, source
 from exporter.asyncui import Asker, Cancelled, run_with_progress
+from exporter.tkutil import centre_on_screen, centre_over
 from exporter.custom_tags import (
     CustomTagError,
     PreparedTag,
@@ -88,6 +89,8 @@ class WizardApp(tk.Tk):
         self.route = source.detect()
 
         self._build()
+        centre_on_screen(self)
+
         # After the window exists, so a failure has somewhere to report itself.
         self.after(100, self._load)
 
@@ -503,6 +506,7 @@ def _ask_credentials(parent: tk.Tk) -> tuple[str, str]:
     window.bind("<Escape>", lambda _event: window.destroy())
 
     email_entry.focus_set()
+    centre_over(window, parent)
     window.grab_set()
     parent.wait_window(window)
 
@@ -585,6 +589,7 @@ def _ask_string(
     window.bind("<Return>", lambda _event: _accept())
     window.bind("<Escape>", lambda _event: window.destroy())
 
+    centre_over(window, parent)
     window.grab_set()
     parent.wait_window(window)
 
@@ -608,6 +613,7 @@ def _ask_choice(parent: tk.Tk, title: str, prompt: str, options: Sequence[str]) 
 
     ttk.Button(frame, text="OK", command=window.destroy).pack(pady=(12, 0))
 
+    centre_over(window, parent)
     window.grab_set()
     parent.wait_window(window)
 
