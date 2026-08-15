@@ -13,9 +13,19 @@ library, **FindMy.py**, can now read the same records out of **iCloud** instead.
 same Android app. What changes is where the data comes from, and the consequence is that the
 exporter stops needing macOS at all.
 
-**Stage it: build a headless CLI first**, prompting on the terminal, and only then hang the
-existing tkinter screens on it. The CLI is most of the logic and is testable in one run; the GUI
-work is fiddlier and partly blocked (see *Blocked*).
+**And extract the zip writer into a shared package** — `python/opentagviewer_export/` — because
+the Android app is about to need exactly the same thing. It runs Python too, through Chaquopy, so
+both can call one implementation. This is the larger half of the task and the part with a second
+consumer, so it is worth doing first and doing carefully.
+
+**Stage it in three:**
+
+1. **The shared sink.** Pure Python, no UI, no network: it takes accessory data plus a chosen list
+   and writes a zip. Test it directly with pytest — no Apple account needed, so this stage is
+   fully verifiable by you.
+2. **A headless CLI** that logs in, recovers, fetches and calls the sink. Testable in one run by
+   the account owner.
+3. **The tkinter screens** on top of the CLI's logic. Fiddlier and partly blocked — see *Blocked*.
 
 ## What exists today
 
@@ -34,11 +44,41 @@ The flow is: get a key from the macOS keychain → decrypt plists under `INPUT_P
 **Replace:** everything that produces that map — `_retrieve_beacon_data`, `_read_all_plists`,
 `_extract_plists`, and the `airtag_decryptor` path behind them.
 
-**Rework, do not reuse as-is:** `_create_zip`. It copies plist *files*, deriving each output path
-from the source path via `make_output_path(...)`. Under the new route there are no source paths —
-records arrive from iCloud as data. Build the layout directly from identifiers instead. Two other
-things in that method are macOS-only or wrong off macOS: `os.system("open …")` at the end, and
-`sourceUser: os.getenv("USER")`, which is `USERNAME` on Windows and will be `None` as written.
+**Extract and rewrite, do not reuse as-is:** `_create_zip` becomes the shared package. It cannot
+move unchanged — it copies plist *files*, deriving each output path from the source path via
+`make_output_path(...)`, and under the new route there are no source paths: records arrive from
+iCloud as data. Build the layout directly from identifiers instead. Two other things in that
+method must not survive the move: `os.system("open …")` at the end, which is macOS-only and is a
+UI concern rather than the sink's, and `sourceUser: os.getenv("USER")`, which is `USERNAME` on
+Windows and will be `None` as written.
+
+## The shared package
+
+`python/opentagviewer_export/`, consumed by two callers with nothing else in common.
+
+**Why it is shared rather than written twice.** The format has traps — see *The zip format* — and
+two implementations means two chances to get each one wrong. The failure is invisible on the
+producing side: a malformed zip fails at **import**, in Java, on someone else's phone. One
+implementation with one test suite is the only version of this that stays correct.
+
+**It also makes the sink testable without a device.** The Android app's real tests are instrumented
+and need an emulator; a Java sink would need one to test. Python does not, and the app's Python
+layer is already forbidden from importing Android or Java types, so a shared package slots in as
+another Chaquopy source directory rather than needing a bridge.
+
+Rules for it:
+
+- **Pure.** No UI, no network, no Apple ID, no platform assumptions. In and out: data and a path.
+- **`via:` is a parameter, never invented inside.** Rule 9 makes `VERSION` in `wizard.py` the
+  exporter's identity; the app has its own producer string. One module, two callers, two strings
+  passed in. Same for anything else identifying the producer.
+- **Its tests live with it** and run on plain CPython. Add them to the test table in
+  `CONTRIBUTING.md` — rule 10.
+- **Two packagings have to include it**: PyInstaller's `OpenTagViewer.spec`, and the APK via
+  Chaquopy's source sets. Neither picks it up on its own.
+
+The Android side of the wiring is **not** part of this task — that machine cannot build the app.
+Leave the package importable and documented; someone else connects it.
 
 ## The new source
 
