@@ -111,6 +111,24 @@ A worked example, using an iPhone 14 Pro on iOS 17.4:
 | Device UUID | a random v4 UUID, **uppercase**, generated once and persisted |
 | UDID | 32 uppercase hex characters, generated once and persisted. **May be the same value as the device UUID**, with its hyphens removed — a UUID's hex form is exactly 32 uppercase hex characters. Nothing observed requires them to differ, and one persisted value is one fewer thing that can drift out of step with itself. |
 
+> ### The build is the real one, not a shortened one
+>
+> **There is no truncation convention here**, and the question comes up because a wrong value in
+> the wild looks like one. `22C65` for macOS 13.1 and `21E219` for iOS 17.4 are both the complete
+> build strings Apple ships. A build that is a character short of a real one is a mistake, not a
+> house style.
+>
+> The case that prompts this: **macOS 13.4.1 is build `22F82`**, and `22F8` has been seen sent
+> alongside it in a client info string. That violates the rule below — the four values describe one
+> release or they describe nothing — and it is exactly the kind of thing that reads as a typo to
+> whoever finds it next, which is why it is written down here rather than fixed quietly.
+>
+> **Correcting one costs a sign-in, so it is not a free tidy-up.** The client info is part of the
+> machine identity Apple binds a session to, so changing any of its parts invalidates the sessions
+> established under it. A client that has already shipped a wrong build is choosing between an
+> inconsistency nothing has yet rejected and re-authenticating everybody. A client that has not
+> shipped should simply use the real one.
+
 The OS version, build, CFNetwork version and Darwin version must correspond to one another —
 they describe one real iOS release, and Apple's own clients never disagree with themselves.
 Changing the hardware model means changing all of them together.
