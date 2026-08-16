@@ -22,12 +22,22 @@ dependencies = [
     # writing an encrypted bundle needs this. Pulls pycryptodomex, which is the same library
     # as pycryptodome above under a different namespace - both end up installed.
     "pyzipper==0.4.0",
-    # The iCloud export route. A branch rather than a release: the iCloud keychain export work
+    # The iCloud export route. A fork rather than a release: the iCloud keychain export work
     # is unreleased. This becomes a plain `FindMy==<x>` pin once it lands on PyPI.
     #
-    # Unlike the Chaquopy pin in app/build.gradle.kts, this one is reproducible anyway - uv.lock
-    # records the resolved commit, so two builds of the same commit of this repository install
-    # the same FindMy.py. Moving to a newer one is `uv lock --upgrade-package FindMy`.
+    # **The commit is in [tool.uv.sources], and it is the same one app/build.gradle.kts
+    # installs.** It tracked the branch until it turned out that this repository ships one
+    # shared package - opentagviewer_export - to two consumers running two different FindMy.py
+    # commits: Chaquopy packages it into the APK, and the exporter runs it from source. A branch
+    # made that drift by construction, and the first API difference would have broken exactly
+    # one of them.
+    #
+    # uv.lock recorded the resolved commit, so a *build* was always reproducible - but "which
+    # FindMy.py does this repository use" still had two answers. Now it has one, asserted by
+    # test_main.py::test_the_whole_repository_pins_one_findmy.
+    #
+    # Moving it means editing three places together: here, app/build.gradle.kts, and
+    # app/src/test/python/requirements.txt, then `uv lock`.
     "FindMy",
     # Checkboxes and arrow-key selection for the CLI. Pure Python, no native code, and it works
     # on Windows - which rules out curses. See main/prompts.py for what happens without a
@@ -59,7 +69,7 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
-FindMy = { git = "https://github.com/parawanderer/FindMy.py", branch = "feat/icloud-keychain-export" }
+FindMy = { git = "https://github.com/parawanderer/FindMy.py", rev = "102dd8ea14767d2a2aa745186ac23276f32689f1" }
 
 [dependency-groups]
 # Only the release build installs this, with `uv sync --no-default-groups --group build`. It is
