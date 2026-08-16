@@ -87,6 +87,43 @@ class Abandoned(Exception):
     """Raised when the user pressed Ctrl-C at a prompt rather than answering it."""
 
 
+class PromptForbidden(Exception):
+    """
+    Raised instead of asking, when the run was told there is nobody to ask.
+
+    Carries the question so the failure names what was missing rather than only that something
+    was. "It wanted to ask: Screen-lock passcode for F2L…" is actionable; "cannot prompt" is not.
+    """
+
+    def __init__(self, question: str) -> None:
+        super().__init__(
+            f"This run cannot ask questions (--non-interactive), and it needed to ask:"
+            f"\n\n  {question}\n\n"
+            f"Supply it up front, or drop --non-interactive. See --help.",
+        )
+        self.question = question
+
+
+_forbidden = False
+
+
+def forbid_prompting(forbidden: bool = True) -> None:
+    """
+    Make every prompt raise rather than ask.
+
+    **Here rather than at each call site**, because a scripted run that hangs on a question is the
+    exact failure this prevents, and a check that has to be remembered at a dozen prompts will be
+    missed at the thirteenth. A prompt added later is covered without anybody thinking about it.
+    """
+    global _forbidden
+    _forbidden = forbidden
+
+
+def _refuse_to_ask(question: str) -> None:
+    if _forbidden:
+        raise PromptForbidden(question)
+
+
 def interactive() -> bool:
     """
     Whether there is a terminal to draw on, at both ends.
@@ -99,6 +136,8 @@ def interactive() -> bool:
 
 async def select(question: str, options: Sequence[Option]) -> Any:
     """Pick exactly one. Arrow keys where possible, a numbered list where not."""
+    _refuse_to_ask(question)
+
     if not options:
         raise ValueError("Nothing to choose between.")
 
@@ -127,6 +166,8 @@ async def checkbox(question: str, options: Sequence[Option], instruction: str = 
     list that arrives pre-ticked turns "hand over one tag" and "hand over everything I own" into
     the same keystroke.
     """
+    _refuse_to_ask(question)
+
     if not options:
         raise ValueError("Nothing to choose between.")
 
@@ -149,6 +190,8 @@ async def checkbox(question: str, options: Sequence[Option], instruction: str = 
 
 async def text(question: str, default: str = "") -> str:
     """Ask for a line of text."""
+    _refuse_to_ask(question)
+
     if not interactive():
         print(f"{question}{f' [{default}]' if default else ''} ", end="", file=sys.stderr, flush=True)
         return input().strip() or default
@@ -165,6 +208,8 @@ async def password(question: str) -> str:
     getpass either way: it is the one prompt where falling back to `input()` would echo a password
     into a terminal's scrollback, so the non-interactive path has to hide it too.
     """
+    _refuse_to_ask(question)
+
     if not interactive():
         return getpass.getpass(f"{question} ")
 
@@ -175,6 +220,8 @@ async def password(question: str) -> str:
 
 async def confirm(question: str, default: bool = False) -> bool:
     """Ask a yes or no question."""
+    _refuse_to_ask(question)
+
     if not interactive():
         print(f"{question} [{'Y/n' if default else 'y/N'}] ", end="", file=sys.stderr, flush=True)
         typed = input().strip().lower()

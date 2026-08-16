@@ -38,10 +38,29 @@ implausible as real hardware so that nothing mistakes it for a Mac. It shares it
 Android app's `0PENTAGVIEWR` so a user seeing both recognises them as the same project.
 """
 
-CLOUDKIT_DEVICE_NAME = "OpenTagViewer Exporter"
+DEVICE_NAME = "OpenTagViewer Exporter"
 """
-What CloudKit is told this client is called.
+What this client tells CloudKit it is called.
 
-FindMy.py defaults it to `FindMy.py`, which would name the library rather than the program in the
-one place this is reported.
+FindMy.py otherwise defaults it to `FindMy.py`, which names the library rather than the program in
+the one place this is reported.
+
+**It is not the name in the account's device list, and nothing here can set that.** Signing in
+registers the device by itself and Apple builds its row from the client identity, so the name
+defaults to the claimed hardware - `MacBookPro`. The only call that sets one is the `postdata`
+announce of findmy-export 02-mobileme-delegate §7, and Apple refuses it without a push token
+(`ec -800012`, "Push token is invalid.").
+
+That is a boundary rather than a gap: a push token is what makes a registered device trusted for
+verification codes, and 01-authentication §13 argues at length that this program must never become
+a second factor for somebody's Apple ID. The row says so, and it is worth more than a better name:
+
+    This device cannot be used to receive Apple Account verification codes.
+
+**So the serial is the label.** §13's three display fields are three independent levers, and the
+serial is the only one sign-in controls that a person actually reads - which is why
+:data:`EXPORTER_SERIAL` is legible rather than plausible.
 """
+
+CLOUDKIT_DEVICE_NAME = DEVICE_NAME
+"""Older spelling, kept for anything still importing it."""

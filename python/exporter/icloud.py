@@ -27,6 +27,7 @@ from typing import Any, Awaitable, Callable, Sequence
 
 from findmy import (
     AsyncAppleAccount,
+    InvalidCredentialsError,
     LocalAnisetteProvider,
     LoginState,
     RemoteAnisetteProvider,
@@ -46,10 +47,11 @@ from findmy.cloudkit.beacons import (
 )
 from findmy.cloudkit.client import AsyncCloudKitClient
 from findmy.icloud import AsyncFindMyClient
+from findmy.keychain.recovery import RecoveryError
 from findmy.keychain.session import AsyncKeychainSession
 
 from exporter import device
-from exporter.identity import CLOUDKIT_DEVICE_NAME, EXPORTER_SERIAL
+from exporter.identity import DEVICE_NAME, EXPORTER_SERIAL
 from opentagviewer_export import AccessoryExport
 from opentagviewer_export.hardware import identify
 
@@ -150,7 +152,7 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
     provider = _make_provider(anisette_url, libs_path, stored)
 
     if stored is None:
-        return AsyncAppleAccount(provider)
+        return AsyncAppleAccount(provider, device_name=DEVICE_NAME)
 
     # Only the ids are restored. The rest of the shape has to be there because the library reads
     # it, and every field of it is empty on purpose - this is a logged-out account that happens to
@@ -165,7 +167,7 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
 
     logger.info("Reusing the stored device identity, so this is not a new device to Apple")
 
-    return AsyncAppleAccount(provider, state_info=state)
+    return AsyncAppleAccount(provider, state_info=state, device_name=DEVICE_NAME)
 
 
 def _make_provider(
@@ -197,13 +199,54 @@ def remember(account: AsyncAppleAccount) -> None:
 
     Called once signing in has worked, rather than at the end: the device is registered by then,
     and an export that is abandoned afterwards should not leave an entry nothing can reuse.
+
+    **This does not name the entry, and nothing here can.** Signing in registers the device by
+    itself (findmy-export 01-authentication §13) and Apple synthesises its row from the client
+    identity, so the name defaults to the claimed hardware - `MacBookPro`. The only call that sets
+    a name is the `postdata` announce of Stage 2 §7, and Apple refuses it without a push token:
+
+        HTTP 401, body {'ec': -800012, 'em': 'Push token is invalid.'}
+
+    A push token is what makes a registered device trusted for verification codes, and §13 is
+    explicit that this is "a boundary to hold rather than a gap to close" - an exporter that became
+    a second factor for somebody's Apple ID would be a much larger thing to have compromised. So
+    the announce was tried, refused, and removed rather than left failing on every fresh install.
+
+    **The serial is the label instead**, which is what §13 designed it for: `X-Apple-I-SRL-NO` is
+    sent during sign-in, needs no announce, and `0PENTAGXPORT` is the one field in that row a
+    person can actually read. See :mod:`exporter.identity`.
     """
-    # The account's own serialisation, with only the two harmless parts taken out of it. It also
+    # The account's own serialisation, with only the harmless parts taken out of it. It also
     # carries the username, the password and the login state - which is exactly why this picks
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
     device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
+
+
+MAX_LOGIN_ATTEMPTS = 3
+"""
+How many times an Apple ID and password may be offered in one run.
+
+Small on purpose. **Apple locks an account after enough failed sign-ins**, and how many is not a
+thing to establish by experiment on somebody's real account - the cost of being wrong is not a
+failed export, it is an account they have to go and recover.
+"""
+
+MAX_CODE_ATTEMPTS = 3
+"""How many times a verification code may be submitted before the sign-in is given up on."""
+
+CODE_AGAIN = "again"
+"""Ask for the code again. The one Apple already sent is still valid, so this is the usual answer."""
+
+CODE_RESEND = "resend"
+"""
+Have Apple send a new code first.
+
+**This invalidates the code already sent** (findmy-export 01-authentication §5), so it is the right
+answer only when that one is gone or expired - never a default, and never something to do on the
+user's behalf.
+"""
 
 
 async def log_in(
@@ -213,16 +256,27 @@ async def log_in(
     *,
     choose_second_factor: Callable[[Sequence[str]], Awaitable[int]],
     get_code: Callable[[], Awaitable[str]],
+    retry_credentials: Callable[[Exception, int], Awaitable[tuple[str, str] | None]] | None = None,
+    retry_code: Callable[[Exception, int], Awaitable[str | None]] | None = None,
 ) -> None:
     """
     Sign in, dealing with two-factor authentication if the account asks for it.
 
+    Both things the user types can be got wrong, and neither ends the run when it is. See
+    :func:`unlock` for why that matters: everything before a failure has to be done again, and the
+    verification code in particular is not a thing that can simply be re-entered once it is gone.
+
     :param choose_second_factor: Given the methods as text, returns which one to use. Awaited,
         because asking is drawn on a terminal and drawing happens inside this same event loop.
     :param get_code: Returns the code the user received. Awaited, as above.
+    :param retry_credentials: Awaited with the error and the attempt number when Apple rejects the
+        Apple ID or password; returns a replacement pair, or None to stop. None means one attempt.
+    :param retry_code: Awaited with the error and the attempt number when Apple rejects the
+        verification code; returns :data:`CODE_AGAIN`, :data:`CODE_RESEND`, or None to stop.
     :raises ExportSourceError: If signing in does not end signed in.
+    :raises InvalidCredentialsError: If the last attempt is rejected, or the user stops.
     """
-    state = await account.login(email, password)
+    state = await _log_in_with_retries(account, email, password, retry_credentials)
 
     if state == LoginState.REQUIRE_2FA:
         methods = await account.get_2fa_methods()
@@ -233,10 +287,68 @@ async def log_in(
 
         chosen = methods[await choose_second_factor([_describe_factor(m) for m in methods])]
         await chosen.request()
-        state = await chosen.submit(await get_code())
+        state = await _submit_code_with_retries(chosen, get_code, retry_code)
 
     if state != LoginState.LOGGED_IN:
         raise ExportSourceError(f"Signing in ended at {state} rather than signed in.")
+
+
+async def _log_in_with_retries(account, email, password, retry_credentials):
+    """
+    Offer the Apple ID and password, letting a rejected pair be corrected in place.
+
+    **Capped, and never automatic.** Apple locks an account after enough failed sign-ins, and how
+    many is not this project's to discover on somebody's real account - so `retry_credentials` is
+    asked every time and the count is small. A caller that passes None gets exactly one attempt,
+    which is what this did before.
+    """
+    for attempt in range(1, MAX_LOGIN_ATTEMPTS + 1):
+        try:
+            return await account.login(email, password)
+        except InvalidCredentialsError as e:
+            logger.info("Apple rejected the credentials on attempt %d", attempt)
+
+            replacement = (
+                None
+                if retry_credentials is None or attempt == MAX_LOGIN_ATTEMPTS
+                else await retry_credentials(e, attempt)
+            )
+            if replacement is None:
+                raise
+
+            email, password = replacement
+
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+async def _submit_code_with_retries(chosen, get_code, retry_code):
+    """
+    Submit the verification code, letting a mistyped one be corrected.
+
+    **The default retry re-types the code rather than asking for a new one**, and the difference is
+    not cosmetic: requesting delivery again sends a second code *and invalidates the first*
+    (findmy-export 01-authentication §5). So somebody who mistyped a code they are still holding
+    would lose it by being "helpfully" sent another, and a resend has to be a thing they choose.
+    """
+    for attempt in range(1, MAX_CODE_ATTEMPTS + 1):
+        try:
+            return await chosen.submit(await get_code())
+        except InvalidCredentialsError as e:
+            logger.info("Apple rejected the verification code on attempt %d", attempt)
+
+            choice = (
+                None
+                if retry_code is None or attempt == MAX_CODE_ATTEMPTS
+                else await retry_code(e, attempt)
+            )
+            if choice is None:
+                raise
+
+            if choice == CODE_RESEND:
+                # Deliberate: this is what invalidates whatever they were holding.
+                await chosen.request()
+
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _describe_factor(method: object) -> str:
@@ -262,7 +374,7 @@ async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
             account,
             client=AsyncCloudKitClient(
                 account,
-                device_name=CLOUDKIT_DEVICE_NAME,
+                device_name=DEVICE_NAME,
                 device_serial=EXPORTER_SERIAL,
             ),
         )
@@ -271,6 +383,57 @@ async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
         raise
 
     return AsyncFindMyClient(account, session, store)
+
+
+MAX_UNLOCK_ATTEMPTS = 3
+"""
+How many times a passcode may be offered in one run.
+
+A bound rather than a free retry, because **attempts are probably a limited resource**. FindMy.py
+says Apple's escrow services generally cap them and that what this one allows is not established,
+which is a good reason not to find out on somebody's real account.
+"""
+
+
+async def unlock(client, record, ask_passcode, on_rejection) -> None:
+    """
+    Recover the keychain keys, letting a rejected passcode be retried in place.
+
+    **The retry is the point.** Both entry points used to make exactly one attempt, and a rejection
+    propagated out of the whole export - so a typo in a hidden field cost the sign-in, the
+    verification code and everything after it, and the user started again from the Apple ID.
+
+    That was the wrong shape for this particular failure. The library's first advice on a rejection
+    is to try again *with the same passcode*, because the call has been observed to fail
+    intermittently and then succeed; the second is that a wrong passcode and a mis-parameterised
+    exchange are indistinguishable here, so a rejection is not proof the passcode was wrong. Both
+    say retry, and only this loop makes retrying cheap.
+
+    **Nothing retries on its own.** :func:`on_rejection` is asked each time and a false answer
+    stops, so the decision to spend another attempt is always the user's - which matters because
+    the cap is unknown and the cost of exhausting it is not recoverable from here.
+
+    :param client: An open Find My client.
+    :param record: The escrow record chosen from `recovery_options()`.
+    :param ask_passcode: Awaited for a passcode, given the attempt number, starting at 1.
+    :param on_rejection: Awaited with the error and the attempt number; returns whether to ask
+        again. Not called after the last attempt, where there is nothing to decide.
+    :raises RecoveryError: If the last attempt is rejected, or the user declines another.
+    """
+    for attempt in range(1, MAX_UNLOCK_ATTEMPTS + 1):
+        passcode = await ask_passcode(attempt)
+        try:
+            await client.unlock(record, passcode)
+            return
+        except RecoveryError as e:
+            logger.info("Escrow recovery rejected attempt %d of %d", attempt, MAX_UNLOCK_ATTEMPTS)
+
+            if attempt == MAX_UNLOCK_ATTEMPTS or not await on_rejection(e, attempt):
+                raise
+        finally:
+            # The passcode is not this program's to keep a moment longer than the call needs it,
+            # and a retry loop holds one across an interaction that waits on a person.
+            del passcode
 
 
 async def fetch(client: AsyncFindMyClient) -> Fetched:
