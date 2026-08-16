@@ -297,6 +297,12 @@ class WizardApp(tk.Tk):
                         transform=verification_code,
                     )),
                 ),
+                retry_credentials=lambda error, attempt: _async(
+                    _ask_again_for_credentials(self, asker, error, attempt),
+                ),
+                retry_code=lambda error, attempt: _async(
+                    _ask_again_for_code(self, asker, error, attempt),
+                ),
             )
 
             # Registered a device by now; remembering it stops the next export registering another.
@@ -772,6 +778,54 @@ def _ask_choice(parent: tk.Tk, title: str, prompt: str, options: Sequence[str]) 
 async def _async(value):
     """Wrap an already-computed answer, for the awaitable callbacks `icloud.log_in` expects."""
     return value
+
+
+def _ask_again_for_credentials(parent: tk.Tk, asker: Asker, error, attempt: int):
+    """
+    Offer the Apple ID and password again after Apple rejects them.
+
+    Both fields, not only the password: the Apple ID may be the one that is wrong, and a retry that
+    will not let it be corrected is a dead end with a text box in it.
+    """
+    keep_going = asker.ask(lambda: messagebox.askretrycancel(
+        "Sign in",
+        f"Apple would not accept that sign-in (attempt {attempt} of"
+        f" {icloud.MAX_LOGIN_ATTEMPTS}).\n\n{error}\n\n"
+        "Apple locks an account after enough failed sign-ins, so it is worth being sure"
+        " rather than guessing.",
+        parent=parent,
+    ))
+    if not keep_going:
+        return None
+
+    email, password = asker.ask(lambda: _ask_credentials(parent))
+
+    return (email, password) if email and password else None
+
+
+def _ask_again_for_code(parent: tk.Tk, asker: Asker, error, attempt: int):
+    """
+    Offer the verification code again, and send a new one only if asked.
+
+    **Yes re-types, No sends a new one, Cancel stops**, and that order is deliberate: a resend
+    invalidates the code Apple already sent, so the common case - a mistyped code that is still
+    sitting on somebody's phone - must be the answer that does not destroy it. The legend is in the
+    message because a three-button dialog cannot label its own buttons here.
+    """
+    answer = asker.ask(lambda: messagebox.askyesnocancel(
+        "Verification",
+        f"Apple would not accept that code (attempt {attempt} of"
+        f" {icloud.MAX_CODE_ATTEMPTS}).\n\n{error}\n\n"
+        "Yes - type the code again. The one Apple sent is still valid.\n"
+        "No - send a new code. This cancels the one already sent.\n"
+        "Cancel - stop signing in.",
+        parent=parent,
+    ))
+
+    if answer is None:
+        return None
+
+    return icloud.CODE_AGAIN if answer else icloud.CODE_RESEND
 
 
 def log_file() -> Path:

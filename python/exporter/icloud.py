@@ -27,6 +27,7 @@ from typing import Any, Awaitable, Callable, Sequence
 
 from findmy import (
     AsyncAppleAccount,
+    InvalidCredentialsError,
     LocalAnisetteProvider,
     LoginState,
     RemoteAnisetteProvider,
@@ -207,6 +208,31 @@ def remember(account: AsyncAppleAccount) -> None:
     device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
 
 
+MAX_LOGIN_ATTEMPTS = 3
+"""
+How many times an Apple ID and password may be offered in one run.
+
+Small on purpose. **Apple locks an account after enough failed sign-ins**, and how many is not a
+thing to establish by experiment on somebody's real account - the cost of being wrong is not a
+failed export, it is an account they have to go and recover.
+"""
+
+MAX_CODE_ATTEMPTS = 3
+"""How many times a verification code may be submitted before the sign-in is given up on."""
+
+CODE_AGAIN = "again"
+"""Ask for the code again. The one Apple already sent is still valid, so this is the usual answer."""
+
+CODE_RESEND = "resend"
+"""
+Have Apple send a new code first.
+
+**This invalidates the code already sent** (findmy-export 01-authentication §5), so it is the right
+answer only when that one is gone or expired - never a default, and never something to do on the
+user's behalf.
+"""
+
+
 async def log_in(
     account: AsyncAppleAccount,
     email: str,
@@ -214,16 +240,27 @@ async def log_in(
     *,
     choose_second_factor: Callable[[Sequence[str]], Awaitable[int]],
     get_code: Callable[[], Awaitable[str]],
+    retry_credentials: Callable[[Exception, int], Awaitable[tuple[str, str] | None]] | None = None,
+    retry_code: Callable[[Exception, int], Awaitable[str | None]] | None = None,
 ) -> None:
     """
     Sign in, dealing with two-factor authentication if the account asks for it.
 
+    Both things the user types can be got wrong, and neither ends the run when it is. See
+    :func:`unlock` for why that matters: everything before a failure has to be done again, and the
+    verification code in particular is not a thing that can simply be re-entered once it is gone.
+
     :param choose_second_factor: Given the methods as text, returns which one to use. Awaited,
         because asking is drawn on a terminal and drawing happens inside this same event loop.
     :param get_code: Returns the code the user received. Awaited, as above.
+    :param retry_credentials: Awaited with the error and the attempt number when Apple rejects the
+        Apple ID or password; returns a replacement pair, or None to stop. None means one attempt.
+    :param retry_code: Awaited with the error and the attempt number when Apple rejects the
+        verification code; returns :data:`CODE_AGAIN`, :data:`CODE_RESEND`, or None to stop.
     :raises ExportSourceError: If signing in does not end signed in.
+    :raises InvalidCredentialsError: If the last attempt is rejected, or the user stops.
     """
-    state = await account.login(email, password)
+    state = await _log_in_with_retries(account, email, password, retry_credentials)
 
     if state == LoginState.REQUIRE_2FA:
         methods = await account.get_2fa_methods()
@@ -234,10 +271,68 @@ async def log_in(
 
         chosen = methods[await choose_second_factor([_describe_factor(m) for m in methods])]
         await chosen.request()
-        state = await chosen.submit(await get_code())
+        state = await _submit_code_with_retries(chosen, get_code, retry_code)
 
     if state != LoginState.LOGGED_IN:
         raise ExportSourceError(f"Signing in ended at {state} rather than signed in.")
+
+
+async def _log_in_with_retries(account, email, password, retry_credentials):
+    """
+    Offer the Apple ID and password, letting a rejected pair be corrected in place.
+
+    **Capped, and never automatic.** Apple locks an account after enough failed sign-ins, and how
+    many is not this project's to discover on somebody's real account - so `retry_credentials` is
+    asked every time and the count is small. A caller that passes None gets exactly one attempt,
+    which is what this did before.
+    """
+    for attempt in range(1, MAX_LOGIN_ATTEMPTS + 1):
+        try:
+            return await account.login(email, password)
+        except InvalidCredentialsError as e:
+            logger.info("Apple rejected the credentials on attempt %d", attempt)
+
+            replacement = (
+                None
+                if retry_credentials is None or attempt == MAX_LOGIN_ATTEMPTS
+                else await retry_credentials(e, attempt)
+            )
+            if replacement is None:
+                raise
+
+            email, password = replacement
+
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+async def _submit_code_with_retries(chosen, get_code, retry_code):
+    """
+    Submit the verification code, letting a mistyped one be corrected.
+
+    **The default retry re-types the code rather than asking for a new one**, and the difference is
+    not cosmetic: requesting delivery again sends a second code *and invalidates the first*
+    (findmy-export 01-authentication §5). So somebody who mistyped a code they are still holding
+    would lose it by being "helpfully" sent another, and a resend has to be a thing they choose.
+    """
+    for attempt in range(1, MAX_CODE_ATTEMPTS + 1):
+        try:
+            return await chosen.submit(await get_code())
+        except InvalidCredentialsError as e:
+            logger.info("Apple rejected the verification code on attempt %d", attempt)
+
+            choice = (
+                None
+                if retry_code is None or attempt == MAX_CODE_ATTEMPTS
+                else await retry_code(e, attempt)
+            )
+            if choice is None:
+                raise
+
+            if choice == CODE_RESEND:
+                # Deliberate: this is what invalidates whatever they were holding.
+                await chosen.request()
+
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _describe_factor(method: object) -> str:

@@ -234,6 +234,46 @@ async def ask_choice(question: str, options: Sequence[str]) -> int:
     )
 
 
+async def _retry_credentials(error, attempt: int):
+    """
+    Offer the Apple ID and password again after Apple rejects them.
+
+    Both are asked for again rather than only the password: the Apple ID may be the wrong one, and
+    a screen that will not let you correct it is worse than one extra field to press enter on.
+    """
+    print(f"\nApple would not accept that sign-in:\n\n  {error}\n", file=sys.stderr)
+    print(f"Attempt {attempt} of {icloud.MAX_LOGIN_ATTEMPTS}. Apple locks an account after enough",
+          file=sys.stderr)
+    print("failed sign-ins, so it is worth being sure rather than guessing.\n", file=sys.stderr)
+
+    if not await prompts.confirm("Try again?"):
+        return None
+
+    email = await prompts.text("Apple ID")
+
+    return email, await prompts.password("Password")
+
+
+async def _retry_code(error, attempt: int):
+    """
+    Offer the verification code again, and only send a new one if asked.
+
+    **Re-typing is the default and sending a new code is not**, because a resend invalidates the
+    code Apple already sent - so somebody who simply mistyped the code in front of them would have
+    it taken away by the recovery step.
+    """
+    print(f"\nApple would not accept that code:\n\n  {error}\n", file=sys.stderr)
+    print(f"Attempt {attempt} of {icloud.MAX_CODE_ATTEMPTS}.", file=sys.stderr)
+
+    choice = await ask_choice("What now?", [
+        "Type the code again (the one Apple sent is still valid)",
+        "Send a new code (this cancels the one already sent)",
+        "Stop",
+    ])
+
+    return [icloud.CODE_AGAIN, icloud.CODE_RESEND, None][choice]
+
+
 async def _ask_verification_code() -> str:
     """
     Ask for the code Apple sent, and keep asking until it could be one.
@@ -358,6 +398,8 @@ async def sign_in(arguments: argparse.Namespace):
                 password,
                 choose_second_factor=lambda methods: ask_choice("How should Apple send the code?", methods),
                 get_code=_ask_verification_code,
+                retry_credentials=_retry_credentials,
+                retry_code=_retry_code,
             )
         except MobileMeDelegateError as e:
             # Authentication itself worked; the exchange that follows it did not. Unaccepted terms
