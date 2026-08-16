@@ -140,7 +140,6 @@
     <string name="use_system_colors">Systeemkleuren gebruiken</string>
     <string name="use_system_colors_description">Kleurt de app op basis van je achtergrond. Vereist Android 12 of hoger.</string>
     <string name="export_history">Geschiedenis exporteren</string>
-    <string name="export_tag">Tag exporteren</string>
     <string name="selected">Geselecteerd</string>
     <string name="x_selected">%1$d geselecteerd</string>
     <string name="exit_selection">Selecteren stoppen</string>
@@ -148,4 +147,5 @@
     <string name="error_occurred_while_exporting_the_history">Kon de geschiedenis niet exporteren</string>
     <string name="are_you_sure_you_want_to_remove_these_devices">Weet je zeker dat je deze apparaten wilt verwijderen? Eenmaal verwijderd moeten ze opnieuw worden geïmporteerd.</string>
     <string name="remove_devices">Apparaten verwijderen</string>
+    <string name="export_tags">Tags exporteren</string>
 </resources>
