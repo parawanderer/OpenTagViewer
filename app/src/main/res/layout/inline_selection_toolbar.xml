@@ -72,10 +72,10 @@
                 android:backgroundTint="?android:attr/colorBackground"
                 android:contentDescription="@string/more"
                 android:onClick="@{() -> onClickMenu.run()}"
-                android:padding="6dp"
+                android:padding="10dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/menu_dots_vertical_24"
-                android:tint="?attr/colorOnSurface" />
+                android:tint="?attr/colorOutline" />
 
         </LinearLayout>
 
