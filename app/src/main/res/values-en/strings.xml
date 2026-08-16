@@ -137,4 +137,13 @@
     <string name="anisette_local_status_checking">Checking…</string>
     <string name="anisette_login_needs_server">This device could not set up sign-in on its own, so a server has to do it this time. You can change this later in Settings.</string>
     <string name="anisette_provider">Anisette Provider</string>
+    <string name="export_history">Export History</string>
+    <string name="export_tag">Export Tag</string>
+    <string name="selected">Selected</string>
+    <string name="x_selected">%1$d selected</string>
+    <string name="exit_selection">Stop selecting</string>
+    <string name="history_exported">History exported</string>
+    <string name="error_occurred_while_exporting_the_history">Could not export the history</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">Are you sure you want to remove these devices? Once removed they will need to be reimported to get them back.</string>
+    <string name="remove_devices">Remove Devices</string>
 </resources>

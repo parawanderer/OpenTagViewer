@@ -3,8 +3,10 @@ package dev.wander.android.opentagviewer.ui.mydevices;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.text.format.DateUtils;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,11 +17,14 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -38,6 +43,38 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
      */
     private final BiConsumer<View, BeaconInformation> onDeviceLongClickCallback;
 
+    /** Told how many rows are selected, so the contextual bar can say so. */
+    private final Consumer<Integer> onSelectionChangedCallback;
+
+    /**
+     * The theme's own row background, resolved once.
+     *
+     * <p>Looked up rather than hard-coded because {@code ?attr/selectableItemBackground} cannot
+     * be passed to {@code setBackgroundResource}, and re-resolving it per bind would mean a
+     * theme lookup for every row on every scroll.
+     */
+    private final int selectableItemBackground;
+
+    /**
+     * Which rows are selected, by beacon id.
+     *
+     * <p>Keyed by id rather than by position because the list is mutated while a selection is
+     * live - removing a device shifts every position after it, and a position-keyed selection
+     * would silently start pointing at the wrong rows.
+     */
+    @Getter
+    private final Set<String> selectedBeaconIds = new HashSet<>();
+
+    /**
+     * Whether the list is in selection mode.
+     *
+     * <p>Kept separate from {@code selectedBeaconIds.isEmpty()} so that deselecting the last
+     * row leaves the contextual bar up rather than dropping the user out of the mode they are
+     * plainly still using.
+     */
+    @Getter
+    private boolean selectionMode = false;
+
     @Getter
     public static class ViewHolder extends RecyclerView.ViewHolder {
         private final FrameLayout container;
@@ -46,6 +83,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
         private final TextView itemEmoji;
         private final ImageView itemImage;
         private final ImageView warningIcon;
+        private final ImageView selectedCheck;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -55,20 +93,29 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             this.itemEmoji = itemView.findViewById(R.id.list_item_emoji);
             this.itemImage = itemView.findViewById(R.id.list_item_image);
             this.warningIcon = itemView.findViewById(R.id.warning_icon);
+            this.selectedCheck = itemView.findViewById(R.id.list_item_selected_check);
         }
     }
 
     public DeviceListAdaptor(
+            @lombok.NonNull Context context,
             @lombok.NonNull Resources resources,
             @lombok.NonNull List<BeaconInformation> beaconInfo,
             @lombok.NonNull Map<String, BeaconLocationReport> locations,
             @lombok.NonNull Consumer<BeaconInformation> onDeviceClickCallback,
-            @lombok.NonNull BiConsumer<View, BeaconInformation> onDeviceLongClickCallback) {
+            @lombok.NonNull BiConsumer<View, BeaconInformation> onDeviceLongClickCallback,
+            @lombok.NonNull Consumer<Integer> onSelectionChangedCallback) {
         this.resources = resources;
         this.beaconInfo = beaconInfo;
         this.locations = locations;
         this.onDeviceClickCallback = onDeviceClickCallback;
         this.onDeviceLongClickCallback = onDeviceLongClickCallback;
+        this.onSelectionChangedCallback = onSelectionChangedCallback;
+
+        TypedValue background = new TypedValue();
+        context.getTheme().resolveAttribute(
+                android.R.attr.selectableItemBackground, background, true);
+        this.selectableItemBackground = background.resourceId;
     }
 
     // Create new views (invoked by the layout manager)
@@ -117,7 +164,24 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             viewHolder.getWarningIcon().setVisibility(VISIBLE);
         }
 
+        final boolean isSelected = this.selectedBeaconIds.contains(beaconId);
+
+        viewHolder.getSelectedCheck().setVisibility(
+                this.selectionMode && isSelected ? VISIBLE : GONE);
+
+        // Tinted only while selected. Setting a colour unconditionally would replace the
+        // ripple that ?attr/selectableItemBackground provides, so the row would stop
+        // responding to touch the way every other row in the app does.
+        viewHolder.getContainer().setBackgroundResource(
+                this.selectionMode && isSelected
+                        ? R.drawable.device_list_item_selected
+                        : this.selectableItemBackground);
+
         viewHolder.getContainer().setOnClickListener(v -> {
+            if (this.selectionMode) {
+                this.toggleSelection(beaconId);
+                return;
+            }
             this.onDeviceClickCallback.accept(beacon);
         });
 
@@ -126,6 +190,48 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             // Consumed, so the row does not also fire its normal click.
             return true;
         });
+    }
+
+    /** Enters selection mode with one row already chosen, which is what a long press means. */
+    public void startSelectionWith(final String beaconId) {
+        this.selectionMode = true;
+        this.selectedBeaconIds.clear();
+        this.selectedBeaconIds.add(beaconId);
+        this.notifyItemRangeChanged(0, this.getItemCount());
+    }
+
+    public void toggleSelection(final String beaconId) {
+        if (!this.selectedBeaconIds.remove(beaconId)) {
+            this.selectedBeaconIds.add(beaconId);
+        }
+        this.onSelectionChangedCallback.accept(this.selectedBeaconIds.size());
+
+        final int position = this.positionOf(beaconId);
+        if (position >= 0) {
+            this.notifyItemChanged(position);
+        }
+    }
+
+    public void clearSelection() {
+        this.selectionMode = false;
+        this.selectedBeaconIds.clear();
+        this.notifyItemRangeChanged(0, this.getItemCount());
+    }
+
+    /** The selected beacons themselves, in the order they appear on screen. */
+    public List<BeaconInformation> getSelectedBeacons() {
+        return this.beaconInfo.stream()
+                .filter(beacon -> this.selectedBeaconIds.contains(beacon.getBeaconId()))
+                .collect(Collectors.toList());
+    }
+
+    private int positionOf(final String beaconId) {
+        for (int i = 0; i < this.beaconInfo.size(); i++) {
+            if (this.beaconInfo.get(i).getBeaconId().equals(beaconId)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     // Return the size of your dataset (invoked by the layout manager)

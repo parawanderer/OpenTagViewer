@@ -137,4 +137,13 @@
     <string name="anisette_local_status_checking">Wird geprüft …</string>
     <string name="anisette_login_needs_server">Dieses Gerät konnte die Anmeldung nicht selbst einrichten, daher übernimmt das diesmal ein Server. Du kannst das später in den Einstellungen ändern.</string>
     <string name="anisette_provider">Anisette-Anbieter</string>
+    <string name="export_history">Verlauf exportieren</string>
+    <string name="export_tag">Tag exportieren</string>
+    <string name="selected">Ausgewählt</string>
+    <string name="x_selected">%1$d ausgewählt</string>
+    <string name="exit_selection">Auswahl beenden</string>
+    <string name="history_exported">Verlauf exportiert</string>
+    <string name="error_occurred_while_exporting_the_history">Der Verlauf konnte nicht exportiert werden</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">Möchtest du diese Geräte wirklich entfernen? Nach dem Entfernen müssen sie erneut importiert werden.</string>
+    <string name="remove_devices">Geräte entfernen</string>
 </resources>

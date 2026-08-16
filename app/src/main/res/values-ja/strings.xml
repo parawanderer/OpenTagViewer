@@ -137,4 +137,13 @@
     <string name="anisette_local_status_checking">確認中…</string>
     <string name="anisette_login_needs_server">この端末だけではサインインの準備ができなかったため、今回はサーバーを使用します。後で設定から変更できます。</string>
     <string name="anisette_provider">Anisette の提供元</string>
+    <string name="export_history">履歴をエクスポート</string>
+    <string name="export_tag">タグをエクスポート</string>
+    <string name="selected">選択済み</string>
+    <string name="x_selected">%1$d 件選択中</string>
+    <string name="exit_selection">選択を終了</string>
+    <string name="history_exported">履歴をエクスポートしました</string>
+    <string name="error_occurred_while_exporting_the_history">履歴をエクスポートできませんでした</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">これらのデバイスを削除してもよろしいですか？削除すると、元に戻すには再インポートが必要です。</string>
+    <string name="remove_devices">デバイスを削除</string>
 </resources>
