@@ -60,6 +60,8 @@ import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.ui.login.Apple2FACodeInputManager;
+import dev.wander.android.opentagviewer.ui.login.StepTransition;
+import dev.wander.android.opentagviewer.ui.login.StepTransition.Direction;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
@@ -74,13 +76,27 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * This entire thing should be refactored and made less convoluted and spaghetti-like
- * Also: prettier (i.e. add animations)
  */
 @Slf4j
 public class AppleLoginActivity extends AppCompatActivity {
     private static final String TAG = AppleLoginActivity.class.getSimpleName();
 
     private static final Pattern REGEX_2FA_CODE = Pattern.compile("^[0-9]{6}$");
+
+    /**
+     * The mutually exclusive steps of the flow, in the order the user walks through them.
+     *
+     * <p>Listed once so that showing a step is "show this one" rather than every caller
+     * remembering to hide each of the others - which was six separate {@code setVisibility}
+     * calls spread over the file, and is the kind of thing that leaves two steps stacked on
+     * top of each other when one of them is missed.
+     */
+    private static final int[] PAGES = {
+            R.id.login_anisette_container,
+            R.id.login_maininfo_container,
+            R.id.login_2fa_choice,
+            R.id.login_2fa_container,
+    };
 
     private static final int HINT_DIFFERENT_ANISETTE_SERVER_AFTER_FAILED_2FACODES = 3;
 
@@ -253,9 +269,63 @@ public class AppleLoginActivity extends AppCompatActivity {
         }
     }
 
-    private void setCurrentStepText(final int stringResId) {
+    /**
+     * Move to one step of the flow, animating away whichever one is currently up.
+     *
+     * @param pageId    one of {@link #PAGES}, or {@link View#NO_ID} to leave the flow showing
+     *                  nothing - which is what happens while the spinner is up
+     * @param direction the way the user is travelling, which decides which way things slide.
+     *                  {@link Direction#NONE} for a render that is not navigation, such as
+     *                  the first draw or a restore after rotation
+     */
+    private void showPage(final int pageId, final Direction direction) {
+        View outgoing = null;
+        for (final int candidate : PAGES) {
+            if (candidate == pageId) {
+                continue;
+            }
+            final View page = this.findViewById(candidate);
+            if (outgoing == null && page.getVisibility() == VISIBLE) {
+                outgoing = page;
+                continue;
+            }
+            // Either already off screen or a second visible step, which should not happen.
+            // Hidden without ceremony either way: only one thing can animate out, and a view
+            // left half-faded by an earlier swap would come back that way next time.
+            StepTransition.swap(page, null, Direction.NONE);
+        }
+
+        StepTransition.swap(
+                outgoing,
+                pageId == View.NO_ID ? null : this.findViewById(pageId),
+                direction);
+    }
+
+    /** Leave the current step with nothing to replace it, because the spinner is taking over. */
+    private void hideCurrentPage(final Direction direction) {
+        this.showPage(View.NO_ID, direction);
+    }
+
+    /**
+     * Name the step the user is on, travelling with it when it changes.
+     *
+     * <p>Set before it is animated, so what it says is readable straight away and only the
+     * movement is decorative.
+     *
+     * <p>Unchanged text is left alone rather than re-animated. Choosing a 2FA method and then
+     * typing the code are two steps under one heading, so animating on every call would make
+     * the heading twitch for a change that did not happen.
+     */
+    private void setCurrentStepText(final int stringResId, final Direction direction) {
         TextView textView = this.findViewById(R.id.login_current_input_indicator);
-        textView.setText(stringResId);
+
+        final String next = this.getString(stringResId);
+        if (next.contentEquals(textView.getText())) {
+            return;
+        }
+
+        textView.setText(next);
+        StepTransition.enter(textView, direction);
     }
 
     private void showLoading(final Integer stringResId) {
@@ -287,7 +357,7 @@ public class AppleLoginActivity extends AppCompatActivity {
     }
 
     private void handleAuth(LoginActivityState state) {
-        this.setCurrentStepText(R.string.welcome);
+        this.setCurrentStepText(R.string.welcome, Direction.NONE);
         this.showLoading(null);
 
         var sub = this.getAnisetteSetupStatus()
@@ -295,18 +365,20 @@ public class AppleLoginActivity extends AppCompatActivity {
             .subscribe(status -> {
                 this.hideLoading();
 
+                // Nothing here is navigation - it is the screen being drawn, or restored after
+                // a rotation. Animating it would replay steps the user did not just take.
                 if (status == SETUP_STATUS.OK && (!state.hasSpecifiedCurrentPage() || state.getCurrentPage() == PAGE.LOGIN)) {
                     this.binding.setAllowServerConfNext(true);
                     this.sharedMainSettingsManager.showAnisetteTestStatus(OK);
                     this.sharedMainSettingsManager.setAnisetteTextFieldError(null);
-                    this.showAccountLoginAuthOptions();
+                    this.showAccountLoginAuthOptions(Direction.NONE);
                 } else if (state.getCurrentPage() == PAGE.CHOOSE_2FA) {
-                    this.showNextAuthPage(state.getAuthResponse().getLoginState());
+                    this.showNextAuthPage(state.getAuthResponse().getLoginState(), Direction.NONE);
                 } else if (state.currentPageIs2faEntry()) {
-                    this.show2FACodeEntryTextbox();
+                    this.show2FACodeEntryTextbox(Direction.NONE);
                 } else {
                     // show welcome step/server setup step
-                    this.showInitialWelcomeConfOptions(status);
+                    this.showInitialWelcomeConfOptions(status, Direction.NONE);
                 }
             });
     }
@@ -318,7 +390,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         // there is nothing to validate and nothing that could stop somebody getting past here.
         if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
             this.getUiState().setCurrentPage(PAGE.LOGIN);
-            this.showAccountLoginAuthOptions();
+            this.showAccountLoginAuthOptions(Direction.FORWARD);
             return;
         }
 
@@ -335,13 +407,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.testAndSaveAnisetteUrl(currentInput, () -> {
             this.getUiState().setCurrentPage(PAGE.LOGIN);
-            this.showAccountLoginAuthOptions();
+            this.showAccountLoginAuthOptions(Direction.FORWARD);
         });
     }
 
     public void onClickBackToAnisetteSettings(View view) {
         Log.d(TAG, "Clicked backwards to language + anisette settings");
-        this.showInitialWelcomeConfOptions(SETUP_STATUS.NO_SERVER_CONFIGURED);
+        this.showInitialWelcomeConfOptions(SETUP_STATUS.NO_SERVER_CONFIGURED, Direction.BACK);
     }
 
     public void onClickLoginButton(View view) {
@@ -359,8 +431,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         // show spinner in button
         // TODO: don't take away the entire UI like this.
         // for now this is good enough...
-        final LinearLayout accountLoginContainer = this.findViewById(R.id.login_maininfo_container);
-        accountLoginContainer.setVisibility(GONE);
+        this.hideCurrentPage(Direction.FORWARD);
 
         final String emailOrPhone = Objects.requireNonNull(emailOrPhoneInput.getText()).toString();
         final String password = Objects.requireNonNull(passwordInput.getText()).toString();
@@ -385,9 +456,10 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this.getUiState().setAuthResponse(null);
                 Log.e(TAG, "Error while trying to log in via python", error);
 
-                // undo loading and allow user to try again, basically.
+                // undo loading and allow user to try again, basically. Backwards, because
+                // that is what it is: the step the user just left, handed back to them.
                 this.hideLoading();
-                accountLoginContainer.setVisibility(VISIBLE);
+                this.showPage(R.id.login_maininfo_container, Direction.BACK);
                 emailOrPhoneInput.setEnabled(true);
                 passwordInput.setEnabled(true);
                 loginButton.setClickable(true);
@@ -405,10 +477,10 @@ public class AppleLoginActivity extends AppCompatActivity {
         Log.d(TAG, "Login state was " + loginState);
         this.getUiState().setAuthResponse(authResponse);
 
-        this.showNextAuthPage(loginState);
+        this.showNextAuthPage(loginState, Direction.FORWARD);
     }
 
-    private void showNextAuthPage(PythonAuthService.LOGIN_STATE loginState) {
+    private void showNextAuthPage(PythonAuthService.LOGIN_STATE loginState, Direction direction) {
         switch (loginState) {
             case LOGGED_OUT:
                 // TODO: invalid password?
@@ -421,23 +493,20 @@ public class AppleLoginActivity extends AppCompatActivity {
                 break;
             case REQUIRE_2FA:
                 // require 2FA!
-                this.show2FAChoiceScreen();
+                this.show2FAChoiceScreen(direction);
                 break;
         }
     }
 
-    private void show2FAChoiceScreen() {
+    private void show2FAChoiceScreen(Direction direction) {
         var state = this.getUiState();
         state.setCurrentPage(PAGE.CHOOSE_2FA);
 
         PythonAuthResponse authResponse = state.getAuthResponse();
-        // TODO: make this all nice and animated...
         // determine which options should be shown:
         this.hideLoading();
-        LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
-        twoFACodeEntryContainer.setVisibility(GONE);
 
-        this.setCurrentStepText(R.string.two_factor_authentication);
+        this.setCurrentStepText(R.string.two_factor_authentication, direction);
         Button trustedDeviceButton = this.findViewById(R.id.twofactorauth_choice_trusted_device);
         final boolean hasTrustedDevice = authResponse.getAuthMethods().stream().anyMatch(authMethod -> authMethod.getType() == TRUSTED_DEVICE);
         trustedDeviceButton.setVisibility(hasTrustedDevice ? VISIBLE : GONE);
@@ -466,8 +535,9 @@ public class AppleLoginActivity extends AppCompatActivity {
                     this.getUiState().getSms2FAButtonToAuthMethod().put(v, authMethodPhone);
                 });
 
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
-        accountLoginContainer.setVisibility(VISIBLE);
+        // Shown last, so the options above are in place before it slides in rather than
+        // appearing one by one on a view the user is already looking at.
+        this.showPage(R.id.login_2fa_choice, direction);
     }
 
     public void onClick2FAWithTrustedDevice(View view) {
@@ -478,13 +548,12 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.getUiState().setChosenAuthMethod(chosenAuthMethod);
 
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
-        accountLoginContainer.setVisibility(GONE);
+        this.hideCurrentPage(Direction.FORWARD);
         this.showLoading(R.string.requesting_code);
 
         var async = this.authService.requestCode(chosenAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::show2FACodeEntryTextbox,
+                .subscribe(() -> this.show2FACodeEntryTextbox(Direction.FORWARD),
                 error -> {
                     Log.e(TAG, "Error occurred when trying to request 2FA code from Trusted Devices", error);
                     this.hideLoading();
@@ -499,13 +568,12 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.getUiState().setChosenAuthMethod(phoneAuthMethod);
 
         // TODO: try to do the auth
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_2fa_choice);
-        accountLoginContainer.setVisibility(GONE);
+        this.hideCurrentPage(Direction.FORWARD);
         this.showLoading(R.string.requesting_code);
 
         var async = this.authService.requestCode(phoneAuthMethod)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::show2FACodeEntryTextbox,
+                .subscribe(() -> this.show2FACodeEntryTextbox(Direction.FORWARD),
                 error -> {
                     Log.e(TAG, "Error occurred when trying to request 2FA code to SMS for phone number " + phoneAuthMethod.getPhoneNumber(), error);
                     this.hideLoading();
@@ -514,17 +582,13 @@ public class AppleLoginActivity extends AppCompatActivity {
                 });
     }
 
-    private void showInitialWelcomeConfOptions(SETUP_STATUS setupStatus) {
+    private void showInitialWelcomeConfOptions(SETUP_STATUS setupStatus, Direction direction) {
         var state = this.getUiState();
         state.setCurrentPage(PAGE.SETUP);
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_maininfo_container);
-        accountLoginContainer.setVisibility(GONE);
 
-        // TODO: make this all nice and animated...
         final UserSettings userSettings = this.getUserSettings();
 
-        LinearLayout anisetteSetupContainer = this.findViewById(R.id.login_anisette_container);
-        anisetteSetupContainer.setVisibility(VISIBLE);
+        this.showPage(R.id.login_anisette_container, direction);
 
         MaterialAutoCompleteTextView urlTextInput = findViewById(R.id.anisetteServerUrl);
 
@@ -543,7 +607,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
             // Nothing is going to ask a server for anything, so testing one would be a network
             // request whose only possible effect is to block the button below it.
-            this.setCurrentStepText(R.string.welcome);
+            this.setCurrentStepText(R.string.welcome, direction);
             this.binding.setAllowServerConfNext(true);
             return;
         }
@@ -551,9 +615,9 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.testAndSaveAnisetteUrl(currentAnisetteServerSelection);
 
         if (setupStatus == SETUP_STATUS.NO_SERVER_CONFIGURED) {
-            this.setCurrentStepText(R.string.welcome);
+            this.setCurrentStepText(R.string.welcome, direction);
         } else {
-            this.setCurrentStepText(R.string.choose_your_server);
+            this.setCurrentStepText(R.string.choose_your_server, direction);
 
             this.sharedMainSettingsManager.showAnisetteTestStatus(ERROR);
             this.sharedMainSettingsManager.setAnisetteTextFieldError(
@@ -563,19 +627,10 @@ public class AppleLoginActivity extends AppCompatActivity {
         }
     }
 
-    private void showAccountLoginAuthOptions() {
-        // TODO: make this all nice and animated...
-        LinearLayout anisetteSetupContainer = this.findViewById(R.id.login_anisette_container);
-        anisetteSetupContainer.setVisibility(GONE);
+    private void showAccountLoginAuthOptions(Direction direction) {
+        this.showPage(R.id.login_maininfo_container, direction);
 
-        LinearLayout login2FAChoice = this.findViewById(R.id.login_2fa_choice);
-        login2FAChoice.setVisibility(GONE);
-
-        // main:
-        LinearLayout accountLoginContainer = this.findViewById(R.id.login_maininfo_container);
-        accountLoginContainer.setVisibility(VISIBLE);
-
-        this.setCurrentStepText(R.string.apple_account);
+        this.setCurrentStepText(R.string.apple_account, direction);
 
         TextInputEditText emailOrPhoneInput = this.findViewById(R.id.email_or_phone_input_field);
         TextInputEditText passwordInput = this.findViewById(R.id.password_input_field);
@@ -593,14 +648,13 @@ public class AppleLoginActivity extends AppCompatActivity {
         }));
     }
 
-    private void show2FACodeEntryTextbox() {
+    private void show2FACodeEntryTextbox(Direction direction) {
         this.getUiState().setCurrentPage(PAGE.ENTER_2FA_CODE);
 
         this.hideLoading();
-        this.setCurrentStepText(R.string.two_factor_authentication);
+        this.setCurrentStepText(R.string.two_factor_authentication, direction);
 
-        LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
-        twoFACodeEntryContainer.setVisibility(VISIBLE);
+        this.showPage(R.id.login_2fa_container, direction);
 
         TextView infoText = this.findViewById(R.id.twofa_sent_info_text);
         var chosenAuthMethod = this.getUiState().getChosenAuthMethod();
@@ -633,7 +687,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         passwordInput.setEnabled(true);
         loginButton.setClickable(true);
 
-        this.showAccountLoginAuthOptions();
+        this.showAccountLoginAuthOptions(Direction.BACK);
     }
 
     public void onClickBackTo2FAMethodChoice(View view) {
@@ -646,7 +700,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.twoFactorEntryManager.clear();
         final FrameLayout twoFactorErrorMessage = this.findViewById(R.id.verification_code_error_msg_container);
         twoFactorErrorMessage.setVisibility(GONE); // re-show it later if relevant...
-        this.show2FAChoiceScreen();
+        this.show2FAChoiceScreen(Direction.BACK);
     }
 
     private void on2FAAuthCodeFilled(final String authCode) {
@@ -656,8 +710,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         }
 
         this.showLoading(R.string.logging_in);
-        final LinearLayout twoFACodeEntryContainer = this.findViewById(R.id.login_2fa_container);
-        twoFACodeEntryContainer.setVisibility(GONE); // for now: on error unhide
+        this.hideCurrentPage(Direction.FORWARD); // for now: on error unhide
 
         final FrameLayout twoFactorErrorMessage = this.findViewById(R.id.verification_code_error_msg_container);
         final TextView errorMessageText = this.findViewById(R.id.verification_code_error_message);
@@ -680,7 +733,7 @@ public class AppleLoginActivity extends AppCompatActivity {
 
                     Log.e(TAG, "Error during auth data retrieval and storage after 2FA success", error);
                     this.hideLoading();
-                    twoFACodeEntryContainer.setVisibility(VISIBLE);
+                    this.showPage(R.id.login_2fa_container, Direction.BACK);
                     this.twoFactorEntryManager.clear();
                     this.twoFactorAuthChoiceBackButton.setEnabled(true);
 
@@ -697,7 +750,7 @@ public class AppleLoginActivity extends AppCompatActivity {
             state.setFailed2FAAttemptCount(failedLoginAttemptCount);
 
             this.hideLoading();
-            twoFACodeEntryContainer.setVisibility(VISIBLE);
+            this.showPage(R.id.login_2fa_container, Direction.BACK);
             this.twoFactorEntryManager.clear();
             this.twoFactorAuthChoiceBackButton.setEnabled(true);
 
