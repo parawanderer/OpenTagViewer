@@ -137,4 +137,13 @@
     <string name="anisette_local_status_checking">확인 중…</string>
     <string name="anisette_login_needs_server">이 기기에서 로그인을 직접 준비하지 못해 이번에는 서버를 사용합니다. 나중에 설정에서 변경할 수 있습니다.</string>
     <string name="anisette_provider">Anisette 제공자</string>
+    <string name="export_history">기록 내보내기</string>
+    <string name="export_tag">태그 내보내기</string>
+    <string name="selected">선택됨</string>
+    <string name="x_selected">%1$d개 선택됨</string>
+    <string name="exit_selection">선택 종료</string>
+    <string name="history_exported">기록을 내보냈습니다</string>
+    <string name="error_occurred_while_exporting_the_history">기록을 내보낼 수 없습니다</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">이 기기들을 삭제하시겠습니까? 삭제하면 다시 가져와야 복구할 수 있습니다.</string>
+    <string name="remove_devices">기기 삭제</string>
 </resources>

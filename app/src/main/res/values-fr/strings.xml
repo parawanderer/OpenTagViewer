@@ -137,4 +137,13 @@
     <string name="anisette_local_status_checking">Vérification…</string>
     <string name="anisette_login_needs_server">Cet appareil n\'a pas pu configurer la connexion par lui-même, un serveur s\'en charge donc cette fois-ci. Vous pourrez changer cela plus tard dans les réglages.</string>
     <string name="anisette_provider">Fournisseur Anisette</string>
+    <string name="export_history">Exporter l’historique</string>
+    <string name="export_tag">Exporter le tag</string>
+    <string name="selected">Sélectionné</string>
+    <string name="x_selected">%1$d sélectionné(s)</string>
+    <string name="exit_selection">Quitter la sélection</string>
+    <string name="history_exported">Historique exporté</string>
+    <string name="error_occurred_while_exporting_the_history">Impossible d’exporter l’historique</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">Voulez-vous vraiment supprimer ces appareils ? Une fois supprimés, il faudra les réimporter pour les récupérer.</string>
+    <string name="remove_devices">Supprimer les appareils</string>
 </resources>
