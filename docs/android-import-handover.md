@@ -206,3 +206,11 @@ on that:
 
 `AdiDeviceIdentity.CLIENT_INFO`'s comment used to justify its value as the least remarkable string
 Apple sees. That reasoning is gone: an entry built to be recognised is not blending in.
+
+**Build the disclosure text from the account, not from constants.** §7.1 of Stage 2 requires that
+the identifiers shown to the user are the ones actually sent - the whole point being that somebody
+reading their Apple device list can match it to what the app told them. FindMy.py now exposes
+`account.device_name` and `account.serial`, so the screen that announces what will be registered
+should read them rather than restating string literals that can drift out of step with what goes
+on the wire. A disclosure that is merely *usually* right is worse than none, because it teaches the
+user to trust a name that might not be theirs.
