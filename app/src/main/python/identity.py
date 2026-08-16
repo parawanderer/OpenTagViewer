@@ -20,9 +20,24 @@ recognised and removed on its own.
 
 from __future__ import annotations
 
+import json
+import traceback
 from typing import Any
 
 from findmy.reports.anisette import DeviceIdentity
+
+IDENTITY_FIELDS = frozenset(
+    {"model", "os_name", "os_version", "os_build", "cfnetwork", "darwin"}
+)
+"""
+The six fields Java has to send, checked before they are used.
+
+`DeviceIdentity.from_json` fills a missing key from FindMy.py's *own* identity rather than
+failing, which is right for reading back an identity written by an older version and wrong
+here: a renamed key on either side would quietly produce a machine that is part this app and
+part the library - a MacBook Pro 18,3 on macOS 13.1, a release that does not exist. Checking
+first turns that into a visible fallback instead of an invisible hybrid.
+"""
 
 APP_SERIAL = "0PENTAGVIEWR"
 """
@@ -36,31 +51,6 @@ Without this a session presents FindMy.py's default, `0FINDMYPY001` - which name
 rather than the program, in the one place the user ever looks.
 """
 
-APP_IDENTITY = DeviceIdentity(
-    model="MacBookPro13,2",
-    os_name="macOS",
-    os_version="13.1",
-    os_build="22C65",
-    cfnetwork="1404.0.5",
-    darwin="22.2.0",
-)
-"""
-The machine a new session claims to be - **the same one ADI is initialised with**.
-
-This is the whole point of it. `AdiDeviceIdentity.CLIENT_INFO` on the Java side sends
-`<MacBookPro13,2> <macOS;13.1;22C65>` when it provisions ADI, and FindMy.py used to send a
-MacBook Pro 18,3 on macOS 13.4.1 from its own defaults. One app, one session, two different
-Macs - down to the OS *name*, `macOS` against `Mac OS X`. Rule 11 exists to prevent exactly
-that, and until FindMy.py grew `DeviceIdentity` there was nowhere to say otherwise.
-
-**Moved to match Java rather than the other way round**, because the ADI string is the half
-that is also baked into how ADI was provisioned on the device.
-
-The six parts describe one real release and move together: macOS 13.1 is build 22C65,
-CFNetwork 1404.0.5, Darwin 22.2.0. Nothing validates that - FindMy.py has no copy of Apple's
-release table - so changing one means changing all six deliberately.
-"""
-
 # **There is deliberately no device name here, and no announce_device() call.**
 #
 # Naming the device-list entry needs `announce_device()`, which authenticates with the
@@ -72,6 +62,74 @@ release table - so changing one means changing all six deliberately.
 # The serial carries the recognisability on its own: an entry reading `0PENTAGVIEWR` is
 # identifiable as software the user installed, which is the thing that stops them removing it.
 # The row is still titled after the claimed model, and that is accepted.
+
+
+def hardwareProfile(localAnisette: Any) -> DeviceIdentity | None:
+    """
+    The machine this install claims to be, **read from Java rather than decided here**.
+
+    This used to be a constant, and a constant is wrong for a reason that only shows up in one
+    case. Java persists the profile per install: an install that predates the choice keeps the
+    Mac it has always claimed, and a fresh one is an iPhone. So there is no single right answer
+    for the Python side to hold - somebody signed in before all this, who signs out and signs
+    back in, must present the Mac their ADI was provisioned with, while the install beside
+    theirs must present the iPhone. A copy here would be right for one of them.
+
+    It is also the contradiction rule 11 is about. The same six values reach Apple twice: once
+    in the client info Java sends when it provisions ADI, and once in the client info FindMy.py
+    sends at login. Apple's own clients never disagree with themselves about which machine they
+    are, and two values maintained in two languages disagree eventually.
+
+    Returns None when there is nothing to ask or the answer is unusable, which leaves FindMy.py
+    on its own identity. That is a real mismatch, and worth saying so loudly - but it is a
+    mismatch on a *new* sign-in, which costs a device-list entry that is wrong rather than a
+    session that stops working, and failing the login outright would be worse.
+    """
+    if localAnisette is None:
+        # No bridge at all: nothing to align with, so nothing to impose.
+        return None
+
+    try:
+        payload = json.loads(str(localAnisette.hardwareProfileJson()))
+    except Exception:
+        print(f"Could not read the hardware profile from Java: {traceback.format_exc()}")
+        return None
+
+    missing = IDENTITY_FIELDS - payload.keys()
+    if missing:
+        print(
+            "The hardware profile from Java is missing "
+            f"{sorted(missing)} - falling back to FindMy.py's own identity, which will not "
+            "match what ADI was provisioned with. AdiDeviceIdentity.Hardware.toJson and "
+            "DeviceIdentity have drifted apart."
+        )
+        return None
+
+    return DeviceIdentity.from_json(payload)
+
+
+def identityForNewSession(localAnisette: Any) -> dict:
+    """
+    The identity a **new** sign-in presents: this app's serial, and Java's machine.
+
+    Only for a new sign-in. Everything restored from a stored account keeps whatever it was
+    established with - see `identityForRestore`, and the warning at the top of this module.
+
+    The two halves are not the same kind of thing, which is why only one of them is asked for.
+    The serial is a label, chosen by this app and free to be the same on every install. The
+    machine is not a choice at all: it has to match what this particular install already told
+    Apple during ADI provisioning, so it is read rather than decided.
+
+    Returns keyword arguments for the provider, so a library that grows another identity field
+    fails loudly here instead of silently dropping it.
+    """
+    kwargs: dict = {"serial": APP_SERIAL}
+
+    identity = hardwareProfile(localAnisette)
+    if identity is not None:
+        kwargs["identity"] = identity
+
+    return kwargs
 
 
 def identityForRestore(previous: Any) -> dict:

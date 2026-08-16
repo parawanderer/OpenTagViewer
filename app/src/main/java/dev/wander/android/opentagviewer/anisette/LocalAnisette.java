@@ -34,10 +34,19 @@ import java.util.Map;
 public final class LocalAnisette implements AnisetteSource {
     private static final String TAG = "LocalAnisette";
 
-    private static final String PREFERENCES = "anisette-identity";
-    private static final String KEY_DEVICE_ID = "uniqueDeviceIdentifier";
-    private static final String KEY_ADI_ID = "adiIdentifier";
-    private static final String KEY_LOCAL_USER = "localUserUuid";
+    /**
+     * Where the identity lives.
+     *
+     * <p>Visible because this is a <b>storage contract with installs already in the field</b>,
+     * not an implementation detail. What is written here decides whether an upgrade keeps
+     * somebody signed in, and the only way to test that is to write the older shape and read it
+     * back - so the test names these rather than a copy of them, which would keep passing after
+     * the real ones moved.
+     */
+    public static final String PREFERENCES = "anisette-identity";
+    public static final String KEY_DEVICE_ID = "uniqueDeviceIdentifier";
+    public static final String KEY_ADI_ID = "adiIdentifier";
+    public static final String KEY_LOCAL_USER = "localUserUuid";
 
     /**
      * Which machine this install claims to be.
@@ -45,7 +54,7 @@ public final class LocalAnisette implements AnisetteSource {
      * <p>Added after the other three, so <b>its absence beside them is meaningful</b>: it marks
      * an install from before there was a choice, which can only have been the Mac.
      */
-    private static final String KEY_HARDWARE = "hardwareProfile";
+    public static final String KEY_HARDWARE = "hardwareProfile";
 
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
@@ -241,6 +250,26 @@ public final class LocalAnisette implements AnisetteSource {
             Log.w(TAG, "unknown stored hardware profile " + stored + ", using " + fallback);
             return fallback;
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Deliberately does not go through {@link #ensureReady}. A sign-in that falls back to a
+     * remote server needs this answer too, and it must be the <i>same</i> answer - which kind
+     * of Anisette produced a session is a transport detail, and a user whose local Anisette
+     * failed must not thereby become a different machine.
+     *
+     * <p>Reads the loaded identity when there is one, and otherwise reads - or, on a genuinely
+     * fresh install, writes - the persisted one. Generating it here rather than in
+     * {@link #load} is intentional: an install that only ever uses a remote server still has an
+     * identity, and it is the same one it will use if local Anisette is turned on later.
+     */
+    @Override
+    public synchronized String hardwareProfileJson() {
+        final AdiDeviceIdentity current =
+                this.identity != null ? this.identity : loadOrCreateIdentity();
+        return current.hardware().toJson();
     }
 
     /** Why local Anisette is not being used, or null if it is. */
