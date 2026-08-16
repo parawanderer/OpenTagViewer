@@ -129,11 +129,19 @@ Today's importer skips the unknown directory silently. What it needs:
 
 - The new directory in `AppleZipImporterUtil.MATCHERS`. Note the identifier is **not** a UUID -
   these come from files other tools wrote - so the existing v4-UUID regex does not apply.
-- Storage for a key-list accessory. `OwnedBeacon.content` assumes a plist; `accessoryJson` is
-  already FindMy.py's own JSON and is the natural home, but the fetch path calls
-  `FindMyAccessory.from_json` specifically and a custom tag is a `FixedRollingKeyPairAccessory`.
-- **A Room migration** if the schema moves - rule 1, and there is no going back from getting that
-  wrong.
+- ~~Storage for a key-list accessory... the fetch path calls `FindMyAccessory.from_json`
+  specifically.~~ **Done.** `main.accessoryFromJson` dispatches on FindMy.py's own `type` tag, and
+  everything else the fetch path touches - `keys_between`, `get_min_index`, `get_max_index`,
+  `update_alignment`, `to_json` - is on both classes already, so nothing downstream learns which
+  kind it has.
+- ~~**A Room migration** if the schema moves.~~ **It does not move.** `OwnedBeacons.content` is
+  already nullable in schema 3, so a key-list tag is a row with `accessory_json` set and `content`
+  NULL. No new column, no migration, and rule 1 does not come into it.
+
+  The risk moved rather than vanished: the read paths must tolerate a NULL plist.
+  `BeaconRepository` already does, but `BeaconDataParser` reads
+  `getOwnedBeaconInfo().content` straight into an XML parse, and a custom tag has no naming record
+  either - its display name is the `name` in its own mapping. That is where the work is.
 
 ## 5. The app becomes an exporter too — and then most people stop needing an export
 
@@ -267,44 +275,48 @@ support thread.
 
 ---
 
-## 6. Two smaller things
+## 6. Two smaller things — **mostly done**
 
-**The FindMy pin is out of step with itself.** `app/build.gradle.kts` installs the
-`feat/icloud-keychain-export` branch, while `app/src/test/python/requirements.txt` pins
-`FindMy==0.9.8`. Whatever `test_pinned_versions_match_the_app_build` is checking, it is not those
-two agreeing - so the bridge tests exercise a different library than the app ships. The exporter
-solved the same problem with a lockfile that records the resolved commit; the app still needs
-`@<sha>` appended before any build that leaves the machine, which its own comment already says.
+**~~The FindMy pin is out of step with itself.~~** Done, and then done again more widely. The app
+pins a commit in both `app/build.gradle.kts` and `app/src/test/python/requirements.txt`; the
+exporter, which tracked the branch and so drifted every time anybody pushed, now pins the same
+commit in `python/pyproject.toml`. `test_main.py::test_the_whole_repository_pins_one_findmy`
+asserts all four agree and names the file that does not.
 
-**The app registers as `0FINDMYPY001`.** Nothing passes a serial to FindMy.py, so the device the
-user sees in their Apple account list is named after the library rather than after this app -
-which is what [rule 11](../AGENTS.md) exists to prevent, and not what the docs describe. FindMy.py
-now takes `serial=` on the Anisette provider and defaults CloudKit to it, so this is a one-line
-fix at the point the provider is built, plus a decision that `0PENTAGVIEWR` is the app's. The
-exporter presents `0PENTAGXPORT`, deliberately different: two installs, two entries, each
-removable without breaking the other.
+The reason it is one pin and not two: **`opentagviewer_export` is shared code with two runtimes.**
+Chaquopy packages it into the APK, the exporter runs the same files from source, and one package
+behind two library versions breaks exactly one of its consumers on the first API difference.
 
-**And the entry has no name, which is the field a person reads first.** Nothing calls the
-`postdata` announce of
-[Stage 2 §7](./findmy-export/02-mobileme-delegate.md#7-naming-the-registered-device), so Apple
-names the row after whatever model the client claims - `MacBookPro18,3` shows up as a bare
-**"MacBookPro"**, sitting in a list of the user's real hardware with nothing to tell it apart.
-FindMy.py cannot do this at all today; the ask is written up in
-[findmy-py-device-name-request.md](./findmy-py-device-name-request.md). Target is
-**`OpenTagViewer App`**, with the exporter as `OpenTagViewer Exporter`.
+**~~The app registers as `0FINDMYPY001`.~~** Done. A new sign-in presents `0PENTAGVIEWR`, beside
+the exporter's `0PENTAGXPORT`. **New sessions only** - an account established before this keeps
+what it was bound to, because re-identifying an existing session costs that user a sign-in and
+leaves a second entry they never asked for. See `app/src/main/python/identity.py`.
 
-**Once name and serial are set, the model is only choosing an icon** - so the app should claim an
-iPhone and the desktop tool a Mac, which makes a device list readable at a glance. Two conditions
-on that:
+**The entry has no name, and it is not going to get one.** Naming the row needs the `postdata`
+announce of [Stage 2 §7](./findmy-export/02-mobileme-delegate.md#7-naming-the-registered-device),
+which authenticates with the `com.apple.gs.idms.hb` heartbeat token. That token arrives once, in
+the same set as the PET, and an account serialised before FindMy.py started keeping it has nothing
+to announce with - so for the installed base it does not work, and making it work means those
+users signing in again. **Not worth a re-login for a label**, and
+[findmy-py-device-name-request.md](./findmy-py-device-name-request.md) is therefore not being
+pursued for the app. The serial carries the recognisability instead.
 
-- **Do not switch the model on its own.** Today the app sends serial `"0"` and no name, so an
-  iPhone claim would produce an entry called "iPhone" with no serial, among the user's real
-  iPhones. Strictly worse than the Mac claim it has now. Model, name and serial land together or
-  not at all.
-- **All five strings move together.** Model, OS version, build, CFNetwork and Darwin describe one
-  real release - see [rule 11](../AGENTS.md) and
-  [Stage 1 §2.2](./findmy-export/01-authentication.md), which carries a worked set:
-  `iPhone15,2`, iOS `17.4`, build `21E219`, CFNetwork `1494.0.7`, Darwin `23.4.0`.
+**~~Once name and serial are set, the model is only choosing an icon.~~** Done, with the icon
+being the whole point: `iPhone15,2` renders as **"iPhone 14 Pro"** rather than as a bare
+"MacBookPro" among the user's real Macs. Both conditions were met -
+
+- **It did not switch on its own.** The serial landed in the same release, so the entry is an
+  iPhone *with* `0PENTAGVIEWR` on it rather than an unnamed, unserialled phone among real ones.
+- **All five strings moved together**, from the worked set in
+  [Stage 1 §2.2](./findmy-export/01-authentication.md): `iPhone15,2`, iOS `17.4`, build `21E219`,
+  CFNetwork `1494.0.7`, Darwin `23.4.0`.
+
+**And only for fresh installs.** An install that already has an ADI identity keeps the Mac it was
+provisioned as, forever - the two are one identity and Apple binds a session to it. That is
+`AdiDeviceIdentity.Hardware`, whose two profiles Python reads across the bridge rather than
+copying. [Rule 11](../AGENTS.md) has the longer version, including the trap that cost most of the
+time: FindMy.py transforms `X-Apple-I-MD-LU` and `X-Mme-Device-Id` on the way out and the Java ADI
+path does not, so passing "the same string" aligns one field and silently leaves the other as two.
 
 > **[observed] Claiming to be a phone does not make it a second factor.** A registered entry
 > presenting as an iPhone still reports *"This device cannot be used to receive Apple Account
@@ -312,8 +324,8 @@ on that:
 > [Stage 1 §13](./findmy-export/01-authentication.md) argued - so the icon change carries no risk
 > of turning this app into a second factor for someone's Apple ID.
 
-`AdiDeviceIdentity.CLIENT_INFO`'s comment used to justify its value as the least remarkable string
-Apple sees. That reasoning is gone: an entry built to be recognised is not blending in.
+`AdiDeviceIdentity.CLIENT_INFO` no longer exists; a compile-time constant could only ever be one
+thing for everyone, which is precisely what a per-install profile cannot be.
 
 **Build the disclosure text from the account, not from constants.** §7.1 of Stage 2 requires that
 the identifiers shown to the user are the ones actually sent - the whole point being that somebody
