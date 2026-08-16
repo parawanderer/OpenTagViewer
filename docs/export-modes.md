@@ -126,8 +126,13 @@ write anything.
 
 | Flow | Joins |
 | --- | --- |
-| One-off export, in the app or the wizard | **no** — recover keys, decrypt, write the zip, leave nothing |
-| Live tracking of your own account's tags | yes, and say so before doing it |
+| One-off export, in the **desktop tool** | **no** — recover keys, decrypt, write the zip, leave nothing |
+| Reading your own account's tags **in the app** | yes, and say so before doing it |
+
+**The app has no export-only mode**, and should not grow one. Reading the user's tags and
+joining are the same act there — joining is what stops it quietly ceasing to work — so they are
+not two questions to ask. A one-off export that writes nothing to the account is exactly what
+the desktop tool exists for.
 
 Bundling the join into sign-in would give every user who wanted a single export a peer in their
 keychain trust circle and an escrow record that **no Apple interface displays**, acquired without
