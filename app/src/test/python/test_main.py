@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import json
+import re
+
 import pytest
 
 import main
@@ -599,6 +601,53 @@ def test_a_session_that_still_works_restores_normally():
 # --------------------------------------------------------------------------
 # Guard against the test environment drifting from what the app ships
 # --------------------------------------------------------------------------
+
+# The four files spell the same pin four ways - `...FindMy.py@<sha>`, `?rev=<sha>#<sha>`, and
+# TOML's `{ git = "...FindMy.py", rev = "<sha>" }` - so this matches a full sha anywhere on a
+# line that names the repository, rather than one exact syntax. Deliberately not "any 40-hex
+# string in the file": uv.lock is full of other packages' revisions.
+_FINDMY_SHA = re.compile(r"FindMy\.py[^\n]{0,80}?([0-9a-f]{40})")
+
+
+def test_the_whole_repository_pins_one_findmy():
+    """
+    One repository, one FindMy.py - in the app build, the bridge tests, and the exporter.
+
+    **Because `opentagviewer_export` is shared code that runs under both.** Chaquopy packages it
+    into the APK, where it executes against the pin in `app/build.gradle.kts`, and the desktop
+    exporter runs the same files from source against `python/uv.lock`. Two commits of one library
+    behind one package is a bug waiting for the first API difference, and it would break exactly
+    one of the two consumers.
+
+    The exporter tracked the *branch*, so this drifted by construction: every `uv lock` picked up
+    whatever had been pushed since. A build was still reproducible - the lockfile records what it
+    resolved - but "which FindMy.py does this repository use" had two answers.
+
+    Three files, one sha. Moving it means moving all three.
+    """
+    root = Path(__file__).resolve().parents[3].parent
+
+    sources = {
+        "app/build.gradle.kts": root / "app" / "build.gradle.kts",
+        "app/src/test/python/requirements.txt": Path(__file__).resolve().parent
+        / "requirements.txt",
+        "python/pyproject.toml": root / "python" / "pyproject.toml",
+        "python/uv.lock": root / "python" / "uv.lock",
+    }
+
+    found = {}
+    for name, path in sources.items():
+        assert path.is_file(), f"{name} is missing - this test no longer checks what it thinks"
+        shas = set(_FINDMY_SHA.findall(path.read_text(encoding="utf-8")))
+        assert shas, f"{name} does not pin FindMy.py to a commit"
+        assert len(shas) == 1, f"{name} names more than one FindMy.py commit: {sorted(shas)}"
+        found[name] = shas.pop()
+
+    assert len(set(found.values())) == 1, (
+        "the repository pins more than one FindMy.py:\n"
+        + "\n".join(f"  {name}: {sha}" for name, sha in sorted(found.items()))
+    )
+
 
 def test_pinned_versions_match_the_app_build():
     """
