@@ -159,6 +159,95 @@ Worth knowing while building it: the app must present `0PENTAGVIEWR` and not the
 exporter never does — it may enrol as a peer rather than only recovering. That is the one place
 this stops being read-only, and it deserves its own decision rather than arriving as a side effect.
 
+## 7. The connection model, and the screens that express it
+
+Refinement to everything above, settled after the exporter shipped. **The app has two states and
+no third.**
+
+| | What it means |
+| --- | --- |
+| **Not connected** | Signed in to Apple, because fetching location reports needs an Apple ID whatever the tags are. Tags come from files the user imports. Nothing is read from their iCloud account and nothing is written to it. |
+| **Connected** | Also reads the tags in the user's own Apple account, which means it has joined the keychain trust circle. |
+
+**There is no export-only mode in the app.** A one-off export that touches nothing is what the
+desktop tool is for. In the app, "read my tags from my Apple account" and "join" are the same act
+— joining is what stops it quietly ceasing to work — so they are not two questions.
+
+The app can still *write* a bundle for someone else, but that is a thing a connected app can do,
+not a mode it runs in.
+
+### First run: two buttons, not four
+
+- **Fetch my tags from my Apple account**
+- **Import tags from a file**
+
+The obvious four collapse. **A bundle and a key file are the same button**: the app can tell them
+apart by looking, and `opentagviewer_export/keyfiles.py` already parses `.keys`, bare key lists,
+`findmy-custom-accessory.json` and `macless-haystack-devices.json`. A user with one AirTag and one
+self-generated tag is both cases at once anyway, so neither is a mode to be in.
+
+**Say what was found, not just that it worked.** "Imported 3 AirTags" against "imported 2
+self-generated tags" is how somebody who picked the wrong file finds out, and it is the natural
+place to say that a bundle is a snapshot rather than a live link.
+
+**Every path signs in.** Copy that implies importing a file avoids needing an Apple account will
+produce a fresh crop of issues shaped exactly like #19.
+
+### "Shared with me in Find My" is not a fourth option — it is the first one failing
+
+A tag can only be registered by an iPhone or iPad, so an account with no device on it owns no
+tags. Somebody choosing *fetch my tags* and finding nothing is almost always a person whose friend
+shared tags with them in Apple's own Find My. That sharing does not carry key material — see
+[export-modes.md](./export-modes.md) — so there is nothing to fetch and never will be.
+
+Catch it where it happens rather than asking users to classify themselves up front:
+
+> **No tags owned by this account**
+>
+> Tags are registered by an iPhone or iPad, and only that account can unlock them. This account
+> has no device that can.
+>
+> **If a friend shared their tags with you in Find My**, that sharing does not include the keys
+> this app needs. Ask them to export a bundle for you, and import it here.
+
+Then drop them into the import path. The sold-or-wiped-device case reaches the same screen and
+needs no branch of its own — that user still has Apple's own routes to restore keychain access.
+
+### Settings: one switch
+
+**Read my tags from my Apple account — on or off.** On joins. There is no separate "stay
+connected" question, because users do not distinguish it from being connected at all, and no
+third state on the screen.
+
+Turning it off should say what it does not undo: it stops reading the tag list, and it does not
+remove the entry from the user's Apple device list. That removal is theirs to do, in Apple's
+interface.
+
+### The one prompt that interrupts a connected app
+
+Once joined, key rotation is handled — a member is given the new keys. So the only thing that
+breaks a working connection is the user changing something in Apple's own interface: **removing
+OpenTagViewer from their device list**, or **resetting iCloud Keychain**. Section 6.7.1 of
+[the Stage 3 spec](./findmy-export/03-keychain-trust.md) says the same.
+
+Both are deliberate acts elsewhere, so the copy can be specific:
+
+> **Your Apple account no longer recognises OpenTagViewer.** This usually means it was removed
+> from your device list. Enter the passcode of one of your Apple devices to reconnect.
+
+Which is the argument for naming the entry — `0PENTAGVIEWR` — on the connect screen in the first
+place. It gets removed because the row looked unfamiliar next to *"If you do not recognise this
+device"*.
+
+### Two passcodes, and only one of them is new
+
+The **device passcode** is an existing iPhone PIN or Mac login password, used to recover the
+keychain. The passcode the user **chooses** seals this client's own recovery record, and exists
+only on the connected path. Neither is the Apple ID password, and saying so on the screen saves a
+support thread.
+
+---
+
 ## 6. Two smaller things
 
 **The FindMy pin is out of step with itself.** `app/build.gradle.kts` installs the
