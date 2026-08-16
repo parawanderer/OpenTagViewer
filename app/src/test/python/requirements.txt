@@ -4,7 +4,12 @@
 # block), otherwise the tests exercise a different library version than the app
 # actually ships. test_main.py::test_pinned_versions_match_the_app_build asserts
 # they stay in sync.
-FindMy==0.9.8
+#
+# FindMy is the fork, at the same commit the app builds against. It said
+# `FindMy==0.9.8` here for as long as the app built the fork, so every bridge test
+# ran against a library the app does not ship - which is not a small difference:
+# the fork's Anisette providers take `serial=` and PyPI's do not.
+git+https://github.com/parawanderer/FindMy.py@acd17c507b63e8bd0e56d8b4c5a92c096050bfa3
 NSKeyedUnArchiver==1.5
 
 pytest>=8.0
