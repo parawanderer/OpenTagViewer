@@ -271,19 +271,23 @@ chaquopy {
             // TEMPORARY: a fork, until the iCloud keychain export work is merged upstream
             // and released to PyPI. Then this goes back to a plain `install("FindMy==<x>")`.
             //
-            // A branch, deliberately, while that branch is under active development - a
-            // commit pin would need moving on every change to it. The cost is that the build
-            // is not reproducible: two builds of the same commit of *this* repo can ship
-            // different Python. Acceptable now, not acceptable to release.
+            // **A commit, not a branch.** It used to track the branch head, which meant two
+            // builds of the same commit of *this* repo could ship different Python - and,
+            // worse, that the bridge tests ran against whatever PyPI's `FindMy==0.9.8` was
+            // while the app shipped the fork. Those are different libraries: `serial=` on the
+            // Anisette providers exists in one and not the other, so the tests could pass on
+            // code the app cannot run, and did.
             //
-            // **Pin to a commit before any build that leaves this machine**, by appending
-            // `@<sha>` in place of the branch name.
+            // Bumping it is now a deliberate act. Move this and the matching line in
+            // `app/src/test/python/requirements.txt` together - they are asserted to agree by
+            // test_main.py::test_pinned_versions_match_the_app_build, which previously could
+            // not see this line at all because it only understood `name==version`.
             //
             // Note for whoever bumps it: 0.10.x adds protobuf, which publishes a native
             // wheel for desktop platforms and a pure-Python `py3-none-any` one as well.
             // There is no Android wheel, so pip falls back to the pure-Python build - which
             // is correct but markedly slower. The messages here are small enough not to care.
-            install("git+https://github.com/parawanderer/FindMy.py@feat/icloud-keychain-export")
+            install("git+https://github.com/parawanderer/FindMy.py@acd17c507b63e8bd0e56d8b4c5a92c096050bfa3")
 
             install("NSKeyedUnArchiver==1.5")
         }
