@@ -275,7 +275,16 @@ def exportToString(account: AppleAccount) -> str:
     Replaces the old account.export() pattern. In FindMy 0.9.x, AppleAccount uses to_json/from_json.
     The returned dict (AccountStateMapping) embeds the anisette provider state, so the
     server URL no longer needs to be supplied at restore time.
+
+    The login state is logged on the way out. A stored account that is not LOGGED_IN fails
+    every later fetch inside FindMy.py's own state check, before any request reaches Apple -
+    see issue #43, where an account was somehow persisted as REQUIRE_2FA and stayed that way
+    across a reinstall. Logging it here and at restore is what tells a bad *write* apart from
+    a bad *read*, and it is the only evidence anyone can produce: the stored account holds the
+    Apple ID password and is encrypted under a key that never leaves the device, so a user
+    cannot hand it over and should not be asked to. A state name is not sensitive.
     """
+    print(f"Storing account, login state: {account.login_state}")
     return json.dumps(account.to_json())
 
 
@@ -394,7 +403,15 @@ def getAccount(
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)
 
-        print(f"Login State: {acc.login_state}")
+        print(f"Restored account, login state: {acc.login_state}")
+        if acc.login_state != LoginState.LOGGED_IN:
+            # Worth saying plainly rather than leaving to the traceback that follows minutes
+            # later from somewhere else entirely. This is the state that makes every fetch
+            # raise InvalidStateError with nothing sent.
+            print(
+                "Restored account is NOT logged in - every report fetch will fail its state "
+                "check before any request is made. See issue #43."
+            )
 
         return acc
     except Exception:
@@ -871,4 +888,46 @@ def getReports(
     except Exception:
         err = traceback.format_exc()
         print(f"Failed to fetch all reports due to error: {err}")
+        return None
+
+
+def identifyHardware(plistXml: str) -> str | None:
+    """
+    Say what an accessory is, from the `OwnedBeacons` plist the app already holds.
+
+    **The heuristic lives in `opentagviewer_export.hardware`, not here and not in Java.** It is
+    guesswork over half a dozen fields - product and vendor ids, the model, the shape of
+    `stableIdentifier` - and the same guesswork runs in the desktop exporter when it asks which
+    accessories to export. Two copies of it would drift, and the symptom of drift is one tag
+    described as an AirTag in one place and as a hex number in the other.
+
+    Returns None when nothing recognises the record, which is a real answer: the caller should
+    then show what it already has rather than a guess.
+
+    :param plistXml: The accessory's plist, as the app stores it.
+    """
+    try:
+        from opentagviewer_export.hardware import identify
+
+        return identify(util_files.read_data_plist(plistXml.encode("utf-8")))
+    except Exception:
+        # Never fatal: this is a label. An import failing here should cost a nicer row in a list,
+        # not the accessory.
+        print(f"identifyHardware failed, carrying on without it: {traceback.format_exc()}")
+        return None
+
+
+def whereToLookUpHardware(plistXml: str) -> str | None:
+    """
+    How the user could find out what an unrecognised accessory is, in one line.
+
+    Offered rather than guessed at - see `opentagviewer_export.hardware.where_to_look_up`. Returns
+    None when there is nothing worth saying, which is the common case.
+    """
+    try:
+        from opentagviewer_export.hardware import where_to_look_up
+
+        return where_to_look_up(util_files.read_data_plist(plistXml.encode("utf-8")))
+    except Exception:
+        print(f"whereToLookUpHardware failed, carrying on without it: {traceback.format_exc()}")
         return None

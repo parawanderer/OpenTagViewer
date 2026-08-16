@@ -63,6 +63,13 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
         }
     };
 
+    /**
+     * The database file's name, which is also read directly - see
+     * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
+     * user from a returning one before anything has opened the database.
+     */
+    public static final String DATABASE_NAME = "opentagviewer-db";
+
     public static OpenTagViewerDatabase getInstance(Context context) {
         // Singleton pattern for single-process apps: https://developer.android.com/training/data-storage/room#java
 
@@ -70,7 +77,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
             INSTANCE = Room.databaseBuilder(
                     context,
                     OpenTagViewerDatabase.class,
-                    "opentagviewer-db")
+                    DATABASE_NAME)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build();
         }

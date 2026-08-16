@@ -13,5 +13,5 @@
     android:focusable="true"
     android:scaleType="centerCrop"
     app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.OpenTagViewer.Circle"
-    app:strokeColor="@color/md_theme_outlineVariant"
+    app:strokeColor="?attr/colorOutlineVariant"
     app:strokeWidth="1dp" />

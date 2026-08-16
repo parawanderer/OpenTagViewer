@@ -1,0 +1,79 @@
+# Translation, tooling and type checks. Everything here is cheap and needs no Android.
+#
+# It used to live in build-debug.yml, next to the emulator. GitHub filters paths per workflow
+# and not per job, so the two shared one trigger: `scripts/**` had to be listed because the
+# Android build shells out to two files in there, and the effect was that editing any script -
+# or a docstring in one - booted an emulator for twenty minutes to prove nothing.
+#
+# Split so each can say what it actually depends on. This one watches everything it checks;
+# build-debug.yml watches the Android build's own inputs, naming the two scripts it uses rather
+# than the whole directory.
+name: Static checks
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "pyrightconfig.json"
+      - ".flake8"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "pyrightconfig.json"
+      - ".flake8"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # Cheap and dependency-free, so it runs on its own and reports in seconds rather than
+  # after an emulator boot. A string missing from a locale fails nothing on its own - the
+  # build succeeds and the app looks correct to anyone reading the language it was written
+  # in - so without this it is only ever found by a user seeing English.
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check every locale has every string
+        run: python scripts/add_strings.py --check
+
+      # These scripts gate other checks - add_strings.py gates the step above, and
+      # release_version.py gates the exporter and Android releases - so a bug in one of them reports
+      # green while protecting nothing.
+      - name: Test the tooling in scripts/
+        run: |
+          python -m pip install pytest
+          python -m pytest scripts/test -v
+
+      # pyright rather than mypy: the editors used on this project run Pylance, which is
+      # pyright, and mypy's defaults are lenient enough to pass code Pylance flags.
+      #
+      # Scoped to the two clean trees. python/ (the desktop exporter) has its own checks in
+      # macos-scripts-python.yml.
+      #
+      # main.py imports findmy and NSKeyedUnArchiver, so those have to be installed first or
+      # every one of them is reported as an unresolved import and the check means nothing.
+      #
+      # Run through pip rather than an action so this is the identical command CONTRIBUTING.md
+      # tells contributors to run locally.
+      # Pillow is only used by make_debug_launcher_icon.py, and that script degrades
+      # gracefully without it. Installed rather than silenced so pyright actually checks the
+      # file instead of skipping it.
+      - name: Type-check Python with pyright
+        run: |
+          python -m pip install pyright==1.1.411 pillow
+          python -m pip install -r app/src/test/python/requirements.txt
+          python -m pyright app/src/main/python scripts

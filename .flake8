@@ -1,3 +1,19 @@
 [flake8]
 max-line-length = 120
 max-complexity = 10
+
+# flake8's own default exclusions do not cover a virtualenv, and `uv sync` puts one inside
+# python/. Without this, linting ./python walks site-packages and reports hundreds of findings in
+# other people's code - including under the E9/F63/F7/F82 selection that CI treats as fatal.
+extend-exclude = .venv,venv,build,dist
+
+# The shared package re-exports its public names lazily, through a module-level __getattr__, so
+# the imports in its TYPE_CHECKING block exist only for editors and type checkers. flake8 cannot
+# see the connection and reports every one of them as unused.
+#
+# Both spellings, because flake8 matches the path as it was walked: from the repository root - as
+# CI does, to pick up this file - it is python/opentagviewer_export/..., and from python/, as a
+# person iterating does, it is opentagviewer_export/... with no leading segment for */ to match.
+per-file-ignores =
+    */opentagviewer_export/__init__.py:F401
+    opentagviewer_export/__init__.py:F401

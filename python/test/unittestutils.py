@@ -1,7 +1,7 @@
 import pytest
 import os
 
-from main.utils import (
+from exporter.utils import (
     DARWIN,
     MACOS_VER,
     SYSTEM,

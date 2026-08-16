@@ -6,9 +6,11 @@ import android.util.Log;
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.chaquo.python.android.PyApplication;
+import com.google.android.material.color.DynamicColors;
 
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 
 public class OpenAirTagApplication extends PyApplication {
     private static final String TAG = OpenAirTagApplication.class.getSimpleName();
@@ -22,6 +24,110 @@ public class OpenAirTagApplication extends PyApplication {
         this.initAMapPrivacyCompliance();
 
         this.setupTheme();
+        this.setupSystemColors();
+    }
+
+    /**
+     * Whether to colour activities from the user's wallpaper.
+     *
+     * <p>Read by the precondition below every time an activity is created, which is what lets
+     * the Settings switch take effect in both directions. Volatile because it is written from
+     * the UI thread and read during activity creation.
+     */
+    private static volatile boolean useSystemColors = false;
+
+    /**
+     * Arranges for activities to be coloured from the user's wallpaper when they have asked
+     * for that.
+     *
+     * <p>Registration happens unconditionally and exactly once, because it cannot be undone -
+     * {@code applyToActivitiesIfAvailable} adds an {@code ActivityLifecycleCallbacks} to the
+     * process and Material offers no way to remove it. Registering with a <b>precondition</b>
+     * instead of registering conditionally is what makes turning the setting back off work:
+     * the precondition is consulted per activity, so a recreated activity picks up the
+     * current answer rather than the one that was true at startup.
+     *
+     * <p>It must also happen before the first activity is created, since the callback only
+     * sees activities created after it. That includes the login screen, which is the first
+     * thing a new user sees and the one they cannot reach Settings from.
+     *
+     * <p>Reading the setting synchronously here is what {@link #setupTheme()} already does,
+     * and for the same reason: there is nothing drawing yet to block.
+     *
+     * <p>The version check is left to Material, whose registration is a no-op below Android
+     * 12. The Settings entry is hidden there, so the flag should never be set on such a
+     * device - but a value can arrive from a backup restore, and being defensive is cheaper
+     * than reasoning about it.
+     */
+    private void setupSystemColors() {
+        try {
+            var repository = new UserSettingsRepository(
+                    UserSettingsDataStore.getInstance(this.getApplicationContext()));
+
+            final Boolean stored = repository.getUserSettings().getUseSystemColors();
+
+            if (stored != null) {
+                useSystemColors = stored;
+            } else {
+                // Nobody has chosen. A first install should look like the phone it is on; an
+                // update should look like it did yesterday. See UserSettings.useSystemColors.
+                useSystemColors = this.isFirstRun();
+
+                // Recorded now so the answer does not change out from under the user later:
+                // the database appears as soon as anything reads it, so isFirstRun() is only
+                // ever true during this one launch, and an unresolved setting would silently
+                // flip their app back to the app palette on the next.
+                var async = repository.storeUseSystemColors(useSystemColors)
+                        .subscribe(() -> { },
+                                error -> Log.e(TAG, "Could not record the system colours default", error));
+            }
+        } catch (Exception e) {
+            // The app's own palette is a working fallback, and a theme is not worth failing
+            // to start over.
+            Log.e(TAG, "Failed to read the system colours setting; keeping the app palette", e);
+            useSystemColors = false;
+        }
+
+        DynamicColors.applyToActivitiesIfAvailable(
+                this, (activity, themeResId) -> useSystemColors);
+
+        Log.i(TAG, "System colours available=" + DynamicColors.isDynamicColorAvailable()
+                + " enabled=" + useSystemColors);
+    }
+
+    /**
+     * Whether nobody has used this app on this device yet.
+     *
+     * <p>The signal is whether the database file exists. Room creates it the first time anything
+     * reads from it, so it is absent only before the first run has got as far as looking at a
+     * beacon or a session - which is exactly "new user".
+     *
+     * <p>Package install timestamps were tried first and are wrong for this. They answer "was
+     * this package ever updated", not "has this person used the app". Clearing the app's data
+     * leaves both timestamps untouched, so somebody starting over - or a developer with
+     * "clear app data before launch" set - is reported as an existing user and quietly gets the
+     * old default. The database is a property of the data, so it follows the data.
+     *
+     * <p>Errs towards {@code false} - the app palette - because that is the answer that changes
+     * nothing for somebody who already had the app.
+     */
+    private boolean isFirstRun() {
+        try {
+            return !this.getDatabasePath(OpenTagViewerDatabase.DATABASE_NAME).exists();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not tell whether this is a first run", e);
+            return false;
+        }
+    }
+
+    /**
+     * Switches wallpaper colouring on or off for activities created from now on.
+     *
+     * <p>Callers are expected to recreate whatever is on screen; everything behind it is
+     * recreated by Android when it returns to the foreground.
+     */
+    public static void setUseSystemColors(final boolean enabled) {
+        useSystemColors = enabled;
     }
 
     /**

@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
+        <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
@@ -14,6 +15,8 @@
         <variable name="onClickMapProvider" type="Runnable" />
         <variable name="currentMapProvider" type="String" />
         <variable name="isDebugDataEnabled" type="boolean" />
+        <variable name="isSystemColorsSupported" type="boolean" />
+        <variable name="isSystemColorsEnabled" type="boolean" />
     </data>
 
     <LinearLayout
@@ -57,6 +60,65 @@
                 app:title="@{@string/theme}"
                 app:onClick="@{onClickTheme}"
                 />
+
+            <!--
+                Hidden rather than disabled below Android 12: wallpaper colours do not exist
+                there, and a switch that cannot be moved invites people to work out why.
+            -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="22dp"
+                android:paddingTop="10dp"
+                android:paddingRight="22dp"
+                android:paddingBottom="10dp"
+                android:visibility="@{isSystemColorsSupported ? View.VISIBLE : View.GONE}">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:contentDescription="@null"
+                    app:srcCompat="@drawable/palette_24px" />
+
+                <!--
+                    Title and subtitle are TextViews rather than the switch's own label, so the
+                    row matches settings_item_clickable exactly. A MaterialSwitch draws its text
+                    in Material's type, which next to the Nunito rows above it reads as a
+                    different size and weight.
+                -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/nunito_semi_bold"
+                        android:text="@string/use_system_colors"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/use_system_colors_description"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/settings_app_use_system_colors"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="12dp"
+                    android:checked="@{isSystemColorsEnabled}"
+                    android:contentDescription="@string/use_system_colors"
+                    android:enabled="true" />
+            </LinearLayout>
 
             <include
                 android:id="@+id/setting_app_language"

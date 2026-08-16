@@ -35,3 +35,9 @@ tmp/
 # in - none of which belongs to anybody else working on this.
 /.idea/androidTestResultsUserPreferences.xml
 /.idea/deploymentTargetSelector.xml
+
+# Fixture-investigation notebook. Its whole job is decoding real exports, so its saved cell
+# outputs contain the very things the fixtures under app/src/test/resources/ exist to have
+# stripped: device names ("<person>'s iPad"), record UUIDs, key material. Committing it would
+# publish, in a notebook, exactly what was redacted out of the plists next to it.
+scripts/plist_explorer.ipynb

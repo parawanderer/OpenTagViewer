@@ -22,7 +22,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_bold"
                 android:text="@string/language"
-                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <include layout="@layout/language_input" />
@@ -43,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_bold"
                 android:text="@string/map_provider"
-                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <include layout="@layout/map_provider_input" />
@@ -79,7 +79,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="@string/anisette_login_needs_server"
-            android:textColor="@color/md_theme_outline"
+            android:textColor="?attr/colorOutline"
             android:textSize="13sp"
             android:visibility="gone" />
 
@@ -96,7 +96,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_bold"
                 android:text="@string/anisette_server_url"
-                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -112,7 +112,7 @@
                     android:layout_weight="0"
                     android:visibility="gone"
                     app:srcCompat="@drawable/check_circle_24px_fill"
-                    app:tint="@color/md_theme_outline" />
+                    app:tint="?attr/colorOutline" />
 
                 <ImageView
                     android:id="@+id/anisetteServerUrlErrorIcon"
@@ -121,7 +121,7 @@
                     android:layout_weight="0"
                     android:visibility="gone"
                     app:srcCompat="@drawable/warning_24px_fill"
-                    app:tint="@color/md_theme_error" />
+                    app:tint="?attr/colorError" />
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/anisetteServerUrlProgressIndicator"
@@ -131,7 +131,7 @@
                     app:hideAnimationBehavior="inward"
                     app:indicatorSize="21dp"
                     app:showAnimationBehavior="inward"
-                    app:trackColor="@color/md_theme_surfaceVariant_highContrast"
+                    app:trackColor="?attr/colorSurfaceVariant"
                     app:trackCornerRadius="2dp"
                     />
 

@@ -162,12 +162,12 @@ fi
 # ---------------------------------------------------------------------------------------
 # 5. Run it.
 #
-# PYTHONPATH=. is required: wizard.py does `from main.airtag_decryptor import ...`, and
-# running the file directly puts python/main on sys.path rather than python/.
+# PYTHONPATH=. is required: wizard.py does `from exporter.airtag_decryptor import ...`, and
+# running the file directly puts python/exporter on sys.path rather than python/.
 # ---------------------------------------------------------------------------------------
 say "Starting the export wizard"
 echo "    Checkout: $DEST ($(git -C "$DEST" rev-parse --abbrev-ref HEAD))"
-echo "    Re-run later with: cd $DEST/python && . .venv/bin/activate && PYTHONPATH=. python3 main/wizard.py"
+echo "    Re-run later with: cd $DEST/python && . .venv/bin/activate && PYTHONPATH=. python3 exporter/wizard.py"
 echo
 
-PYTHONPATH=. python3 main/wizard.py
+PYTHONPATH=. python3 exporter/wizard.py

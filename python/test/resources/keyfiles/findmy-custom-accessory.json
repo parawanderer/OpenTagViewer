@@ -1,0 +1,9 @@
+{
+  "type": "custom_rolling_key_accessory",
+  "private_keys": [
+    "82838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d",
+    "aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5"
+  ],
+  "name": "Keys (FindMy.py)",
+  "identifier": "keys-findmy"
+}
