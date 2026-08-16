@@ -414,9 +414,26 @@ class TestNamingThisDeviceInTheAccountList:
 
         assert account.announced == 1
 
+    def test_an_upgrade_from_before_naming_existed_is_named(self, tmp_path, monkeypatch):
+        """
+        The case the first attempt at this got wrong, and the one that matters most.
+
+        Everybody already running the exporter has a stored identity and no name. Gating on "is
+        there an identity" therefore skipped exactly the people the naming was added for, and the
+        feature would have been invisible to every existing user while looking like it worked.
+        """
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+        # An identity written by a version that could not name anything.
+        icloud.device.save("uid-1", "devid-1", {"type": "aniLocal"}, identity)
+        account = FakeNamedAccount()
+
+        asyncio.run(icloud.remember(account))
+
+        assert account.announced == 1
+
     def test_a_later_run_does_not_name_itself_again(self, tmp_path, monkeypatch):
-        # Announcing writes to the user's account. Once the identity is stored this installation
-        # has registered before, so there is nothing new to name and nothing to write.
+        # Announcing writes to the user's account, so once it is done there is nothing to say.
         identity = tmp_path / "device-identity.json"
         monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
 
@@ -445,6 +462,21 @@ class TestNamingThisDeviceInTheAccountList:
 
         assert account.announced == 1
         assert icloud.device.load(identity) is not None
+
+    def test_a_failure_is_tried_again_next_run(self, tmp_path, monkeypatch):
+        # Recording a failed announce as done would leave the entry unnamed forever, with nothing
+        # to say why and no way to retry short of deleting the file.
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+
+        asyncio.run(icloud.remember(FakeNamedAccount(fail=True)))
+        assert icloud.device.load(identity)["announced"] is False
+
+        second = FakeNamedAccount()
+        asyncio.run(icloud.remember(second))
+
+        assert second.announced == 1
+        assert icloud.device.load(identity)["announced"] is True
 
 
 class TestOneName:

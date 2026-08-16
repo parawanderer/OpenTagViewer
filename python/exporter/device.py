@@ -37,7 +37,7 @@ FILENAME = "device-identity.json"
 # Everything this file may contain. A key outside this set is a bug or a change upstream, and
 # either way the file is not written - the point of keeping it is that it holds nothing sensitive,
 # and a check is worth more than an intention.
-_ALLOWED = frozenset({"uid", "devid", "anisette"})
+_ALLOWED = frozenset({"uid", "devid", "anisette", "announced"})
 
 # Nothing named like this reaches disk, whatever else changes. Belt and braces with `_ALLOWED`,
 # because the anisette mapping comes from a library and its shape is not this project's to fix.
@@ -82,15 +82,28 @@ def load(path: Path | None = None) -> dict[str, Any] | None:
     return stored
 
 
-def save(uid: str, devid: str, anisette: Any, path: Path | None = None) -> None:
+def save(
+    uid: str,
+    devid: str,
+    anisette: Any,
+    path: Path | None = None,
+    *,
+    announced: bool = False,
+) -> None:
     """
     Store the identity for next time.
 
     Never raises either. Failing to save costs a new device-list entry on the next run; failing an
     export that has already succeeded costs the export.
+
+    :param announced: Whether this installation has told Apple what to call itself. Recorded
+        rather than inferred from the file existing, because those two stopped meaning the same
+        thing the moment naming was added: every user who had already run the exporter had an
+        identity and no name, and treating "has an identity" as "has been named" left exactly
+        those people - all of the existing ones - with an entry still called `MacBook Pro`.
     """
     path = path or identity_path()
-    document = {"uid": uid, "devid": devid, "anisette": anisette}
+    document = {"uid": uid, "devid": devid, "anisette": anisette, "announced": announced}
 
     try:
         _only_identity(document)
