@@ -692,6 +692,21 @@ as `service:token:absoluteExpiry`; the live run returned two fields, not three, 
 the one-year default like everything else. Trust the field count you actually receive rather
 than any documented layout, this one included.
 
+> ### Keep the heartbeat token, not just the PET
+>
+> **It arrives once and cannot be asked for again.** `com.apple.gs.idms.hb` comes back in the same
+> token set as the PET and nowhere else, so a login that keeps the PET and discards the rest has
+> silently thrown away the credential for every GSA endpoint that wants it — including the device
+> announce of [Stage 2 §7](./02-mobileme-delegate.md#7-naming-the-registered-device), whose whole
+> purpose is to make the registered device recognisable to the user.
+>
+> The failure lands nowhere near the cause: the login succeeds, the account works, and something
+> much later fails to build an `X-Apple-HB-Token` for a request it cannot make. It has to survive
+> the transition to `LOGGED_IN` and be written into any serialised account.
+>
+> **An account restored from a file written before it was kept has no way to get one**, short of
+> logging in again. Worth saying so plainly at restore rather than failing at the request.
+
 **[observed] The first field of the PET is not a service name.** Service tokens key themselves
 by their own first field, but the PET's is an account identifier — so it must be filed under
 `com.apple.gs.idms.pet` by the code, not by what the header says.
