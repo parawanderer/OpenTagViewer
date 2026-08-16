@@ -164,4 +164,7 @@
 
 タグと位置履歴はこの端末に残っています。失われたものはありません。</string>
     <string name="ok">OK</string>
+    <string name="custom_tag">自作タグ</string>
+    <string name="custom_tag_explained">OpenHaystack 方式のタグです。鍵は作成者が生成したもので、Apple アカウントに登録されたことがありません。そのため Apple 由来の名前・絵文字・バッテリー残量はありません。以下でご自身で設定してください。</string>
+    <string name="custom_tag_keys_remaining">事前生成された鍵 %1$d 個</string>
 </resources>

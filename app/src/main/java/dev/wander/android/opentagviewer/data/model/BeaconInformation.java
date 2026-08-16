@@ -198,4 +198,27 @@ public class BeaconInformation {
     public boolean isAirTag() {
         return this.productId == AIRTAG_PRODUCT_ID;
     }
+
+    /**
+     * Whether this tag was generated rather than paired - OpenHaystack-style.
+     *
+     * <p>Set at construction rather than inferred, unlike {@link #isAirTag()} and
+     * {@link #isIpad()}, which guess from a plist field. There is nothing to guess from here:
+     * a self-generated tag has no plist, no product id and no vendor id, so every heuristic on
+     * this class returns false for it and would go on saying "Unknown" forever.
+     */
+    private final boolean customAccessory;
+
+    /**
+     * How many pre-generated keys it carries, or 0 if that could not be read.
+     *
+     * <p>Shown because it is the one number that says something real about this kind of tag:
+     * the keys are a finite list rather than a rolling derivation, so it will stop being
+     * findable once they run out. An Apple-paired tag has no equivalent.
+     */
+    private final int customAccessoryKeyCount;
+
+    public boolean isCustomAccessory() {
+        return this.customAccessory;
+    }
 }
