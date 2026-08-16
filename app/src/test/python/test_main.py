@@ -465,23 +465,57 @@ def test_getAccount_refuses_local_anisette():
 
 def test_pinned_versions_match_the_app_build():
     """
-    These tests only mean anything if they run against the same library version
-    Chaquopy installs into the APK. Keeps requirements.txt honest.
+    These tests only mean anything if they run against the same library the APK ships.
+
+    **Every install, not just the `name==version` ones.** This used to match only that
+    shape, so the line installing FindMy from a git branch was invisible to it - and
+    requirements.txt said `FindMy==0.9.8` from PyPI while the app built the fork, for as
+    long as both were true. That is not a version skew, it is a different library: the
+    fork's Anisette providers take `serial=` and PyPI's do not, so a bridge test could
+    pass on code the app is unable to run.
     """
     import re
 
     gradle = (Path(__file__).resolve().parents[3] / "build.gradle.kts").read_text(encoding="utf-8")
     requirements = (Path(__file__).resolve().parent / "requirements.txt").read_text(encoding="utf-8")
 
-    installed = dict(re.findall(r'install\("([A-Za-z_][\w.-]*)==([\d.]+)"\)', gradle))
-    required = dict(re.findall(r'^([A-Za-z_][\w.-]*)==([\d.]+)', requirements, re.MULTILINE))
+    # Comments first: the block above these installs explains what to put here using an
+    # `install("FindMy==<x>")` of its own, and a scan that cannot tell code from prose
+    # fails on the documentation telling you how to fix it.
+    #
+    # Whole comment lines only. Splitting each line on "//" also splits `https://`, which
+    # silently truncates the one install this test exists to check - the failure being
+    # that everything passes. That is the same blindness as the bug being fixed here, so
+    # it is worth the two extra characters of care.
+    code = "\n".join(
+        line for line in gradle.splitlines() if not line.lstrip().startswith("//")
+    )
+
+    # Every string literal handed to install(). The unicorn stub is passed as a file path
+    # rather than a literal, so it is not caught here and does not need to be.
+    installed = re.findall(r'install\("([^"]+)"\)', code)
 
     assert installed, "could not find any pinned pip installs in build.gradle.kts"
 
-    for package, version in installed.items():
-        assert package in required, (
-            f"{package} is installed by Chaquopy but not pinned in requirements.txt"
-        )
-        assert required[package] == version, (
-            f"{package} is {version} in build.gradle.kts but {required[package]} in requirements.txt"
-        )
+    required_lines = [
+        line.strip() for line in requirements.splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+
+    for spec in installed:
+        if spec.startswith("git+"):
+            # Compared whole, including the ref: a bare URL, or one at a branch, means the
+            # two sides can silently diverge again the moment somebody pushes to it.
+            assert "@" in spec.rsplit("/", 1)[-1], (
+                f"{spec} installs from git without pinning a commit - two builds of this"
+                " repo would ship different Python"
+            )
+            assert spec in required_lines, (
+                f"build.gradle.kts installs {spec}, which requirements.txt does not"
+            )
+        else:
+            package, _, version = spec.partition("==")
+            assert version, f"{spec} in build.gradle.kts is not pinned to a version"
+            assert f"{package}=={version}" in required_lines, (
+                f"{package} is {version} in build.gradle.kts but not in requirements.txt"
+            )
