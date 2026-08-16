@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">This export could not be read. It may be incomplete, or made by a newer version of the exporter.</string>
     <string name="import_failed_no_tags">This export does not contain any tags, so there is nothing to import.</string>
     <string name="import_failed_unreadable">That file could not be opened. Choose it again.</string>
+    <string name="bundle_locked_title">This bundle is locked</string>
+    <string name="bundle_locked_message">Enter the code the exporter showed when it made this file. Capital letters, spaces and dashes do not matter.</string>
+    <string name="bundle_locked_hint">Unlock code</string>
+    <string name="bundle_unlock">Unlock</string>
+    <string name="import_failed_wrong_passcode">That code did not open the bundle. Check it against the one the exporter showed.</string>
+    <string name="import_failed_locked">This bundle is locked and no code was entered.</string>
+    <string name="bundle_passcode_malformed">A code is made of digits and letters only.</string>
 </resources>

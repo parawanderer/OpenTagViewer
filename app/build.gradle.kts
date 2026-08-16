@@ -334,6 +334,7 @@ dependencies {
     // 参考文档：https://lbs.amap.com/api/android-sdk/gettingstarted
     // 注意：3D地图SDK已包含定位功能，无需单独引入location SDK
     implementation(libs.amap.map3d)
+    implementation(libs.zip4j)
 
     testImplementation(libs.junit)
     testImplementation(libs.android.room.testing)

@@ -72,24 +72,36 @@ remembering: a wrong name is believed, a hex number gets looked up.
 Keep `isAirTag()` if something depends on the boolean - it agrees with the shared version by
 construction.
 
-## 3. Read a locked bundle
+## 3. Read a locked bundle — **done**
 
 **The exporter locks bundles by default** (AES-256, WinZip scheme, a generated 12-character code).
 `java.util.zip.ZipInputStream` in `AppleZipImporterUtil` cannot decrypt anything at all - not AES,
-not the legacy ZipCrypto - so a locked bundle currently fails to import with a message about the
-zip rather than about a missing code.
+not the legacy ZipCrypto - so a locked bundle used to fail to import with a message about the zip
+rather than about a missing code.
 
-What this needs:
+What it took, and what to know if you touch it:
 
-- **zip4j**, or another reader that does AES. `net.lingala.zip4j:zip4j`.
-- **A prompt.** `ZipFile.isEncrypted()` answers before anything is read, so the app can ask for the
-  code rather than failing.
-- **The same normalisation the exporter uses**, or the code a user types will not match the bytes
-  the zip was locked with. It is in `opentagviewer_export/passcode.py`: strip spaces and hyphens,
-  uppercase, then fold `O` to `0` and `I`/`L` to `1`. Those letters are excluded from the alphabet
-  *because* people write them for the digits, so a code read off paper depends on this.
+- **zip4j** (`net.lingala.zip4j:zip4j`) replaced `java.util.zip` for reading. A plain bundle goes
+  through the same path, so there is one reader rather than one per kind of bundle.
+- **The prompt is driven by a `Reason`, not by `isEncrypted()`.** That method never gets a chance:
+  for AES, zip4j raises from `getNextEntry()` before handing back a header. It raises
+  `WRONG_PASSWORD` for a *missing* password as readily as an incorrect one, so which of the two it
+  is comes from whether the app had a code to try - `LOCKED` if not, `WRONG_PASSCODE` if so.
+- **The normalisation is duplicated, and that is the risk.** `BundlePasscode.normalise` has to
+  agree with `opentagviewer_export/passcode.py` exactly, because a zip password is compared as
+  bytes and the symptom of drift is a user being told their correct code is wrong. Note the doc
+  summary previously given here - "strip spaces and hyphens" - was incomplete: it also drops
+  underscores, tabs and newlines, which is what makes a code pasted out of an email work.
+- **The fixture is written by the real exporter** (`scripts/make_locked_bundle_fixture.py`) rather
+  than by the test, so `LockedBundleTest` is checking pyzipper-against-zip4j and not zip4j against
+  itself. See [CONTRIBUTING](../CONTRIBUTING.md#the-locked-bundle-fixture).
 
-Until then, exports for released app versions need `--no-password`. The
+**When the exporter is embedded in the app**, `passcode.py` arrives with it through Chaquopy and
+there will be two implementations of one contract in the same APK. At that point the Java copy
+should defer to the Python one, or a test should assert the two agree over the same inputs.
+
+Note that *released* app versions still cannot open a locked bundle, so exports for them continue
+to need `--no-password` until this ships. The
 [CLI guide](./how-to-export-with-the-cli.md) says so prominently.
 
 ## 4. Import a self-generated tag

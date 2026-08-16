@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">Не удалось прочитать этот экспорт. Возможно, он неполный или создан более новой версией экспортёра.</string>
     <string name="import_failed_no_tags">В этом экспорте нет меток, импортировать нечего.</string>
     <string name="import_failed_unreadable">Не удалось открыть этот файл. Выберите его снова.</string>
+    <string name="bundle_locked_title">Этот архив заблокирован</string>
+    <string name="bundle_locked_message">Введите код, который экспортёр показал при создании этого файла. Регистр, пробелы и дефисы не важны.</string>
+    <string name="bundle_locked_hint">Код разблокировки</string>
+    <string name="bundle_unlock">Разблокировать</string>
+    <string name="import_failed_wrong_passcode">Этот код не открыл архив. Сверьте его с тем, что показал экспортёр.</string>
+    <string name="import_failed_locked">Этот архив заблокирован, а код не введён.</string>
+    <string name="bundle_passcode_malformed">Код состоит только из цифр и букв.</string>
 </resources>

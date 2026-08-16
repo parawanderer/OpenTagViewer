@@ -34,9 +34,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipInputStream;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import net.lingala.zip4j.model.LocalFileHeader;
 
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
@@ -98,6 +98,19 @@ public class AppleZipImporterUtil {
     }
 
     public ImportData extractZip(@NonNull Uri zipFileUri) throws ZipImporterException {
+        return this.extractZip(zipFileUri, null);
+    }
+
+    /**
+     * Read a bundle, unlocking it if it is locked.
+     *
+     * @param passcode the code the bundle was locked with, already through
+     *                 {@link BundlePasscode#normalise}, or null if none has been asked for yet.
+     *                 A locked bundle with no code raises {@link Reason#LOCKED} before any entry
+     *                 is read, which is the caller's cue to prompt and try again.
+     */
+    public ImportData extractZip(@NonNull Uri zipFileUri, final String passcode)
+            throws ZipImporterException {
 
         String openTagViewerYaml = null;
         Map<String, String> ownedBeacons = new HashMap<>();
@@ -108,34 +121,48 @@ public class AppleZipImporterUtil {
 
         int entriesSeen = 0;
 
+        // zip4j rather than java.util.zip, which cannot decrypt anything at all - not the AES
+        // the exporter writes, not even the legacy ZipCrypto. A plain bundle reads the same way
+        // through it, so there is only one path here rather than one per kind of bundle.
         try (BufferedInputStream source = this.open(zipFileUri);
-             ZipInputStream zipInput = new ZipInputStream(source, StandardCharsets.UTF_8);
+             ZipInputStream zipInput = passcode == null
+                     ? new ZipInputStream(source, StandardCharsets.UTF_8)
+                     : new ZipInputStream(source, passcode.toCharArray(), StandardCharsets.UTF_8);
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             byte[] buffer = new byte[1024];
             int read = 0;
-            ZipEntry zipEntry;
+            LocalFileHeader zipEntry;
 
             while ((zipEntry = zipInput.getNextEntry()) != null) {
                 entriesSeen++;
                 // read data
-                String fileName = zipEntry.getName();
+                String fileName = zipEntry.getFileName();
                 Log.d(TAG, "Now reading file " + fileName + " while unzipping...");
+
+                if (zipEntry.isEncrypted() && passcode == null) {
+                    // Rarely reached: for the AES the exporter writes, zip4j raises from
+                    // getNextEntry above rather than handing back a header, and that path is
+                    // what actually reports this. Kept for any scheme where the header does
+                    // come back first, so the question is asked before content is touched.
+                    throw new ZipImporterException(Reason.LOCKED,
+                            "Bundle is encrypted and no passcode was supplied");
+                }
 
                 if (zipEntry.isDirectory()) {
                     Log.d(TAG, "Skipping " + fileName + ": this is a directory, nothing to do here");
                     continue;
                 }
 
-                if (!isExpectedFileType(zipEntry.getName())) {
+                if (!isExpectedFileType(fileName)) {
                     Log.d(TAG, "Skipping " + fileName + ": this is a file with an unallowed file type (file extension not in whitelist)");
                     continue;
                 }
 
                 // which type is it?
-                final Pair<FILE_TYPE, List<String>> typeAndRegexGroups = getAllowedFileType(zipEntry.getName());
+                final Pair<FILE_TYPE, List<String>> typeAndRegexGroups = getAllowedFileType(fileName);
                 if (typeAndRegexGroups == null) {
-                    Log.w(TAG, "Encountered unexpected file " + zipEntry.getName()
+                    Log.w(TAG, "Encountered unexpected file " + fileName
                             + " that was not whitelisted for parsing! This file is being skipped.");
                     continue;
                 }
@@ -165,6 +192,22 @@ public class AppleZipImporterUtil {
                 }
             }
         } catch (ZipException e) {
+            if (e.getType() == ZipException.Type.WRONG_PASSWORD) {
+                // Both "locked, and nobody has been asked yet" and "asked, and that was not it"
+                // arrive here, because zip4j raises WRONG_PASSWORD for a missing password as
+                // readily as for an incorrect one. Which of the two it is is not something the
+                // zip knows - it is whether we had a code to try.
+                //
+                // AES carries a two-byte password verifier, so an incorrect one is known at the
+                // first entry rather than after decrypting something into nonsense. That is what
+                // makes "that code did not work" sayable at all, instead of "this is damaged".
+                throw new ZipImporterException(
+                        passcode == null ? Reason.LOCKED : Reason.WRONG_PASSCODE,
+                        passcode == null
+                                ? "Bundle is encrypted and no passcode was supplied"
+                                : "Passcode did not open the bundle",
+                        e);
+            }
             // The signature said zip, so it is one - it just cannot be read to the end.
             throw new ZipImporterException(Reason.DAMAGED,
                     "Zip could not be read after " + entriesSeen + " entries", e);
