@@ -140,7 +140,6 @@
     <string name="use_system_colors">使用系統配色</string>
     <string name="use_system_colors_description">根據桌布為應用程式配色。需要 Android 12 或更新版本。</string>
     <string name="export_history">匯出歷史記錄</string>
-    <string name="export_tag">匯出標籤</string>
     <string name="selected">已選擇</string>
     <string name="x_selected">已選擇 %1$d 個</string>
     <string name="exit_selection">結束選擇</string>
@@ -148,4 +147,5 @@
     <string name="error_occurred_while_exporting_the_history">無法匯出歷史記錄</string>
     <string name="are_you_sure_you_want_to_remove_these_devices">確定要移除這些裝置嗎？移除後需要重新匯入才能復原。</string>
     <string name="remove_devices">移除裝置</string>
+    <string name="export_tags">匯出標籤</string>
 </resources>
