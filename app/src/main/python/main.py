@@ -22,6 +22,8 @@ from findmy.reports.twofactor import (
     SyncSecondFactorMethod
 )
 
+from identity import APP_SERIAL
+
 
 class TwoFactorMethods(Enum):
     UNKNOWN = 0
@@ -166,7 +168,11 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
     """
 
     def __init__(self, bridge: Any, fallbackServerUrl: str) -> None:
-        super().__init__()
+        # The app's own serial, not the library's default - see identity.APP_SERIAL. Both
+        # providers have to pass it: which one produced a session is a transport detail, and a
+        # user whose Anisette fell back to a server must not acquire a second device-list entry
+        # for it.
+        super().__init__(serial=APP_SERIAL)
         self._bridge = bridge
         self._fallbackServerUrl = fallbackServerUrl
 
@@ -220,7 +226,7 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None):
         except Exception:
             print(f"Local Anisette failed, using the remote server: {traceback.format_exc()}")
 
-    return RemoteAnisetteProvider(anisetteServerUrl)
+    return RemoteAnisetteProvider(anisetteServerUrl, serial=APP_SERIAL)
 
 
 def loginSync(email: str, password: str, anisetteServerUrl: str,
