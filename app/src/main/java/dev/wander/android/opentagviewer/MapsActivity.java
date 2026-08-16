@@ -48,6 +48,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
@@ -611,10 +612,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private void onImportFilePicked(Intent data) {
+        this.onImportFilePicked(data, null);
+    }
+
+    /**
+     * @param passcode the code to unlock the bundle with, or null on the first attempt. The
+     *                 importer decides whether one is needed from the zip's own headers, so it
+     *                 is never asked for until it is known to be required.
+     */
+    private void onImportFilePicked(Intent data, final String passcode) {
         Log.d(TAG, "File has been picked");
 
         // combine them into the current list of beaconLocations & show this list
-        var async = this.extractImportedData(data)
+        var async = this.extractImportedData(data, passcode)
             .flatMap(this.beaconRepo::addNewImport)
             .doOnNext((importData) -> {
                 this.runOnUiThread(() -> {
@@ -650,6 +660,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 Log.i(TAG, "Finished visualising new location reports!");
             }, error -> {
                 Log.e(TAG, "Error occurred while importing new devices!", error);
+
+                final ZipImporterException.Reason reason = ZipImporterException.reasonOf(error);
+                if (reason == ZipImporterException.Reason.LOCKED
+                        || reason == ZipImporterException.Reason.WRONG_PASSCODE) {
+                    // A question, not a failure. The exporter locks bundles by default, so this
+                    // is the ordinary path rather than something having gone wrong.
+                    BundlePasscodeDialog.show(
+                            this,
+                            reason == ZipImporterException.Reason.WRONG_PASSCODE,
+                            code -> this.onImportFilePicked(data, code));
+                    return;
+                }
+
                 Toast.makeText(this, importFailureMessage(error), LENGTH_LONG).show();
             });
     }
@@ -674,6 +697,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 return R.string.import_failed_no_tags;
             case UNREADABLE:
                 return R.string.import_failed_unreadable;
+            case WRONG_PASSCODE:
+                return R.string.import_failed_wrong_passcode;
+            case LOCKED:
+                // Normally answered with a prompt rather than a message. Reached only if the
+                // user dismissed it, which is them declining, so it says what is still true.
+                return R.string.import_failed_locked;
             default:
                 return R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry;
         }
@@ -714,7 +743,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
     }
 
-    private Observable<ImportData> extractImportedData(Intent data) {
+    private Observable<ImportData> extractImportedData(Intent data, final String passcode) {
         return Observable.fromCallable(() -> {
             try {
                 Uri zipFileUri = data.getData();
@@ -726,7 +755,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 }
 
                 var util = new AppleZipImporterUtil(this.getApplicationContext());
-                return util.extractZip(zipFileUri);
+                return util.extractZip(zipFileUri, passcode);
 
             } catch (ZipImporterException e) {
                 // Rethrown as itself rather than wrapped: the reason it carries is what decides

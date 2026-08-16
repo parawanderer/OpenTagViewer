@@ -30,6 +30,18 @@ public class ZipImporterException extends RuntimeException {
         /** Ours, but unreadable: truncated, corrupt, or a format this version cannot parse. */
         DAMAGED,
 
+        /**
+         * Locked, and no code has been supplied yet.
+         *
+         * <p>Not a failure so much as a question. The exporter locks bundles by default, so
+         * this is the ordinary path for a current export, and the caller is expected to ask
+         * for the code and try again rather than show an error.
+         */
+        LOCKED,
+
+        /** Locked, a code was supplied, and it was not the right one. */
+        WRONG_PASSCODE,
+
         /** A valid export that carries no tags, so importing it would do nothing. */
         NO_TAGS,
 
