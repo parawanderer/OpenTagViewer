@@ -684,6 +684,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging(arguments.verbose)
 
     try:
+        return _run_and_return(arguments)
+    finally:
+        # **Again, at the end.** The copy printed when logging was turned on is thousands of
+        # lines up by now, and the end of the run is both where somebody is looking and where
+        # they start selecting from. A warning that has scrolled away is one that was not given.
+        if arguments.verbose:
+            warn_about_sharing_logs()
+
+
+def _run_and_return(arguments: argparse.Namespace) -> int:
+    try:
         return asyncio.run(run(arguments))
     except prompts.Abandoned:
         print("\nStopped. Nothing was written.", file=sys.stderr)
