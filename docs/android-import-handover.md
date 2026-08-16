@@ -11,7 +11,7 @@ things it emits are ahead of what the app can read, and one thing it shares need
 
 ---
 
-## 1. Wire the shared package into Chaquopy
+## 1. Wire the shared package into Chaquopy — **done**
 
 `python/opentagviewer_export/` is the one implementation of the bundle format and of the
 accessory-identification heuristic. The app's Python layer already calls into it -
@@ -30,23 +30,30 @@ chaquopy {
 }
 ```
 
+**Filtering won, and the open question is answered: Chaquopy does honour `include` and
+`exclude`.** So the package stays where it is, nothing moves, and `pyproject.toml`, the
+PyInstaller spec and `conftest.py` are all untouched. What shipped:
+
+```kotlin
+srcDir("../python")
+include("*.py", "opentagviewer_export/**")
+exclude("opentagviewer_export/tests/**")
+```
+
 > [!WARNING]
-> **Do not merge that line as written.** `../python` also contains `exporter/` (the desktop wizard,
-> which imports tkinter) and `test/` - and a top-level package called `test` on the Python path
-> **shadows the standard library's `test` module**. That is a real hazard in a phone app and the
-> reason this was left undone rather than committed unverified.
->
-> Two ways out, either fine:
->
-> - **Move the shared package under a directory of its own** - `python/shared/opentagviewer_export/`
->   - and point `srcDir` at `python/shared`, which then contains exactly one thing. The exporter
->   reaches it by adding `shared` to its path; `python/pyproject.toml` and the PyInstaller spec both
->   need to know.
-> - **Filter the source set**, if Chaquopy's `srcDir` honours AGP's `exclude` patterns. Cheaper if
->   it works; unverified here, which is the whole problem.
->
-> Whichever, `app/src/test/python/conftest.py` puts `python/` on `sys.path` today and must be
-> changed to match, or the tests will exercise a layout the app does not have.
+> **The filter applies to the whole source set, not to the `srcDir` it follows.** So
+> `include("opentagviewer_export/**")` on its own also filters `app/src/main/python/`, and
+> **drops `main.py` out of the APK** — with a green build, passing unit tests, and an app that
+> cannot sign in. That is what the first pattern is for. `../python` has no top-level `.py`
+> files for it to catch by accident today.
+
+Both hazards — that one, and `test/` shadowing the standard library — are now asserted rather
+than reasoned about. `PythonPackagingTest` imports each module on a device: `main` and
+`opentagviewer_export` must resolve, `test.test_airtag_decryptor` and `exporter.asyncui` must
+not. It also asks the heuristic for an answer it knows the shape of, because `identifyHardware`
+swallows every exception by design and a failed import there is otherwise invisible.
+
+The APK now contains exactly `main.pyc` and six `opentagviewer_export` modules.
 
 `main.py`'s two bridge functions never raise: an accessory is not worth losing over a label, so a
 failed import there costs the label and logs.
