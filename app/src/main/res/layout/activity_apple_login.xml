@@ -54,8 +54,8 @@
 
                 <ImageView
                     android:id="@+id/appLogo"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="92dp"
+                    android:layout_height="92dp"
                     app:srcCompat="@drawable/opentagviewer_icon_themed" />
 
                 <TextView
