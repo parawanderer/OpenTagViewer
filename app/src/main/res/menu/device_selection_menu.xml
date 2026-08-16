@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What can be done with the selected tags.
+
+    Export Tag is listed and disabled rather than hidden: it is coming, and a menu that changes
+    shape between versions is harder to learn than one where an item is visibly not ready yet.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_export_history"
+        android:icon="@drawable/history_24px"
+        android:title="@string/export_history" />
+
+    <item
+        android:id="@+id/action_export_tags"
+        android:enabled="false"
+        android:icon="@drawable/share_24px"
+        android:title="@string/export_tags" />
+
+    <item
+        android:id="@+id/action_remove_devices"
+        android:icon="@drawable/delete_24px"
+        android:title="@string/remove_devices" />
+
+</menu>

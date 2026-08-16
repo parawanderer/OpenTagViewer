@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The bar that replaces the page title while rows are being selected.
+
+    A separate layout rather than an action slot bolted onto inline_top_toolbar: that include is
+    shared by most screens in the app, and giving it optional actions would mean every one of
+    them inherits a bar that can change shape.
+
+    One overflow button rather than a row of icons. Three unlabelled glyphs make the reader
+    guess, and one of the actions destroys data - a named menu item is worth the extra tap.
+-->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable name="selectedCount" type="String" />
+        <variable name="onClickClose" type="Runnable" />
+        <variable name="onClickMenu" type="Runnable" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/colorBackground"
+        android:backgroundTint="?android:attr/colorBackground"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="20dp"
+            android:paddingTop="20dp"
+            android:paddingRight="20dp"
+            android:paddingBottom="20dp">
+
+            <ImageButton
+                android:id="@+id/selection_close_button"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/ripple_background"
+                android:backgroundTint="?android:attr/colorBackground"
+                android:contentDescription="@string/exit_selection"
+                android:onClick="@{() -> onClickClose.run()}"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/close_24px"
+                android:tint="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/selection_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="15dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/nunito_bold"
+                android:text="@{selectedCount}"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="20sp"
+                tools:text="2 selected" />
+
+            <ImageButton
+                android:id="@+id/selection_menu_button"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/ripple_background"
+                android:backgroundTint="?android:attr/colorBackground"
+                android:contentDescription="@string/more"
+                android:onClick="@{() -> onClickMenu.run()}"
+                android:padding="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/menu_dots_vertical_24"
+                android:tint="?attr/colorOnSurface" />
+
+        </LinearLayout>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+</layout>
