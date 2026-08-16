@@ -1,5 +1,50 @@
 # Report to FindMy.py: `announce_device` returns HTTP 401
 
+> ## Answered: Apple wants the one field this flow refuses to send
+>
+> With the body now reported, the refusal explains itself:
+>
+> ```
+> HTTP 401, body {'ec': -800012, 'em': 'Push token is invalid.'}
+> ```
+>
+> Neither header divergence was the cause. Both were real and both are fixed; this is something
+> else, and it is not a bug in the implementation.
+>
+> **`ptkn` is omitted on purpose.** Stage 2 §7 says "never send `ptkn` — omit the key entirely
+> rather than sending it empty", and Stage 1 §13 argues at length why: a push token is the most
+> likely reason a registered device becomes trusted for verification codes, and this client must
+> never become a second factor for somebody's Apple ID. The library implements that, with a
+> comment saying there is deliberately no parameter for it.
+>
+> Apple appears to treat *absent* as *invalid*. That is a reading of one error string rather than
+> a proven mechanism — Apple's codes are frequently imprecise, and `-800012` may cover more than
+> its text suggests — but it is the obvious one and it is consistent with the endpoint's purpose:
+> `postdata` announces a live client, and liveness to Apple means reachable by push.
+>
+> ### This is a decision, not a fix
+>
+> Making the call succeed means sending a real push token, which means **registering with APNs and
+> becoming addressable** — the precise thing §13 says not to do. It is also not a small change: a
+> token has to be obtained from Apple's push service, so there is nothing to "just pass through".
+>
+> The safety property currently holds and the user can see it. The device list entry reads:
+>
+> > This device cannot be used to receive Apple Account verification codes.
+>
+> That line is what a client with no push token earns, and it is worth more than a nicer name.
+>
+> **So this consumer is not asking for `ptkn` support**, and would not use it if it appeared. The
+> open question belongs to whoever owns the specification: whether §7's device naming is reachable
+> at all by a client that declines to be push-addressable, or whether the section should record
+> that it is not. Either answer is useful; the current text implies the call works as described,
+> and on this account it does not.
+>
+> Everything below is the original report, kept because the two divergences it names were real.
+
+---
+
+
 > **A bug report from a consumer.** Addressed to whoever works on FindMy.py. Delete it from this
 > repository once the library has an answer.
 >
