@@ -247,7 +247,23 @@ would fall in seconds.
 | `--anisette-url` | Use a remote Anisette server instead of running one locally |
 | `--anisette-libs` | Cache Apple's ADI libraries in a file, so a later run does not download them |
 | `-v`, `--verbose` | Show what the library is doing. Worth having on the first run |
-| `-vv` | Everything, including the CloudKit and keychain protocol steps. This is what to send with a bug report |
+| `-vv` | Everything, including the CloudKit and keychain protocol steps. This is what to send with a bug report — **read the warning below first** |
+
+> [!CAUTION]
+> **Read `-v` and `-vv` output before you paste it anywhere, and strip anything that identifies
+> you.** It is written for debugging, not for publishing, and it names real things:
+>
+> - **Your devices, by name, model and serial number.** Escrow records are described the way a
+>   person recognises them, so "Paula's iPhone, iPhone14,2, serial F2L…" is a normal line.
+> - **Keychain item attributes, verbatim.** The account and label fields are printed as they are
+>   stored, and what is in them is Apple's choice rather than this program's.
+> - **Peer identifiers** for every device in your account's trust circle. Pseudonymous, but stable
+>   and unique to you.
+>
+> No key material, passcode or password is logged, and payloads appear only as byte counts. But
+> **this cannot promise a given identifier never reaches the output** — the text comes from a
+> library reading Apple's structures, and a field that is innocuous on one account may not be on
+> another. So the check is yours to make, every time, before it goes in an issue.
 
 ---
 
