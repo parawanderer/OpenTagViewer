@@ -56,7 +56,7 @@
                     android:id="@+id/appLogo"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    app:srcCompat="@drawable/opentagviewer_icon" />
+                    app:srcCompat="@drawable/opentagviewer_icon_themed" />
 
                 <TextView
                     android:id="@+id/login_current_input_indicator"
@@ -95,13 +95,13 @@
 
                     <Button
                         android:id="@+id/go_to_maininfo"
-                        style="?attr/materialIconButtonOutlinedStyle"
+                        style="?attr/materialIconButtonFilledTonalStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:enabled="@{allowServerConfNext}"
                         android:onClick="onClickToLoginAccount"
                         app:icon="@drawable/arrow_forward_24px"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="?attr/colorOnSecondaryContainer" />
 
                 </LinearLayout>
 
@@ -187,13 +187,13 @@
 
                     <Button
                         android:id="@+id/iconButton2"
-                        style="?attr/materialIconButtonOutlinedStyle"
+                        style="?attr/materialIconButtonFilledTonalStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_weight="0"
                         android:onClick="onClickBackToAnisetteSettings"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="?attr/colorOnSecondaryContainer" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -246,7 +246,7 @@
 
                     <Button
                         android:id="@+id/twofactorauth_choice_trusted_device"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
@@ -260,7 +260,7 @@
                         android:textSize="18sp"
                         app:icon="@drawable/devices_24px"
                         app:iconSize="24dp"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="?attr/colorOnSecondaryContainer" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -275,12 +275,12 @@
 
                     <Button
                         android:id="@+id/twofactorauth_option_selection_back_to_login"
-                        style="?attr/materialIconButtonOutlinedStyle"
+                        style="?attr/materialIconButtonFilledTonalStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:onClick="onClickBackToLogin"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="?attr/colorOnSecondaryContainer" />
 
                 </LinearLayout>
 
@@ -464,12 +464,12 @@
 
                     <Button
                         android:id="@+id/twofactorauthchoice_back_button"
-                        style="?attr/materialIconButtonOutlinedStyle"
+                        style="?attr/materialIconButtonFilledTonalStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:onClick="onClickBackTo2FAMethodChoice"
                         app:icon="@drawable/arrow_back_24px"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="?attr/colorOnSecondaryContainer" />
 
                 </LinearLayout>
 

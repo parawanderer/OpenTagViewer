@@ -75,6 +75,8 @@ public class SystemColorsLayoutTest {
     private static final int[] TILE_SUBJECTS = {
             R.drawable.pin_drop_tile_pin_filled,
             R.drawable.pin_drop_tile_empty_filled,
+            // The app mark on the login screen, whose two-tone fill comes from the theme.
+            R.drawable.opentagviewer_icon_themed,
     };
 
     /** Tiles are a narrow timeline column; their natural size is tiny. */
