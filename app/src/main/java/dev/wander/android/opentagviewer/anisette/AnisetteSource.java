@@ -50,6 +50,35 @@ public interface AnisetteSource {
     /** What {@link #recordSessionProvenance} last recorded. False if nothing has. */
     boolean wasSessionEstablishedLocally();
 
+    /**
+     * The machine this install claims to be, as FindMy.py's {@code DeviceIdentity} mapping.
+     *
+     * <p><b>Answerable when nothing else here is.</b> Every other method on this interface
+     * describes locally produced Anisette, and returns nothing useful when it is unavailable -
+     * but a sign-in relayed through a remote server still has to tell Apple which machine it
+     * is, and it must be the same answer either way. So this does not consult ADI, does not
+     * download anything, and does not care whether {@link #ensureReady} succeeded: the profile
+     * is persisted beside the device identity and read straight back.
+     *
+     * <p>Called from Python at sign-in. See {@code identity.identityForNewSession}.
+     */
+    String hardwareProfileJson();
+
+    /**
+     * The two ids this installation already introduced itself to Apple with, as
+     * {@code {"uid": ..., "devid": ...}}.
+     *
+     * <p>ADI provisioning is its own exchange with Apple, made before FindMy.py exists, and it
+     * carries {@code X-Mme-Device-Id} and {@code X-Apple-I-MD-LU}. FindMy.py used to mint its
+     * own pair, so <b>one install talked to Apple as two devices</b>; these are what stop that.
+     *
+     * <p>Both or neither - FindMy.py refuses one of two, and is right to. A client matching one
+     * id and inventing the other is a shape no real client produces.
+     *
+     * <p>Answerable without ADI, for the same reason as {@link #hardwareProfileJson}.
+     */
+    String deviceIdsJson();
+
     /** Short human-readable state, for logs and diagnostics. */
     String describe();
 }

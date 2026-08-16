@@ -96,7 +96,6 @@
     <string name="map_provider">地图提供商</string>
     <string name="map_provider_google">Google 地图</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
-    <string name="relogin_required_after_upgrade">FindMy 库已更新，请重新登录。</string>
     <string name="amap_api_key_explanation">高德地图需要您自行提供 API Key。请前往 lbs.amap.com 注册，平台选择“Android 平台 SDK”，然后将 Key 粘贴到此处。</string>
     <string name="amap_copy_registration_details">复制包名和 SHA1</string>
     <string name="amap_registration_details_copied">已复制。创建 Key 时请将这些信息粘贴到高德控制台。</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">该代码无法解开此导出包。请与导出工具显示的代码核对。</string>
     <string name="import_failed_locked">此导出包已加密，但未输入代码。</string>
     <string name="bundle_passcode_malformed">代码仅由数字和字母组成。</string>
+    <string name="session_expired_title">请重新登录</string>
+    <string name="session_expired_message">Apple 不再接受本设备上保存的登录信息，重新登录后才能定位你的标签。
+
+标签及其位置历史仍保存在这部手机上，没有任何数据丢失。</string>
+    <string name="ok">好</string>
 </resources>

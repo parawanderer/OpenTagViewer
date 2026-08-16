@@ -1029,18 +1029,48 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         return false;
     }
 
+    /**
+     * Send somebody back to sign in, and tell them why.
+     *
+     * <p>This used to be a toast asserting that the FindMy library had been updated - true of
+     * the one migration it was written for, and wrong every other time. What a person needs
+     * here is what happened, and the reassurance that their tags and history are still on the
+     * phone; the explaining is done by the login screen, because this one is finishing.
+     *
+     * <p><b>The address is read before the account is cleared</b>, which is the whole reason
+     * this is not two independent steps: clearing is what destroys it.
+     */
     private void handleAccountRestoreFailureOnUiThread() {
+        final String email = signedInEmailOrNull();
+
         var disposable = this.userAuthRepo.clearUser()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
-                    Toast.makeText(this, R.string.relogin_required_after_upgrade, LENGTH_LONG).show();
                     this.finish();
-                    this.sendToLogin();
+                    this.sendToLoginBecauseTheSessionExpired(email);
                 }, err -> {
                     Log.e(TAG, "Failed to clear stale auth blob during restore-failure recovery", err);
                     // Fall through silently — at worst the user has to log out manually.
                 });
+    }
+
+    /**
+     * The signed-in address, or null if it cannot be read.
+     *
+     * <p>Deliberately incurious about why it might not be: this runs while recovering from an
+     * account that has already failed to restore, and a missing address costs a prefilled
+     * field, not the recovery.
+     */
+    private String signedInEmailOrNull() {
+        try {
+            return this.userAuthRepo.getUserAuth().blockingFirst()
+                    .map(stored -> stored.getUser().getAccount().getInfo().getAccountName())
+                    .orElse(null);
+        } catch (final Exception e) {
+            Log.w(TAG, "Could not read the signed-in address to prefill the login screen", e);
+            return null;
+        }
     }
 
     private synchronized void addBeaconToCurrent(final List<BeaconInformation> newBeaconInformation) {
@@ -1343,6 +1373,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private void sendToLogin() {
         Intent intent = new Intent(this, AppleLoginActivity.class);
+        startActivity(intent);
+    }
+
+    /** As above, but for somebody who did not choose to be signed out. */
+    private void sendToLoginBecauseTheSessionExpired(final String email) {
+        Intent intent = new Intent(this, AppleLoginActivity.class);
+        intent.putExtra(AppleLoginActivity.EXTRA_SESSION_EXPIRED, true);
+        if (email != null) {
+            intent.putExtra(AppleLoginActivity.EXTRA_PREFILL_EMAIL, email);
+        }
         startActivity(intent);
     }
 

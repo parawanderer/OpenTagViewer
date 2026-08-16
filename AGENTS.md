@@ -254,7 +254,7 @@ See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup and every test suite. Sho
 Gradle provisions the emulator, runs the tests, and destroys it:
 
 ```bash
-./gradlew :app:testEmulatorDebugAndroidTest    # 72 tests, about 20 seconds
+./gradlew :app:testEmulatorDebugAndroidTest    # 190 tests, about a minute
 ```
 
 Use this rather than `connectedDebugAndroidTest`. The Android Gradle Plugin holds its ADB

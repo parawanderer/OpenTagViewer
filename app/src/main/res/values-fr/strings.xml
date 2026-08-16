@@ -108,7 +108,6 @@
     <string name="map_provider">Fournisseur de cartes</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">Veuillez vous reconnecter : la bibliothèque FindMy a été mise à jour.</string>
     <string name="maps_api_key_missing_title">Clé API Google Maps manquante</string>
     <string name="maps_api_key_missing_message">Cette version ne contient pas de clé API Google Maps, la carte ne se chargera donc pas. Ajoutez MAPS_API_KEY à secrets.properties et recompilez, ou choisissez un autre fournisseur de cartes dans les paramètres.</string>
     <string name="resolving_tags_banner">Localisation de vos balises pour la première fois. Cela peut prendre quelques minutes : veuillez laisser l’application ouverte.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">Ce code n’a pas ouvert l’archive. Vérifiez-le par rapport à celui affiché par l’exportateur.</string>
     <string name="import_failed_locked">Cette archive est verrouillée et aucun code n’a été saisi.</string>
     <string name="bundle_passcode_malformed">Un code se compose uniquement de chiffres et de lettres.</string>
+    <string name="session_expired_title">Veuillez vous reconnecter</string>
+    <string name="session_expired_message">Apple n’accepte plus la connexion enregistrée pour cet appareil : vos balises ne peuvent pas être localisées tant que vous ne vous reconnectez pas.
+
+Vos balises et leur historique de position restent sur ce téléphone — rien n’a été perdu.</string>
+    <string name="ok">OK</string>
 </resources>

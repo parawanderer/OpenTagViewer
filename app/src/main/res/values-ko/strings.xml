@@ -108,7 +108,6 @@
     <string name="map_provider">지도 제공자</string>
     <string name="map_provider_google">Google 지도</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">FindMy 라이브러리가 업데이트되었습니다. 다시 로그인해 주세요.</string>
     <string name="maps_api_key_missing_title">Google 지도 API 키가 없습니다</string>
     <string name="maps_api_key_missing_message">이 빌드에는 Google 지도 API 키가 없어 지도를 불러올 수 없습니다. secrets.properties에 MAPS_API_KEY를 추가한 후 다시 빌드하거나, 설정에서 다른 지도 제공자를 선택하세요.</string>
     <string name="resolving_tags_banner">태그의 위치를 처음으로 확인하는 중입니다. 몇 분 정도 걸릴 수 있으니 앱을 열어 두세요.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">이 코드로는 번들을 열 수 없습니다. 내보내기 도구가 표시한 코드와 대조해 보세요.</string>
     <string name="import_failed_locked">이 번들은 잠겨 있으며 코드가 입력되지 않았습니다.</string>
     <string name="bundle_passcode_malformed">코드는 숫자와 영문자로만 이루어집니다.</string>
+    <string name="session_expired_title">다시 로그인해 주세요</string>
+    <string name="session_expired_message">Apple이 이 기기에 저장된 로그인을 더 이상 받아들이지 않습니다. 다시 로그인하기 전까지는 태그의 위치를 찾을 수 없습니다.
+
+태그와 위치 기록은 이 휴대전화에 그대로 남아 있습니다. 사라진 것은 없습니다.</string>
+    <string name="ok">확인</string>
 </resources>

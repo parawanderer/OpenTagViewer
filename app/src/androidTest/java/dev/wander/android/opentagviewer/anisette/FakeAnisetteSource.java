@@ -93,6 +93,44 @@ public final class FakeAnisetteSource implements AnisetteSource {
         this.recordedProvenance = establishedLocally;
     }
 
+    private AdiDeviceIdentity.Hardware hardware = AdiDeviceIdentity.Hardware.IPHONE;
+
+    /**
+     * Claim a different machine. Not a named constructor because it is orthogonal to the
+     * states above - every one of them can be either profile, and the interesting case is an
+     * install that is {@link AdiDeviceIdentity.Hardware#LEGACY_MAC} <i>and</i> unavailable.
+     */
+    public FakeAnisetteSource claiming(AdiDeviceIdentity.Hardware hardware) {
+        this.hardware = hardware;
+        return this;
+    }
+
+    /**
+     * The real profile's own JSON, not a hand-written copy.
+     *
+     * <p>A literal here would keep passing after the real thing changed shape, which is the
+     * failure this fake would otherwise introduce - it is substituted into the sign-in path
+     * that feeds Python.
+     */
+    @Override
+    public String hardwareProfileJson() {
+        return this.hardware.toJson();
+    }
+
+    /**
+     * Fixed values, so a test can assert that these exact strings reached Apple.
+     *
+     * <p>A UUID for the device id because FindMy.py parses it as one - CloudKit does
+     * {@code uuid.UUID(device_uuid)} - and a real installation's is a UUID too.
+     */
+    public static final String UID = "9E1D0C4B-77A2-4E3F-8D51-2B6A0F9C3D74";
+    public static final String DEVID = "1A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9";
+
+    @Override
+    public String deviceIdsJson() {
+        return "{\"uid\":\"" + UID + "\",\"devid\":\"" + DEVID + "\"}";
+    }
+
     @Override
     public String describe() {
         return this.ready ? "fake, ready" : "fake, unavailable: " + this.unavailableReason;

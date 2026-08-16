@@ -460,6 +460,45 @@ def test_getAccount_refuses_local_anisette():
 
 
 # --------------------------------------------------------------------------
+# A session Apple has stopped accepting
+#
+# It deserializes perfectly and is completely unusable: every fetch fails its state
+# check before a request is made. Returning it as a success is how the app came up
+# showing stale pins and spinners that stopped, with the reason only in the log.
+# Issue #43.
+# --------------------------------------------------------------------------
+
+def _storedAccount(loggedIn: bool) -> str:
+    from findmy.reports import AppleAccount, RemoteAnisetteProvider
+    from findmy.reports.state import LoginState
+
+    account = AppleAccount(RemoteAnisetteProvider("https://ani.example.com"))
+    stored = account.to_json()
+
+    # A fresh account is LOGGED_OUT, which is exactly the shape an invalidated session
+    # restores to. The logged-in case is the same blob with the one field moved, so the
+    # two tests differ in nothing else.
+    stored["login"]["state"] = (
+        LoginState.LOGGED_IN.value if loggedIn else LoginState.LOGGED_OUT.value
+    )
+    return json.dumps(stored)
+
+
+def test_a_session_apple_no_longer_accepts_is_a_failed_restore():
+    assert main.getAccount(_storedAccount(loggedIn=False)) is None
+
+
+def test_a_session_that_still_works_restores_normally():
+    """
+    The other half, and the one that matters more.
+
+    Reporting a working session as failed would sign people out for no reason - a far worse
+    bug than the one above, and the obvious way to get this wrong.
+    """
+    assert main.getAccount(_storedAccount(loggedIn=True)) is not None
+
+
+# --------------------------------------------------------------------------
 # Guard against the test environment drifting from what the app ships
 # --------------------------------------------------------------------------
 
