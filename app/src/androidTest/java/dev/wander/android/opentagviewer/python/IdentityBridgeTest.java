@@ -3,9 +3,12 @@ package dev.wander.android.opentagviewer.python;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+
+import android.util.Base64;
 
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
@@ -19,6 +22,8 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Java and Python agreeing about which machine this is.
@@ -158,6 +163,64 @@ public class IdentityBridgeTest {
                 kwargs.callAttr("get", "identity").get("model").toString());
         assertEquals("the serial is a label, and a new sign-in is a new entry either way",
                 "0PENTAGVIEWR", kwargs.callAttr("get", "serial").toString());
+    }
+
+    /**
+     * The two ids cross intact and keep their names.
+     *
+     * <p>That FindMy.py then accepts them under exactly these keywords is asserted in
+     * {@code test_identity.py}, against a real account and the same pinned library. What only a
+     * device can show is the crossing itself - a Java string, through Chaquopy, out of the JSON
+     * an {@code AnisetteSource} actually produces.
+     */
+    @Test
+    public void theIdsThisInstallAlreadyUsedCrossIntact() {
+        final PyObject ids = identity().callAttr(
+                "deviceIdsForNewSession", FakeAnisetteSource.ready());
+
+        assertEquals(FakeAnisetteSource.UID, ids.callAttr("get", "uid").toString());
+        assertEquals(FakeAnisetteSource.DEVID, ids.callAttr("get", "devid").toString());
+    }
+
+    /**
+     * The uid crosses as stored, not as the header renders it.
+     *
+     * <p>FindMy.py base64-encodes it on the way out, and a fresh install's ADI provisioning
+     * already sent base64 of the same string. Handing over the encoded form would encode it
+     * twice - a value Apple has never seen, from a client claiming to be an installation it
+     * has. The alignment is one step away from that mistake in either direction, so both steps
+     * are pinned here together.
+     */
+    @Test
+    public void theUidIsNotEncodedTwice() {
+        final String crossed = identity()
+                .callAttr("deviceIdsForNewSession", FakeAnisetteSource.ready())
+                .callAttr("get", "uid").toString();
+
+        assertEquals(FakeAnisetteSource.UID, crossed);
+        assertNotEquals("this is the header form; FindMy.py would encode it a second time",
+                Hardware.IPHONE.localUserHeader(crossed), crossed);
+        assertEquals("and the header form is exactly what FindMy.py will produce from it",
+                Base64.encodeToString(crossed.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP),
+                Hardware.IPHONE.localUserHeader(crossed));
+    }
+
+    /**
+     * An install from before profiles existed sends its local user id raw, and cannot not.
+     *
+     * <p>Its ADI was provisioned under the raw convention and is never provisioned again, and
+     * there is no {@code uid} whose base64 is a 64-character hex string. So for these two the
+     * device id aligns and this one does not - stated as a test rather than left as a surprise,
+     * because it is the one part of the alignment that does not hold for everybody.
+     */
+    @Test
+    public void alegacyInstallCannotAlignItsLocalUserId() {
+        final String stored = "3F2A1B0C9D8E7F6A5B4C3D2E1F0A9B8C7D6E5F4A3B2C1D0E9F8A7B6C5D4E3F2A";
+
+        assertEquals(stored, Hardware.LEGACY_MAC.localUserHeader(stored));
+        assertNotEquals("if these ever matched, the two conventions would have converged",
+                Hardware.LEGACY_MAC.localUserHeader(stored),
+                Base64.encodeToString(stored.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP));
     }
 
     /**

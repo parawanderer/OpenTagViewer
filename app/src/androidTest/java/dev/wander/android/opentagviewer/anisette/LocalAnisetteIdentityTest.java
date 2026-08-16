@@ -3,6 +3,7 @@ package dev.wander.android.opentagviewer.anisette;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -188,6 +189,69 @@ public class LocalAnisetteIdentityTest {
                 .commit();
 
         assertEquals(AdiDeviceIdentity.Hardware.IPHONE.toJson(), subject().hardwareProfileJson());
+    }
+
+    /**
+     * The ids handed to FindMy.py are the ones stored, not new ones.
+     *
+     * <p>This is the whole alignment in one assertion: what a legacy install already told Apple
+     * during provisioning is what its next sign-in claims to be. Minting a pair here instead
+     * would put it back to talking to Apple as two devices, silently.
+     */
+    @Test
+    public void thestoredIdsAreTheOnesHandedOver() throws Exception {
+        writeTheOldShape();
+
+        final JSONObject ids = new JSONObject(subject().deviceIdsJson());
+
+        assertEquals(OLD_DEVICE_ID, ids.getString("devid"));
+        assertEquals(OLD_LOCAL_USER, ids.getString("uid"));
+    }
+
+    /**
+     * And the local user id is handed over as stored, never as the header renders it.
+     *
+     * <p>FindMy.py encodes it on the way out. Handing it the encoded form would encode it twice.
+     */
+    @Test
+    public void theuidIsHandedOverUnencoded() throws Exception {
+        writeTheOldShape();
+        final AdiDeviceIdentity.Hardware profile = AdiDeviceIdentity.Hardware.LEGACY_MAC;
+
+        final String handedOver = new JSONObject(subject().deviceIdsJson()).getString("uid");
+
+        assertEquals(OLD_LOCAL_USER, handedOver);
+        assertEquals("this install's header convention is raw, so these coincide here",
+                profile.localUserHeader(OLD_LOCAL_USER), handedOver);
+    }
+
+    /** A fresh install's ids are stable too - asking twice must not mint a second device. */
+    @Test
+    public void afreshInstallsIdsAreStableAcrossCalls() {
+        final String first = subject().deviceIdsJson();
+
+        assertEquals(first, subject().deviceIdsJson());
+    }
+
+    /**
+     * A fresh install hands over exactly what it stored, which is where a double-encode hides.
+     *
+     * <p>The legacy tests above cannot see this one: that profile sends its local user id raw,
+     * so the stored value and the header value coincide and a bug that returned the header form
+     * would pass. On a fresh install they differ - base64 against the UUID - and only the UUID
+     * is correct, because FindMy.py encodes it again on the way out.
+     */
+    @Test
+    public void afreshInstallHandsOverTheStoredIdsAndNotTheHeaderForms() throws Exception {
+        final JSONObject ids = new JSONObject(subject().deviceIdsJson());
+
+        assertEquals(this.preferences.getString(LocalAnisette.KEY_LOCAL_USER, null),
+                ids.getString("uid"));
+        assertEquals(this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null),
+                ids.getString("devid"));
+        assertNotEquals("this is the header form, and handing it over would encode it twice",
+                AdiDeviceIdentity.Hardware.IPHONE.localUserHeader(ids.getString("uid")),
+                ids.getString("uid"));
     }
 
     /**

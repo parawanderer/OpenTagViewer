@@ -64,6 +64,21 @@ public interface AnisetteSource {
      */
     String hardwareProfileJson();
 
+    /**
+     * The two ids this installation already introduced itself to Apple with, as
+     * {@code {"uid": ..., "devid": ...}}.
+     *
+     * <p>ADI provisioning is its own exchange with Apple, made before FindMy.py exists, and it
+     * carries {@code X-Mme-Device-Id} and {@code X-Apple-I-MD-LU}. FindMy.py used to mint its
+     * own pair, so <b>one install talked to Apple as two devices</b>; these are what stop that.
+     *
+     * <p>Both or neither - FindMy.py refuses one of two, and is right to. A client matching one
+     * id and inventing the other is a shape no real client produces.
+     *
+     * <p>Answerable without ADI, for the same reason as {@link #hardwareProfileJson}.
+     */
+    String deviceIdsJson();
+
     /** Short human-readable state, for logs and diagnostics. */
     String describe();
 }

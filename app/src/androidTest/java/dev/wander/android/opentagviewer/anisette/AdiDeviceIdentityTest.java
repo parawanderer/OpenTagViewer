@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.util.Base64;
+
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity.Hardware;
@@ -12,6 +14,7 @@ import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -161,6 +164,54 @@ public class AdiDeviceIdentityTest {
         assertEquals(36, fresh.uniqueDeviceIdentifier().length());
         assertEquals(fresh.uniqueDeviceIdentifier().toUpperCase(java.util.Locale.ROOT),
                 fresh.uniqueDeviceIdentifier());
+    }
+
+    /**
+     * A fresh install's local user id is a UUID, because FindMy.py's is.
+     *
+     * <p>Not cosmetic. The value Java provisions ADI with is handed to FindMy.py verbatim and
+     * encoded there, so it has to be a string both sides can carry and that Apple has seen in
+     * this shape before - which is the UUID every FindMy.py client already sends.
+     */
+    @Test
+    public void afreshInstallsLocalUserIdIsAUuid() {
+        final String id = AdiDeviceIdentity.generate().localUserUuid();
+
+        assertEquals(36, id.length());
+        assertEquals(id.toUpperCase(java.util.Locale.ROOT), id);
+        java.util.UUID.fromString(id);
+    }
+
+    /**
+     * And provisioning sends the encoded form, which is what FindMy.py will send at login.
+     *
+     * <p>This equality <i>is</i> the alignment. Java's ADI provisioning is one exchange, made
+     * once, before FindMy.py exists; the login happens later and FindMy.py composes the header
+     * itself as {@code base64(uid)}. If these two ever differ, one installation is introducing
+     * itself to Apple as two.
+     */
+    @Test
+    public void afreshInstallProvisionsUnderWhatFindMyWillSend() {
+        final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
+        final String whatJavaSends =
+                fresh.hardware().localUserHeader(fresh.localUserUuid());
+        final String whatFindMyWillSend = Base64.encodeToString(
+                fresh.localUserUuid().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+
+        assertEquals(whatFindMyWillSend, whatJavaSends);
+    }
+
+    /**
+     * A legacy install sends it raw, and keeps doing so.
+     *
+     * <p>Changing this would only matter if such an install ever re-provisioned - which happens
+     * when somebody resets Anisette - and it should then send what it sent the first time.
+     */
+    @Test
+    public void alegacyInstallSendsItsLocalUserIdUnencoded() {
+        final String stored = "3F2A1B0C9D8E7F6A5B4C3D2E1F0A9B8C7D6E5F4A3B2C1D0E9F8A7B6C5D4E3F2A";
+
+        assertEquals(stored, Hardware.LEGACY_MAC.localUserHeader(stored));
     }
 
     /** Two installs must not be the same machine. */

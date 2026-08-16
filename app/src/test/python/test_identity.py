@@ -15,11 +15,13 @@ login succeeds or does not, and the evidence is in somebody else's Apple account
 
 from __future__ import annotations
 
+import base64
 import json
 
 import identity
 import main
-from findmy.reports import RemoteAnisetteProvider
+import pytest
+from findmy.reports import AppleAccount, RemoteAnisetteProvider
 from findmy.reports.anisette import CLIENT_IDENTITY, CLIENT_SERIAL, DeviceIdentity
 
 # What Java sends for each of its two profiles. Copies, and only usable as copies: nothing here
@@ -44,11 +46,19 @@ IPHONE = {
 }
 
 
+UID = "9E1D0C4B-77A2-4E3F-8D51-2B6A0F9C3D74"
+DEVID = "1A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9"
+
+
 class Bridge:
     """A local-Anisette bridge that works."""
 
-    def __init__(self, profile=None):
+    def __init__(self, profile=None, ids=None):
         self._profile = IPHONE if profile is None else profile
+        self._ids = {"uid": UID, "devid": DEVID} if ids is None else ids
+
+    def deviceIdsJson(self):
+        return json.dumps(self._ids)
 
     def ensureReady(self):
         return True
@@ -151,6 +161,91 @@ class TestTheIdentityANewSessionPresents:
         assert identity.identityForNewSession(Bridge(LEGACY_MAC))["serial"] == identity.APP_SERIAL
 
 
+class TestTheIdsANewSessionIntroducesItselfWith:
+    """
+    The half that stops one install being two devices.
+
+    ADI provisioning tells Apple `X-Mme-Device-Id` and `X-Apple-I-MD-LU` before FindMy.py
+    exists. Left to itself the library mints a fresh random pair, so the same app arrives twice
+    under two identifiers — which already cost the desktop exporter a device-list entry per run.
+    """
+
+    def test_both_ids_come_from_java(self):
+        assert identity.deviceIdsForNewSession(Bridge()) == {"uid": UID, "devid": DEVID}
+
+    def test_the_account_actually_sends_them(self):
+        """
+        Through the library, not just out of this function.
+
+        `uid` and `devid` are private attributes; the only honest check is to build an account
+        and read back what it says it is.
+        """
+        account = AppleAccount(
+            RemoteAnisetteProvider("https://example.invalid"),
+            **identity.deviceIdsForNewSession(Bridge()),
+        )
+
+        assert account.device_uuid == DEVID
+        assert account.local_user_uuid == UID
+
+    def test_the_uid_is_passed_as_stored_and_not_as_java_sends_it(self):
+        """
+        The trap this whole design turns on.
+
+        FindMy.py base64-encodes the uid on the way out, and Java's own header for a fresh
+        install is base64 of the same string. Passing the *encoded* form here would encode it
+        twice and produce a value Apple has never seen from anybody.
+        """
+        account = AppleAccount(
+            RemoteAnisetteProvider("https://example.invalid"),
+            **identity.deviceIdsForNewSession(Bridge()),
+        )
+
+        assert account.local_user_uuid == UID
+        assert base64.b64decode(
+            base64.b64encode(account.local_user_uuid.encode())
+        ).decode() == UID
+
+    def test_one_of_two_is_refused_by_the_library(self):
+        """
+        Not this module's rule, but the reason it never passes a half pair.
+
+        A client matching one id and minting the other is a shape no real client produces.
+        """
+        with pytest.raises(ValueError):
+            AppleAccount(RemoteAnisetteProvider("https://example.invalid"), uid=UID)
+
+    def test_a_half_pair_from_java_is_dropped_entirely(self):
+        for ids in ({"uid": UID, "devid": ""}, {"uid": "", "devid": DEVID}):
+            assert identity.deviceIdsForNewSession(Bridge(ids=ids)) == {}
+
+    def test_a_missing_key_is_dropped_rather_than_half_applied(self):
+        assert identity.deviceIdsForNewSession(Bridge(ids={"uid": UID})) == {}
+
+    def test_a_restored_account_keeps_its_own_pair_whatever_is_passed(self):
+        """
+        `state_info` wins upstream, and this app depends on that.
+
+        Somebody already signed in has a pair Apple associates with their session; replacing it
+        because this install happens to know a different one is a re-identification.
+        """
+        established = AppleAccount(
+            RemoteAnisetteProvider("https://example.invalid"),
+            **identity.deviceIdsForNewSession(Bridge()),
+        )
+        stored = established.to_json()
+
+        restored = AppleAccount(
+            RemoteAnisetteProvider("https://example.invalid"),
+            state_info=stored,
+            uid="00000000-0000-4000-8000-000000000000",
+            devid="11111111-1111-4111-8111-111111111111",
+        )
+
+        assert restored.device_uuid == DEVID
+        assert restored.local_user_uuid == UID
+
+
 class TestWhenJavaCannotBeAsked:
     """
     Every one of these ends in a login that works and a device-list entry that is wrong.
@@ -162,6 +257,14 @@ class TestWhenJavaCannotBeAsked:
     def test_no_bridge_at_all_imposes_nothing(self):
         assert identity.hardwareProfile(None) is None
         assert identity.identityForNewSession(None) == {"serial": identity.APP_SERIAL}
+        assert identity.deviceIdsForNewSession(None) == {}
+
+    def test_a_bridge_that_cannot_give_ids_lets_the_library_mint_its_own(self):
+        class Broken(Bridge):
+            def deviceIdsJson(self):
+                raise RuntimeError("no such method")
+
+        assert identity.deviceIdsForNewSession(Broken()) == {}
 
     def test_a_bridge_that_throws_does_not_take_the_login_with_it(self):
         class Broken(Bridge):
