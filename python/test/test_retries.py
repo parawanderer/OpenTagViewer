@@ -489,3 +489,40 @@ class TestOneName:
 
         assert identity.CLOUDKIT_DEVICE_NAME == identity.DEVICE_NAME
         assert identity.DEVICE_NAME == "OpenTagViewer Exporter"
+
+
+class TestTheDiagnosticsSurvive:
+    """
+    `-vv` has to cover the module that explains a failure, not the modules that were interesting
+    when the flag was written.
+    """
+
+    def test_verbose_covers_every_part_of_findmy(self):
+        """
+        The regression this exists for.
+
+        `configure_logging` used to enumerate `findmy.cloudkit`, `findmy.keychain` and
+        `findmy.icloud` - every part anybody had needed, and therefore wrong the first time a new
+        one mattered. `announce_device` logs under `findmy.reports`, so the DEBUG line written
+        specifically to explain an HTTP 401 was discarded by the flag turned on to read it.
+        """
+        import logging
+
+        from exporter import cli
+
+        cli.configure_logging(2)
+
+        assert logging.getLogger("findmy.reports.account").isEnabledFor(logging.DEBUG)
+
+    def test_but_not_the_socket_chatter(self):
+        # Why it was a list rather than the root logger in the first place: aiohttp and asyncio at
+        # DEBUG bury everything about Apple. `findmy` is the level that excludes them without
+        # having to predict which of its modules matters next.
+        import logging
+
+        from exporter import cli
+
+        cli.configure_logging(2)
+
+        assert not logging.getLogger("aiohttp").isEnabledFor(logging.DEBUG)
+        assert not logging.getLogger("asyncio").isEnabledFor(logging.DEBUG)
