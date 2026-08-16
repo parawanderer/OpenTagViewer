@@ -146,7 +146,15 @@ If you add or change one of these, update its index in the same commit:
 | A workflow in `.github/workflows/` | the CI table in [CONTRIBUTING.md](./CONTRIBUTING.md#continuous-integration) |
 | A test suite, or one that needs opting into | the test table and its section in `CONTRIBUTING.md` |
 | A script in `scripts/` that people run by hand | the section of `CONTRIBUTING.md` covering that workflow |
+| A skill in `.claude/skills/` | the skills table below |
 | A constraint that would take someone an afternoon to rediscover | a rule here |
+
+Skills carry the longer version of a workflow, so this file can stay short:
+
+| Skill | For |
+| --- | --- |
+| `.claude/skills/add-strings/` | any user-facing string — adding, rewording, removing, checking |
+| `.claude/skills/device-screenshots/` | rendering the UI on the managed device and reading it cheaply |
 
 The test for whether it belongs here rather than in a comment: would somebody hit it *before*
 reading the code that explains it? Anisette's machine-identity binding is the example — it
@@ -258,6 +266,27 @@ Two more rules that came out of the same failures:
   first one completed the sign-in and there is no activity left to close a keyboard on.
 - **A `GONE` view still matches `withId`.** "Not on screen" is `matches(not(isDisplayed()))`,
   never an expected `NoMatchingViewException`.
+
+### Looking at the UI yourself
+
+A visual change should be looked at, not reasoned about. `SystemColorsLayoutTest` shows the
+pattern: inflate a layout, or load a drawable, against a themed context, draw it to a bitmap,
+and write it to the directory AGP passes as `additionalTestOutputDir`. It comes back to the
+host in `app/build/outputs/managed_device_android_test_additional_output/`, and the managed
+device runs headless, so no window and no emulator of your own is needed.
+
+Then compact them before reading — a raw 1080px screenshot is mostly whitespace:
+
+```bash
+python .claude/skills/device-screenshots/sheet.py <output-dir> <somewhere-temporary>
+```
+
+**A screenshot is not an assertion.** It shows what one configuration looked like once. Assert
+the thing that matters as well — a resolved colour, a contrast ratio, a measured height — and
+be careful what the assertion is about: the screenshot test kept passing while the history
+timeline was invisible, because it loaded the drawables with a theme and the app did not.
+
+Full details, including forcing dark mode without touching the device: `.claude/skills/device-screenshots/`.
 
 ### Showing a UI test to a person
 
