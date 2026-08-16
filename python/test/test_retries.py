@@ -377,3 +377,83 @@ async def _next(codes):
 
 async def _unused(*_args, **_kwargs):
     raise AssertionError("should not have been asked")
+
+
+class FakeNamedAccount:
+    """An account that records whether it was asked to name itself."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.announced = 0
+
+    async def announce_device(self) -> None:
+        self.announced += 1
+
+        if self.fail:
+            raise RuntimeError("Apple said no")
+
+    def to_json(self):
+        return {
+            "ids": {"uid": "uid-1", "devid": "devid-1"},
+            "anisette": {"type": "aniLocal", "prov_data": "AAAA"},
+        }
+
+
+class TestNamingThisDeviceInTheAccountList:
+    """
+    Without this the entry is named after the hardware the client claims to be - a bare
+    "MacBook Pro" among somebody's real Macs, beside a *Remove from Account* button.
+    """
+
+    def test_a_first_run_names_itself(self, tmp_path, monkeypatch):
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+        account = FakeNamedAccount()
+
+        asyncio.run(icloud.remember(account))
+
+        assert account.announced == 1
+
+    def test_a_later_run_does_not_name_itself_again(self, tmp_path, monkeypatch):
+        # Announcing writes to the user's account. Once the identity is stored this installation
+        # has registered before, so there is nothing new to name and nothing to write.
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+
+        asyncio.run(icloud.remember(FakeNamedAccount()))
+        second = FakeNamedAccount()
+        asyncio.run(icloud.remember(second))
+
+        assert second.announced == 0
+
+    def test_the_identity_is_stored_either_way(self, tmp_path, monkeypatch):
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+
+        asyncio.run(icloud.remember(FakeNamedAccount()))
+
+        assert icloud.device.load(identity) is not None
+
+    def test_a_failure_to_name_does_not_fail_the_export(self, tmp_path, monkeypatch):
+        # What is lost is a recognisable name. Failing a sign-in that has already succeeded to
+        # report a cosmetic problem would be the wrong trade.
+        identity = tmp_path / "device-identity.json"
+        monkeypatch.setattr(icloud.device, "identity_path", lambda: identity)
+        account = FakeNamedAccount(fail=True)
+
+        asyncio.run(icloud.remember(account))
+
+        assert account.announced == 1
+        assert icloud.device.load(identity) is not None
+
+
+class TestOneName:
+    def test_cloudkit_and_the_device_list_are_told_the_same_thing(self):
+        """
+        Rule 11. Two names for one installation would put two differently-labelled things on the
+        account, which is exactly the confusion the serial exists to prevent.
+        """
+        from exporter import identity
+
+        assert identity.CLOUDKIT_DEVICE_NAME == identity.DEVICE_NAME
+        assert identity.DEVICE_NAME == "OpenTagViewer Exporter"
