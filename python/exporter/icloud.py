@@ -51,7 +51,7 @@ from findmy.keychain.recovery import RecoveryError
 from findmy.keychain.session import AsyncKeychainSession
 
 from exporter import device
-from exporter.identity import CLOUDKIT_DEVICE_NAME, EXPORTER_SERIAL
+from exporter.identity import DEVICE_NAME, EXPORTER_SERIAL
 from opentagviewer_export import AccessoryExport
 from opentagviewer_export.hardware import identify
 
@@ -152,7 +152,7 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
     provider = _make_provider(anisette_url, libs_path, stored)
 
     if stored is None:
-        return AsyncAppleAccount(provider)
+        return AsyncAppleAccount(provider, device_name=DEVICE_NAME)
 
     # Only the ids are restored. The rest of the shape has to be there because the library reads
     # it, and every field of it is empty on purpose - this is a logged-out account that happens to
@@ -167,7 +167,7 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
 
     logger.info("Reusing the stored device identity, so this is not a new device to Apple")
 
-    return AsyncAppleAccount(provider, state_info=state)
+    return AsyncAppleAccount(provider, state_info=state, device_name=DEVICE_NAME)
 
 
 def _make_provider(
@@ -193,19 +193,55 @@ def _make_provider(
     return LocalAnisetteProvider(libs_path=libs_path, serial=EXPORTER_SERIAL, state_blob=state_blob)
 
 
-def remember(account: AsyncAppleAccount) -> None:
+async def remember(account: AsyncAppleAccount) -> None:
     """
-    Store this account's device identity, so the next export is the same device.
+    Store this account's device identity, and name it in the user's device list.
 
     Called once signing in has worked, rather than at the end: the device is registered by then,
     and an export that is abandoned afterwards should not leave an entry nothing can reuse.
+
+    **The naming happens on the first run only.** Whether an identity was already stored is
+    exactly whether this installation has registered before, so it is also the test for whether
+    there is anything new to name. Announcing writes to the user's account, and doing it on every
+    export would be a write per run to say something already true.
     """
+    # Read before saving: after `device.save` below there is always a stored identity, so this is
+    # the last moment the question can be asked.
+    already_registered = device.load() is not None
+
     # The account's own serialisation, with only the two harmless parts taken out of it. It also
     # carries the username, the password and the login state - which is exactly why this picks
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
     device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
+
+    if not already_registered:
+        await _announce(account)
+
+
+async def _announce(account: AsyncAppleAccount) -> None:
+    """
+    Tell Apple what to call this device, so the row a user reads names the program.
+
+    Without it the entry is named after the hardware the client claims to be - a bare `MacBook Pro`
+    among somebody's real Macs, beside a *Remove from Account* button and the words "if you do not
+    recognise this device". The serial (`0PENTAGXPORT`) is the other half of the same problem, and
+    rule 11 is why both are set from one place.
+
+    **Never fatal.** The export works either way; what is lost is a recognisable name, and failing
+    a sign-in that has already succeeded to report a cosmetic problem would be the wrong trade. It
+    is logged rather than raised, and the next fresh install tries again.
+    """
+    try:
+        await account.announce_device()
+        logger.info("Registered this device as %r in the account's device list", DEVICE_NAME)
+    except Exception:
+        logger.warning(
+            "Could not name this device in your Apple account, so it will show under whatever"
+            " hardware this claims to be. The export is unaffected.",
+            exc_info=True,
+        )
 
 
 MAX_LOGIN_ATTEMPTS = 3
@@ -358,7 +394,7 @@ async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
             account,
             client=AsyncCloudKitClient(
                 account,
-                device_name=CLOUDKIT_DEVICE_NAME,
+                device_name=DEVICE_NAME,
                 device_serial=EXPORTER_SERIAL,
             ),
         )

@@ -38,10 +38,18 @@ implausible as real hardware so that nothing mistakes it for a Mac. It shares it
 Android app's `0PENTAGVIEWR` so a user seeing both recognises them as the same project.
 """
 
-CLOUDKIT_DEVICE_NAME = "OpenTagViewer Exporter"
+DEVICE_NAME = "OpenTagViewer Exporter"
 """
-What CloudKit is told this client is called.
+What this client calls itself, everywhere it is asked.
 
-FindMy.py defaults it to `FindMy.py`, which would name the library rather than the program in the
-one place this is reported.
+**Two places read this, and rule 11 is why it is one constant.** CloudKit is told it - FindMy.py
+otherwise defaults to `FindMy.py`, naming the library rather than the program - and it is what
+`announce_device` registers in the account's device list, which is the name a person actually
+reads next to *Remove from Account*.
+
+Those two disagreeing would not fail. It would put two differently-named things on one account for
+one installation, which is precisely the confusion the serial exists to prevent.
 """
+
+CLOUDKIT_DEVICE_NAME = DEVICE_NAME
+"""Deprecated spelling, from when CloudKit was the only place this was reported."""

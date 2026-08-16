@@ -47,6 +47,9 @@ from exporter.custom_tags import (
     suggested_identifier,
     suggested_name,
 )
+from findmy import InvalidCredentialsError
+from findmy.keychain.recovery import RecoveryError
+
 from exporter.icloud import Candidate, ExportSourceError
 from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION
 from opentagviewer_export import (
@@ -231,6 +234,25 @@ class WizardApp(tk.Tk):
         except (ExportSourceError, ExportError) as e:
             messagebox.showerror("Could not read your accessories", str(e))
             return
+        except InvalidCredentialsError as e:
+            # **Not the handler below, which asks for a bug report.** A password Apple rejected is
+            # the most ordinary thing that can happen here, and being told to go and file an issue
+            # about your own typo is both wrong and slightly insulting. Nothing was changed and the
+            # button is still there, so this says that and stops.
+            messagebox.showerror(
+                "Apple did not accept that sign-in",
+                f"{e}\n\nNothing was changed. You can try again whenever you like.",
+            )
+            return
+        except RecoveryError as e:
+            # Same reasoning, for the passcode. Its message already carries FindMy.py's advice -
+            # starting with trying again, because this call fails intermittently - so it is shown
+            # whole rather than summarised.
+            messagebox.showerror(
+                "Could not unlock your keychain",
+                f"{e}\n\nNothing was changed. You can try again whenever you like.",
+            )
+            return
         except Exception as e:  # noqa: BLE001 - anything else is still the user's problem to see
             logger.exception("Reading accessories failed")
             messagebox.showerror(
@@ -306,7 +328,7 @@ class WizardApp(tk.Tk):
             )
 
             # Registered a device by now; remembering it stops the next export registering another.
-            icloud.remember(account)
+            await icloud.remember(account)
 
             async with await icloud.open_client(account) as client:
                 options = await client.recovery_options()
@@ -338,12 +360,15 @@ class WizardApp(tk.Tk):
                     # Offered rather than taken: the attempt cap is Apple's and unknown, so
                     # spending another one is the user's call. The library's text says why the
                     # first thing to try is the same passcode over again.
-                    return asker.ask(lambda: messagebox.askyesno(
+                    if asker.ask(lambda: messagebox.askyesno(
                         "Unlock",
                         f"That passcode was not accepted (attempt {attempt} of"
                         f" {icloud.MAX_UNLOCK_ATTEMPTS}).\n\n{error}\n\nTry again?",
                         parent=self,
-                    ))
+                    )):
+                        return True
+
+                    raise _stopped()
 
                 await icloud.unlock(client, chosen, ask_passcode, rejected)
 
@@ -796,11 +821,25 @@ def _ask_again_for_credentials(parent: tk.Tk, asker: Asker, error, attempt: int)
         parent=parent,
     ))
     if not keep_going:
-        return None
+        raise _stopped()
 
     email, password = asker.ask(lambda: _ask_credentials(parent))
+    if not email or not password:
+        raise _stopped()
 
-    return (email, password) if email and password else None
+    return email, password
+
+
+def _stopped() -> ExportSourceError:
+    """
+    What a user pressing Cancel means, as distinct from what Apple said.
+
+    **Returning None here would re-raise Apple's rejection**, and the window would then report
+    "Password authentication failed" to somebody whose last action was to deliberately stop. Worse,
+    it used to arrive through the generic handler, so choosing to give up on a typo ended in a
+    dialog asking them to file a bug with a log attached.
+    """
+    return ExportSourceError("Signing in was stopped. Nothing was changed.")
 
 
 def _ask_again_for_code(parent: tk.Tk, asker: Asker, error, attempt: int):
@@ -823,7 +862,7 @@ def _ask_again_for_code(parent: tk.Tk, asker: Asker, error, attempt: int):
     ))
 
     if answer is None:
-        return None
+        raise _stopped()
 
     return icloud.CODE_AGAIN if answer else icloud.CODE_RESEND
 

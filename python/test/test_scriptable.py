@@ -15,14 +15,11 @@ legitimately ends in a space would otherwise fail as though it were wrong.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
-import os
-import stat
 
 import pytest
 
-from exporter import cli, icloud, prompts, secrets
+from exporter import cli, prompts, secrets
 
 
 @pytest.fixture(autouse=True)
