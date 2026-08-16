@@ -25,9 +25,20 @@ import java.util.UUID;
 public final class AdiDeviceIdentity {
 
     /**
-     * What we claim to be. Matching anisette-v3-server exactly is deliberate: this string is
-     * already the most common one Apple sees from Anisette traffic, so it is the least
-     * remarkable thing we could send.
+     * What we claim to be.
+     *
+     * <p>The value matches anisette-v3-server, which was originally chosen because it is the most
+     * common string Apple sees and therefore the least remarkable thing to send. <b>That reasoning
+     * no longer applies.</b> Rule 11 has this app registering under a name and a serial that exist
+     * to be recognised - a user looking at their Apple device list is meant to know which entry is
+     * this - so blending in stopped being achievable the moment being identifiable became the
+     * point. The string stays because it works, not because it hides.
+     *
+     * <p><b>The parts describe one real release and have to move together.</b> Model, OS version,
+     * build, CFNetwork and Darwin are a set; claiming a Mac here and an iPhone elsewhere is a
+     * contradiction Apple's own clients never produce. See rule 11 and
+     * {@code docs/findmy-export/01-authentication.md} section 2.2, which carries a worked iPhone
+     * set if this ever changes to one.
      */
     public static final String CLIENT_INFO =
             "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>";
