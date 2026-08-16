@@ -40,16 +40,27 @@ Android app's `0PENTAGVIEWR` so a user seeing both recognises them as the same p
 
 DEVICE_NAME = "OpenTagViewer Exporter"
 """
-What this client calls itself, everywhere it is asked.
+What this client tells CloudKit it is called.
 
-**Two places read this, and rule 11 is why it is one constant.** CloudKit is told it - FindMy.py
-otherwise defaults to `FindMy.py`, naming the library rather than the program - and it is what
-`announce_device` registers in the account's device list, which is the name a person actually
-reads next to *Remove from Account*.
+FindMy.py otherwise defaults it to `FindMy.py`, which names the library rather than the program in
+the one place this is reported.
 
-Those two disagreeing would not fail. It would put two differently-named things on one account for
-one installation, which is precisely the confusion the serial exists to prevent.
+**It is not the name in the account's device list, and nothing here can set that.** Signing in
+registers the device by itself and Apple builds its row from the client identity, so the name
+defaults to the claimed hardware - `MacBookPro`. The only call that sets one is the `postdata`
+announce of findmy-export 02-mobileme-delegate §7, and Apple refuses it without a push token
+(`ec -800012`, "Push token is invalid.").
+
+That is a boundary rather than a gap: a push token is what makes a registered device trusted for
+verification codes, and 01-authentication §13 argues at length that this program must never become
+a second factor for somebody's Apple ID. The row says so, and it is worth more than a better name:
+
+    This device cannot be used to receive Apple Account verification codes.
+
+**So the serial is the label.** §13's three display fields are three independent levers, and the
+serial is the only one sign-in controls that a person actually reads - which is why
+:data:`EXPORTER_SERIAL` is legible rather than plausible.
 """
 
 CLOUDKIT_DEVICE_NAME = DEVICE_NAME
-"""Deprecated spelling, from when CloudKit was the only place this was reported."""
+"""Older spelling, kept for anything still importing it."""

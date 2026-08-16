@@ -315,12 +315,7 @@ def apple(monkeypatch):
 
     monkeypatch.setattr(cli.icloud, "make_account", lambda *_args, **_kwargs: account)
     monkeypatch.setattr(cli.icloud, "log_in", _log_in)
-
-    # Async since it also names the device in the account's list, which is a call to Apple.
-    async def remember(account):
-        remembered.append(account)
-
-    monkeypatch.setattr(cli.icloud, "remember", remember)
+    monkeypatch.setattr(cli.icloud, "remember", remembered.append)
     monkeypatch.setattr(prompts, "password", _password)
     monkeypatch.setattr(prompts, "text", _text)
 

@@ -505,7 +505,7 @@ async def sign_in(arguments: argparse.Namespace):
         # one is what stops the next export registering another. Out here rather than inside the
         # handler, where it only ran for an account that had terms pending - so the ordinary
         # sign-in, which is nearly every run, stored nothing and registered a fresh Mac each time.
-        await icloud.remember(account)
+        icloud.remember(account)
     except BaseException:
         # The account owns an HTTP session, and a sign-in that fails leaves it open - which
         # surfaces as "Unclosed client session" from asyncio, after the real error, where it reads
