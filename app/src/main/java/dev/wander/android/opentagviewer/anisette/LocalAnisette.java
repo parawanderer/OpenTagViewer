@@ -39,6 +39,14 @@ public final class LocalAnisette implements AnisetteSource {
     private static final String KEY_ADI_ID = "adiIdentifier";
     private static final String KEY_LOCAL_USER = "localUserUuid";
 
+    /**
+     * Which machine this install claims to be.
+     *
+     * <p>Added after the other three, so <b>its absence beside them is meaningful</b>: it marks
+     * an install from before there was a choice, which can only have been the Mac.
+     */
+    private static final String KEY_HARDWARE = "hardwareProfile";
+
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
             "libc++_shared.so", "libstoreservicescore.so");
@@ -188,7 +196,17 @@ public final class LocalAnisette implements AnisetteSource {
         final String localUser = preferences.getString(KEY_LOCAL_USER, null);
 
         if (deviceId != null && adiId != null && localUser != null) {
-            return new AdiDeviceIdentity(deviceId, adiId, localUser);
+            // **An install that already has an identity keeps the machine it has always
+            // claimed to be.** The absence of the hardware key is what says "from before
+            // profiles existed", and that can only mean the Mac: it is the only thing this app
+            // ever sent. Defaulting a pre-existing install to the new profile instead would
+            // re-identify it to Apple, which costs the user a sign-in and leaves a second
+            // device-list entry - to change the icon on a row they already recognise.
+            final AdiDeviceIdentity.Hardware hardware =
+                    hardwareFrom(preferences.getString(KEY_HARDWARE, null),
+                            AdiDeviceIdentity.Hardware.LEGACY_MAC);
+
+            return new AdiDeviceIdentity(deviceId, adiId, localUser, hardware);
         }
 
         final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
@@ -196,10 +214,33 @@ public final class LocalAnisette implements AnisetteSource {
                 .putString(KEY_DEVICE_ID, fresh.uniqueDeviceIdentifier())
                 .putString(KEY_ADI_ID, fresh.adiIdentifier())
                 .putString(KEY_LOCAL_USER, fresh.localUserUuid())
+                .putString(KEY_HARDWARE, fresh.hardware().name())
                 .apply();
 
-        Log.i(TAG, "generated a new device identity - this must now be kept");
+        Log.i(TAG, "generated a new device identity as " + fresh.hardware()
+                + " - this must now be kept");
         return fresh;
+    }
+
+    /**
+     * The stored profile, or {@code fallback} when there is nothing usable stored.
+     *
+     * <p>An unrecognised name falls back rather than throwing. A profile removed in a later
+     * version would otherwise make an install that has one unable to start at all, and the
+     * identity is not worth crashing over - the fallback re-identifies that install, which is
+     * bad, but it is recoverable and a crash loop is not.
+     */
+    private static AdiDeviceIdentity.Hardware hardwareFrom(
+            final String stored, final AdiDeviceIdentity.Hardware fallback) {
+        if (stored == null) {
+            return fallback;
+        }
+        try {
+            return AdiDeviceIdentity.Hardware.valueOf(stored);
+        } catch (final IllegalArgumentException e) {
+            Log.w(TAG, "unknown stored hardware profile " + stored + ", using " + fallback);
+            return fallback;
+        }
     }
 
     /** Why local Anisette is not being used, or null if it is. */

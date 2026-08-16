@@ -24,44 +24,33 @@ import java.util.UUID;
  */
 public final class AdiDeviceIdentity {
 
-    /**
-     * What we claim to be.
-     *
-     * <p>The value matches anisette-v3-server, which was originally chosen because it is the most
-     * common string Apple sees and therefore the least remarkable thing to send. <b>That reasoning
-     * no longer applies.</b> Rule 11 has this app registering under a name and a serial that exist
-     * to be recognised - a user looking at their Apple device list is meant to know which entry is
-     * this - so blending in stopped being achievable the moment being identifiable became the
-     * point. The string stays because it works, not because it hides.
-     *
-     * <p><b>The parts describe one real release and have to move together.</b> Model, OS version,
-     * build, CFNetwork and Darwin are a set; claiming a Mac here and an iPhone elsewhere is a
-     * contradiction Apple's own clients never produce. See rule 11 and
-     * {@code docs/findmy-export/01-authentication.md} section 2.2, which carries a worked iPhone
-     * set if this ever changes to one.
-     */
-    public static final String CLIENT_INFO =
-            "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>";
-
     private final String uniqueDeviceIdentifier;
     private final String adiIdentifier;
     private final String localUserUuid;
+    private final Hardware hardware;
 
+    /**
+     * @param hardware which machine this install claims to be. An install that already existed
+     *                 before profiles were introduced passes {@link Hardware#LEGACY_MAC}, and
+     *                 must keep doing so - see the enum.
+     */
     public AdiDeviceIdentity(String uniqueDeviceIdentifier, String adiIdentifier,
-                             String localUserUuid) {
+                             String localUserUuid, Hardware hardware) {
         this.uniqueDeviceIdentifier = uniqueDeviceIdentifier;
         this.adiIdentifier = adiIdentifier;
         this.localUserUuid = localUserUuid;
+        this.hardware = hardware;
     }
 
-    /** A fresh identity. Call this once, persist the result, and never call it again. */
+    /** A fresh identity, claiming to be an iPhone. Call once, persist, never call again. */
     public static AdiDeviceIdentity generate() {
         final SecureRandom random = new SecureRandom();
 
         return new AdiDeviceIdentity(
                 UUID.randomUUID().toString().toUpperCase(Locale.ROOT),
                 hex(random, 8).toLowerCase(Locale.ROOT),
-                hex(random, 32).toUpperCase(Locale.ROOT));
+                hex(random, 32).toUpperCase(Locale.ROOT),
+                Hardware.IPHONE);
     }
 
     private static String hex(SecureRandom random, int bytes) {
@@ -73,6 +62,116 @@ public final class AdiDeviceIdentity {
             out.append(String.format("%02X", b));
         }
         return out.toString();
+    }
+
+    /**
+     * The machine this install claims to be, chosen once and then kept.
+     *
+     * <p>Two profiles, and <b>which one an install has is not a preference</b>: it is part of
+     * what Apple binds a session to, so moving an install from one to the other costs that user
+     * a sign-in and leaves a second entry in their device list. An install that already has an
+     * ADI identity keeps {@link #LEGACY_MAC} forever; only a fresh one gets {@link #IPHONE}.
+     *
+     * <p>Each carries all six parts because <b>they describe one real release and move
+     * together</b> - model, OS, build, CFNetwork and Darwin. FindMy.py's {@code DeviceIdentity}
+     * takes the same six for the same reason, and the Python side reads whichever one this
+     * install has rather than deciding for itself. Rule 11.
+     */
+    public enum Hardware {
+        /**
+         * What every install before this shipped as, preserved exactly.
+         *
+         * <p><b>Not corrected, deliberately.</b> macOS 13.1 is Darwin 22.2.0, and this sends
+         * 22.3.0 - so the client info and the user agent name different releases. It is wrong,
+         * it has always been wrong, and changing it now would re-identify every existing
+         * install to fix a contradiction Apple has evidently never minded. The new profile does
+         * not have it.
+         */
+        LEGACY_MAC(
+                "MacBookPro13,2", "macOS", "13.1", "22C65",
+                "1404.0.5", "22.3.0",
+                "com.apple.dt.Xcode/3594.4.19"),
+
+        /**
+         * What a fresh install claims: an iPhone 14 Pro.
+         *
+         * <p><b>For the icon, and for the words next to it.</b> Apple synthesises the device-list
+         * entry from the claimed model, so {@code iPhone15,2} renders as "iPhone 14 Pro" with a
+         * phone icon rather than as a bare "MacBookPro" among the user's real Macs. See
+         * {@code docs/findmy-export/01-authentication.md} section 2.2, which is where these
+         * values are from - observed, not invented.
+         *
+         * <p>Safe on both counts that matter. Claiming to be a phone does <b>not</b> make this
+         * eligible as a second factor: that is decided by the push token, which FindMy.py has no
+         * parameter for and never sends, and an iPhone-shaped entry still reports "This device
+         * cannot be used to receive Apple Account verification codes". And it arrives together
+         * with the serial {@code 0PENTAGVIEWR}, which is what keeps it recognisable - an iPhone
+         * claim on its own, unnamed and unserialled, would be worse than the Mac it replaces.
+         */
+        IPHONE(
+                "iPhone15,2", "iPhone OS", "17.4", "21E219",
+                "1494.0.7", "23.4.0",
+                "com.apple.akd/1.0");
+
+        private final String model;
+        private final String osName;
+        private final String osVersion;
+        private final String osBuild;
+        private final String cfnetwork;
+        private final String darwin;
+        private final String authKitApp;
+
+        Hardware(String model, String osName, String osVersion, String osBuild,
+                 String cfnetwork, String darwin, String authKitApp) {
+            this.model = model;
+            this.osName = osName;
+            this.osVersion = osVersion;
+            this.osBuild = osBuild;
+            this.cfnetwork = cfnetwork;
+            this.darwin = darwin;
+            this.authKitApp = authKitApp;
+        }
+
+        /** Sent as X-MMe-Client-Info. */
+        public String clientInfo() {
+            return String.format(Locale.ROOT, "<%s> <%s;%s;%s> <com.apple.AuthKit/1 (%s)>",
+                    this.model, this.osName, this.osVersion, this.osBuild, this.authKitApp);
+        }
+
+        /** The User-Agent the provisioning requests go out under. */
+        public String userAgent() {
+            return String.format(Locale.ROOT, "akd/1.0 CFNetwork/%s Darwin/%s",
+                    this.cfnetwork, this.darwin);
+        }
+
+        public String model() {
+            return this.model;
+        }
+
+        public String osName() {
+            return this.osName;
+        }
+
+        public String osVersion() {
+            return this.osVersion;
+        }
+
+        public String osBuild() {
+            return this.osBuild;
+        }
+
+        public String cfnetwork() {
+            return this.cfnetwork;
+        }
+
+        public String darwin() {
+            return this.darwin;
+        }
+    }
+
+    /** Which machine this install claims to be. Never changes once an install has one. */
+    public Hardware hardware() {
+        return this.hardware;
     }
 
     /** Sent as X-Mme-Device-Id. */

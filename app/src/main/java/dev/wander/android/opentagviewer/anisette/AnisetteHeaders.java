@@ -71,7 +71,7 @@ public final class AnisetteHeaders {
         headers.put("X-Apple-I-TimeZone", TimeZone.getDefault().getID());
         headers.put("X-Apple-Locale", Locale.getDefault().toString());
         headers.put("X-Mme-Device-Id", this.identity.uniqueDeviceIdentifier());
-        headers.put("X-MMe-Client-Info", AdiDeviceIdentity.CLIENT_INFO);
+        headers.put("X-MMe-Client-Info", this.identity.hardware().clientInfo());
         return headers;
     }
 

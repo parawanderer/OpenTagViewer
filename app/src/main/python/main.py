@@ -22,7 +22,7 @@ from findmy.reports.twofactor import (
     SyncSecondFactorMethod
 )
 
-from identity import APP_SERIAL
+import identity as app_identity
 
 
 class TwoFactorMethods(Enum):
@@ -167,12 +167,13 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
     came from here or from a server is a transport detail, not part of the account.
     """
 
-    def __init__(self, bridge: Any, fallbackServerUrl: str) -> None:
-        # The app's own serial, not the library's default - see identity.APP_SERIAL. Both
-        # providers have to pass it: which one produced a session is a transport detail, and a
-        # user whose Anisette fell back to a server must not acquire a second device-list entry
-        # for it.
-        super().__init__(serial=APP_SERIAL)
+    def __init__(self, bridge: Any, fallbackServerUrl: str, **identityKwargs: Any) -> None:
+        # Whatever identity the caller decides - the app's for a new sign-in, and the one the
+        # restored account already had when this is replacing a rebuilt provider. Defaulted to
+        # nothing rather than to the app's, so that a path which forgets to say inherits
+        # FindMy.py's default and costs nobody a re-login, instead of silently re-identifying
+        # an existing session.
+        super().__init__(**identityKwargs)
         self._bridge = bridge
         self._fallbackServerUrl = fallbackServerUrl
 
@@ -206,19 +207,24 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
         pass
 
 
-def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None):
+def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None, **identityKwargs: Any):
     """Prefer this device, fall back to the configured server.
 
     The fallback is not a nicety. Apple can change their libraries at any time, the download
     needs network the first time, and the whole mechanism is an optimisation over something
     that already works - so anything going wrong here has to degrade to the old behaviour
     rather than fail a login.
+
+    **The identity is the caller's to supply, and both branches get the same one.** Which kind
+    of Anisette produced a session is a transport detail; a user whose local Anisette fell back
+    to a server must not thereby become a different machine, because that is a re-login and a
+    second device-list entry for something they did not do.
     """
     if localAnisette is not None:
         try:
             if localAnisette.ensureReady():
                 print(f"Using local Anisette: {localAnisette.describe()}")
-                return LocalAnisetteProvider(localAnisette, anisetteServerUrl)
+                return LocalAnisetteProvider(localAnisette, anisetteServerUrl, **identityKwargs)
             print(
                 "Local Anisette unavailable, using the remote server instead: "
                 f"{localAnisette.unavailableReason()}"
@@ -226,13 +232,21 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None):
         except Exception:
             print(f"Local Anisette failed, using the remote server: {traceback.format_exc()}")
 
-    return RemoteAnisetteProvider(anisetteServerUrl, serial=APP_SERIAL)
+    return RemoteAnisetteProvider(anisetteServerUrl, **identityKwargs)
 
 
 def loginSync(email: str, password: str, anisetteServerUrl: str,
               localAnisette: Any = None) -> dict:
     try:
-        anisette = _anisetteProvider(anisetteServerUrl, localAnisette)
+        # A new sign-in, so this is the one place the app's own identity is used. Everything
+        # restored from a stored account keeps whatever it was established with - see
+        # identity.identityForRestore, and the warning on identity.APP_SERIAL.
+        anisette = _anisetteProvider(
+            anisetteServerUrl,
+            localAnisette,
+            serial=app_identity.APP_SERIAL,
+            identity=app_identity.APP_IDENTITY,
+        )
         acc = AppleAccount(anisette)
 
         state = acc.login(email, password)
@@ -379,10 +393,19 @@ def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:
             print("FindMy's account internals have changed; keeping the remote provider")
             return
 
+        # Carried across from the provider FindMy just rebuilt, not taken from this app's
+        # identity: swapping the Anisette transport must not change the machine Apple sees.
+        # An account signed in before any of this restores to FindMy.py's defaults and keeps
+        # them, which is what spares that user a re-login.
+        carried = app_identity.identityForRestore(previous)
+
         inner._anisette = LocalAnisetteProvider(
-            localAnisette, getattr(previous, "_server_url", "")
+            localAnisette, getattr(previous, "_server_url", ""), **carried
         )
-        print(f"Restored account switched to local Anisette: {localAnisette.describe()}")
+        print(
+            f"Restored account switched to local Anisette: {localAnisette.describe()}"
+            f" (keeping serial {carried.get('serial', 'FindMy default')})"
+        )
     except Exception:
         print(f"Could not switch to local Anisette: {traceback.format_exc()}")
 

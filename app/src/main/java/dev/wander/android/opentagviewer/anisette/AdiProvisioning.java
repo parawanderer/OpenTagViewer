@@ -242,12 +242,12 @@ public final class AdiProvisioning {
      * from the reference implementation rather than tidied up.
      */
     private void applyHeaders(HttpURLConnection connection) {
-        connection.setRequestProperty("User-Agent", "akd/1.0 CFNetwork/1404.0.5 Darwin/22.3.0");
+        connection.setRequestProperty("User-Agent", this.identity.hardware().userAgent());
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         connection.setRequestProperty("Connection", "keep-alive");
 
         connection.setRequestProperty("X-Mme-Device-Id", this.identity.uniqueDeviceIdentifier());
-        connection.setRequestProperty("X-MMe-Client-Info", AdiDeviceIdentity.CLIENT_INFO);
+        connection.setRequestProperty("X-MMe-Client-Info", this.identity.hardware().clientInfo());
         connection.setRequestProperty("X-Apple-I-MD-LU", this.identity.localUserUuid());
         connection.setRequestProperty("X-Apple-Client-App-Name", "Setup");
         connection.setRequestProperty("X-Apple-I-Client-Time", now());

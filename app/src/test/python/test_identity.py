@@ -1,12 +1,16 @@
 """
-What the app presents itself as to Apple.
+What the app presents itself as to Apple, and — the harder half — when it does not.
 
-This is not a cosmetic string. It becomes a row in the user's Apple account device list, next to
-a *Remove from Account* button and the words "If you do not recognise this device" - so a wrong
-or inconsistent value gets the user to remove the thing that was working. Rule 11.
+This becomes a row in the user's Apple account device list, next to a *Remove from Account*
+button and the words "If you do not recognise this device". Rule 11.
 
-Tested here rather than trusted because the failure is silent and remote: nothing throws, the
-login succeeds, and the only symptom is an entry the user cannot identify.
+**The rule that shapes all of it: a new identity is for a new session only.** Apple binds a
+session to the identity that established it, so re-identifying an existing one costs that user
+a sign-in and leaves a second entry they never asked for. Someone already signed in keeps what
+they have, unrecognisable name and all, because the alternative is worse for them.
+
+Tested rather than trusted because every failure here is silent and remote: nothing throws, the
+login succeeds or does not, and the evidence is in somebody else's Apple account.
 """
 
 from __future__ import annotations
@@ -14,120 +18,166 @@ from __future__ import annotations
 import identity
 import main
 from findmy.reports import RemoteAnisetteProvider
-from findmy.reports.anisette import CLIENT_SERIAL
+from findmy.reports.anisette import CLIENT_IDENTITY, CLIENT_SERIAL, DeviceIdentity
 
 
-class TestTheSerialTheAppPresents:
-    def test_it_is_the_apps_own_and_not_the_librarys(self):
-        # 0FINDMYPY001 names FindMy.py. A user reading their device list should see this app.
+class Bridge:
+    """A local-Anisette bridge that works."""
+
+    def ensureReady(self):
+        return True
+
+    def describe(self):
+        return "a fake"
+
+    def otp(self):
+        return "otp"
+
+    def machine(self):
+        return "machine"
+
+
+class Unavailable:
+    def ensureReady(self):
+        return False
+
+    def unavailableReason(self):
+        return "no libraries"
+
+
+class TestTheIdentityANewSessionPresents:
+    def test_the_serial_is_the_apps_own_and_not_the_librarys(self):
         assert identity.APP_SERIAL == "0PENTAGVIEWR"
         assert identity.APP_SERIAL != CLIENT_SERIAL
 
-    def test_it_is_the_shape_apple_accepts(self):
+    def test_the_serial_is_the_shape_apple_accepts(self):
         assert len(identity.APP_SERIAL) == 12
         assert identity.APP_SERIAL.isalnum()
         assert identity.APP_SERIAL.upper() == identity.APP_SERIAL
 
-    def test_it_is_not_the_exporters(self):
-        # Two installs, two entries, each removable without breaking the other. Sharing a prefix
-        # is deliberate; sharing the whole serial would make them one device.
+    def test_the_serial_is_not_the_exporters(self):
+        # Two installs, two entries, each removable without breaking the other.
         assert identity.APP_SERIAL != "0PENTAGXPORT"
         assert identity.APP_SERIAL[:5] == "0PENT"
 
+    def test_the_identity_matches_the_one_adi_is_initialised_with(self):
+        """
+        The whole reason `DeviceIdentity` was asked for upstream.
 
-class TestEveryProviderPresentsIt:
+        `AdiDeviceIdentity.CLIENT_INFO` on the Java side sends this exact string when it
+        provisions ADI. FindMy.py used to send a MacBook Pro 18,3 on macOS 13.4.1 from its own
+        defaults — one app, one session, two different Macs, differing even in the OS *name*.
+        If this assertion ever fails, the two halves have drifted apart again.
+        """
+        composed = (
+            f"<{identity.APP_IDENTITY.model}> "
+            f"<{identity.APP_IDENTITY.os_name};{identity.APP_IDENTITY.os_version};"
+            f"{identity.APP_IDENTITY.os_build}>"
+        )
+
+        assert composed == "<MacBookPro13,2> <macOS;13.1;22C65>", (
+            "This must stay identical to AdiDeviceIdentity.CLIENT_INFO in the Java sources."
+        )
+
+    def test_the_identity_is_not_the_librarys(self):
+        assert identity.APP_IDENTITY != CLIENT_IDENTITY
+
+    def test_a_new_login_uses_it_on_both_transports(self):
+        """
+        Local and remote must present the same machine.
+
+        The fallback from local Anisette to a server is automatic, so if the two disagreed a
+        user would silently become a second device without doing anything to cause it.
+        """
+        for bridge in (Bridge(), Unavailable(), None):
+            provider = main._anisetteProvider(
+                "https://example.invalid",
+                bridge,
+                serial=identity.APP_SERIAL,
+                identity=identity.APP_IDENTITY,
+            )
+
+            assert provider.serial == identity.APP_SERIAL
+            assert provider.identity == identity.APP_IDENTITY
+
+
+class TestARestoredSessionKeepsWhatItHad:
     """
-    Both providers, because which one produced a session is a transport detail.
+    The half that protects people who are already signed in.
 
-    A user whose local Anisette fell back to a server must not thereby acquire a second entry in
-    their device list - and that fallback is automatic, so it would happen without them doing
-    anything to cause it.
+    An account established before any of this was bound to FindMy.py's defaults. Handing it the
+    app's identity now would present Apple with a different machine on an existing session.
     """
 
-    def test_the_remote_provider_presents_it(self):
+    def test_a_provider_with_no_identity_asked_for_gets_the_librarys(self):
+        # Which is what an account file written before this change restores to, and what the
+        # library promises never to move.
         provider = main._anisetteProvider("https://example.invalid")
 
-        assert isinstance(provider, RemoteAnisetteProvider)
-        assert provider.serial == identity.APP_SERIAL
+        assert provider.serial == CLIENT_SERIAL
+        assert provider.identity == CLIENT_IDENTITY
 
-    def test_the_local_provider_presents_it(self):
-        class Bridge:
-            def ensureReady(self):
-                return True
-
-            def describe(self):
-                return "a fake"
-
-            def otp(self):
-                return "otp"
-
-            def machine(self):
-                return "machine"
-
-        provider = main._anisetteProvider("https://example.invalid", Bridge())
-
-        assert isinstance(provider, main.LocalAnisetteProvider)
-        assert provider.serial == identity.APP_SERIAL
-
-    def test_a_local_provider_that_falls_back_still_presents_it(self):
-        class Unavailable:
-            def ensureReady(self):
-                return False
-
-            def unavailableReason(self):
-                return "no libraries"
-
-        provider = main._anisetteProvider("https://example.invalid", Unavailable())
-
-        assert isinstance(provider, RemoteAnisetteProvider)
-        assert provider.serial == identity.APP_SERIAL
-
-
-class TestTheKnownMismatch:
-    """
-    The part of the identity that does not agree with itself yet.
-
-    Recorded rather than fixed: the second string is hardcoded inside FindMy.py and there is
-    nowhere to pass one in, so a request to expose it has gone upstream. These tests exist so
-    that the day the library grows the knob - or moves the value - something fails and says so,
-    rather than the discrepancy quietly outliving the reason for it.
-    """
-
-    def test_the_two_client_info_strings_still_disagree(self):
-        ours, theirs = identity.KNOWN_IDENTITY_MISMATCH
-
-        assert ours != theirs, (
-            "If these now agree, the mismatch is fixed - delete KNOWN_IDENTITY_MISMATCH, this"
-            " test, and docs/findmy-py-client-info-request.md."
-        )
-
-    def test_it_records_what_the_library_actually_sends(self):
+    def test_the_local_provider_defaults_to_no_opinion(self):
         """
-        Composed from the library's own constants, not scraped out of its source.
+        `LocalAnisetteProvider` must not bake the app's identity into itself.
 
-        The first version of this searched `anisette.py` for the finished string, and broke
-        the moment the fork split the identity into parts - which it had already done at the
-        commit the app pins, so the test failed on a library that had not changed its identity
-        at all. Reading the values means a refactor is free and a *changed identity* is not.
+        It did, briefly, and that was the bug: it is constructed on the *restore* path too, so
+        an upgrading user's next request would have gone out under a new serial.
         """
-        from findmy.reports import anisette
+        provider = main.LocalAnisetteProvider(Bridge(), "https://example.invalid")
 
-        parts = ("CLIENT_MODEL", "CLIENT_OS", "CLIENT_OS_VERSION", "CLIENT_OS_BUILD")
-        missing = [name for name in parts if not hasattr(anisette, name)]
-        assert not missing, (
-            f"findmy.reports.anisette has no {', '.join(missing)}. The installed FindMy is not"
-            " the commit app/build.gradle.kts pins - check requirements.txt and your venv."
+        assert provider.serial == CLIENT_SERIAL
+        assert provider.identity == CLIENT_IDENTITY
+
+    def test_a_restored_identity_is_carried_across_unchanged(self):
+        established = DeviceIdentity(
+            model="MacBookPro18,3", os_name="Mac OS X", os_version="13.4.1",
+            os_build="22F8", cfnetwork="1408.0.4", darwin="22.5.0",
+        )
+        previous = RemoteAnisetteProvider(
+            "https://example.invalid", serial="0FINDMYPY001", identity=established,
         )
 
-        theirs_now = (
-            f"<{anisette.CLIENT_MODEL}> "
-            f"<{anisette.CLIENT_OS};{anisette.CLIENT_OS_VERSION};{anisette.CLIENT_OS_BUILD}>"
+        carried = identity.identityForRestore(previous)
+        replacement = main.LocalAnisetteProvider(Bridge(), "https://example.invalid", **carried)
+
+        assert replacement.serial == "0FINDMYPY001"
+        assert replacement.identity == established
+
+    def test_a_restored_new_style_account_keeps_the_apps_identity_too(self):
+        """Someone who signed in *after* this shipped must not revert on the next restore."""
+        previous = RemoteAnisetteProvider(
+            "https://example.invalid",
+            serial=identity.APP_SERIAL,
+            identity=identity.APP_IDENTITY,
         )
 
-        _, theirs_recorded = identity.KNOWN_IDENTITY_MISMATCH
+        carried = identity.identityForRestore(previous)
+        replacement = main.LocalAnisetteProvider(Bridge(), "https://example.invalid", **carried)
 
-        assert theirs_recorded == theirs_now, (
-            f"FindMy.py now presents {theirs_now}, not {theirs_recorded}. Update"
-            " KNOWN_IDENTITY_MISMATCH - and check whether it now agrees with"
-            " AdiDeviceIdentity.CLIENT_INFO, in which case the mismatch is over."
-        )
+        assert replacement.serial == identity.APP_SERIAL
+        assert replacement.identity == identity.APP_IDENTITY
+
+    def test_reading_an_identity_off_something_that_has_none_asks_for_nothing(self):
+        # A library rename must degrade to "keep the default", not to a crash on every restore.
+        assert identity.identityForRestore(object()) == {}
+
+
+class TestTheLibraryDefaultIsStillWhereWeLeftIt:
+    """
+    Existing sessions depend on FindMy.py's default never moving, and the library says so.
+
+    If it ever does, every account that never asked for an identity silently becomes a
+    different machine — the exact harm this design avoids, arriving from underneath.
+    """
+
+    def test_the_default_serial_has_not_moved(self):
+        assert CLIENT_SERIAL == "0FINDMYPY001"
+
+    def test_the_default_identity_has_not_moved(self):
+        assert CLIENT_IDENTITY.model == "MacBookPro18,3"
+        assert CLIENT_IDENTITY.os_name == "Mac OS X"
+        assert CLIENT_IDENTITY.os_version == "13.4.1"
+        # Deliberately a character short of a real macOS build (13.4.1 is 22F82). Kept wrong
+        # because every existing session is bound to it; correcting it would cost a re-login.
+        assert CLIENT_IDENTITY.os_build == "22F8"
