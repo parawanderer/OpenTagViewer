@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 import json
 import time
 import traceback
@@ -9,6 +9,7 @@ import base64
 import NSKeyedUnArchiver
 
 from findmy import FindMyAccessory
+from findmy.accessory import FixedRollingKeyPairAccessory
 from findmy.reports import (
     RemoteAnisetteProvider,
     AppleAccount,
@@ -541,7 +542,65 @@ _RANGE_FETCH_ATTEMPTS = 2
 _RANGE_FETCH_RETRY_DELAY_SECONDS = 1
 
 
-def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
+StoredAccessory = FindMyAccessory | FixedRollingKeyPairAccessory
+"""
+Either kind of tag this app can locate.
+
+A union rather than their shared base, because the base is not enough: `RollingKeyPairSource`
+has the key methods but not `to_json`, which comes from `Serializable` further along a separate
+line. Naming the two concrete classes says what is actually true - these two, and adding a
+third is a deliberate edit here.
+"""
+
+ACCESSORY_TYPES: dict[str, type[StoredAccessory]] = {
+    "accessory": FindMyAccessory,
+    "custom_rolling_key_accessory": FixedRollingKeyPairAccessory,
+}
+"""
+Which class reads which stored accessory, keyed by FindMy.py's own `type` tag.
+
+**Two sibling classes, not a base and a subclass.** An Apple-paired accessory derives its keys
+from a master key, a shared secret and a secondary secret; a self-generated one - OpenHaystack
+style - carries a plain list of pre-generated keys and derives nothing. Neither is a special
+case of the other, and FindMy.py has no factory that reads both, so the dispatch lives here.
+
+The tag is theirs, written by `to_json` and asserted by each `from_json`, so a mapping handed
+to the wrong class fails loudly rather than half-loading.
+"""
+
+
+def accessoryFromJson(accessoryJson: str) -> StoredAccessory:
+    """
+    Rebuild a stored accessory, whichever kind it is.
+
+    Everything the fetch path does to an accessory - `keys_between`, `get_min_index`,
+    `get_max_index`, `update_alignment`, `to_json` - is on `RollingKeyPairSource`, which both
+    kinds implement. So this is the **only** place the difference matters, and the rest of the
+    fetch path never learns which it has.
+
+    :raises ValueError: if the stored JSON names a type this version cannot read. Deliberately
+        loud: the alternative is guessing, and guessing wrong means fetching against keys that
+        belong to a different derivation - which finds nothing, and looks like a tag out of range
+        rather than like a bug.
+    """
+    mapping: Any = json.loads(accessoryJson)
+    kind = mapping.get("type") if isinstance(mapping, dict) else None
+
+    accessoryType = ACCESSORY_TYPES.get(kind) if isinstance(kind, str) else None
+    if accessoryType is None:
+        raise ValueError(
+            f"stored accessory has type {kind!r}, which this version cannot read - "
+            f"known types are {sorted(ACCESSORY_TYPES)}"
+        )
+
+    # Cast because the two from_json signatures each want their own TypedDict, and this is
+    # untyped JSON off disk. Validating it is precisely what from_json does - it asserts the
+    # type tag and raises on a missing field - so re-describing the shape here would be a
+    # second implementation of a check the library already owns.
+    return accessoryType.from_json(cast(Any, mapping))
+
+
+def _isAlignmentWide(accessory: StoredAccessory, start, end) -> int:
     """Width of the key-index range a history fetch would search, or 0 if unknown."""
     try:
         return accessory.get_max_index(end) - accessory.get_min_index(start)
@@ -563,7 +622,7 @@ class AccessoryFetch(NamedTuple):
     bounded_to_window: bool
 
 
-def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory, start, end):
+def _fetchReportsForAccessory(account: AppleAccount, accessory: StoredAccessory, start, end):
     """
     Fetch reports for one accessory, avoiding a full-history key search when possible.
 
@@ -613,7 +672,7 @@ def _chunk(items, size):
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _fetchReportsInRange(account: AppleAccount, accessory: FindMyAccessory, start, end):
+def _fetchReportsInRange(account: AppleAccount, accessory: StoredAccessory, start, end):
     """
     Fetch the reports an accessory produced inside a specific time window.
 
@@ -679,7 +738,7 @@ def _fetchReportsInRange(account: AppleAccount, accessory: FindMyAccessory, star
     return reports
 
 
-def _alignBeforeRangedFetch(account: AppleAccount, accessory: FindMyAccessory, start, end) -> bool:
+def _alignBeforeRangedFetch(account: AppleAccount, accessory: StoredAccessory, start, end) -> bool:
     """
     Narrow the key index range before generating keys for it.
 
@@ -707,7 +766,7 @@ def _alignBeforeRangedFetch(account: AppleAccount, accessory: FindMyAccessory, s
     return True
 
 
-def _keysForRange(accessory: FindMyAccessory, start, end):
+def _keysForRange(accessory: StoredAccessory, start, end):
     """The `(index, key)` pairs covering a time window, capped at what one fetch may search."""
     try:
         indexed_keys = list(accessory.keys_between(start, end))
@@ -734,7 +793,7 @@ class _ChunkFetchError(Exception):
     """One request of a ranged fetch failed, after its retries."""
 
 
-def _fetchChunkAndAlign(account: AppleAccount, accessory: FindMyAccessory, chunk, index_by_key):
+def _fetchChunkAndAlign(account: AppleAccount, accessory: StoredAccessory, chunk, index_by_key):
     """
     Fetch one request's worth of keys and feed what comes back into the accessory's alignment.
 
@@ -772,7 +831,7 @@ def _fetchChunkAndAlign(account: AppleAccount, accessory: FindMyAccessory, chunk
     return reports
 
 
-def _updateAlignment(accessory: FindMyAccessory, report, index):
+def _updateAlignment(accessory: StoredAccessory, report, index):
     if index is None:
         return
     try:
@@ -860,7 +919,7 @@ def getLastReports(
 
             print(f"Fetching report for {beaconId} for the last {hoursBack} hours...")
 
-            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
+            airtag = accessoryFromJson(accessoryJson)
             start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
             now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
 
@@ -931,7 +990,7 @@ def getReports(
 
             print(f"Fetching report for {beaconId} in time range {unixStartMs}-{unixEndMs}...")
 
-            airtag = FindMyAccessory.from_json(json.loads(accessoryJson))
+            airtag = accessoryFromJson(accessoryJson)
             start_dt = datetime.fromtimestamp(unixStartMs / 1000, tz=timezone.utc)
             end_dt = datetime.fromtimestamp(unixEndMs / 1000, tz=timezone.utc)
 
