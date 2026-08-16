@@ -35,6 +35,15 @@ other modes read, edit it, then feed it back:
 --replace refuses unless the string is already defined in every locale, so a mistyped name
 fails instead of silently doing nothing.
 
+Removing strings, from every locale at once. Takes names rather than a JSON file, since there
+is nothing to translate:
+
+    python scripts/add_strings.py --remove export_tag old_unused_string
+
+Renaming is --remove followed by an ordinary add. Note that nothing here updates references:
+if a layout or menu still points at a removed string, aapt fails the build, which is the
+intended way to find out.
+
 Listing the locales it found:
 
     python scripts/add_strings.py --locales
@@ -401,6 +410,67 @@ def replace_strings(spec: dict, locales: list[str]) -> int:
     return 0
 
 
+def strip_one_locale(names: list[str], locale: str) -> tuple[str, int]:
+    """One locale's file contents with the given strings gone, and how many were removed."""
+    content = strings_file(locale).read_text(encoding="utf-8")
+    removed = 0
+
+    for name in names:
+        # Takes the whole line including its indentation and trailing newline, so removing a
+        # string does not leave a blank line where it used to be. DOTALL because a message can
+        # span lines; non-greedy so two strings cannot be swallowed as one match.
+        pattern = re.compile(
+            rf'[ \t]*<string name="{re.escape(name)}"[^>]*>.*?</string>[ \t]*\r?\n',
+            re.DOTALL)
+
+        content, count = pattern.subn("", content)
+        removed += count
+
+    return content, removed
+
+
+def remove_strings(names: list[str], locales: list[str]) -> int:
+    """Delete strings from every locale at once.
+
+    The counterpart to --replace, and needed for the same reason. Renaming a key or dropping a
+    string somebody decided against means ten near-identical deletions, and a missed one is
+    invisible: an orphaned string is still valid XML, still passes --check, and simply sits
+    there until somebody wonders what it was for.
+
+    Refuses to write unless the string exists somewhere, so a mistyped name fails loudly rather
+    than reporting a successful removal of nothing.
+    """
+    unknown = [
+        name for name in names
+        if not any(name in existing_names(strings_file(locale)) for locale in locales)
+    ]
+
+    if unknown:
+        print("Refusing to write:\n", file=sys.stderr)
+        for name in unknown:
+            print(f"  - {name}: not defined in any locale. Check the spelling.", file=sys.stderr)
+        return 1
+
+    for locale in locales:
+        path = strings_file(locale)
+        content, removed = strip_one_locale(names, locale)
+
+        path.write_text(content, encoding="utf-8")
+
+        try:
+            ElementTree.parse(path)
+        except ElementTree.ParseError as error:
+            print(f"{path} is no longer valid XML after writing: {error}", file=sys.stderr)
+            return 1
+
+        print(f"  {path.relative_to(REPO_ROOT)}: -{removed}")
+
+    print(f"\nDone. {len(names)} string(s) removed from {len(locales)} locale(s).")
+    print("Remember the references: aapt will fail the build if a layout or menu still "
+          "points at one of these.")
+    return 0
+
+
 def check(locales: list[str]) -> int:
     default_path = strings_file(DEFAULT_LOCALE)
     if not default_path.is_file():
@@ -489,6 +559,9 @@ def main(argv: list[str]) -> int:
 
     if len(argv) >= 2 and argv[0] == "--show":
         return show_strings(argv[1:], locales)
+
+    if len(argv) >= 2 and argv[0] == "--remove":
+        return remove_strings(argv[1:], locales)
 
     mode = argv[0] if len(argv) == 2 and argv[0] in ("--fill", "--replace") else None
     if mode:
