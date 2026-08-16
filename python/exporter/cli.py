@@ -23,9 +23,11 @@ import argparse
 import asyncio
 import getpass
 import logging
+import os
 import pydoc
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Sequence
 
@@ -168,6 +170,54 @@ def configure_logging(verbosity: int) -> None:
     if verbosity >= 2:
         for name in ("findmy.cloudkit", "findmy.keychain", "findmy.icloud", "exporter"):
             logging.getLogger(name).setLevel(logging.DEBUG)
+
+    if verbosity:
+        warn_about_sharing_logs()
+
+
+def warn_about_sharing_logs() -> None:
+    """
+    Say what is about to be printed, before it is printed.
+
+    **Said here rather than only in the docs**, because the person who turns this on is usually
+    about to paste the result into an issue, and by then it has scrolled past. The docs are read
+    before a first run; this is read at the moment it matters.
+
+    The list is specific on purpose. "Contains personal information" is easy to skim past and
+    tells nobody what to look for; a device serial and a keychain `acct` field are things somebody
+    can actually find and delete.
+    """
+    lines = [
+        "  Verbose output is for debugging, not for publishing. It names your devices by",
+        "  name, model and serial, prints keychain item attributes as Apple stores them,",
+        "  and identifies every device in your trust circle.",
+        "",
+        "  No key, password or passcode is logged. But this cannot promise a given",
+        "  identifier never appears, because the text comes from a library reading",
+        "  Apple's own structures.",
+        "",
+        "  Read it and strip anything that identifies you before pasting it anywhere.",
+    ]
+
+    print("", file=sys.stderr)
+    for line in lines:
+        print(_red(line), file=sys.stderr)
+    print("", file=sys.stderr)
+
+
+def _red(text: str) -> str:
+    """
+    Colour, when there is a terminal to colour and the reader has not asked otherwise.
+
+    **Guarded rather than unconditional.** The likely next step after reading this is piping the
+    run to a file to attach it, and escape codes written into that file are noise in the issue -
+    which is the opposite of what the warning is for. `NO_COLOR` is honoured because it costs one
+    lookup and somebody has already decided.
+    """
+    if not sys.stderr.isatty() or os.environ.get("NO_COLOR"):
+        return text
+
+    return f"\033[31m{text}\033[0m"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -654,6 +704,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Apple said something this library does not model. Worth its own message: it is not the
         # user's mistake and there is nothing for them to correct.
         print(f"\nApple returned something unexpected: {e}", file=sys.stderr)
+
+        # **And the traceback, because this is the one error where it is the whole diagnosis.**
+        # The message names a symptom - a length that disagrees with the bytes around it - and
+        # says nothing about which structure was being read. There are a dozen places that parse
+        # DER here and the message is identical from all of them, so without the stack a report
+        # of this cannot be acted on at all. That is not hypothetical: issue #89 arrived with
+        # exactly this line and nothing else, and it could not be placed.
+        if arguments.verbose:
+            traceback.print_exc()
+        else:
+            print("\nRe-run with -vv and include the output if you report this. Without the",
+                  file=sys.stderr)
+            print("stack this message names a symptom and not a place. That run will say what",
+                  file=sys.stderr)
+            print("it prints about you, and it is worth reading before pasting it anywhere.",
+                  file=sys.stderr)
+
         return 1
     except KeyboardInterrupt:
         print("\nStopped. Nothing was written.", file=sys.stderr)
