@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">Dieser Export konnte nicht gelesen werden. Er ist möglicherweise unvollständig oder wurde mit einer neueren Version des Exporters erstellt.</string>
     <string name="import_failed_no_tags">Dieser Export enthält keine Tags, es gibt also nichts zu importieren.</string>
     <string name="import_failed_unreadable">Diese Datei konnte nicht geöffnet werden. Wähle sie erneut aus.</string>
+    <string name="bundle_locked_title">Dieses Bündel ist gesperrt</string>
+    <string name="bundle_locked_message">Gib den Code ein, den der Exporter beim Erstellen dieser Datei angezeigt hat. Groß- und Kleinschreibung, Leerzeichen und Bindestriche spielen keine Rolle.</string>
+    <string name="bundle_locked_hint">Entsperrcode</string>
+    <string name="bundle_unlock">Entsperren</string>
+    <string name="import_failed_wrong_passcode">Mit diesem Code ließ sich das Bündel nicht öffnen. Vergleiche ihn mit dem, den der Exporter angezeigt hat.</string>
+    <string name="import_failed_locked">Dieses Bündel ist gesperrt und es wurde kein Code eingegeben.</string>
+    <string name="bundle_passcode_malformed">Ein Code besteht nur aus Ziffern und Buchstaben.</string>
 </resources>

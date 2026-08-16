@@ -539,7 +539,25 @@ python scripts/measure_key_alignment_cost.py <dir> --hours-back 24
 
 # Generate a synthetic beacon plist of a given age.
 python scripts/make_test_beacon_plist.py out.plist --days-old 730
+
+# Rewrite the locked bundle the Android importer's tests read. Needs the exporter's own
+# dependencies (`pip install -e python/`), because it writes the fixture with the real
+# exporter rather than an imitation of it — see below.
+python scripts/make_locked_bundle_fixture.py
 ```
+
+### The locked-bundle fixture
+
+`app/src/androidTest/assets/locked_bundle_fixture.zip` is committed rather than built by the
+test that reads it, and that is deliberate. The exporter writes AES-256 in the WinZip scheme
+through `pyzipper`; the app reads it with zip4j. A test that wrote *and* read with zip4j would
+prove zip4j agrees with itself, which is not the thing that can break. So the fixture is the
+bytes the real exporter produces, and `LockedBundleTest` opens them the way a user would.
+
+The unlock code it is built with, `H4K2-9WMR-7TQX`, is in both the generator and the test —
+typed there in the grouped form so that the normalisation in `BundlePasscode` is exercised
+too. Regenerate after any change to `zipsink.py` or `passcode.py`. The bytes differ on every
+run regardless: each AES entry carries a fresh random salt.
 
 ---
 
