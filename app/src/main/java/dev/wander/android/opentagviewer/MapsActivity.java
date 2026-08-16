@@ -650,11 +650,33 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 Log.i(TAG, "Finished visualising new location reports!");
             }, error -> {
                 Log.e(TAG, "Error occurred while importing new devices!", error);
-                Toast.makeText(
-                        this,
-                        R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry,
-                        LENGTH_LONG).show();
+                Toast.makeText(this, importFailureMessage(error), LENGTH_LONG).show();
             });
+    }
+
+    /**
+     * What to tell somebody whose import did not work.
+     *
+     * <p>Almost always they picked the wrong file, and for a long time the answer to that was
+     * "try to restart the app and retry" - advice for a broken app, given to somebody who
+     * chose their holiday photos. The generic message is kept for the cases that really are
+     * unexplained, which is the only place it was ever true.
+     */
+    private static int importFailureMessage(Throwable error) {
+        switch (ZipImporterException.reasonOf(error)) {
+            case NOT_A_ZIP:
+                return R.string.import_failed_not_a_zip;
+            case NOT_AN_EXPORT:
+                return R.string.import_failed_not_an_export;
+            case DAMAGED:
+                return R.string.import_failed_damaged;
+            case NO_TAGS:
+                return R.string.import_failed_no_tags;
+            case UNREADABLE:
+                return R.string.import_failed_unreadable;
+            default:
+                return R.string.error_occurred_while_importing_new_devices_try_to_restart_the_app_and_retry;
+        }
     }
 
     private void onExportLogsToLocationPicked(@lombok.NonNull Intent data) {
@@ -696,14 +718,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         return Observable.fromCallable(() -> {
             try {
                 Uri zipFileUri = data.getData();
-                assert zipFileUri != null;
+                if (zipFileUri == null) {
+                    // A result with no file in it. Nothing to diagnose, but it is still the
+                    // picked file's problem rather than the app's, so say so as such.
+                    throw new ZipImporterException(
+                            ZipImporterException.Reason.UNREADABLE, "Picker returned no file");
+                }
 
                 var util = new AppleZipImporterUtil(this.getApplicationContext());
                 return util.extractZip(zipFileUri);
 
             } catch (ZipImporterException e) {
-                Log.e(TAG, "Import or conversion error occurred while importing file", e);
-                throw new RuntimeException(e);
+                // Rethrown as itself rather than wrapped: the reason it carries is what decides
+                // what the user is told, and it only survives if the exception does.
+                Log.e(TAG, "Import failed (" + e.getReason() + ")", e);
+                throw e;
             } catch (Exception e) {
                 Log.e(TAG, "Unexpected error occurred while importing file into DB", e);
                 throw new RuntimeException(e);

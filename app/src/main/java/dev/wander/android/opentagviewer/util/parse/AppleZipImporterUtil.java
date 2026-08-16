@@ -17,11 +17,13 @@ import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 
 import javax.xml.xpath.XPath;
@@ -43,6 +46,7 @@ import dev.wander.android.opentagviewer.data.model.BeaconNamingRecordCloudKitMet
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.util.parse.ZipImporterException.Reason;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -78,6 +82,15 @@ public class AppleZipImporterUtil {
 
     private static final String X_PATH_TO_CLOUDKIT_METADATA = "/plist/dict/key[.='cloudKitMetadata']/following-sibling::data[1]";
 
+    private static final int ZIP_SIGNATURE_LENGTH = 4;
+
+    /** Local file header, end of central directory (an empty archive), and spanned marker. */
+    private static final byte[][] ZIP_SIGNATURES = {
+            {'P', 'K', 0x03, 0x04},
+            {'P', 'K', 0x05, 0x06},
+            {'P', 'K', 0x07, 0x08},
+    };
+
     private final Context appContext;
 
     public AppleZipImporterUtil(Context appContext) {
@@ -93,9 +106,10 @@ public class AppleZipImporterUtil {
         // accessories macOS has never observed a key index for.
         Map<String, String> keyAlignmentRecords = new HashMap<>();
 
-        try (ZipInputStream zipInput = new ZipInputStream(
-                this.appContext.getContentResolver()
-                        .openInputStream(zipFileUri), StandardCharsets.UTF_8);
+        int entriesSeen = 0;
+
+        try (BufferedInputStream source = this.open(zipFileUri);
+             ZipInputStream zipInput = new ZipInputStream(source, StandardCharsets.UTF_8);
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             byte[] buffer = new byte[1024];
@@ -103,6 +117,7 @@ public class AppleZipImporterUtil {
             ZipEntry zipEntry;
 
             while ((zipEntry = zipInput.getNextEntry()) != null) {
+                entriesSeen++;
                 // read data
                 String fileName = zipEntry.getName();
                 Log.d(TAG, "Now reading file " + fileName + " while unzipping...");
@@ -149,12 +164,31 @@ public class AppleZipImporterUtil {
                         break;
                 }
             }
+        } catch (ZipException e) {
+            // The signature said zip, so it is one - it just cannot be read to the end.
+            throw new ZipImporterException(Reason.DAMAGED,
+                    "Zip could not be read after " + entriesSeen + " entries", e);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new ZipImporterException(Reason.DAMAGED,
+                    "Import stream failed after " + entriesSeen + " entries", e);
+        }
+
+        if (openTagViewerYaml == null) {
+            // A zip, but not one of ours: this is the common case of somebody picking the wrong
+            // file, so it has to be distinguishable from an export of ours that went wrong.
+            throw new ZipImporterException(Reason.NOT_AN_EXPORT,
+                    "No OPENTAGVIEWER.yml among the " + entriesSeen + " entries in this zip");
         }
 
         assertOpenTagViewerYamlIsValid(openTagViewerYaml);
         innerJoinBeaconFiles(ownedBeacons, beaconNamingRecords);
+
+        if (ownedBeacons.isEmpty()) {
+            // Otherwise this succeeds and reports "0 new imported devices", which reads as the
+            // import having worked and the tags having gone missing afterwards.
+            throw new ZipImporterException(Reason.NO_TAGS,
+                    "Export is well-formed but carries no OwnedBeacons");
+        }
 
         // now we can produce the expected data
         return convert(
@@ -163,6 +197,77 @@ public class AppleZipImporterUtil {
           beaconNamingRecords,
           keyAlignmentRecords
         );
+    }
+
+    /**
+     * Open the picked file, having first established that it is a zip at all.
+     *
+     * <p>Checked up front rather than inferred from the parse, because {@link ZipInputStream}
+     * does not report a non-zip: {@code getNextEntry} simply returns null, so a JPEG and an
+     * empty archive and somebody else's zip all arrived at the same place, and the first
+     * complaint the code could make was that the manifest was missing. "This export has no
+     * OPENTAGVIEWER.yml" is a strange thing to tell somebody who picked a photo.
+     */
+    private BufferedInputStream open(@NonNull Uri zipFileUri) throws ZipImporterException {
+        final BufferedInputStream source;
+        try {
+            final InputStream raw = this.appContext.getContentResolver().openInputStream(zipFileUri);
+            if (raw == null) {
+                throw new ZipImporterException(Reason.UNREADABLE,
+                        "Content resolver returned no stream for " + zipFileUri);
+            }
+            source = new BufferedInputStream(raw);
+        } catch (IOException | SecurityException e) {
+            // Picked from a provider that has since revoked access, or the file has moved.
+            throw new ZipImporterException(Reason.UNREADABLE,
+                    "Could not open " + zipFileUri, e);
+        }
+
+        try {
+            source.mark(ZIP_SIGNATURE_LENGTH);
+            final byte[] signature = new byte[ZIP_SIGNATURE_LENGTH];
+            final int read = readFully(source, signature);
+            source.reset();
+
+            if (read < ZIP_SIGNATURE_LENGTH || !isZipSignature(signature)) {
+                throw new ZipImporterException(Reason.NOT_A_ZIP,
+                        "File does not start with a zip signature");
+            }
+        } catch (IOException e) {
+            throw new ZipImporterException(Reason.UNREADABLE,
+                    "Could not read the start of " + zipFileUri, e);
+        }
+
+        return source;
+    }
+
+    /** Read until the buffer is full or the stream ends, which a single read does not promise. */
+    private static int readFully(final InputStream in, final byte[] into) throws IOException {
+        int total = 0;
+        while (total < into.length) {
+            final int read = in.read(into, total, into.length - total);
+            if (read < 0) {
+                break;
+            }
+            total += read;
+        }
+        return total;
+    }
+
+    /**
+     * Whether these first bytes are any of the three things a zip can begin with.
+     *
+     * <p>An archive with no entries starts at the end-of-central-directory record rather than
+     * at a local file header, and a spanned one carries its own marker. Both are zips, so both
+     * are accepted here and rejected later for the real reason - that they are not an export.
+     */
+    private static boolean isZipSignature(final byte[] bytes) {
+        for (final byte[] candidate : ZIP_SIGNATURES) {
+            if (Arrays.equals(bytes, candidate)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void processBeaconNamingRecord(final List<String> regexGroupMatches, final String newFileContent, Map<String, Pair<String, String>> beaconIdToEntryIdAndContent) {
@@ -473,13 +578,21 @@ public class AppleZipImporterUtil {
                 .collect(Collectors.toList());
     }
 
-    public static class ImportFileFormatException extends RuntimeException {
+    /**
+     * The manifest was there and did not hold up.
+     *
+     * <p>A {@link ZipImporterException} because it is one - it previously extended
+     * {@code RuntimeException} directly, so the {@code catch (ZipImporterException)} written to
+     * handle import failures never saw it and it fell through to the generic handler beside it.
+     * That made no difference only because both did the same thing.
+     */
+    public static class ImportFileFormatException extends ZipImporterException {
         public ImportFileFormatException(String message) {
-            super(message);
+            super(Reason.DAMAGED, message);
         }
 
         public ImportFileFormatException(String message, Throwable cause) {
-            super(message, cause);
+            super(Reason.DAMAGED, message, cause);
         }
     }
 

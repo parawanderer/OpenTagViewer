@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">Weet je zeker dat je deze apparaten wilt verwijderen? Eenmaal verwijderd moeten ze opnieuw worden geïmporteerd.</string>
     <string name="remove_devices">Apparaten verwijderen</string>
     <string name="export_tags">Tags exporteren</string>
+    <string name="import_failed_not_a_zip">Dat bestand is geen zip. Kies het zipbestand dat de OpenTagViewer-exporter heeft gemaakt.</string>
+    <string name="import_failed_not_an_export">Deze zip is niet gemaakt door de OpenTagViewer-exporter, dus er valt niets te importeren.</string>
+    <string name="import_failed_damaged">Deze export kon niet worden gelezen. Mogelijk is hij onvolledig of gemaakt met een nieuwere versie van de exporter.</string>
+    <string name="import_failed_no_tags">Deze export bevat geen tags, dus er valt niets te importeren.</string>
+    <string name="import_failed_unreadable">Dat bestand kon niet worden geopend. Kies het opnieuw.</string>
 </resources>
