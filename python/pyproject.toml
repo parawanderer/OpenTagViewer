@@ -41,6 +41,23 @@ dependencies = [
 # this directory, so there is nothing to build and no version to declare.
 package = false
 
+# Intel Macs must not build cryptography from source, and 49.0.0 is where they started having to.
+#
+# cryptography publishes macOS wheels for arm64 only from 49 onward; 48.0.0 is the last with a
+# universal2 wheel, and that one targets macOS 10.9. Without a wheel, the Intel release build
+# compiles it against whatever OpenSSL the runner has - Homebrew's, preinstalled on GitHub's
+# macOS images - and PyInstaller then bundles Homebrew's libcrypto.3.dylib. A bottle's minimum
+# macOS is baked in when Homebrew builds it, so the resulting binary demanded macOS 15 and
+# scripts/check_macos_min_version.py refused it. Which was correct: the macOS-local export route
+# needs macOS 14 or earlier, so a 15-only binary is useless to exactly the people who need an
+# Intel build.
+#
+# Scoped by marker so only Intel macOS is held back - every other platform keeps the current
+# release. Remove it if cryptography ever ships an x86_64 macOS wheel again.
+constraint-dependencies = [
+    "cryptography<49 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+
 [tool.uv.sources]
 FindMy = { git = "https://github.com/parawanderer/FindMy.py", branch = "feat/icloud-keychain-export" }
 
