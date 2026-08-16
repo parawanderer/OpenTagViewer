@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.util.Log;
@@ -158,6 +159,7 @@ public class SystemColorsLayoutTest {
 
             write(name + "-fixed.png", render(appTheme(), layout));
             write(name + "-wallpaper.png", render(dynamicTheme(), layout));
+            write(name + "-dark.png", render(nightTheme(), layout));
         }
     }
 
@@ -169,6 +171,7 @@ public class SystemColorsLayoutTest {
 
             write(name + "-fixed.png", renderDrawable(appTheme(), drawable));
             write(name + "-wallpaper.png", renderDrawable(dynamicTheme(), drawable));
+            write(name + "-dark.png", renderDrawable(nightTheme(), drawable));
         }
     }
 
@@ -195,6 +198,10 @@ public class SystemColorsLayoutTest {
 
             assertTileIsVisible(name, "the app palette", appTheme(), drawable);
             assertTileIsVisible(name, "wallpaper colours", dynamicTheme(), drawable);
+            // The dark palette is a separate set of colours in values-night, and until now
+            // nothing has ever checked it - every render and every assertion here ran against
+            // whatever the device happened to be set to, which is light.
+            assertTileIsVisible(name, "the dark palette", nightTheme(), drawable);
         }
     }
 
@@ -284,6 +291,24 @@ public class SystemColorsLayoutTest {
 
     private static Context dynamicTheme() {
         return DynamicColors.wrapContextIfAvailable(appTheme());
+    }
+
+    /**
+     * The app theme as it resolves in dark mode.
+     *
+     * <p>Everything else here renders whatever the device happens to be set to, which is light -
+     * so {@code values-night} has never actually been looked at. Overriding the configuration
+     * gets at it without touching the device or restarting anything.
+     */
+    private static Context nightTheme() {
+        final Context base = getInstrumentation().getTargetContext();
+
+        Configuration night = new Configuration(base.getResources().getConfiguration());
+        night.uiMode = (night.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
+                | Configuration.UI_MODE_NIGHT_YES;
+
+        return new ContextThemeWrapper(
+                base.createConfigurationContext(night), R.style.Theme_OpenTagViewer);
     }
 
     private static int resolve(final Context context, final int attr) {
