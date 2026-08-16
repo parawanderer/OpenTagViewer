@@ -659,7 +659,7 @@ wheels = [
 [[package]]
 name = "findmy"
 version = "0.10.1"
-source = { git = "https://github.com/parawanderer/FindMy.py?branch=feat%2Ficloud-keychain-export#534867de1f78a6b3f634ecc96f4aa3bf4afa25c9" }
+source = { git = "https://github.com/parawanderer/FindMy.py?branch=feat%2Ficloud-keychain-export#ab18447fa2de25ca8d51ee85d58f0abf82255b7a" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anisette" },
