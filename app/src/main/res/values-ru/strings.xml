@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">Удалить эти устройства? После удаления их придётся импортировать заново.</string>
     <string name="remove_devices">Удалить устройства</string>
     <string name="export_tags">Экспорт меток</string>
+    <string name="import_failed_not_a_zip">Это не zip-архив. Выберите zip-файл, созданный экспортёром OpenTagViewer.</string>
+    <string name="import_failed_not_an_export">Этот архив создан не экспортёром OpenTagViewer, импортировать нечего.</string>
+    <string name="import_failed_damaged">Не удалось прочитать этот экспорт. Возможно, он неполный или создан более новой версией экспортёра.</string>
+    <string name="import_failed_no_tags">В этом экспорте нет меток, импортировать нечего.</string>
+    <string name="import_failed_unreadable">Не удалось открыть этот файл. Выберите его снова.</string>
 </resources>

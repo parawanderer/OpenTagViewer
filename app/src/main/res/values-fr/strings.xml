@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">Voulez-vous vraiment supprimer ces appareils ? Une fois supprimés, il faudra les réimporter pour les récupérer.</string>
     <string name="remove_devices">Supprimer les appareils</string>
     <string name="export_tags">Exporter les tags</string>
+    <string name="import_failed_not_a_zip">Ce fichier n’est pas une archive zip. Choisissez l’archive créée par l’exportateur OpenTagViewer.</string>
+    <string name="import_failed_not_an_export">Cette archive n’a pas été créée par l’exportateur OpenTagViewer : il n’y a rien à importer.</string>
+    <string name="import_failed_damaged">Cet export n’a pas pu être lu. Il est peut-être incomplet, ou créé par une version plus récente de l’exportateur.</string>
+    <string name="import_failed_no_tags">Cet export ne contient aucun tag : il n’y a rien à importer.</string>
+    <string name="import_failed_unreadable">Ce fichier n’a pas pu être ouvert. Sélectionnez-le à nouveau.</string>
 </resources>
