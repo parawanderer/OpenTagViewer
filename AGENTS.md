@@ -267,6 +267,32 @@ Two more rules that came out of the same failures:
 - **A `GONE` view still matches `withId`.** "Not on screen" is `matches(not(isDisplayed()))`,
   never an expected `NoMatchingViewException`.
 
+#### `animationsDisabled` does not disable animations
+
+It reads like it settles the question. It does not: AGP passes `--no-window-animation` to
+`am instrument`, which zeroes the *window* and *transition* scales and leaves
+`animator_duration_scale` — the one `ViewPropertyAnimator` and `ObjectAnimator` obey — exactly
+as the device had it. Animators in the app can and do run at full speed under test.
+
+So **no view's final state may be set in an animation callback.** `StepTransition`, which
+animates the sign-in steps, is the worked example: every visibility, offset and alpha it
+touches is at its final value before the call returns, and the animation only decorates the
+journey there. A screen whose state is readable only once an animation has ended cannot be
+asserted on without sleeping, and `Eventually` is a retry loop, not a fix for that.
+
+Two things fall out of it that are easy to get wrong:
+
+- **Animating a step out is not free.** These containers are siblings in a vertical
+  `LinearLayout`, so one still fading occupies its height and the arriving one is laid out
+  *below* it, then jumps when the old one finally goes. It reads as a snapping bug, not as a
+  slow fade. Only the arriving step animates; cross-fading them needs a `FrameLayout`.
+- **Do not read the animator scale to decide what a test expects.** It is a global, and by the
+  time this suite reaches any one class something earlier has already turned animators off.
+  `StepTransitionTest` sets the scale it needs per test, through reflection, and puts it back.
+
+That test also pins down that Settings → Accessibility → **Remove animations** is honoured —
+the flow stops moving entirely rather than moving quickly, which is the point of the setting.
+
 ### Looking at the UI yourself
 
 A visual change should be looked at, not reasoned about. `SystemColorsLayoutTest` shows the
