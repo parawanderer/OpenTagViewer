@@ -155,6 +155,7 @@ Skills carry the longer version of a workflow, so this file can stay short:
 | --- | --- |
 | `.claude/skills/add-strings/` | any user-facing string — adding, rewording, removing, checking |
 | `.claude/skills/device-screenshots/` | rendering the UI on the managed device and reading it cheaply |
+| `.claude/skills/watch-pr/` | watching a pushed PR's checks through to a verdict, and acting on it |
 
 The test for whether it belongs here rather than in a comment: would somebody hit it *before*
 reading the code that explains it? Anisette's machine-identity binding is the example — it
