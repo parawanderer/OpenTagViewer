@@ -194,6 +194,50 @@ Three things follow:
 so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
 user reading their device list can recognise it — see the wiki.
 
+### 12. A UI change gets a test that inflates it, and one that drives it
+
+UI is where this repo's silent failures live. Nothing throws, the build is green, and the
+screen is simply wrong — blank, unreadable, or quietly dropping what the user typed. Every
+example below shipped or nearly shipped here.
+
+**Inflate it. Almost always, and it is cheap.** No activity, no account, no network: build a
+themed context, inflate, measure, draw to a bitmap. `SystemColorsLayoutTest` is the pattern.
+What to actually assert:
+
+| Check | The failure it catches |
+| --- | --- |
+| It inflates at all | a missing `?attr/`, a style that does not exist in this theme, a bad `tools:` leak — throws at runtime only, on the one screen nobody opened |
+| Every id the code looks up resolves | a renamed id still compiles; `findViewById` returns null and the screen half-works |
+| Drawables load **the way the app loads them** | `ResourcesCompat.getDrawable(..., null)` draws a theme-attribute vector as *nothing*. The history timeline went blank this way while its screenshot test stayed green, because the test passed a theme and the app did not |
+| Resolved colours, not named ones | contrast is a number: 3:1 non-text, 4.5:1 AA. A selected pin here once landed at 1.23:1 — present, correct, invisible |
+| Dark mode, as a second render | `createConfigurationContext` with `UI_MODE_NIGHT_YES`. Half of what breaks only breaks in one mode |
+| Measured size is not zero, and does not clip | `wrap_content` on something that measures to nothing |
+| A screenshot, alongside the assertions | it explains *why* a failure looks wrong. **It is not itself an assertion** — see below |
+
+**Then drive it with Espresso and fakes, for the error paths as much as the success one.**
+Success gets exercised by hand constantly; failures do not, and failures are what users meet.
+`AppDependencies.replaceAnisette` and the fake auth service exist for exactly this — states
+that would otherwise need Apple to have shipped a new build or the network to be down.
+`TestHostActivity` hosts a dialog without starting an activity that wants an Apple session.
+
+Assert what the user is told, per failure, not merely that something failed. Every import
+error used to arrive at one toast telling people to restart the app, and no test noticed
+because no test asked what it said.
+
+**Two habits that make the difference between a test and a decoration:**
+
+- **Check the test can fail.** Break the thing on purpose and confirm it goes red. Ten
+  green tests first try is a reason for suspicion, not confidence — the paste handling in
+  `BundlePasscodeDialogTest` was verified this way, by reinstating the truncation bug it
+  exists to catch and watching exactly two of the ten turn red.
+- **A screenshot is not an assertion.** It shows what one configuration looked like once.
+  Assert the resolved colour, the ratio, the measured height — and be careful what the
+  assertion is *about*.
+
+The mechanics of all of this — `Eventually`, the managed device, rendering to a bitmap and
+compacting the results — are under [Building and testing](#building-and-testing) below. Do not
+restate them here; this rule is about *what* to cover, that section is about *how*.
+
 ---
 
 ## Building and testing
@@ -266,6 +310,10 @@ Two more rules that came out of the same failures:
   first one completed the sign-in and there is no activity left to close a keyboard on.
 - **A `GONE` view still matches `withId`.** "Not on screen" is `matches(not(isDisplayed()))`,
   never an expected `NoMatchingViewException`.
+- **`replaceText`, not `typeText`, for any field that moves focus as it fills.** The 2FA code
+  boxes and the bundle passcode groups both advance when full, and Espresso's per-character
+  typing fails the moment the field it started on stops being focused. It is also the case
+  people actually hit: a code is pasted far more often than typed.
 
 #### `animationsDisabled` does not disable animations
 
