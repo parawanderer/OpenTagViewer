@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import json
+import re
+
 import pytest
 
 import main
@@ -64,6 +66,102 @@ def test_convertPlistToJson_produces_restorable_json(plist_path):
     from findmy import FindMyAccessory
     restored = FindMyAccessory.from_json(parsed)
     assert restored is not None
+
+
+# --------------------------------------------------------------------------
+# accessoryFromJson
+#
+# Two kinds of tag now reach the fetch path, and they are sibling classes rather than
+# a base and a subclass: an Apple-paired accessory derives its keys from a master key
+# and two secrets, a self-generated one carries a plain list and derives nothing.
+# FindMy.py has no factory that reads both, so the dispatch is ours - which makes
+# "does an existing user's stored tag still load" a question worth asking out loud.
+# --------------------------------------------------------------------------
+
+_CUSTOM_ACCESSORY = {
+    "type": "custom_rolling_key_accessory",
+    # Two 28-byte private keys, which is the size FindMy.py's KeyPair expects.
+    "private_keys": ["11" * 28, "22" * 28],
+    "name": "A tag nobody paired",
+    "identifier": "openhaystack-1",
+}
+
+
+@pytest.mark.skipif(not BEACON_PLISTS, reason="no redacted beacon fixture available")
+def test_an_apple_paired_tag_still_loads():
+    """
+    The upgrade case, and the one with something to lose.
+
+    Every beacon an existing user has is stored as this. If the dispatch got it wrong they
+    would all stop locating at once, on a build that installed cleanly.
+    """
+    stored = main.convertPlistToJson(_read_plist_xml(BEACON_PLISTS[0]))
+
+    accessory = main.accessoryFromJson(stored)
+
+    assert isinstance(accessory, main.FindMyAccessory)
+    # Round-trips through the same door it came out of, which is what the fetch path does
+    # after every call to persist the updated alignment.
+    assert main.accessoryFromJson(json.dumps(accessory.to_json())) is not None
+
+
+def test_a_self_generated_tag_loads_as_the_other_kind():
+    accessory = main.accessoryFromJson(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert isinstance(accessory, main.FixedRollingKeyPairAccessory)
+    assert accessory.identifier == "openhaystack-1"
+    assert accessory.name == "A tag nobody paired"
+
+
+def test_a_self_generated_tag_survives_the_round_trip_the_fetch_path_makes():
+    """
+    `getLastReports` writes `to_json()` back to the database after every fetch, so a tag that
+    reads but does not re-read would work once and then be unreadable - a failure that only
+    appears on the *second* refresh.
+    """
+    once = main.accessoryFromJson(json.dumps(_CUSTOM_ACCESSORY))
+    twice = main.accessoryFromJson(json.dumps(once.to_json()))
+
+    assert twice.identifier == once.identifier
+    assert list(twice.keys_between(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 2, tzinfo=timezone.utc),
+    )) == list(once.keys_between(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 2, tzinfo=timezone.utc),
+    ))
+
+
+def test_both_kinds_offer_everything_the_fetch_path_uses():
+    """
+    The reason the rest of the fetch path never learns which kind it has.
+
+    If a future library version moved one of these off one of the two classes, the fetch would
+    fail at runtime for that kind only - and only for whoever owns that kind of tag.
+    """
+    for accessoryType in main.ACCESSORY_TYPES.values():
+        for method in ("keys_between", "get_min_index", "get_max_index",
+                       "update_alignment", "to_json", "from_json"):
+            assert hasattr(accessoryType, method), f"{accessoryType.__name__} lost {method}"
+
+
+def test_an_unknown_type_is_refused_rather_than_guessed_at():
+    """
+    Loud, because the quiet alternative is worse.
+
+    Guessing would fetch against keys from a different derivation, which finds nothing and
+    reads as a tag that is simply out of range rather than as a bug.
+    """
+    with pytest.raises(ValueError) as raised:
+        main.accessoryFromJson(json.dumps({"type": "something_from_the_future"}))
+
+    assert "something_from_the_future" in str(raised.value)
+
+
+@pytest.mark.parametrize("blob", ['{"no": "type"}', '"a string"', "null", "[]"])
+def test_json_that_is_not_an_accessory_is_refused(blob):
+    with pytest.raises(ValueError):
+        main.accessoryFromJson(blob)
 
 
 def test_convertPlistToJson_returns_none_on_garbage():
@@ -282,8 +380,10 @@ class _FakeRequestList:
 
 
 def _runGetLastReports(monkeypatch, fetch_result, hours_back=24):
-    monkeypatch.setattr(
-        main.FindMyAccessory, "from_json", staticmethod(lambda _json: _FakeAirtag()))
+    # The dispatch, not the library class. These tests are about what getLastReports does with
+    # an accessory, not about reading one - and patching FindMy.py's own from_json used to let
+    # them feed it a blob with no "type", which the real thing has always rejected.
+    monkeypatch.setattr(main, "accessoryFromJson", lambda _json: _FakeAirtag())
     monkeypatch.setattr(
         main, "_fetchReportsForAccessory", lambda *args, **kwargs: fetch_result)
 
@@ -501,6 +601,53 @@ def test_a_session_that_still_works_restores_normally():
 # --------------------------------------------------------------------------
 # Guard against the test environment drifting from what the app ships
 # --------------------------------------------------------------------------
+
+# The four files spell the same pin four ways - `...FindMy.py@<sha>`, `?rev=<sha>#<sha>`, and
+# TOML's `{ git = "...FindMy.py", rev = "<sha>" }` - so this matches a full sha anywhere on a
+# line that names the repository, rather than one exact syntax. Deliberately not "any 40-hex
+# string in the file": uv.lock is full of other packages' revisions.
+_FINDMY_SHA = re.compile(r"FindMy\.py[^\n]{0,80}?([0-9a-f]{40})")
+
+
+def test_the_whole_repository_pins_one_findmy():
+    """
+    One repository, one FindMy.py - in the app build, the bridge tests, and the exporter.
+
+    **Because `opentagviewer_export` is shared code that runs under both.** Chaquopy packages it
+    into the APK, where it executes against the pin in `app/build.gradle.kts`, and the desktop
+    exporter runs the same files from source against `python/uv.lock`. Two commits of one library
+    behind one package is a bug waiting for the first API difference, and it would break exactly
+    one of the two consumers.
+
+    The exporter tracked the *branch*, so this drifted by construction: every `uv lock` picked up
+    whatever had been pushed since. A build was still reproducible - the lockfile records what it
+    resolved - but "which FindMy.py does this repository use" had two answers.
+
+    Three files, one sha. Moving it means moving all three.
+    """
+    root = Path(__file__).resolve().parents[3].parent
+
+    sources = {
+        "app/build.gradle.kts": root / "app" / "build.gradle.kts",
+        "app/src/test/python/requirements.txt": Path(__file__).resolve().parent
+        / "requirements.txt",
+        "python/pyproject.toml": root / "python" / "pyproject.toml",
+        "python/uv.lock": root / "python" / "uv.lock",
+    }
+
+    found = {}
+    for name, path in sources.items():
+        assert path.is_file(), f"{name} is missing - this test no longer checks what it thinks"
+        shas = set(_FINDMY_SHA.findall(path.read_text(encoding="utf-8")))
+        assert shas, f"{name} does not pin FindMy.py to a commit"
+        assert len(shas) == 1, f"{name} names more than one FindMy.py commit: {sorted(shas)}"
+        found[name] = shas.pop()
+
+    assert len(set(found.values())) == 1, (
+        "the repository pins more than one FindMy.py:\n"
+        + "\n".join(f"  {name}: {sha}" for name, sha in sorted(found.items()))
+    )
+
 
 def test_pinned_versions_match_the_app_build():
     """

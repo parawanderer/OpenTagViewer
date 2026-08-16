@@ -326,13 +326,8 @@ class StubAccessory:
 
 @pytest.fixture
 def stub_accessory(monkeypatch):
-    """from_json needs real accessory data; the tests here only care about failure handling."""
-    class StubFindMyAccessory:
-        @staticmethod
-        def from_json(_data):
-            return StubAccessory()
-
-    monkeypatch.setattr(main, "FindMyAccessory", StubFindMyAccessory)
+    """Reading an accessory needs real data; the tests here only care about failure handling."""
+    monkeypatch.setattr(main, "accessoryFromJson", lambda _json: StubAccessory())
 
 
 def test_getReports_reports_an_error_when_every_accessory_fails(monkeypatch, stub_accessory):
