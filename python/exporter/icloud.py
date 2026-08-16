@@ -200,27 +200,34 @@ async def remember(account: AsyncAppleAccount) -> None:
     Called once signing in has worked, rather than at the end: the device is registered by then,
     and an export that is abandoned afterwards should not leave an entry nothing can reuse.
 
-    **The naming happens on the first run only.** Whether an identity was already stored is
-    exactly whether this installation has registered before, so it is also the test for whether
-    there is anything new to name. Announcing writes to the user's account, and doing it on every
-    export would be a write per run to say something already true.
-    """
-    # Read before saving: after `device.save` below there is always a stored identity, so this is
-    # the last moment the question can be asked.
-    already_registered = device.load() is not None
+    **Named once, and "once" is recorded rather than guessed at.** The first attempt at this
+    announced only when no identity was stored, on the reasoning that a stored one meant the
+    device had registered before. That is true and it is the wrong question: everybody already
+    running the exporter had an identity and *no name*, so the people the naming exists for were
+    precisely the ones it skipped. What matters is whether this installation has been *named*,
+    which is now a field.
 
-    # The account's own serialisation, with only the two harmless parts taken out of it. It also
+    Announcing renames the registration that signing in already made - it does not add a second
+    one - so an existing install gets its entry corrected on the next run and never again.
+    """
+    stored = device.load() or {}
+
+    # The account's own serialisation, with only the harmless parts taken out of it. It also
     # carries the username, the password and the login state - which is exactly why this picks
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
-    device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
+    named = bool(stored.get("announced")) or await _announce(account)
 
-    if not already_registered:
-        await _announce(account)
+    device.save(
+        state["ids"]["uid"],
+        state["ids"]["devid"],
+        state["anisette"],
+        announced=named,
+    )
 
 
-async def _announce(account: AsyncAppleAccount) -> None:
+async def _announce(account: AsyncAppleAccount) -> bool:
     """
     Tell Apple what to call this device, so the row a user reads names the program.
 
@@ -230,18 +237,23 @@ async def _announce(account: AsyncAppleAccount) -> None:
     rule 11 is why both are set from one place.
 
     **Never fatal.** The export works either way; what is lost is a recognisable name, and failing
-    a sign-in that has already succeeded to report a cosmetic problem would be the wrong trade. It
-    is logged rather than raised, and the next fresh install tries again.
+    a sign-in that has already succeeded to report a cosmetic problem would be the wrong trade.
+
+    :returns: Whether it worked, so a failure is not recorded as done and the next run tries again.
     """
     try:
         await account.announce_device()
-        logger.info("Registered this device as %r in the account's device list", DEVICE_NAME)
     except Exception:
         logger.warning(
             "Could not name this device in your Apple account, so it will show under whatever"
-            " hardware this claims to be. The export is unaffected.",
+            " hardware this claims to be. The export is unaffected, and the next run tries again.",
             exc_info=True,
         )
+        return False
+
+    logger.info("Registered this device as %r in the account's device list", DEVICE_NAME)
+
+    return True
 
 
 MAX_LOGIN_ATTEMPTS = 3
