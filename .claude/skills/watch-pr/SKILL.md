@@ -30,18 +30,32 @@ gh pr view "$PR" --json statusCheckRollup --jq \
 
 ## First check whether this PR gets checks at all
 
-An **empty** rollup is not "too early" — it may mean nothing will ever run. Every workflow here
-is path-filtered (`app/**`, `scripts/**`, `gradle/**`, `pyrightconfig.json`, `.flake8`), so a PR
-touching only docs, `.gitattributes`, `.claude/`, or `.github/` itself produces no checks and a
-monitor on it waits out its whole timeout for nothing.
+An **empty** rollup is not "too early" — it may mean nothing will ever run.
 
 ```bash
-gh pr view <n> --json statusCheckRollup --jq '.statusCheckRollup | length'
+gh pr view <n> --json statusCheckRollup,baseRefName \
+  --jq '{base: .baseRefName, checks: (.statusCheckRollup | length)}'
 ```
 
-Zero, and the diff touches no filtered path? **Do not arm a monitor.** Say the change is not
-covered by CI and why, and let the human decide — that is more useful than a green tick would
-have been, because it names what is *not* being verified.
+Two independent reasons it comes back zero, and **the second one is invisible in the diff**:
+
+- **Path filters.** Every workflow here is filtered (`app/**`, `scripts/**`, `gradle/**`,
+  `pyrightconfig.json`, `.flake8`), so a PR touching only docs, `.gitattributes`, `.claude/`, or
+  `.github/` itself produces nothing.
+- **A base that is not `main`.** Every workflow is `pull_request: branches: [ "main" ]`, so a
+  **stacked PR gets no checks whatsoever**, however much application code it touches. This is
+  the one that catches you out: the obvious test — "does the diff touch a filtered path?" —
+  says yes, and still nothing runs. Seen on #105, which changed `app/**` heavily and had a
+  rollup of zero because it was based on the branch of #104.
+
+Zero either way? **Do not arm a monitor.** Say the change is not covered by CI and why, and let
+the human decide — that is more useful than a green tick would have been, because it names what
+is *not* being verified. For a stack, the choice is theirs: merge the base so GitHub retargets
+the child onto `main`, or retarget it now and accept the parent's commits showing in the diff.
+
+**Whichever they pick, local runs are the only evidence until then.** Say what you ran, in
+numbers — `./gradlew :app:testEmulatorDebugAndroidTest` and the pytest suites — rather than
+letting "no checks" read as "nothing to check".
 
 ## Use `gh pr view`, not `gh pr checks`
 
@@ -68,14 +82,23 @@ while true; do
         '.statusCheckRollup[] | select(.status == "COMPLETED") | "\(.name): \(.conclusion)"' 2>/dev/null | sort)
   comm -13 <(printf '%s\n' "$seen") <(printf '%s\n' "$now")
   seen="$now"
+  total=$(gh pr view "$PR" --json statusCheckRollup --jq '.statusCheckRollup | length' 2>/dev/null)
+  if [ "$total" = "0" ]; then
+    echo "PR #$PR: NO CHECKS EXIST - nothing is verifying this. See the section above."
+    break
+  fi
   if [ "$(gh pr view "$PR" --json statusCheckRollup --jq \
           '[.statusCheckRollup[].status] | all(. == "COMPLETED")' 2>/dev/null)" = "true" ]; then
-    echo "PR #$PR: all checks finished"
+    echo "PR #$PR: all $total checks finished"
     break
   fi
   sleep 30
 done
 ```
+
+**The zero case is checked separately, and that is not belt-and-braces.** `[] | all(...)` is
+`true` in jq, so without it an empty rollup exits immediately announcing "all checks finished" —
+a monitor reporting success over a PR that ran nothing at all. That happened on #105.
 
 `timeout_ms`: the emulator suite here takes several minutes and the whole run rarely exceeds 20,
 so 2700000 (45 min) is comfortable. `persistent: false` — it ends itself.

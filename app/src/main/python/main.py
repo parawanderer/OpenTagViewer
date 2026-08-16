@@ -441,13 +441,21 @@ def getAccount(
 
         print(f"Restored account, login state: {acc.login_state}")
         if acc.login_state != LoginState.LOGGED_IN:
-            # Worth saying plainly rather than leaving to the traceback that follows minutes
-            # later from somewhere else entirely. This is the state that makes every fetch
-            # raise InvalidStateError with nothing sent.
+            # **Not a successful restore, and it used to be treated as one.** This account is
+            # readable and unusable: every fetch fails its state check before a request is even
+            # made, so the app came up showing stale pins and spinners that stopped, with the
+            # reason only in the log. Issue #43.
+            #
+            # Reported as a failure so the caller can do the one thing that helps - send the
+            # user to sign in again. That is safe here because the app only ever stores an
+            # account after a completed sign-in: mid-2FA state is never written, so this state
+            # can only mean the session went bad afterwards.
             print(
-                "Restored account is NOT logged in - every report fetch will fail its state "
-                "check before any request is made. See issue #43."
+                f"Restored account is not logged in (state: {acc.login_state}) - Apple has "
+                "stopped accepting this session. Treating it as a failed restore so the user "
+                "is asked to sign in again rather than left with a map that never updates."
             )
+            return None
 
         return acc
     except Exception:

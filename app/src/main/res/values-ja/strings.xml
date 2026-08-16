@@ -108,7 +108,6 @@
     <string name="map_provider">地図プロバイダ</string>
     <string name="map_provider_google">Google マップ</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">FindMy ライブラリが更新されました。もう一度サインインしてください。</string>
     <string name="maps_api_key_missing_title">Google マップ API キーがありません</string>
     <string name="maps_api_key_missing_message">このビルドには Google マップ API キーがないため、地図を読み込めません。secrets.properties に MAPS_API_KEY を追加してビルドし直すか、設定で別の地図プロバイダを選択してください。</string>
     <string name="resolving_tags_banner">タグの位置を初めて特定しています。数分かかる場合があります。アプリを開いたままにしてください。</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">このコードではバンドルを開けませんでした。エクスポーターが表示したコードと照らし合わせてください。</string>
     <string name="import_failed_locked">このバンドルはロックされていますが、コードが入力されていません。</string>
     <string name="bundle_passcode_malformed">コードは数字と英字のみで構成されます。</string>
+    <string name="session_expired_title">もう一度サインインしてください</string>
+    <string name="session_expired_message">この端末に保存されたサインインが Apple に受け付けられなくなりました。もう一度サインインするまで、タグの位置を取得できません。
+
+タグと位置履歴はこの端末に残っています。失われたものはありません。</string>
+    <string name="ok">OK</string>
 </resources>

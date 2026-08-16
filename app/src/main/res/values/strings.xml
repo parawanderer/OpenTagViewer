@@ -129,7 +129,6 @@
     <string name="map_provider">Map Provider</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
-    <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
     <string name="amap_api_key" translatable="false">AMap API Key</string>
     <string name="amap_api_key_explanation">AMap requires each user to supply their own API key. Register one at lbs.amap.com, choosing "Android SDK" as the platform, and paste it here.</string>
     <string name="amap_copy_registration_details">Copy package name and SHA1</string>
@@ -195,4 +194,9 @@
     <string name="import_failed_locked">This bundle is locked and no code was entered.</string>
     <string name="bundle_passcode_malformed">A code is made of digits and letters only.</string>
     <string name="bundle_passcode_group_separator" translatable="false">-</string>
+    <string name="session_expired_title">Please sign in again</string>
+    <string name="session_expired_message">Apple no longer accepts the saved sign-in for this device, so your tags cannot be located until you sign in again.
+
+Your tags and their location history stay on this phone — nothing has been lost.</string>
+    <string name="ok">OK</string>
 </resources>

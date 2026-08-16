@@ -108,7 +108,6 @@
     <string name="map_provider">Kartenanbieter</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">Bitte melden Sie sich erneut an – die FindMy-Bibliothek wurde aktualisiert.</string>
     <string name="maps_api_key_missing_title">Google Maps API-Schlüssel fehlt</string>
     <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
     <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">Mit diesem Code ließ sich das Bündel nicht öffnen. Vergleiche ihn mit dem, den der Exporter angezeigt hat.</string>
     <string name="import_failed_locked">Dieses Bündel ist gesperrt und es wurde kein Code eingegeben.</string>
     <string name="bundle_passcode_malformed">Ein Code besteht nur aus Ziffern und Buchstaben.</string>
+    <string name="session_expired_title">Bitte erneut anmelden</string>
+    <string name="session_expired_message">Apple akzeptiert die gespeicherte Anmeldung dieses Geräts nicht mehr. Ihre Tags können erst wieder geortet werden, wenn Sie sich erneut anmelden.
+
+Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts verloren gegangen.</string>
+    <string name="ok">OK</string>
 </resources>
