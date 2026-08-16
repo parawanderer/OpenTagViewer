@@ -3,8 +3,8 @@ package dev.wander.android.opentagviewer.ui.history;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
+import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Geocoder;
 import android.text.format.DateFormat;
@@ -18,7 +18,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.SimpleDateFormat;
@@ -122,20 +122,27 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
             viewHolder.getLocationDetail().setVisibility(GONE);
         }
 
-        Drawable tile;
+        // Loaded through the row's own context, so the theme is available. These tiles are
+        // vectors whose fills are theme attributes, and an attribute cannot be resolved
+        // without a theme - passing null here drew them as nothing at all, which is not an
+        // error anybody sees: the timeline column simply went blank. The Resources handed to
+        // this adapter carry no theme, hence the view's.
+        final Context context = viewHolder.itemView.getContext();
+
+        final int tileRes;
         if (position < this.locations.size() - 1) {
-            tile = ResourcesCompat.getDrawable(resources,
-                    this.selectedItems.contains(position) ? R.drawable.pin_drop_tile_pin_filled
-                        : R.drawable.pin_drop_tile_empty_filled,
-                    null);
+            tileRes = this.selectedItems.contains(position)
+                    ? R.drawable.pin_drop_tile_pin_filled
+                    : R.drawable.pin_drop_tile_empty_filled;
         } else {
             // last item gets special icon tile
-            tile = ResourcesCompat.getDrawable(resources,
-                    this.selectedItems.contains(position) ? R.drawable.pin_drop_tile_pin_filled_bottom
-                            : R.drawable.pin_drop_tile_empty_filled_bottom,
-                    null);
+            tileRes = this.selectedItems.contains(position)
+                    ? R.drawable.pin_drop_tile_pin_filled_bottom
+                    : R.drawable.pin_drop_tile_empty_filled_bottom;
         }
-        viewHolder.getLocationHistoryTile().setImageDrawable(tile);
+
+        viewHolder.getLocationHistoryTile()
+                .setImageDrawable(AppCompatResources.getDrawable(context, tileRes));
 
         var format = DateFormat.getBestDateTimePattern(Locale.getDefault(), "hh:mm:ss");
         var timestampFormat = new SimpleDateFormat(format, Locale.getDefault());

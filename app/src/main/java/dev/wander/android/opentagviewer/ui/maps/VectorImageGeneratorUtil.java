@@ -57,7 +57,8 @@ public final class VectorImageGeneratorUtil {
     private static final float EMOJI_TEXT_SIZE = 60;
 
     public static Bitmap vectorToBitmap(@NonNull Resources resources, @DrawableRes int id) {
-        Drawable vectorDrawable = Objects.requireNonNull(ResourcesCompat.getDrawable(resources, id, null));
+        Drawable vectorDrawable = Objects.requireNonNull(// TINTED_AFTERWARDS: setTint below replaces every fill, so no theme is needed here.
+        ResourcesCompat.getDrawable(resources, id, null));
         Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         vectorDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
@@ -74,7 +75,8 @@ public final class VectorImageGeneratorUtil {
             return BITMAP_CACHE.get(key);
         }
 
-        Drawable markerDrawable = Objects.requireNonNull(ResourcesCompat.getDrawable(resources, R.drawable.location_on_56px, null));
+        Drawable markerDrawable = Objects.requireNonNull(// TINTED_AFTERWARDS: setTint below replaces every fill, so no theme is needed here.
+        ResourcesCompat.getDrawable(resources, R.drawable.location_on_56px, null));
         final int unit = (int)((float)markerDrawable.getIntrinsicWidth() / 3.5f);
 
         Bitmap bitmap = drawBackgroundForMarker(markerDrawable);
@@ -103,7 +105,8 @@ public final class VectorImageGeneratorUtil {
             return BITMAP_CACHE.get(key);
         }
 
-        Drawable markerDrawable = Objects.requireNonNull(ResourcesCompat.getDrawable(resources, R.drawable.location_on_56px, null));
+        Drawable markerDrawable = Objects.requireNonNull(// TINTED_AFTERWARDS: setTint below replaces every fill, so no theme is needed here.
+        ResourcesCompat.getDrawable(resources, R.drawable.location_on_56px, null));
         final int unit = (int)((float)markerDrawable.getIntrinsicWidth() / 3.5f);
         final int half = unit / 2;
 
@@ -113,7 +116,8 @@ public final class VectorImageGeneratorUtil {
         drawMarker(canvas, markerDrawable, markerColor);
 
         // draw secondary icon on marker (e.g. apple icon)
-        Drawable iconOnMarkerDrawable = Objects.requireNonNull(ResourcesCompat.getDrawable(resources, innerIcon, null));
+        Drawable iconOnMarkerDrawable = Objects.requireNonNull(// TINTED_AFTERWARDS: setTint below replaces every fill, so no theme is needed here.
+        ResourcesCompat.getDrawable(resources, innerIcon, null));
         iconOnMarkerDrawable.setBounds(unit, half + INNER_ICON_OFFSET_TOP, canvas.getWidth() - unit, canvas.getHeight() - (unit + half) + INNER_ICON_OFFSET_TOP);
         DrawableCompat.setTint(iconOnMarkerDrawable, iconColor);
         iconOnMarkerDrawable.draw(canvas);
