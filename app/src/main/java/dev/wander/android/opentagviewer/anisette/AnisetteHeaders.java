@@ -65,13 +65,14 @@ public final class AnisetteHeaders {
         headers.put("X-Apple-I-MD", Base64.encodeToString(oneTimePassword, Base64.NO_WRAP));
         headers.put("X-Apple-I-MD-M", Base64.encodeToString(machineIdentifier, Base64.NO_WRAP));
         headers.put("X-Apple-I-MD-RINFO", ROUTING_INFO);
-        headers.put("X-Apple-I-MD-LU", this.identity.localUserUuid());
+        headers.put("X-Apple-I-MD-LU",
+                this.identity.hardware().localUserHeader(this.identity.localUserUuid()));
         headers.put("X-Apple-I-SRL-NO", "0");
         headers.put("X-Apple-I-Client-Time", clientTime());
         headers.put("X-Apple-I-TimeZone", TimeZone.getDefault().getID());
         headers.put("X-Apple-Locale", Locale.getDefault().toString());
         headers.put("X-Mme-Device-Id", this.identity.uniqueDeviceIdentifier());
-        headers.put("X-MMe-Client-Info", AdiDeviceIdentity.CLIENT_INFO);
+        headers.put("X-MMe-Client-Info", this.identity.hardware().clientInfo());
         return headers;
     }
 

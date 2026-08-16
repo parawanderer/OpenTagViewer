@@ -7,6 +7,9 @@ import android.util.Log;
 
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,10 +37,27 @@ import java.util.Map;
 public final class LocalAnisette implements AnisetteSource {
     private static final String TAG = "LocalAnisette";
 
-    private static final String PREFERENCES = "anisette-identity";
-    private static final String KEY_DEVICE_ID = "uniqueDeviceIdentifier";
-    private static final String KEY_ADI_ID = "adiIdentifier";
-    private static final String KEY_LOCAL_USER = "localUserUuid";
+    /**
+     * Where the identity lives.
+     *
+     * <p>Visible because this is a <b>storage contract with installs already in the field</b>,
+     * not an implementation detail. What is written here decides whether an upgrade keeps
+     * somebody signed in, and the only way to test that is to write the older shape and read it
+     * back - so the test names these rather than a copy of them, which would keep passing after
+     * the real ones moved.
+     */
+    public static final String PREFERENCES = "anisette-identity";
+    public static final String KEY_DEVICE_ID = "uniqueDeviceIdentifier";
+    public static final String KEY_ADI_ID = "adiIdentifier";
+    public static final String KEY_LOCAL_USER = "localUserUuid";
+
+    /**
+     * Which machine this install claims to be.
+     *
+     * <p>Added after the other three, so <b>its absence beside them is meaningful</b>: it marks
+     * an install from before there was a choice, which can only have been the Mac.
+     */
+    public static final String KEY_HARDWARE = "hardwareProfile";
 
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
@@ -188,7 +208,17 @@ public final class LocalAnisette implements AnisetteSource {
         final String localUser = preferences.getString(KEY_LOCAL_USER, null);
 
         if (deviceId != null && adiId != null && localUser != null) {
-            return new AdiDeviceIdentity(deviceId, adiId, localUser);
+            // **An install that already has an identity keeps the machine it has always
+            // claimed to be.** The absence of the hardware key is what says "from before
+            // profiles existed", and that can only mean the Mac: it is the only thing this app
+            // ever sent. Defaulting a pre-existing install to the new profile instead would
+            // re-identify it to Apple, which costs the user a sign-in and leaves a second
+            // device-list entry - to change the icon on a row they already recognise.
+            final AdiDeviceIdentity.Hardware hardware =
+                    hardwareFrom(preferences.getString(KEY_HARDWARE, null),
+                            AdiDeviceIdentity.Hardware.LEGACY_MAC);
+
+            return new AdiDeviceIdentity(deviceId, adiId, localUser, hardware);
         }
 
         final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
@@ -196,10 +226,77 @@ public final class LocalAnisette implements AnisetteSource {
                 .putString(KEY_DEVICE_ID, fresh.uniqueDeviceIdentifier())
                 .putString(KEY_ADI_ID, fresh.adiIdentifier())
                 .putString(KEY_LOCAL_USER, fresh.localUserUuid())
+                .putString(KEY_HARDWARE, fresh.hardware().name())
                 .apply();
 
-        Log.i(TAG, "generated a new device identity - this must now be kept");
+        Log.i(TAG, "generated a new device identity as " + fresh.hardware()
+                + " - this must now be kept");
         return fresh;
+    }
+
+    /**
+     * The stored profile, or {@code fallback} when there is nothing usable stored.
+     *
+     * <p>An unrecognised name falls back rather than throwing. A profile removed in a later
+     * version would otherwise make an install that has one unable to start at all, and the
+     * identity is not worth crashing over - the fallback re-identifies that install, which is
+     * bad, but it is recoverable and a crash loop is not.
+     */
+    private static AdiDeviceIdentity.Hardware hardwareFrom(
+            final String stored, final AdiDeviceIdentity.Hardware fallback) {
+        if (stored == null) {
+            return fallback;
+        }
+        try {
+            return AdiDeviceIdentity.Hardware.valueOf(stored);
+        } catch (final IllegalArgumentException e) {
+            Log.w(TAG, "unknown stored hardware profile " + stored + ", using " + fallback);
+            return fallback;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Deliberately does not go through {@link #ensureReady}. A sign-in that falls back to a
+     * remote server needs this answer too, and it must be the <i>same</i> answer - which kind
+     * of Anisette produced a session is a transport detail, and a user whose local Anisette
+     * failed must not thereby become a different machine.
+     *
+     * <p>Reads the loaded identity when there is one, and otherwise reads - or, on a genuinely
+     * fresh install, writes - the persisted one. Generating it here rather than in
+     * {@link #load} is intentional: an install that only ever uses a remote server still has an
+     * identity, and it is the same one it will use if local Anisette is turned on later.
+     */
+    @Override
+    public synchronized String hardwareProfileJson() {
+        return currentIdentity().hardware().toJson();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The local user id is handed over <b>as stored</b>, not as the header renders it.
+     * FindMy.py base64-encodes it on the way out, so passing the encoded form would encode it
+     * twice - which is a value Apple has never seen, from a client claiming to be the same
+     * installation. See {@code AdiDeviceIdentity.Hardware#localUserHeader}.
+     */
+    @Override
+    public synchronized String deviceIdsJson() {
+        final AdiDeviceIdentity current = currentIdentity();
+        try {
+            return new JSONObject()
+                    .put("uid", current.localUserUuid())
+                    .put("devid", current.uniqueDeviceIdentifier())
+                    .toString();
+        } catch (final JSONException e) {
+            throw new IllegalStateException("could not describe this installation", e);
+        }
+    }
+
+    /** The identity in memory if it has been loaded, and the persisted one otherwise. */
+    private AdiDeviceIdentity currentIdentity() {
+        return this.identity != null ? this.identity : loadOrCreateIdentity();
     }
 
     /** Why local Anisette is not being used, or null if it is. */
