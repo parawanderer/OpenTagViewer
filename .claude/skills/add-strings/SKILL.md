@@ -69,7 +69,26 @@ script cannot do what you need. It is slower and it is what the script exists to
 | `--locales` | Lists discovered locales and their files |
 | `<file.json>` | Adds strings; **errors** if any locale is missing or the name already exists |
 | `--fill <file.json>` | Adds only where missing — for back-filling what `--check` reported |
+| `--show <name>...` | Prints existing strings in the input format, ready to edit |
+| `--replace <file.json>` | Rewords strings that already exist; errors if one is not defined everywhere |
+| `--remove <name>...` | Deletes strings from every locale; errors if a name exists nowhere |
 | `--check` | Fails if any locale lacks a string the default locale has. Run before a PR |
+
+## Removing and renaming
+
+Do not hand-delete a string from ten files, for the same reason you do not hand-add one:
+
+```bash
+python scripts/add_strings.py --remove old_name
+```
+
+**Renaming is `--remove` then an ordinary add.** Nothing updates references — if a layout or
+menu still points at a removed string, `aapt` fails the build, which is how you want to find
+out.
+
+Rewording something that already exists is `--show` piped into a file, edited, then
+`--replace`. That refuses unless the string is defined in every locale, so a typo in the name
+fails instead of quietly doing nothing.
 
 ## Translating
 

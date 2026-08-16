@@ -325,6 +325,7 @@ python scripts/add_strings.py new.json        # add strings to every locale
 python scripts/add_strings.py --fill new.json # add only where missing, for back-filling
 python scripts/add_strings.py --show <name>…  # print current text, in the input format
 python scripts/add_strings.py --replace r.json # reword strings that already exist
+python scripts/add_strings.py --remove <name>… # delete strings from every locale
 python scripts/add_strings.py --check         # fail if any locale is missing a string
 ```
 
@@ -340,6 +341,17 @@ Two reasons this is the rule. A missed locale keeps the old wording and still pa
 `--check`, so nothing complains and the app says two different things in two languages. And
 the intermediate JSON puts all ten translations in one reviewable diff, instead of ten
 separate edits nobody reads to the end.
+
+**Deleting goes through `--remove`, and renaming is `--remove` followed by an ordinary add.**
+
+```bash
+python scripts/add_strings.py --remove export_tag
+```
+
+The same argument applies: a string missed in one locale is still valid XML and still passes
+`--check`, so an orphan sits there indefinitely. `--remove` refuses names that exist nowhere,
+so a typo fails loudly. It does **not** update references — if a layout or menu still points
+at a removed string, aapt fails the build, which is the intended way to find out.
 
 Translations are read **from a JSON file, never from a command-line argument**. That is not
 a style preference: passing non-ASCII text through shell quoting has twice corrupted it here,
