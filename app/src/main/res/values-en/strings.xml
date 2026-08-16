@@ -108,7 +108,6 @@
     <string name="map_provider">Map Provider</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">Please sign in again — the FindMy library has been updated.</string>
     <string name="maps_api_key_missing_title">Google Maps API key missing</string>
     <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
     <string name="resolving_tags_banner">Locating your tags for the first time. This can take a few minutes — please keep the app open.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">That code did not open the bundle. Check it against the one the exporter showed.</string>
     <string name="import_failed_locked">This bundle is locked and no code was entered.</string>
     <string name="bundle_passcode_malformed">A code is made of digits and letters only.</string>
+    <string name="session_expired_title">Please sign in again</string>
+    <string name="session_expired_message">Apple no longer accepts the saved sign-in for this device, so your tags cannot be located until you sign in again.
+
+Your tags and their location history stay on this phone — nothing has been lost.</string>
+    <string name="ok">OK</string>
 </resources>

@@ -33,6 +33,7 @@ import androidx.core.os.LocaleListCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -97,6 +98,22 @@ public class AppleLoginActivity extends AppCompatActivity {
             R.id.login_2fa_choice,
             R.id.login_2fa_container,
     };
+
+    /**
+     * Set when the user did not choose to be here - their stored session stopped working.
+     *
+     * <p>Worth distinguishing from an ordinary first run. Being dropped on a login screen with
+     * no explanation reads as the app having lost everything, and the reasonable response to
+     * that is to go and tidy up whatever unfamiliar entry is in your Apple device list - which
+     * is the one action that makes it worse.
+     */
+    public static final String EXTRA_SESSION_EXPIRED = "sessionExpired";
+
+    /**
+     * The address to put in the field, for somebody signing in again rather than for the first
+     * time. Only ever their own, read from the account being discarded.
+     */
+    public static final String EXTRA_PREFILL_EMAIL = "prefillEmail";
 
     private static final int HINT_DIFFERENT_ANISETTE_SERVER_AFTER_FAILED_2FACODES = 3;
 
@@ -221,6 +238,43 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.passwordInput = this.findViewById(R.id.password_input_field);
         this.loginButton = this.findViewById(R.id.login_button_main);
         this.twoFactorAuthChoiceBackButton = this.findViewById(R.id.twofactorauthchoice_back_button);
+
+        this.explainWhySignedOutIfSent();
+    }
+
+    /**
+     * Somebody arriving here because their session stopped working, rather than by choice.
+     *
+     * <p>Being returned to a login screen with no explanation reads as the app having lost
+     * everything - which is exactly the moment somebody goes to their Apple device list, finds
+     * an entry they do not recognise, and removes it. So it says what happened, and says that
+     * the tags and their history are still here.
+     *
+     * <p>Shown on this screen rather than by whoever sent them, because this is the screen that
+     * stays: the sender is finishing, and a dialog on a finishing activity is a leaked window.
+     */
+    private void explainWhySignedOutIfSent() {
+        final String email = this.getIntent().getStringExtra(EXTRA_PREFILL_EMAIL);
+        if (email != null && !email.isEmpty()) {
+            // Prefilled whether or not the dialog is shown, and before it, so the field is
+            // already right the moment the dialog is dismissed rather than filling in
+            // afterwards in front of the user.
+            this.emailOrPhoneInput.setText(email);
+        }
+
+        if (!this.getIntent().getBooleanExtra(EXTRA_SESSION_EXPIRED, false)) {
+            return;
+        }
+
+        // Consumed, so that rotating the device - or coming back to this screen later - does
+        // not re-announce something the user has already read and acted on.
+        this.getIntent().removeExtra(EXTRA_SESSION_EXPIRED);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.session_expired_title)
+                .setMessage(R.string.session_expired_message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
     }
 
     @Override

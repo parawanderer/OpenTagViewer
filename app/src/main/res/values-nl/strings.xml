@@ -108,7 +108,6 @@
     <string name="map_provider">Kaartaanbieder</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">Log opnieuw in — de FindMy-bibliotheek is bijgewerkt.</string>
     <string name="maps_api_key_missing_title">Google Maps API-sleutel ontbreekt</string>
     <string name="maps_api_key_missing_message">Deze build heeft geen Google Maps API-sleutel, dus de kaart wordt niet geladen. Voeg MAPS_API_KEY toe aan secrets.properties en bouw opnieuw, of kies een andere kaartaanbieder in de instellingen.</string>
     <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Dit kan een paar minuten duren — houd de app open.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">Met die code ging de bundel niet open. Vergelijk hem met de code die de exporter toonde.</string>
     <string name="import_failed_locked">Deze bundel is vergrendeld en er is geen code ingevoerd.</string>
     <string name="bundle_passcode_malformed">Een code bestaat alleen uit cijfers en letters.</string>
+    <string name="session_expired_title">Log opnieuw in</string>
+    <string name="session_expired_message">Apple accepteert de opgeslagen aanmelding van dit apparaat niet meer, dus je tags kunnen pas weer worden gelokaliseerd nadat je opnieuw inlogt.
+
+Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niets verloren gegaan.</string>
+    <string name="ok">OK</string>
 </resources>
