@@ -195,6 +195,23 @@ jobs:
 
     # --no-default-groups drops the dev group: pytest and the linters have no business in a
     # bundle handed to a user. `build` carries PyInstaller, pinned like everything else.
+    # GitHub's macOS images ship Homebrew OpenSSL whatever we install, and PyInstaller resolves
+    # `ctypes` library lookups against the *build machine's* libraries - so something probing for
+    # OpenSSL by name gets Homebrew's libcrypto.3.dylib bundled with it. A bottle's minimum macOS
+    # is fixed when Homebrew builds it, so on macos-15-intel that made the binary demand macOS 15
+    # and the deployment-target check refused it, correctly: the macOS-local route needs 14 or
+    # earlier, so a 15-only build is useless to the people who need an Intel one.
+    #
+    # Unlinking rather than uninstalling: nothing else in the job wants it, and the same probe
+    # already fails harmlessly for `libssl.so.1.1.0` and `libssl.32.dylib` in every build that has
+    # ever succeeded - so not finding one more name is the normal case, not a new risk.
+    #
+    # The arm64 job was never green for a good reason either: its runner is macos-14, so the copy
+    # it collected happened to be built for 14 and slipped under the threshold.
+    - name: Keep Homebrew's OpenSSL out of the bundle (macOS)
+      if: matrix.os == 'macos'
+      run: brew unlink openssl@3 || true
+
     - name: Install dependencies
       working-directory: ./python
       run: uv sync --frozen --no-default-groups --group build
