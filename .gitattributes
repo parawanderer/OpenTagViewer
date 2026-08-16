@@ -1,0 +1,24 @@
+# Line endings.
+#
+# Git for Windows defaults to core.autocrlf=true, which rewrites LF to CRLF on checkout. For
+# source that is harmless. For a fixture whose bytes are the thing under test it is fatal, and
+# fatal in the least helpful way: the file is correct in the repository, correct on Linux and
+# macOS, and wrong in the working tree of every Windows contributor. Four tests in
+# test_macos_fixture.py failed that way and could not be made to pass on Windows at all -
+# `assert b'\n' == b'\r'`, on a file nobody had touched.
+#
+# So the fixtures declare themselves binary. `-text` means: never translate, in either
+# direction. It is not a claim that they are unreadable - they are XML, YAML and JSON - only
+# that their bytes are load-bearing.
+
+# Committed exports, replayed byte for byte by opentagviewer_export's fixture tests to prove
+# the exporter still produces exactly what macOS wrote.
+app/src/test/resources/** -text
+
+# Sample key files as other tools emit them. The point of these is to be somebody else's
+# output, so rewriting their line endings on checkout defeats them.
+python/test/resources/** -text
+
+# The locked bundle the Android importer's tests open. A zip is binary regardless; declared
+# so no future setting can decide otherwise.
+*.zip binary
