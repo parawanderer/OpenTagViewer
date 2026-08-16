@@ -193,67 +193,35 @@ def _make_provider(
     return LocalAnisetteProvider(libs_path=libs_path, serial=EXPORTER_SERIAL, state_blob=state_blob)
 
 
-async def remember(account: AsyncAppleAccount) -> None:
+def remember(account: AsyncAppleAccount) -> None:
     """
-    Store this account's device identity, and name it in the user's device list.
+    Store this account's device identity, so the next export is the same device.
 
     Called once signing in has worked, rather than at the end: the device is registered by then,
     and an export that is abandoned afterwards should not leave an entry nothing can reuse.
 
-    **Named once, and "once" is recorded rather than guessed at.** The first attempt at this
-    announced only when no identity was stored, on the reasoning that a stored one meant the
-    device had registered before. That is true and it is the wrong question: everybody already
-    running the exporter had an identity and *no name*, so the people the naming exists for were
-    precisely the ones it skipped. What matters is whether this installation has been *named*,
-    which is now a field.
+    **This does not name the entry, and nothing here can.** Signing in registers the device by
+    itself (findmy-export 01-authentication §13) and Apple synthesises its row from the client
+    identity, so the name defaults to the claimed hardware - `MacBookPro`. The only call that sets
+    a name is the `postdata` announce of Stage 2 §7, and Apple refuses it without a push token:
 
-    Announcing renames the registration that signing in already made - it does not add a second
-    one - so an existing install gets its entry corrected on the next run and never again.
+        HTTP 401, body {'ec': -800012, 'em': 'Push token is invalid.'}
+
+    A push token is what makes a registered device trusted for verification codes, and §13 is
+    explicit that this is "a boundary to hold rather than a gap to close" - an exporter that became
+    a second factor for somebody's Apple ID would be a much larger thing to have compromised. So
+    the announce was tried, refused, and removed rather than left failing on every fresh install.
+
+    **The serial is the label instead**, which is what §13 designed it for: `X-Apple-I-SRL-NO` is
+    sent during sign-in, needs no announce, and `0PENTAGXPORT` is the one field in that row a
+    person can actually read. See :mod:`exporter.identity`.
     """
-    stored = device.load() or {}
-
     # The account's own serialisation, with only the harmless parts taken out of it. It also
     # carries the username, the password and the login state - which is exactly why this picks
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
-    named = bool(stored.get("announced")) or await _announce(account)
-
-    device.save(
-        state["ids"]["uid"],
-        state["ids"]["devid"],
-        state["anisette"],
-        announced=named,
-    )
-
-
-async def _announce(account: AsyncAppleAccount) -> bool:
-    """
-    Tell Apple what to call this device, so the row a user reads names the program.
-
-    Without it the entry is named after the hardware the client claims to be - a bare `MacBook Pro`
-    among somebody's real Macs, beside a *Remove from Account* button and the words "if you do not
-    recognise this device". The serial (`0PENTAGXPORT`) is the other half of the same problem, and
-    rule 11 is why both are set from one place.
-
-    **Never fatal.** The export works either way; what is lost is a recognisable name, and failing
-    a sign-in that has already succeeded to report a cosmetic problem would be the wrong trade.
-
-    :returns: Whether it worked, so a failure is not recorded as done and the next run tries again.
-    """
-    try:
-        await account.announce_device()
-    except Exception:
-        logger.warning(
-            "Could not name this device in your Apple account, so it will show under whatever"
-            " hardware this claims to be. The export is unaffected, and the next run tries again.",
-            exc_info=True,
-        )
-        return False
-
-    logger.info("Registered this device as %r in the account's device list", DEVICE_NAME)
-
-    return True
+    device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
 
 
 MAX_LOGIN_ATTEMPTS = 3

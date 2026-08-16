@@ -27,20 +27,7 @@ class TestRoundTrip:
     def test_what_is_saved_comes_back(self, identity):
         device.save("uid-1", "devid-1", ANISETTE, identity)
 
-        assert device.load(identity) == {
-            "uid": "uid-1",
-            "devid": "devid-1",
-            "anisette": ANISETTE,
-            # Whether this installation has told Apple what to call itself. Defaults to false so
-            # an identity written by a version that predates naming is treated as unnamed, which
-            # is exactly what it is.
-            "announced": False,
-        }
-
-    def test_being_named_is_remembered(self, identity):
-        device.save("uid-1", "devid-1", ANISETTE, identity, announced=True)
-
-        assert device.load(identity)["announced"] is True
+        assert device.load(identity) == {"uid": "uid-1", "devid": "devid-1", "anisette": ANISETTE}
 
     def test_nothing_stored_yet_is_not_an_error(self, identity):
         assert device.load(identity) is None

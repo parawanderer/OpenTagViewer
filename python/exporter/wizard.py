@@ -328,7 +328,7 @@ class WizardApp(tk.Tk):
             )
 
             # Registered a device by now; remembering it stops the next export registering another.
-            await icloud.remember(account)
+            icloud.remember(account)
 
             async with await icloud.open_client(account) as client:
                 options = await client.recovery_options()
