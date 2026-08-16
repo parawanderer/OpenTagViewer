@@ -180,9 +180,13 @@ client look like several — and by
 [findmy-export §5.2](./docs/findmy-export/03-keychain-trust.md), serials are exactly what
 distinguishes devices there.
 
-Three things follow:
+Four things follow:
 
 - **One source of truth.** A path that needs the identity reads it; it does not compose its own.
+  `AdiDeviceIdentity.Hardware` is it — Python reads the six values across the bridge rather than
+  keeping a copy, because there is no single right answer to keep: an install from before the
+  choice existed must present the Mac its ADI was provisioned with, while a fresh one presents
+  the iPhone.
 - **The parts must agree with each other.** Model, OS version, build, CFNetwork and Darwin
   describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
   Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
@@ -190,6 +194,14 @@ Three things follow:
 - **The serial is a label, and the only field here the user actually sees.** `0PENTAGVIEWR` is
   confirmed accepted and displayed. Without one, Apple omits the row entirely, leaving an entry
   with nothing to tell it apart from real hardware.
+- **Sending the same value is not the same as sending the same bytes.** Two of these fields are
+  transformed on the way out, and only by one side. FindMy.py sends `X-Apple-I-MD-LU` as
+  `base64(uid)` and uppercases `X-Mme-Device-Id`; the Java ADI path sends what it is given. So
+  handing Python the string Java sends aligns one field and silently leaves the other as two
+  different values — **alignment that reads as alignment and is not**, which is worse than none,
+  because nothing ever complains. Java renders the header per hardware profile for exactly this
+  reason, and `IdentityBridgeTest` pins both directions. Check what actually goes on the wire
+  before believing two paths agree.
 
 **Changing it later adds an entry rather than renaming one**, and may require signing in again,
 so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
