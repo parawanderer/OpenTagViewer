@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, NamedTuple
 import json
 import time
 import traceback
@@ -506,6 +506,19 @@ def _isAlignmentWide(accessory: FindMyAccessory, start, end) -> int:
         return 0
 
 
+class AccessoryFetch(NamedTuple):
+    """
+    What came back for one accessory, and whether the requested window was honoured.
+
+    `bounded_to_window` is False when the probe path ran. The probe walks backwards from now
+    until it finds anything at all, so what it returns is "the most recent location that still
+    exists" rather than "the locations inside the last N hours" - and the caller must not then
+    filter it to that window. See `_fetchReportsForAccessory`.
+    """
+    reports: list
+    bounded_to_window: bool
+
+
 def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory, start, end):
     """
     Fetch reports for one accessory, avoiding a full-history key search when possible.
@@ -524,6 +537,10 @@ def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory,
     the probe traverses the whole range, finds nothing, narrows nothing, and then the history
     fetch traverses it all over again - double the work, in the worst case rather than the
     best. Replacing the call avoids that.
+
+    Returns an `AccessoryFetch`, because the two paths mean different things: the history path
+    honours the requested window, the probe path does not and its result must survive the
+    caller's time filter.
     """
     width = _isAlignmentWide(accessory, start, end)
 
@@ -542,9 +559,9 @@ def _fetchReportsForAccessory(account: AppleAccount, accessory: FindMyAccessory,
             print("No reports found for this accessory; leaving alignment untouched and "
                   "skipping the history fetch.")
 
-        return [latest] if latest is not None else []
+        return AccessoryFetch([latest] if latest is not None else [], bounded_to_window=False)
 
-    return account.fetch_location_history(accessory)
+    return AccessoryFetch(account.fetch_location_history(accessory), bounded_to_window=True)
 
 
 def _chunk(items, size):
@@ -807,7 +824,8 @@ def getLastReports(
             # which meant no beacon's updated alignment was persisted - so every later
             # fetch started from the same wide range again and never converged.
             try:
-                reports = _fetchReportsForAccessory(account, airtag, start_dt, now_dt) or []
+                fetched = _fetchReportsForAccessory(account, airtag, start_dt, now_dt)
+                reports = fetched.reports or []
             except Exception:
                 failures += 1
                 print(f"Fetch failed for {beaconId}, continuing with the rest: "
@@ -816,8 +834,17 @@ def getLastReports(
 
             print(f"Got {len(reports)} raw reports for {beaconId}")
 
-            filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
-            print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
+            if fetched.bounded_to_window:
+                filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
+                print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
+            else:
+                # The probe ignored the window on purpose - it walks back until it finds
+                # anything - so filtering to it here would throw away the only location we
+                # have. A tag that has sat in a drawer for two days would come back from an
+                # import showing nothing, despite the fetch having just found it.
+                filtered = reports
+                print(f"  -> keeping {len(filtered)} latest-known report(s) without applying "
+                      f"the {hoursBack}h window; alignment was not yet established")
 
             res[beaconId] = {
                 "reports": _serializeReports(filtered),

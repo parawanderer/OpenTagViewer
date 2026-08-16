@@ -214,7 +214,8 @@ def test_wide_window_fetches_latest_instead_of_history():
 
     assert account.fetch_location_calls == 1
     assert account.fetch_history_calls == 0, "must not also search the whole history"
-    assert out == [report]
+    assert out.reports == [report]
+    assert not out.bounded_to_window, "the probe ignores the window, and says so"
 
 
 def test_narrow_window_uses_the_normal_history_fetch():
@@ -228,7 +229,8 @@ def test_narrow_window_uses_the_normal_history_fetch():
 
     assert account.fetch_history_calls == 1
     assert account.fetch_location_calls == 0
-    assert out == history
+    assert out.reports == history
+    assert out.bounded_to_window, "a history fetch honours the requested window"
 
 
 def test_wide_window_with_no_reports_does_not_then_search_the_history():
@@ -245,7 +247,85 @@ def test_wide_window_with_no_reports_does_not_then_search_the_history():
 
     assert account.fetch_location_calls == 1
     assert account.fetch_history_calls == 0, "must not traverse the same empty range twice"
-    assert out == []
+    assert out.reports == []
+
+
+class _FakeAirtag:
+    """Only what getLastReports touches after the fetch."""
+
+    def to_json(self):
+        return {"aligned": True}
+
+
+class _FakeRequest:
+    def __init__(self, beacon_id):
+        self._id = beacon_id
+
+    def getBeaconId(self):
+        return self._id
+
+    def getAccessoryJson(self):
+        return "{}"
+
+
+class _FakeRequestList:
+    """Stands in for the Java List<AccessoryRequest> the bridge is handed."""
+
+    def __init__(self, requests):
+        self._requests = requests
+
+    def size(self):
+        return len(self._requests)
+
+    def get(self, i):
+        return self._requests[i]
+
+
+def _runGetLastReports(monkeypatch, fetch_result, hours_back=24):
+    monkeypatch.setattr(
+        main.FindMyAccessory, "from_json", staticmethod(lambda _json: _FakeAirtag()))
+    monkeypatch.setattr(
+        main, "_fetchReportsForAccessory", lambda *args, **kwargs: fetch_result)
+
+    return main.getLastReports(
+        account=object(),
+        idToAccessoryData=_FakeRequestList([_FakeRequest("beacon-1")]),
+        hoursBack=hours_back)
+
+
+def test_a_newly_imported_tag_keeps_a_location_older_than_the_window(monkeypatch):
+    """
+    The bug this fixes. A tag with no alignment record never honours the requested window -
+    the probe walks backwards until it finds anything at all - so filtering its result to the
+    last 24 hours threw away the only location the app had just successfully found.
+
+    A tag that had sat in a drawer for two days came back from an import reading "no last
+    location known", despite the fetch having located it.
+    """
+    now = datetime.now(tz=timezone.utc)
+    two_days_old = FakeReport(now - timedelta(days=2))
+
+    out = _runGetLastReports(
+        monkeypatch, main.AccessoryFetch([two_days_old], bounded_to_window=False))
+
+    assert len(out["beacon-1"]["reports"]) == 1, \
+        "the latest known location must survive, however old it is"
+
+
+def test_an_aligned_tag_still_has_its_history_bounded_to_the_window(monkeypatch):
+    """
+    The other half: once alignment is known the fetch returns everything Apple holds, and the
+    window is what makes "the last 24 hours" true. Keeping everything here would quietly widen
+    every refresh.
+    """
+    now = datetime.now(tz=timezone.utc)
+    recent = FakeReport(now - timedelta(hours=1))
+    too_old = FakeReport(now - timedelta(days=2))
+
+    out = _runGetLastReports(
+        monkeypatch, main.AccessoryFetch([recent, too_old], bounded_to_window=True))
+
+    assert len(out["beacon-1"]["reports"]) == 1, "the two-day-old report should be dropped"
 
 
 def test_unknown_width_falls_back_to_the_history_fetch():
@@ -264,7 +344,7 @@ def test_unknown_width_falls_back_to_the_history_fetch():
     out = main._fetchReportsForAccessory(account, BrokenAccessory(), now - timedelta(hours=24), now)
 
     assert account.fetch_history_calls == 1
-    assert out == history
+    assert out.reports == history
 
 
 # --------------------------------------------------------------------------
