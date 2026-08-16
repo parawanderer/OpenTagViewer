@@ -122,6 +122,36 @@ def scan(target: Path) -> dict[Path, tuple[int, ...]]:
     return requirements
 
 
+def referrers(target: Path, wanted: Path) -> list[Path]:
+    """Every Mach-O file under `target` that links `wanted`.
+
+    The point is to tell a dependency from an orphan. PyInstaller resolves `ctypes` lookups
+    against the *build machine's* libraries, so a bundle can contain something no binary in it
+    actually links - dragged in by a name some package probed for. Removing one of those is
+    safe; removing a real dependency produces a binary that dies at launch.
+
+    Matched on the file name rather than the full path, because an install name is rewritten to
+    `@rpath/...` or `@loader_path/...` by the time it is bundled.
+    """
+    name = wanted.name
+    files = [target] if target.is_file() else sorted(p for p in target.rglob("*") if p.is_file())
+
+    found: list[Path] = []
+    for path in files:
+        # By name, not by path: a Mach-O library lists its own install name in `otool -L`, so
+        # comparing paths lets a second copy of the same library report itself as a referrer.
+        if path.name == name:
+            continue
+        result = subprocess.run(["otool", "-L", str(path)], capture_output=True, text=True,
+                                check=False, encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            continue
+        if any(name in line for line in result.stdout.splitlines()[1:]):
+            found.append(path)
+
+    return found
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("target", type=Path, help="a built binary, or a directory to walk")
@@ -157,10 +187,26 @@ def main(argv: list[str] | None = None) -> int:
             f"\n"
             f"The usual cause is a dependency built on the runner's own macOS - Homebrew "
             f"bottles in particular are built for the builder's OS and are not backward "
-            f"compatible.\n"
-            f"Check what {path.name} pulled in, and that MACOSX_DEPLOYMENT_TARGET is set for "
-            f"the build.",
+            f"compatible, and MACOSX_DEPLOYMENT_TARGET cannot lower one because nothing is "
+            f"being compiled.",
             file=sys.stderr)
+
+        linked_by = referrers(args.target, path)
+        if linked_by:
+            print(f"\n{path.name} is linked by {len(linked_by)} file(s):", file=sys.stderr)
+            for who in linked_by[:10]:
+                print(f"  {who}", file=sys.stderr)
+            if len(linked_by) > 10:
+                print(f"  ... and {len(linked_by) - 10} more", file=sys.stderr)
+            print("So it is a real dependency: fix where it comes from rather than deleting it.",
+                  file=sys.stderr)
+        else:
+            print(f"\nNothing in the bundle links {path.name}. PyInstaller resolves ctypes "
+                  f"lookups against the build machine's own libraries, so this was most likely "
+                  f"dragged in by a name some package probed for - see the 'required via "
+                  f"ctypes' warnings in the PyInstaller output. Stopping it being found at "
+                  f"build time is the fix.", file=sys.stderr)
+
         return 1
 
     return 0
