@@ -1,8 +1,11 @@
 package dev.wander.android.opentagviewer.anisette;
 
+import android.util.Base64;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.UUID;
@@ -15,10 +18,11 @@ import java.util.UUID;
  * generated exactly like these, which is the working proof that Apple does not check them
  * against anything real.
  *
- * <p>The lengths, however, are not free. ADI rejects an identifier of the wrong size with
- * -45001 (invalid parameters), so these match the reference implementation exactly: 8 random
- * bytes as 16 lowercase hex characters for ADI, and 32 bytes as 64 uppercase hex characters
- * for the local user UUID.
+ * <p>One length is not free. {@code ADISetAndroidID} rejects an identifier of the wrong size
+ * with -45001 (invalid parameters), so {@link #adiIdentifier()} matches the reference
+ * implementation exactly: 8 random bytes as 16 lowercase hex characters. <b>The other two never
+ * reach ADI at all</b> - they are HTTP headers and nothing more - so their shape is a matter of
+ * agreeing with whoever else sends them, which is what {@link Hardware} decides.
  *
  * <p><b>The one rule that matters is that this is generated once and then kept.</b> Regenerating
  * it per login would make every session look like a brand new machine to Apple, which is
@@ -48,12 +52,13 @@ public final class AdiDeviceIdentity {
     /** A fresh identity, claiming to be an iPhone. Call once, persist, never call again. */
     public static AdiDeviceIdentity generate() {
         final SecureRandom random = new SecureRandom();
+        final Hardware hardware = Hardware.IPHONE;
 
         return new AdiDeviceIdentity(
                 UUID.randomUUID().toString().toUpperCase(Locale.ROOT),
                 hex(random, 8).toLowerCase(Locale.ROOT),
-                hex(random, 32).toUpperCase(Locale.ROOT),
-                Hardware.IPHONE);
+                hardware.newLocalUserId(random),
+                hardware);
     }
 
     private static String hex(SecureRandom random, int bytes) {
@@ -93,7 +98,28 @@ public final class AdiDeviceIdentity {
         LEGACY_MAC(
                 "MacBookPro13,2", "macOS", "13.1", "22C65",
                 "1404.0.5", "22.3.0",
-                "com.apple.dt.Xcode/3594.4.19"),
+                "com.apple.dt.Xcode/3594.4.19") {
+
+            /** 32 bytes as 64 uppercase hex, which is what Dadoum's Provision generates. */
+            @Override
+            String newLocalUserId(SecureRandom random) {
+                return hex(random, 32).toUpperCase(Locale.ROOT);
+            }
+
+            /**
+             * Sent exactly as stored, because that is what this install already sent.
+             *
+             * <p>It cannot be brought into line with FindMy.py, and the attempt would make it
+             * worse. FindMy.py sends {@code base64(uid)}; matching that would need a {@code uid}
+             * whose base64 is a 64-character hex string, which is 48 bytes of arbitrary binary
+             * and not a string at all. So for these installs the two halves stay different, the
+             * device id aligns, and this does not.
+             */
+            @Override
+            public String localUserHeader(String localUserUuid) {
+                return localUserUuid;
+            }
+        },
 
         /**
          * What a fresh install claims: an iPhone 14 Pro.
@@ -114,7 +140,49 @@ public final class AdiDeviceIdentity {
         IPHONE(
                 "iPhone15,2", "iPhone OS", "17.4", "21E219",
                 "1494.0.7", "23.4.0",
-                "com.apple.akd/1.0");
+                "com.apple.akd/1.0") {
+
+            /** A UUID, because that is what FindMy.py mints and this has to be the same value. */
+            @Override
+            String newLocalUserId(SecureRandom random) {
+                return UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
+            }
+
+            /**
+             * Base64, matching FindMy.py, so that provisioning and login send the same bytes.
+             *
+             * <p><b>This is the whole reason the convention is per profile.</b> Two conventions
+             * exist for this header: the Anisette servers send the value raw, and FindMy.py
+             * sends {@code base64(uid)} - and there is exactly one place a client can choose,
+             * which is here, before it has told Apple anything. A fresh install provisions ADI
+             * under this and then hands the same string to FindMy.py, which encodes it
+             * identically. One installation, one local user id.
+             */
+            @Override
+            public String localUserHeader(String localUserUuid) {
+                return Base64.encodeToString(
+                        localUserUuid.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+            }
+        };
+
+        /**
+         * A new local user id in whatever shape this profile sends it.
+         *
+         * <p>Package-private: generating one is {@link #generate()}'s job, and an install that
+         * already has one must never be given another.
+         */
+        abstract String newLocalUserId(SecureRandom random);
+
+        /**
+         * {@code X-Apple-I-MD-LU}, rendered from the stored id.
+         *
+         * <p>Only ADI provisioning actually sends this. The header set {@link AnisetteHeaders}
+         * builds is shaped like an Anisette server's response, but FindMy.py reads two values
+         * out of it and composes the rest itself - so at login this header is Apple's view of
+         * {@code base64(uid)}, and the value here is what Apple saw when the machine was
+         * provisioned. Making those the same is the point.
+         */
+        public abstract String localUserHeader(String localUserUuid);
 
         private final String model;
         private final String osName;

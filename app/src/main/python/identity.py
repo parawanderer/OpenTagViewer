@@ -132,6 +132,46 @@ def identityForNewSession(localAnisette: Any) -> dict:
     return kwargs
 
 
+def deviceIdsForNewSession(localAnisette: Any) -> dict:
+    """
+    The two ids this installation **already introduced itself to Apple with**.
+
+    ADI provisioning is its own exchange, made before FindMy.py is involved, and it carries
+    `X-Mme-Device-Id` and `X-Apple-I-MD-LU`. Without these FindMy.py mints a fresh random pair,
+    so one install talks to Apple as two devices - and `X-Mme-Device-Id` is the field Apple is
+    most likely to correlate on, since identifying a particular installation is what it is for.
+
+    **The uid is passed as Java stores it, not as Java sends it.** FindMy.py base64-encodes it
+    on the way out; handing over the encoded form would encode it twice and produce a value
+    nobody has ever seen. Which of the two conventions Java's own header used is decided per
+    hardware profile - see `AdiDeviceIdentity.Hardware#localUserHeader`. A fresh install agrees
+    on both. An install from before profiles existed provisioned under the raw convention, which
+    cannot be reproduced through base64, so for those two the device id aligns and the local
+    user id does not; passing it anyway at least keeps it stable across sign-ins.
+
+    Both or neither. FindMy.py raises on one of two, deliberately: a client matching one id and
+    minting the other is a shape no real client produces, and looks worse than matching neither.
+
+    New sessions only, like everything else here. A restored account keeps the pair it was
+    established with, and `state_info` wins over these upstream in any case.
+    """
+    if localAnisette is None:
+        return {}
+
+    try:
+        payload = json.loads(str(localAnisette.deviceIdsJson()))
+        ids = {"uid": payload["uid"], "devid": payload["devid"]}
+    except Exception:
+        print(f"Could not read this installation's ids from Java: {traceback.format_exc()}")
+        return {}
+
+    if not all(ids.values()):
+        print(f"Java gave an incomplete pair of ids ({ids}) - letting FindMy.py mint its own.")
+        return {}
+
+    return ids
+
+
 def identityForRestore(previous: Any) -> dict:
     """
     The identity a *restored* account should keep: whatever it already had.

@@ -117,6 +117,20 @@ public final class FakeAnisetteSource implements AnisetteSource {
         return this.hardware.toJson();
     }
 
+    /**
+     * Fixed values, so a test can assert that these exact strings reached Apple.
+     *
+     * <p>A UUID for the device id because FindMy.py parses it as one - CloudKit does
+     * {@code uuid.UUID(device_uuid)} - and a real installation's is a UUID too.
+     */
+    public static final String UID = "9E1D0C4B-77A2-4E3F-8D51-2B6A0F9C3D74";
+    public static final String DEVID = "1A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9";
+
+    @Override
+    public String deviceIdsJson() {
+        return "{\"uid\":\"" + UID + "\",\"devid\":\"" + DEVID + "\"}";
+    }
+
     @Override
     public String describe() {
         return this.ready ? "fake, ready" : "fake, unavailable: " + this.unavailableReason;

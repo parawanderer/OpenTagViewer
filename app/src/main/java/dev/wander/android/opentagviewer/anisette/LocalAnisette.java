@@ -7,6 +7,9 @@ import android.util.Log;
 
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -267,9 +270,33 @@ public final class LocalAnisette implements AnisetteSource {
      */
     @Override
     public synchronized String hardwareProfileJson() {
-        final AdiDeviceIdentity current =
-                this.identity != null ? this.identity : loadOrCreateIdentity();
-        return current.hardware().toJson();
+        return currentIdentity().hardware().toJson();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The local user id is handed over <b>as stored</b>, not as the header renders it.
+     * FindMy.py base64-encodes it on the way out, so passing the encoded form would encode it
+     * twice - which is a value Apple has never seen, from a client claiming to be the same
+     * installation. See {@code AdiDeviceIdentity.Hardware#localUserHeader}.
+     */
+    @Override
+    public synchronized String deviceIdsJson() {
+        final AdiDeviceIdentity current = currentIdentity();
+        try {
+            return new JSONObject()
+                    .put("uid", current.localUserUuid())
+                    .put("devid", current.uniqueDeviceIdentifier())
+                    .toString();
+        } catch (final JSONException e) {
+            throw new IllegalStateException("could not describe this installation", e);
+        }
+    }
+
+    /** The identity in memory if it has been loaded, and the persisted one otherwise. */
+    private AdiDeviceIdentity currentIdentity() {
+        return this.identity != null ? this.identity : loadOrCreateIdentity();
     }
 
     /** Why local Anisette is not being used, or null if it is. */

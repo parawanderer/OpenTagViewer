@@ -251,7 +251,10 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
             localAnisette,
             **app_identity.identityForNewSession(localAnisette),
         )
-        acc = AppleAccount(anisette)
+        # And the two ids the same install already used when it provisioned ADI, so this is one
+        # device rather than two that happen to share a serial. Empty when Java cannot say, in
+        # which case FindMy.py mints its own pair exactly as it always did.
+        acc = AppleAccount(anisette, **app_identity.deviceIdsForNewSession(localAnisette))
 
         state = acc.login(email, password)
 
