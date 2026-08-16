@@ -182,4 +182,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">Are you sure you want to remove these devices? Once removed they will need to be reimported to get them back.</string>
     <string name="remove_devices">Remove Devices</string>
     <string name="export_tags">Export Tags</string>
+    <string name="import_failed_not_a_zip">That file is not a zip. Choose the zip file the OpenTagViewer exporter made.</string>
+    <string name="import_failed_not_an_export">This zip was not made by the OpenTagViewer exporter, so there is nothing to import.</string>
+    <string name="import_failed_damaged">This export could not be read. It may be incomplete, or made by a newer version of the exporter.</string>
+    <string name="import_failed_no_tags">This export does not contain any tags, so there is nothing to import.</string>
+    <string name="import_failed_unreadable">That file could not be opened. Choose it again.</string>
 </resources>

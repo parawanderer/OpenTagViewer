@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">これらのデバイスを削除してもよろしいですか？削除すると、元に戻すには再インポートが必要です。</string>
     <string name="remove_devices">デバイスを削除</string>
     <string name="export_tags">タグをエクスポート</string>
+    <string name="import_failed_not_a_zip">このファイルは zip ではありません。OpenTagViewer エクスポーターが作成した zip ファイルを選んでください。</string>
+    <string name="import_failed_not_an_export">この zip は OpenTagViewer エクスポーターで作成されたものではないため、取り込むものがありません。</string>
+    <string name="import_failed_damaged">このエクスポートを読み取れませんでした。内容が不完全か、より新しいバージョンのエクスポーターで作成された可能性があります。</string>
+    <string name="import_failed_no_tags">このエクスポートにはタグが含まれていないため、取り込むものがありません。</string>
+    <string name="import_failed_unreadable">このファイルを開けませんでした。もう一度選び直してください。</string>
 </resources>
