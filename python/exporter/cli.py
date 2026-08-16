@@ -242,7 +242,16 @@ def configure_logging(verbosity: int) -> None:
     )
 
     if verbosity >= 2:
-        for name in ("findmy.cloudkit", "findmy.keychain", "findmy.icloud", "exporter"):
+        # **The package, not a list of its subpackages.** This used to name `findmy.cloudkit`,
+        # `findmy.keychain` and `findmy.icloud`, which is every part anybody had needed so far and
+        # therefore wrong the first time a new one mattered: `announce_device` logs under
+        # `findmy.reports`, so the diagnostic written specifically to explain a failure was
+        # discarded by the flag turned on to see it.
+        #
+        # The reason it was a list is still real - the *root* logger at DEBUG carries aiohttp and
+        # asyncio, which drown everything about Apple in socket chatter. `findmy` is the level that
+        # excludes those without having to predict which of its modules will matter next.
+        for name in ("findmy", "exporter"):
             logging.getLogger(name).setLevel(logging.DEBUG)
 
     if verbosity:
