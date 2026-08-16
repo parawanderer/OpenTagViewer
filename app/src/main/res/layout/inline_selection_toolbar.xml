@@ -5,25 +5,25 @@
     A separate layout rather than an action slot bolted onto inline_top_toolbar: that include is
     shared by most screens in the app, and giving it optional actions would mean every one of
     them inherits a bar that can change shape.
+
+    One overflow button rather than a row of icons. Three unlabelled glyphs make the reader
+    guess, and one of the actions destroys data - a named menu item is worth the extra tap.
 -->
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-        <import type="android.view.View" />
         <variable name="selectedCount" type="String" />
         <variable name="onClickClose" type="Runnable" />
-        <variable name="onClickExportHistory" type="Runnable" />
-        <variable name="onClickExportTag" type="Runnable" />
-        <variable name="onClickRemove" type="Runnable" />
-        <variable name="isExportTagAvailable" type="boolean" />
+        <variable name="onClickMenu" type="Runnable" />
     </data>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceContainerHigh"
+        android:background="?android:attr/colorBackground"
+        android:backgroundTint="?android:attr/colorBackground"
         android:orientation="vertical">
 
         <LinearLayout
@@ -31,16 +31,18 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingLeft="12dp"
-            android:paddingTop="12dp"
-            android:paddingRight="12dp"
-            android:paddingBottom="12dp">
+            android:paddingLeft="20dp"
+            android:paddingTop="20dp"
+            android:paddingRight="20dp"
+            android:paddingBottom="20dp">
 
             <ImageButton
                 android:id="@+id/selection_close_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
                 android:background="@drawable/ripple_background"
+                android:backgroundTint="?android:attr/colorBackground"
                 android:contentDescription="@string/exit_selection"
                 android:onClick="@{() -> onClickClose.run()}"
                 android:padding="8dp"
@@ -52,56 +54,28 @@
                 android:id="@+id/selection_count"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="15dp"
                 android:layout_weight="1"
                 android:fontFamily="@font/nunito_bold"
                 android:text="@{selectedCount}"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="18sp"
+                android:textSize="20sp"
                 tools:text="2 selected" />
 
             <ImageButton
-                android:id="@+id/selection_export_history_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:id="@+id/selection_menu_button"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center_vertical"
                 android:background="@drawable/ripple_background"
-                android:contentDescription="@string/export_history"
-                android:onClick="@{() -> onClickExportHistory.run()}"
-                android:padding="8dp"
+                android:backgroundTint="?android:attr/colorBackground"
+                android:contentDescription="@string/more"
+                android:onClick="@{() -> onClickMenu.run()}"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/history_24px"
+                android:src="@drawable/menu_dots_vertical_24"
                 android:tint="?attr/colorOnSurface" />
-
-            <!--
-                Hidden until the app can write a bundle at all. It is built here rather than
-                left out so that wiring it up later is one visibility change, not a new layout.
-            -->
-            <ImageButton
-                android:id="@+id/selection_export_tag_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginLeft="4dp"
-                android:background="@drawable/ripple_background"
-                android:contentDescription="@string/export_tag"
-                android:onClick="@{() -> onClickExportTag.run()}"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/share_24px"
-                android:tint="?attr/colorOnSurface"
-                android:visibility="@{isExportTagAvailable ? View.VISIBLE : View.GONE}" />
-
-            <ImageButton
-                android:id="@+id/selection_remove_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginLeft="4dp"
-                android:background="@drawable/ripple_background"
-                android:contentDescription="@string/remove_devices"
-                android:onClick="@{() -> onClickRemove.run()}"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/delete_24px"
-                android:tint="?attr/colorError" />
 
         </LinearLayout>
 

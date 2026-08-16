@@ -6,11 +6,8 @@
     <data>
         <variable name="handleClickBack" type="Runnable" />
         <variable name="handleClickCloseSelection" type="Runnable" />
-        <variable name="handleClickExportHistory" type="Runnable" />
-        <variable name="handleClickExportTag" type="Runnable" />
-        <variable name="handleClickRemoveSelected" type="Runnable" />
+        <variable name="handleClickSelectionMenu" type="Runnable" />
         <variable name="selectedCount" type="String" />
-        <variable name="isExportTagAvailable" type="boolean" />
     </data>
 
     <LinearLayout
@@ -32,11 +29,8 @@
         <include
             android:id="@+id/selection_toolbar"
             layout="@layout/inline_selection_toolbar"
-            app:isExportTagAvailable="@{isExportTagAvailable}"
             app:onClickClose="@{handleClickCloseSelection}"
-            app:onClickExportHistory="@{handleClickExportHistory}"
-            app:onClickExportTag="@{handleClickExportTag}"
-            app:onClickRemove="@{handleClickRemoveSelected}"
+            app:onClickMenu="@{handleClickSelectionMenu}"
             app:selectedCount="@{selectedCount}" />
 
         <androidx.recyclerview.widget.RecyclerView

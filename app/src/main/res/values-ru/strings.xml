@@ -139,4 +139,13 @@
     <string name="anisette_provider">Источник Anisette</string>
     <string name="use_system_colors">Использовать системные цвета</string>
     <string name="use_system_colors_description">Раскрашивает приложение по цветам обоев. Требуется Android 12 или новее.</string>
+    <string name="export_history">Экспорт истории</string>
+    <string name="export_tag">Экспорт метки</string>
+    <string name="selected">Выбрано</string>
+    <string name="x_selected">Выбрано: %1$d</string>
+    <string name="exit_selection">Выйти из выбора</string>
+    <string name="history_exported">История экспортирована</string>
+    <string name="error_occurred_while_exporting_the_history">Не удалось экспортировать историю</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">Удалить эти устройства? После удаления их придётся импортировать заново.</string>
+    <string name="remove_devices">Удалить устройства</string>
 </resources>
