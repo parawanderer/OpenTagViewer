@@ -33,6 +33,7 @@ from typing import Sequence
 
 from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, TermsError
 from findmy.errors import UnhandledProtocolError
+from findmy.keychain.recovery import RecoveryError
 
 from exporter import icloud, localsource, prompts, source, terms
 from exporter.codes import (
@@ -414,11 +415,20 @@ async def unlock(client) -> bool:
         [record.describe() for record in options.recoverable],
     )]
 
-    passcode = await prompts.password(f"Screen-lock passcode for {chosen.serial}")
-    try:
-        await client.unlock(chosen, passcode)
-    finally:
-        del passcode
+    async def ask(attempt: int) -> str:
+        again = " (try again)" if attempt > 1 else ""
+        return await prompts.password(f"Screen-lock passcode for {chosen.serial}{again}")
+
+    async def rejected(error, attempt: int) -> bool:
+        # The library's own text, printed whole. It says what was rejected and then three things
+        # worth doing about it, in the order worth doing them - the first being to try the same
+        # passcode again, because this call has been seen to fail intermittently.
+        print(f"\nThat was not accepted:\n\n{error}\n", file=sys.stderr)
+        print(f"Attempt {attempt} of {icloud.MAX_UNLOCK_ATTEMPTS}.", file=sys.stderr)
+
+        return await prompts.confirm("Try again?")
+
+    await icloud.unlock(client, chosen, ask, rejected)
 
     return True
 
@@ -710,6 +720,15 @@ def _run_and_return(arguments: argparse.Namespace) -> int:
         return 1
     except (ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError) as e:
         print(f"\n{e}", file=sys.stderr)
+        return 1
+    except RecoveryError as e:
+        # **Before the handler below, and deliberately not through it.** RecoveryError is an
+        # UnhandledProtocolError by inheritance, but it is not an unmodelled shape: it is a
+        # documented rejection that carries its own advice, and "Apple returned something
+        # unexpected" over the top of that is both wrong and in the way. A stack says nothing here
+        # either, so it does not print one.
+        print(f"\nThe keychain could not be unlocked:\n\n{e}\n", file=sys.stderr)
+        print("Nothing was written.", file=sys.stderr)
         return 1
     except UnhandledProtocolError as e:
         # Apple said something this library does not model. Worth its own message: it is not the

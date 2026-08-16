@@ -319,11 +319,27 @@ class WizardApp(tk.Tk):
                 ))
                 chosen = options.recoverable[index]
 
-                passcode = asker.ask(lambda: _ask_string(
-                    self, "Unlock", f"Screen-lock passcode for {chosen.serial}:", secret=True,
-                ))
+                async def ask_passcode(attempt: int, chosen=chosen) -> str:
+                    again = "\n\nThat last one was not accepted." if attempt > 1 else ""
+                    return asker.ask(lambda: _ask_string(
+                        self,
+                        "Unlock",
+                        f"Screen-lock passcode for {chosen.serial}:{again}",
+                        secret=True,
+                    ))
 
-                await client.unlock(chosen, passcode)
+                async def rejected(error, attempt: int) -> bool:
+                    # Offered rather than taken: the attempt cap is Apple's and unknown, so
+                    # spending another one is the user's call. The library's text says why the
+                    # first thing to try is the same passcode over again.
+                    return asker.ask(lambda: messagebox.askyesno(
+                        "Unlock",
+                        f"That passcode was not accepted (attempt {attempt} of"
+                        f" {icloud.MAX_UNLOCK_ATTEMPTS}).\n\n{error}\n\nTry again?",
+                        parent=self,
+                    ))
+
+                await icloud.unlock(client, chosen, ask_passcode, rejected)
 
                 return await icloud.fetch(client)
         finally:

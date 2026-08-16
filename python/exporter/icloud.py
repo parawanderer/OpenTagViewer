@@ -46,6 +46,7 @@ from findmy.cloudkit.beacons import (
 )
 from findmy.cloudkit.client import AsyncCloudKitClient
 from findmy.icloud import AsyncFindMyClient
+from findmy.keychain.recovery import RecoveryError
 from findmy.keychain.session import AsyncKeychainSession
 
 from exporter import device
@@ -271,6 +272,57 @@ async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
         raise
 
     return AsyncFindMyClient(account, session, store)
+
+
+MAX_UNLOCK_ATTEMPTS = 3
+"""
+How many times a passcode may be offered in one run.
+
+A bound rather than a free retry, because **attempts are probably a limited resource**. FindMy.py
+says Apple's escrow services generally cap them and that what this one allows is not established,
+which is a good reason not to find out on somebody's real account.
+"""
+
+
+async def unlock(client, record, ask_passcode, on_rejection) -> None:
+    """
+    Recover the keychain keys, letting a rejected passcode be retried in place.
+
+    **The retry is the point.** Both entry points used to make exactly one attempt, and a rejection
+    propagated out of the whole export - so a typo in a hidden field cost the sign-in, the
+    verification code and everything after it, and the user started again from the Apple ID.
+
+    That was the wrong shape for this particular failure. The library's first advice on a rejection
+    is to try again *with the same passcode*, because the call has been observed to fail
+    intermittently and then succeed; the second is that a wrong passcode and a mis-parameterised
+    exchange are indistinguishable here, so a rejection is not proof the passcode was wrong. Both
+    say retry, and only this loop makes retrying cheap.
+
+    **Nothing retries on its own.** :func:`on_rejection` is asked each time and a false answer
+    stops, so the decision to spend another attempt is always the user's - which matters because
+    the cap is unknown and the cost of exhausting it is not recoverable from here.
+
+    :param client: An open Find My client.
+    :param record: The escrow record chosen from `recovery_options()`.
+    :param ask_passcode: Awaited for a passcode, given the attempt number, starting at 1.
+    :param on_rejection: Awaited with the error and the attempt number; returns whether to ask
+        again. Not called after the last attempt, where there is nothing to decide.
+    :raises RecoveryError: If the last attempt is rejected, or the user declines another.
+    """
+    for attempt in range(1, MAX_UNLOCK_ATTEMPTS + 1):
+        passcode = await ask_passcode(attempt)
+        try:
+            await client.unlock(record, passcode)
+            return
+        except RecoveryError as e:
+            logger.info("Escrow recovery rejected attempt %d of %d", attempt, MAX_UNLOCK_ATTEMPTS)
+
+            if attempt == MAX_UNLOCK_ATTEMPTS or not await on_rejection(e, attempt):
+                raise
+        finally:
+            # The passcode is not this program's to keep a moment longer than the call needs it,
+            # and a retry loop holds one across an interaction that waits on a person.
+            del passcode
 
 
 async def fetch(client: AsyncFindMyClient) -> Fetched:
