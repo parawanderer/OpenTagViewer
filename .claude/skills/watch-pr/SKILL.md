@@ -28,6 +28,21 @@ gh pr view "$PR" --json statusCheckRollup --jq \
   '.statusCheckRollup[] | select(.status == "COMPLETED") | "\(.name): \(.conclusion)"'
 ```
 
+## First check whether this PR gets checks at all
+
+An **empty** rollup is not "too early" — it may mean nothing will ever run. Every workflow here
+is path-filtered (`app/**`, `scripts/**`, `gradle/**`, `pyrightconfig.json`, `.flake8`), so a PR
+touching only docs, `.gitattributes`, `.claude/`, or `.github/` itself produces no checks and a
+monitor on it waits out its whole timeout for nothing.
+
+```bash
+gh pr view <n> --json statusCheckRollup --jq '.statusCheckRollup | length'
+```
+
+Zero, and the diff touches no filtered path? **Do not arm a monitor.** Say the change is not
+covered by CI and why, and let the human decide — that is more useful than a green tick would
+have been, because it names what is *not* being verified.
+
 ## Use `gh pr view`, not `gh pr checks`
 
 `gh pr checks` sets its exit code from the checks themselves, so the usual
