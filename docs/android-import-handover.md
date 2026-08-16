@@ -264,3 +264,42 @@ now takes `serial=` on the Anisette provider and defaults CloudKit to it, so thi
 fix at the point the provider is built, plus a decision that `0PENTAGVIEWR` is the app's. The
 exporter presents `0PENTAGXPORT`, deliberately different: two installs, two entries, each
 removable without breaking the other.
+
+**And the entry has no name, which is the field a person reads first.** Nothing calls the
+`postdata` announce of
+[Stage 2 §7](./findmy-export/02-mobileme-delegate.md#7-naming-the-registered-device), so Apple
+names the row after whatever model the client claims - `MacBookPro18,3` shows up as a bare
+**"MacBookPro"**, sitting in a list of the user's real hardware with nothing to tell it apart.
+FindMy.py cannot do this at all today; the ask is written up in
+[findmy-py-device-name-request.md](./findmy-py-device-name-request.md). Target is
+**`OpenTagViewer App`**, with the exporter as `OpenTagViewer Exporter`.
+
+**Once name and serial are set, the model is only choosing an icon** - so the app should claim an
+iPhone and the desktop tool a Mac, which makes a device list readable at a glance. Two conditions
+on that:
+
+- **Do not switch the model on its own.** Today the app sends serial `"0"` and no name, so an
+  iPhone claim would produce an entry called "iPhone" with no serial, among the user's real
+  iPhones. Strictly worse than the Mac claim it has now. Model, name and serial land together or
+  not at all.
+- **All five strings move together.** Model, OS version, build, CFNetwork and Darwin describe one
+  real release - see [rule 11](../AGENTS.md) and
+  [Stage 1 §2.2](./findmy-export/01-authentication.md), which carries a worked set:
+  `iPhone15,2`, iOS `17.4`, build `21E219`, CFNetwork `1494.0.7`, Darwin `23.4.0`.
+
+> **[observed] Claiming to be a phone does not make it a second factor.** A registered entry
+> presenting as an iPhone still reports *"This device cannot be used to receive Apple Account
+> verification codes"*. What decides that is omitting `ptkn`, exactly as
+> [Stage 1 §13](./findmy-export/01-authentication.md) argued - so the icon change carries no risk
+> of turning this app into a second factor for someone's Apple ID.
+
+`AdiDeviceIdentity.CLIENT_INFO`'s comment used to justify its value as the least remarkable string
+Apple sees. That reasoning is gone: an entry built to be recognised is not blending in.
+
+**Build the disclosure text from the account, not from constants.** §7.1 of Stage 2 requires that
+the identifiers shown to the user are the ones actually sent - the whole point being that somebody
+reading their Apple device list can match it to what the app told them. FindMy.py now exposes
+`account.device_name` and `account.serial`, so the screen that announces what will be registered
+should read them rather than restating string literals that can drift out of step with what goes
+on the wire. A disclosure that is merely *usually* right is worse than none, because it teaches the
+user to trust a name that might not be theirs.
