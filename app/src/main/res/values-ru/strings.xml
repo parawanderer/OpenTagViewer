@@ -108,7 +108,6 @@
     <string name="map_provider">Поставщик карт</string>
     <string name="map_provider_google">Google Карты</string>
     <string name="map_provider_amap">AMap (高德地图)</string>
-    <string name="relogin_required_after_upgrade">Пожалуйста, войдите снова — библиотека FindMy была обновлена.</string>
     <string name="maps_api_key_missing_title">Отсутствует ключ API Google Карт</string>
     <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
     <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Это может занять несколько минут — не закрывайте приложение.</string>
@@ -160,4 +159,9 @@
     <string name="import_failed_wrong_passcode">Этот код не открыл архив. Сверьте его с тем, что показал экспортёр.</string>
     <string name="import_failed_locked">Этот архив заблокирован, а код не введён.</string>
     <string name="bundle_passcode_malformed">Код состоит только из цифр и букв.</string>
+    <string name="session_expired_title">Войдите снова</string>
+    <string name="session_expired_message">Apple больше не принимает сохранённый вход для этого устройства, поэтому найти метки не получится, пока вы не войдёте снова.
+
+Ваши метки и история их местоположений остаются на этом телефоне — ничего не потеряно.</string>
+    <string name="ok">ОК</string>
 </resources>
