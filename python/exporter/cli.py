@@ -35,7 +35,7 @@ from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, T
 from findmy.errors import UnhandledProtocolError
 from findmy.keychain.recovery import RecoveryError
 
-from exporter import icloud, localsource, prompts, source, terms
+from exporter import icloud, localsource, prompts, secrets, source, terms
 from exporter.codes import (
     VERIFICATION_CODE_LENGTH,
     is_verification_code,
@@ -72,12 +72,23 @@ def build_parser() -> argparse.ArgumentParser:
             "Nothing is saved: your Apple ID password and your device passcode are used once and"
             " dropped, and no account file is written."
         ),
+        # **Off because it silently recreates the flag this deliberately does not have.** argparse
+        # accepts any unambiguous prefix by default, so `--password hunter2` is taken as
+        # `--password-file hunter2` - the exact spelling somebody reaches for when they want to put
+        # a secret on the command line, quietly accepted. It then fails looking for a file named
+        # `hunter2`, by which point the password is already in `ps` output and shell history.
+        #
+        # Abbreviations worth having are spelled out as aliases instead, which is the same
+        # convenience without a rule that invents flag names nobody wrote down.
+        allow_abbrev=False,
     )
 
     parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument(
         "-o",
         "--output",
+        # Spelled out rather than left to prefix matching, which is off - see allow_abbrev above.
+        "--out",
         type=Path,
         help="Where to write the bundle. Defaults to a timestamped zip in the current directory.",
     )
@@ -128,6 +139,68 @@ def build_parser() -> argparse.ArgumentParser:
             " account at all, for a bundle of nothing but --add-keys tags."
         ),
     )
+    scripted = parser.add_argument_group(
+        "Running without a person",
+        "Answers given up front are not asked for. Sign in once by hand first: this machine is"
+        " then a device Apple knows, and later runs usually skip the verification code.",
+    )
+    scripted.add_argument(
+        "--apple-id",
+        help="The Apple ID to sign in as, instead of being asked for it.",
+    )
+    scripted.add_argument(
+        "--password-file",
+        type=Path,
+        metavar="PATH",
+        help=(
+            f"Read the Apple ID password from this file, or from standard input if it is '-'."
+            f" The file must not be readable by other users. ${secrets.APPLE_PASSWORD_VAR} is"
+            f" also read, and is second best. There is deliberately no --password flag: a"
+            f" command line is visible to everyone on the machine."
+        ),
+    )
+    scripted.add_argument(
+        "--passcode-file",
+        type=Path,
+        metavar="PATH",
+        help=(
+            f"Read the device screen-lock passcode the same way."
+            f" ${secrets.DEVICE_PASSCODE_VAR} is also read."
+        ),
+    )
+    scripted.add_argument(
+        "--device",
+        metavar="SERIAL",
+        help=(
+            "Unlock using the escrow record of the device with this serial, instead of asking"
+            " which one. Match is case-insensitive."
+        ),
+    )
+    scripted.add_argument(
+        "--all-tags",
+        action="store_true",
+        help=(
+            "Export every accessory found, instead of asking which. Your own iPhones, iPads and"
+            " Macs are left out unless --include-my-devices is given as well."
+        ),
+    )
+    scripted.add_argument(
+        "--include-my-devices",
+        action="store_true",
+        help=(
+            "Let --all-tags include your own devices. A bundle holding your MacBook lets whoever"
+            " receives it locate you, so this is never implied."
+        ),
+    )
+    scripted.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help=(
+            "Fail rather than ask anything. Without it, a missing answer is prompted for and a"
+            " scripted run hangs waiting for a keystroke that never comes."
+        ),
+    )
+
     parser.add_argument(
         "--anisette-url",
         help=(
@@ -383,8 +456,11 @@ async def sign_in(arguments: argparse.Namespace):
     print("program, not a Mac you own. Remove it any time at account.apple.com > Devices.\n",
           file=sys.stderr)
 
-    email = await prompts.text("Apple ID")
-    password = await prompts.password("Password")
+    email = arguments.apple_id or await prompts.text("Apple ID")
+    password = (
+        secrets.read(arguments.password_file, secrets.APPLE_PASSWORD_VAR)
+        or await prompts.password("Password")
+    )
 
     try:
         # Nested rather than another `except` clause beside the one below, and that is not a style
@@ -433,7 +509,7 @@ async def sign_in(arguments: argparse.Namespace):
     return account
 
 
-async def unlock(client) -> bool:
+async def unlock(client, arguments: argparse.Namespace) -> bool:
     """
     Recover the keychain keys, which needs the passcode of one of the account's devices.
 
@@ -452,12 +528,21 @@ async def unlock(client) -> bool:
     print("\nUnlocking needs the screen-lock passcode of one of your Apple devices -", file=sys.stderr)
     print("its PIN or login password, not your Apple ID password.\n", file=sys.stderr)
 
-    chosen = options.recoverable[await ask_choice(
-        "Which device's passcode do you have?",
-        [record.describe() for record in options.recoverable],
-    )]
+    chosen = _pick_device(options.recoverable, arguments.device) or options.recoverable[
+        await ask_choice(
+            "Which device's passcode do you have?",
+            [record.describe() for record in options.recoverable],
+        )
+    ]
+
+    # Read once, outside the loop: re-reading a file or the environment on every attempt would
+    # retry the identical value three times and report it as three rejections.
+    supplied = secrets.read(arguments.passcode_file, secrets.DEVICE_PASSCODE_VAR)
 
     async def ask(attempt: int) -> str:
+        if attempt == 1 and supplied is not None:
+            return supplied
+
         again = " (try again)" if attempt > 1 else ""
         return await prompts.password(f"Screen-lock passcode for {chosen.serial}{again}")
 
@@ -473,6 +558,47 @@ async def unlock(client) -> bool:
     await icloud.unlock(client, chosen, ask, rejected)
 
     return True
+
+
+def _pick_device(recoverable, serial: str | None):
+    """
+    Find the escrow record `--device` names, so a scripted run does not have to answer a menu.
+
+    :raises ExportSourceError: If nothing matches. Naming what is available, because a serial is
+        easy to mistype and the alternative is a run that silently unlocks with the wrong device.
+    """
+    if serial is None:
+        return None
+
+    wanted = serial.strip().casefold()
+    for record in recoverable:
+        if (record.serial or "").strip().casefold() == wanted:
+            return record
+
+    available = ", ".join(sorted(r.serial for r in recoverable if r.serial)) or "none"
+    msg = f"No recoverable device on this account has the serial {serial!r}. Available: {available}"
+    raise ExportSourceError(msg)
+
+
+def _take_all(candidates: list[Candidate], *, include_my_devices: bool) -> list[Candidate]:
+    """
+    Everything, for `--all-tags`, with the account's own hardware left out by default.
+
+    **"All my tags" and "all my tags plus the laptop I am sitting at" are different requests**, and
+    only one of them is what somebody writing a cron job meant. The interactive path names each
+    device and asks again before including one; a scripted run has nobody to ask, so the safe half
+    is the default and the other half has its own flag.
+    """
+    if include_my_devices:
+        return list(candidates)
+
+    keeping = [c for c in candidates if not is_own_device(c.owned_beacon)]
+
+    for left_out in [c for c in candidates if is_own_device(c.owned_beacon)]:
+        print(f"Leaving out {left_out.label}: it is one of your own devices."
+              " --include-my-devices exports it anyway.", file=sys.stderr)
+
+    return keeping
 
 
 async def choose(candidates: list[Candidate], *, or_nothing: bool = False) -> list[Candidate]:
@@ -651,7 +777,7 @@ async def read_icloud(arguments: argparse.Namespace):
 
     try:
         async with await icloud.open_client(account) as client:
-            if not await unlock(client):
+            if not await unlock(client, arguments):
                 return None
 
             return await icloud.fetch(client)
@@ -693,7 +819,12 @@ async def run(arguments: argparse.Namespace) -> int:
             print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
 
         if fetched.candidates:
-            exports = await name_the_nameless(await choose(fetched.candidates, or_nothing=bool(prepared)))
+            picked = (
+                _take_all(fetched.candidates, include_my_devices=arguments.include_my_devices)
+                if arguments.all_tags
+                else await choose(fetched.candidates, or_nothing=bool(prepared))
+            )
+            exports = await name_the_nameless(picked)
         else:
             print(f"\nNothing on {where} can be exported.", file=sys.stderr)
 
@@ -735,6 +866,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     configure_logging(arguments.verbose)
 
+    if arguments.non_interactive:
+        prompts.forbid_prompting()
+
     try:
         return _run_and_return(arguments)
     finally:
@@ -760,7 +894,10 @@ def _run_and_return(arguments: argparse.Namespace) -> int:
         print("password are both worth checking - a code expires quickly, and Apple reports", file=sys.stderr)
         print("either as a credentials failure at this point. Nothing was written.", file=sys.stderr)
         return 1
-    except (ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError) as e:
+    except (
+        ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError,
+        secrets.SecretError, prompts.PromptForbidden,
+    ) as e:
         print(f"\n{e}", file=sys.stderr)
         return 1
     except RecoveryError as e:
