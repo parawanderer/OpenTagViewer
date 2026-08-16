@@ -125,7 +125,13 @@ public class DeviceInfoActivity extends AppCompatActivity {
         binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
         binding.setExportedBy(this.importData.sourceUser);
 
-        binding.setDeviceType(this.beaconInformation.isIpad() ? this.getString(R.string.ipad)
+        // Checked first, and not as another guess. The other two read a plist field, and a
+        // self-generated tag has no plist at all - so without this it falls through both and
+        // reports "Unknown", which is the one answer that is definitely wrong: this is the kind
+        // of tag we know the most about, not the least.
+        binding.setDeviceType(this.beaconInformation.isCustomAccessory()
+                ? this.getString(R.string.custom_tag)
+                : this.beaconInformation.isIpad() ? this.getString(R.string.ipad)
                 : this.beaconInformation.isAirTag() ? this.getString(R.string.airtag)
                 : this.getString(R.string.unknown));
 

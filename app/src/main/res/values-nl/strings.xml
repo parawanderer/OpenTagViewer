@@ -164,4 +164,7 @@
 
 Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niets verloren gegaan.</string>
     <string name="ok">OK</string>
+    <string name="custom_tag">Zelfgemaakte tag</string>
+    <string name="custom_tag_explained">Een tag in OpenHaystack-stijl. De sleutels zijn gemaakt door wie de tag bouwde en hebben nooit in een Apple-account gestaan, dus er is geen naam, emoji of batterijniveau van Apple — stel hieronder je eigen in.</string>
+    <string name="custom_tag_keys_remaining">%1$d vooraf gegenereerde sleutels</string>
 </resources>
