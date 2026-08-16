@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">이 기기들을 삭제하시겠습니까? 삭제하면 다시 가져와야 복구할 수 있습니다.</string>
     <string name="remove_devices">기기 삭제</string>
     <string name="export_tags">태그 내보내기</string>
+    <string name="import_failed_not_a_zip">이 파일은 zip이 아닙니다. OpenTagViewer 내보내기 도구가 만든 zip 파일을 선택하세요.</string>
+    <string name="import_failed_not_an_export">이 zip은 OpenTagViewer 내보내기 도구로 만든 것이 아니어서 가져올 항목이 없습니다.</string>
+    <string name="import_failed_damaged">이 내보내기 파일을 읽을 수 없습니다. 파일이 불완전하거나 더 새로운 버전의 내보내기 도구로 만들었을 수 있습니다.</string>
+    <string name="import_failed_no_tags">이 내보내기 파일에는 태그가 없어 가져올 항목이 없습니다.</string>
+    <string name="import_failed_unreadable">이 파일을 열 수 없습니다. 다시 선택하세요.</string>
 </resources>

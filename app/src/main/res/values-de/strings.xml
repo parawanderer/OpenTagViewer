@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">Möchtest du diese Geräte wirklich entfernen? Nach dem Entfernen müssen sie erneut importiert werden.</string>
     <string name="remove_devices">Geräte entfernen</string>
     <string name="export_tags">Tags exportieren</string>
+    <string name="import_failed_not_a_zip">Diese Datei ist keine ZIP-Datei. Wähle die ZIP-Datei aus, die der OpenTagViewer-Exporter erstellt hat.</string>
+    <string name="import_failed_not_an_export">Diese ZIP-Datei stammt nicht vom OpenTagViewer-Exporter, es gibt also nichts zu importieren.</string>
+    <string name="import_failed_damaged">Dieser Export konnte nicht gelesen werden. Er ist möglicherweise unvollständig oder wurde mit einer neueren Version des Exporters erstellt.</string>
+    <string name="import_failed_no_tags">Dieser Export enthält keine Tags, es gibt also nichts zu importieren.</string>
+    <string name="import_failed_unreadable">Diese Datei konnte nicht geöffnet werden. Wähle sie erneut aus.</string>
 </resources>

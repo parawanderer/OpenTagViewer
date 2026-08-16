@@ -148,4 +148,9 @@
     <string name="are_you_sure_you_want_to_remove_these_devices">確定要移除這些裝置嗎？移除後需要重新匯入才能復原。</string>
     <string name="remove_devices">移除裝置</string>
     <string name="export_tags">匯出標籤</string>
+    <string name="import_failed_not_a_zip">該檔案不是 zip 壓縮檔。請選擇 OpenTagViewer 匯出工具產生的 zip 檔案。</string>
+    <string name="import_failed_not_an_export">此 zip 不是 OpenTagViewer 匯出工具產生的，沒有可匯入的內容。</string>
+    <string name="import_failed_damaged">無法讀取此匯出檔案。它可能不完整，或由更新版本的匯出工具產生。</string>
+    <string name="import_failed_no_tags">此匯出檔案不含任何標籤，沒有可匯入的內容。</string>
+    <string name="import_failed_unreadable">無法開啟該檔案。請重新選擇。</string>
 </resources>
