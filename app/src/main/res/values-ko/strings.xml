@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">이 내보내기 파일을 읽을 수 없습니다. 파일이 불완전하거나 더 새로운 버전의 내보내기 도구로 만들었을 수 있습니다.</string>
     <string name="import_failed_no_tags">이 내보내기 파일에는 태그가 없어 가져올 항목이 없습니다.</string>
     <string name="import_failed_unreadable">이 파일을 열 수 없습니다. 다시 선택하세요.</string>
+    <string name="bundle_locked_title">이 번들은 잠겨 있습니다</string>
+    <string name="bundle_locked_message">이 파일을 만들 때 내보내기 도구가 표시한 코드를 입력하세요. 대소문자, 공백, 하이픈은 상관없습니다.</string>
+    <string name="bundle_locked_hint">잠금 해제 코드</string>
+    <string name="bundle_unlock">잠금 해제</string>
+    <string name="import_failed_wrong_passcode">이 코드로는 번들을 열 수 없습니다. 내보내기 도구가 표시한 코드와 대조해 보세요.</string>
+    <string name="import_failed_locked">이 번들은 잠겨 있으며 코드가 입력되지 않았습니다.</string>
+    <string name="bundle_passcode_malformed">코드는 숫자와 영문자로만 이루어집니다.</string>
 </resources>

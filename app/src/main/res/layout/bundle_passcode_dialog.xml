@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Three groups of four, because that is how the code is written down.
+
+    The exporter's format_passcode groups by four (H4K2-9WMR-7TQX) and that is the only form
+    the user ever sees, so anything else here makes them count characters to check they have
+    typed it correctly. One long field would take the same string and be harder to proofread
+    against the paper it is on.
+
+    Twelve single-character boxes - the 2FA screen's shape - was the other option, and does not
+    fit: at 44dp each that is 528dp of boxes before any spacing, wider than a phone.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="24dp"
+    android:paddingTop="8dp"
+    android:paddingRight="24dp">
+
+    <TextView
+        android:id="@+id/bundle_passcode_explainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="@string/bundle_locked_message"
+        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/bundle_passcode_group_1_container"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/bundle_passcode_group_1"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:contentDescription="@string/bundle_locked_hint"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:imeOptions="actionNext"
+                android:inputType="textCapCharacters|textNoSuggestions"
+                android:letterSpacing="0.1"
+                android:maxLength="4"
+                android:singleLine="true"
+                android:textSize="18sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:gravity="center"
+            android:text="@string/bundle_passcode_group_separator"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/bundle_passcode_group_2_container"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/bundle_passcode_group_2"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:contentDescription="@string/bundle_locked_hint"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:imeOptions="actionNext"
+                android:inputType="textCapCharacters|textNoSuggestions"
+                android:letterSpacing="0.1"
+                android:maxLength="4"
+                android:singleLine="true"
+                android:textSize="18sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:gravity="center"
+            android:text="@string/bundle_passcode_group_separator"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/bundle_passcode_group_3_container"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/bundle_passcode_group_3"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:contentDescription="@string/bundle_locked_hint"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:imeOptions="actionDone"
+                android:inputType="textCapCharacters|textNoSuggestions"
+                android:letterSpacing="0.1"
+                android:maxLength="4"
+                android:singleLine="true"
+                android:textSize="18sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/bundle_passcode_error"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorError"
+        android:visibility="gone" />
+
+</LinearLayout>

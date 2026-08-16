@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">Cet export n’a pas pu être lu. Il est peut-être incomplet, ou créé par une version plus récente de l’exportateur.</string>
     <string name="import_failed_no_tags">Cet export ne contient aucun tag : il n’y a rien à importer.</string>
     <string name="import_failed_unreadable">Ce fichier n’a pas pu être ouvert. Sélectionnez-le à nouveau.</string>
+    <string name="bundle_locked_title">Cette archive est verrouillée</string>
+    <string name="bundle_locked_message">Saisissez le code affiché par l’exportateur lors de la création de ce fichier. Les majuscules, les espaces et les tirets n’ont pas d’importance.</string>
+    <string name="bundle_locked_hint">Code de déverrouillage</string>
+    <string name="bundle_unlock">Déverrouiller</string>
+    <string name="import_failed_wrong_passcode">Ce code n’a pas ouvert l’archive. Vérifiez-le par rapport à celui affiché par l’exportateur.</string>
+    <string name="import_failed_locked">Cette archive est verrouillée et aucun code n’a été saisi.</string>
+    <string name="bundle_passcode_malformed">Un code se compose uniquement de chiffres et de lettres.</string>
 </resources>

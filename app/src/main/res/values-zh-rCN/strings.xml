@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">无法读取此导出文件。它可能不完整，或由更新版本的导出工具生成。</string>
     <string name="import_failed_no_tags">此导出文件不含任何标签，没有可导入的内容。</string>
     <string name="import_failed_unreadable">无法打开该文件。请重新选择。</string>
+    <string name="bundle_locked_title">此导出包已加密</string>
+    <string name="bundle_locked_message">请输入导出工具生成此文件时显示的代码。大小写、空格和连字符都不影响。</string>
+    <string name="bundle_locked_hint">解锁代码</string>
+    <string name="bundle_unlock">解锁</string>
+    <string name="import_failed_wrong_passcode">该代码无法解开此导出包。请与导出工具显示的代码核对。</string>
+    <string name="import_failed_locked">此导出包已加密，但未输入代码。</string>
+    <string name="bundle_passcode_malformed">代码仅由数字和字母组成。</string>
 </resources>

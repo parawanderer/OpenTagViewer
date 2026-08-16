@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">Deze export kon niet worden gelezen. Mogelijk is hij onvolledig of gemaakt met een nieuwere versie van de exporter.</string>
     <string name="import_failed_no_tags">Deze export bevat geen tags, dus er valt niets te importeren.</string>
     <string name="import_failed_unreadable">Dat bestand kon niet worden geopend. Kies het opnieuw.</string>
+    <string name="bundle_locked_title">Deze bundel is vergrendeld</string>
+    <string name="bundle_locked_message">Voer de code in die de exporter toonde toen dit bestand werd gemaakt. Hoofdletters, spaties en streepjes maken niet uit.</string>
+    <string name="bundle_locked_hint">Ontgrendelcode</string>
+    <string name="bundle_unlock">Ontgrendelen</string>
+    <string name="import_failed_wrong_passcode">Met die code ging de bundel niet open. Vergelijk hem met de code die de exporter toonde.</string>
+    <string name="import_failed_locked">Deze bundel is vergrendeld en er is geen code ingevoerd.</string>
+    <string name="bundle_passcode_malformed">Een code bestaat alleen uit cijfers en letters.</string>
 </resources>

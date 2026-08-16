@@ -153,4 +153,11 @@
     <string name="import_failed_damaged">このエクスポートを読み取れませんでした。内容が不完全か、より新しいバージョンのエクスポーターで作成された可能性があります。</string>
     <string name="import_failed_no_tags">このエクスポートにはタグが含まれていないため、取り込むものがありません。</string>
     <string name="import_failed_unreadable">このファイルを開けませんでした。もう一度選び直してください。</string>
+    <string name="bundle_locked_title">このバンドルはロックされています</string>
+    <string name="bundle_locked_message">このファイルを作成したときにエクスポーターが表示したコードを入力してください。大文字・小文字、スペース、ハイフンは区別されません。</string>
+    <string name="bundle_locked_hint">ロック解除コード</string>
+    <string name="bundle_unlock">ロック解除</string>
+    <string name="import_failed_wrong_passcode">このコードではバンドルを開けませんでした。エクスポーターが表示したコードと照らし合わせてください。</string>
+    <string name="import_failed_locked">このバンドルはロックされていますが、コードが入力されていません。</string>
+    <string name="bundle_passcode_malformed">コードは数字と英字のみで構成されます。</string>
 </resources>
