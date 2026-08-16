@@ -139,4 +139,13 @@
     <string name="anisette_provider">Anisette 提供方</string>
     <string name="use_system_colors">使用系统配色</string>
     <string name="use_system_colors_description">根据壁纸为应用配色。需要 Android 12 或更高版本。</string>
+    <string name="export_history">导出历史记录</string>
+    <string name="export_tag">导出标签</string>
+    <string name="selected">已选择</string>
+    <string name="x_selected">已选择 %1$d 个</string>
+    <string name="exit_selection">退出选择</string>
+    <string name="history_exported">历史记录已导出</string>
+    <string name="error_occurred_while_exporting_the_history">无法导出历史记录</string>
+    <string name="are_you_sure_you_want_to_remove_these_devices">确定要移除这些设备吗？移除后需要重新导入才能恢复。</string>
+    <string name="remove_devices">移除设备</string>
 </resources>

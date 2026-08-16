@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -125,12 +126,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this::onSelectionCountChanged);
 
         this.binding.setHandleClickCloseSelection(this::endSelection);
-        this.binding.setHandleClickExportHistory(this::exportHistoryForSelection);
-        this.binding.setHandleClickExportTag(this::exportTagsForSelection);
-        this.binding.setHandleClickRemoveSelected(this::confirmRemoveSelection);
-        // Built but not reachable: writing a bundle needs the shared export package, which is
-        // not on this branch. See docs/android-import-handover.md.
-        this.binding.setIsExportTagAvailable(false);
+        this.binding.setHandleClickSelectionMenu(this::showSelectionMenu);
         this.showSelectionBar(false);
 
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
@@ -272,9 +268,37 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.createHistoryZipLauncher.launch(this.suggestedZipName());
     }
 
-    /** Placeholder until the shared export package is available - see the handover doc. */
-    private void exportTagsForSelection() {
-        Log.w(TAG, "Export Tag was invoked while it is still gated");
+    /**
+     * The named actions for whatever is selected.
+     *
+     * <p>A menu rather than a row of icons in the bar: three unlabelled glyphs make the reader
+     * guess, and one of them destroys data. Anchored to the overflow button, so it opens where
+     * it was asked for.
+     *
+     * <p>Export Tag is present and disabled rather than absent. Writing a bundle needs the
+     * shared export package, which is not here yet - see docs/android-import-handover.md - and
+     * a menu that grows an item between versions is harder to learn than one where the item is
+     * visibly not ready. The XML disables it; this is where to stop doing that.
+     */
+    private void showSelectionMenu() {
+        PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
+        menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
+
+        menu.setOnMenuItemClickListener(item -> {
+            final int id = item.getItemId();
+
+            if (id == R.id.action_export_history) {
+                this.exportHistoryForSelection();
+                return true;
+            }
+            if (id == R.id.action_remove_devices) {
+                this.confirmRemoveSelection();
+                return true;
+            }
+            return false;
+        });
+
+        menu.show();
     }
 
     /**
