@@ -44,9 +44,10 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginLeft="16dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <LinearLayout
@@ -82,6 +83,23 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <!--
+                Shown only while selecting. A tick alongside the row's tinted background says
+                "selected" twice, which is deliberate: the tint alone is easy to miss on a
+                wallpaper-derived palette, and the tick alone is easy to miss on a long list.
+            -->
+            <ImageView
+                android:id="@+id/list_item_selected_check"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="12dp"
+                android:contentDescription="@string/selected"
+                android:src="@drawable/check_circle_24px_fill"
+                android:tint="?attr/colorPrimary"
+                android:visibility="gone"
+                tools:visibility="visible" />
         </LinearLayout>
     </FrameLayout>
 

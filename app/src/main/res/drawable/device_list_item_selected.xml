@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The background of a selected row.
+
+    A plain colour rather than a ripple: the row still responds to touch through the list's own
+    feedback, and a selected row needs to read as selected while it is not being pressed.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorSecondaryContainer" />
+</shape>

@@ -24,8 +24,14 @@ import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -38,6 +44,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
@@ -54,7 +61,30 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
     private DeviceListAdaptor deviceListAdaptor;
 
+    private ActivityMyDevicesListBinding binding;
+
     private boolean devicesListChanged = false;
+
+    /**
+     * The tags whose history is being written, captured when the storage picker was opened.
+     *
+     * <p>Held separately from the adapter's selection because the picker is another app: this
+     * one can be stopped and recreated while it is up, and the selection would not survive
+     * that.
+     */
+    private List<BeaconInformation> pendingExport = new ArrayList<>();
+
+    private final ActivityResultLauncher<String> createHistoryZipLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/zip"),
+            uri -> {
+                if (uri == null) {
+                    // Cancelled the picker. Not an error, and the selection is left alone so
+                    // they can try again without reselecting everything.
+                    return;
+                }
+                this.writeHistoryZip(uri, this.pendingExport);
+            }
+    );
 
     private final ActivityResultLauncher<Intent> deviceInfoActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -78,20 +108,26 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
-        ActivityMyDevicesListBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
-        binding.setHandleClickBack(this::handleEndActivity);
+        this.binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
+        WindowPaddingUtil.insertUITopPadding(this.binding.getRoot());
+        this.binding.setHandleClickBack(this::handleEndActivity);
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
         }
 
         this.deviceListAdaptor = new DeviceListAdaptor(
+                this,
                 this.getResources(),
                 this.beaconInfo,
                 this.locations,
                 this::onDeviceClicked,
-                this::onDeviceLongPressed);
+                this::onDeviceLongPressed,
+                this::onSelectionCountChanged);
+
+        this.binding.setHandleClickCloseSelection(this::endSelection);
+        this.binding.setHandleClickSelectionMenu(this::showSelectionMenu);
+        this.showSelectionBar(false);
 
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -106,6 +142,13 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.getOnBackPressedDispatcher().addCallback(new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                // Back leaves selection before it leaves the screen. Otherwise the only way
+                // out of selection mode is a small button in the corner, and back does
+                // something more drastic than the user was reaching for.
+                if (deviceListAdaptor.isSelectionMode()) {
+                    endSelection();
+                    return;
+                }
                 handleEndActivity();
             }
         });
@@ -180,18 +223,76 @@ public class MyDevicesListActivity extends AppCompatActivity {
     }
 
     /**
-     * Long press on a row offers to remove it, saving a trip through the device's detail page.
-     * <br>
-     * Anchored to the pressed row rather than shown as a dialog, so it is obvious which device
-     * is about to be acted on - the confirmation itself does not name the device.
+     * Long press starts selecting, with the pressed row already chosen.
+     *
+     * <p>This replaced an anchored popup whose one item was Remove. Remove now lives in the
+     * contextual bar alongside the exports, which is where it belongs once more than one row
+     * can be acted on at a time - and it means the gesture does the same thing here as it does
+     * in every other list on the platform.
      */
     private void onDeviceLongPressed(final View anchor, final BeaconInformation device) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenuInflater().inflate(R.menu.device_list_item_menu, menu.getMenu());
+        this.deviceListAdaptor.startSelectionWith(device.getBeaconId());
+        this.onSelectionCountChanged(this.deviceListAdaptor.getSelectedBeaconIds().size());
+        this.showSelectionBar(true);
+    }
+
+    private void onSelectionCountChanged(final int count) {
+        this.binding.setSelectedCount(this.getString(R.string.x_selected, count));
+    }
+
+    /** Swaps the page title for the contextual bar, or back. */
+    private void showSelectionBar(final boolean selecting) {
+        this.binding.settingsTopToolbar.getRoot().setVisibility(selecting ? GONE : VISIBLE);
+        this.binding.selectionToolbar.getRoot().setVisibility(selecting ? VISIBLE : GONE);
+    }
+
+    private void endSelection() {
+        this.deviceListAdaptor.clearSelection();
+        this.showSelectionBar(false);
+    }
+
+    /**
+     * Asks where to put the zip.
+     *
+     * <p>{@code CreateDocument} rather than writing somewhere ourselves: no storage permission
+     * is needed, and the file lands where the user chose rather than somewhere they have to go
+     * looking for.
+     */
+    private void exportHistoryForSelection() {
+        this.pendingExport = this.deviceListAdaptor.getSelectedBeacons();
+
+        if (this.pendingExport.isEmpty()) {
+            return;
+        }
+
+        this.createHistoryZipLauncher.launch(this.suggestedZipName());
+    }
+
+    /**
+     * The named actions for whatever is selected.
+     *
+     * <p>A menu rather than a row of icons in the bar: three unlabelled glyphs make the reader
+     * guess, and one of them destroys data. Anchored to the overflow button, so it opens where
+     * it was asked for.
+     *
+     * <p>Export Tag is present and disabled rather than absent. Writing a bundle needs the
+     * shared export package, which is not here yet - see docs/android-import-handover.md - and
+     * a menu that grows an item between versions is harder to learn than one where the item is
+     * visibly not ready. The XML disables it; this is where to stop doing that.
+     */
+    private void showSelectionMenu() {
+        PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
+        menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
 
         menu.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_remove_device) {
-                this.confirmRemoveDevice(device);
+            final int id = item.getItemId();
+
+            if (id == R.id.action_export_history) {
+                this.exportHistoryForSelection();
+                return true;
+            }
+            if (id == R.id.action_remove_devices) {
+                this.confirmRemoveSelection();
                 return true;
             }
             return false;
@@ -200,12 +301,76 @@ public class MyDevicesListActivity extends AppCompatActivity {
         menu.show();
     }
 
-    private void confirmRemoveDevice(final BeaconInformation device) {
+    /**
+     * Reads each selected tag's whole stored history and writes the zip.
+     *
+     * <p>Off the main thread throughout: this reads every location row the app holds, which for
+     * somebody with months of history is not a small query.
+     */
+    private void writeHistoryZip(final Uri destination, final List<BeaconInformation> beacons) {
+        var async = Observable.fromIterable(beacons)
+                .concatMap(beacon -> this.beaconRepo
+                        // The whole stored range. The app only holds what it has fetched, so
+                        // this is already bounded; a date picker is issue #71.
+                        .getLocationsFor(beacon.getBeaconId(), 0L, Long.MAX_VALUE)
+                        .map(reports -> Pair.create(beacon.getName(), reports)))
+                .toList()
+                .map(pairs -> {
+                    // LinkedHashMap: entry order follows the order shown on screen, which is
+                    // the order the user picked them in.
+                    Map<String, List<BeaconLocationReport>> byName = new LinkedHashMap<>();
+                    for (var pair : pairs) {
+                        byName.put(pair.first, pair.second);
+                    }
+                    return byName;
+                })
+                .subscribeOn(Schedulers.io())
+                .subscribe(historyByName -> {
+                    try (OutputStream out = this.getContentResolver().openOutputStream(destination)) {
+                        if (out == null) {
+                            throw new IOException("the picker returned nothing to write to");
+                        }
+                        new HistoryZipWriter(ZoneId.systemDefault()).write(out, historyByName);
+                    }
+
+                    this.runOnUiThread(() -> {
+                        Toast.makeText(this.getApplicationContext(),
+                                R.string.history_exported, LENGTH_LONG).show();
+                        this.endSelection();
+                    });
+                }, error -> {
+                    Log.e(TAG, "Failed to export location history", error);
+                    this.runOnUiThread(() -> Toast.makeText(this.getApplicationContext(),
+                            R.string.error_occurred_while_exporting_the_history, LENGTH_LONG).show());
+                });
+    }
+
+    /** Dated, because somebody exporting twice should not be asked to overwrite. */
+    private String suggestedZipName() {
+        return "opentagviewer-history-"
+                + DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
+                        .format(Instant.now())
+                + ".zip";
+    }
+
+    private void confirmRemoveSelection() {
+        final List<BeaconInformation> selected = this.deviceListAdaptor.getSelectedBeacons();
+        if (selected.isEmpty()) {
+            return;
+        }
+
         new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
-                .setTitle(R.string.remove_device)
+                .setTitle(selected.size() == 1 ? R.string.remove_device : R.string.remove_devices)
                 .setIcon(R.drawable.delete_24px)
-                .setMessage(R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back)
-                .setPositiveButton(R.string.confirm, (dialog, which) -> this.removeDevice(device))
+                .setMessage(selected.size() == 1
+                        ? R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back
+                        : R.string.are_you_sure_you_want_to_remove_these_devices)
+                .setPositiveButton(R.string.confirm, (dialog, which) -> {
+                    for (BeaconInformation device : selected) {
+                        this.removeDevice(device);
+                    }
+                    this.endSelection();
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
