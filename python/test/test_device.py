@@ -14,6 +14,7 @@ import json
 import pytest
 
 from exporter import device
+from test.unittestutils import skip_unless_posix_permissions
 
 ANISETTE = {"type": "aniLocal", "prov_data": "AAAA", "serial": "0PENTAGXPORT"}
 
@@ -39,6 +40,7 @@ class TestRoundTrip:
         assert device.load(identity) is None
         assert device.forget(identity) is False
 
+    @skip_unless_posix_permissions
     def test_it_is_readable_by_its_owner_alone(self, identity):
         device.save("uid-1", "devid-1", ANISETTE, identity)
 

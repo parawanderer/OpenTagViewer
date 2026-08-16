@@ -77,7 +77,18 @@ def _from_file(path: Path) -> str:
     # **Refused rather than warned about.** A warning on a file anybody can read is advice nobody
     # acts on, and the whole reason to prefer a file over an environment variable is that a file
     # can have permissions. One that does not is worse than the option it was chosen over.
-    if mode & (stat.S_IRGRP | stat.S_IROTH):
+    #
+    # **Except on Windows, where the bits carry no information.** `st_mode` there is synthesised
+    # by CPython - every regular file reports 0o666, and `os.chmod(path, 0o600)` does not move
+    # the group and other bits at all. So this test was true of every file on the system: it
+    # refused all of them, and told the user to run `chmod 600`, which cannot change the answer.
+    # Reading a secret from a file was simply impossible on a platform this ships a binary for.
+    #
+    # Skipped rather than approximated. Real permissions on Windows are ACLs, which `stat` cannot
+    # see, and checking them needs `icacls` or pywin32 - a large dependency for a guard that is
+    # advisory even on POSIX. Leaving it in place was not the safer option; it was the one that
+    # made the safest input route unusable and pushed people to the environment variable instead.
+    if os.name != "nt" and mode & (stat.S_IRGRP | stat.S_IROTH):
         msg = (
             f"{path} is readable by other users on this machine, so it is not a safe place for a"
             f" secret. Run: chmod 600 {path}"
