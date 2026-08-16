@@ -289,7 +289,34 @@ chaquopy {
         }
     }
     productFlavors {}
-    sourceSets {}
+    sourceSets {
+        getByName("main") {
+            // The shared bundle-format package, so `import opentagviewer_export` resolves in
+            // the APK as well as on desktop. It is the one implementation of the format and of
+            // the accessory-identification heuristic; main.py already calls into it.
+            //
+            // **Whitelisted, not just added.** `../python` also holds `exporter/` (the desktop
+            // wizard, which imports tkinter) and `test/` - and a top-level package named `test`
+            // on the Python path shadows the standard library's own `test` module. Pointing
+            // srcDir at the directory wholesale would put both in the APK.
+            //
+            // An include filter rather than a directory move, because the filter is verified
+            // rather than assumed - PythonPackagingTest imports each of these on a device and
+            // fails if `exporter` or a shadowing `test` came along too.
+            //
+            // **The filter applies to the whole source set, not to the srcDir it follows.**
+            // `include("opentagviewer_export/**")` alone therefore drops main.py - the bridge
+            // this app cannot run without - out of the APK, silently and with a green build.
+            // Hence the first pattern, which keeps app/src/main/python/main.py. `../python`
+            // has no top-level .py files for it to catch by accident, and the test is what
+            // notices if that stops being true.
+            srcDir("../python")
+            include("*.py", "opentagviewer_export/**")
+            // The package's own test suite is not part of the app. It imports pytest, which is
+            // not in the APK, so it is dead weight that would fail if anything ever touched it.
+            exclude("opentagviewer_export/tests/**")
+        }
+    }
 }
 
 dependencies {
