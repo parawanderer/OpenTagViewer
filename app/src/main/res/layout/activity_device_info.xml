@@ -146,7 +146,7 @@
                             android:paddingLeft="22dp"
                             android:paddingTop="8dp"
                             android:text="@string/device_settings"
-                            android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
                     </LinearLayout>
 
@@ -190,7 +190,7 @@
                             app:icon="@drawable/apple"
                             app:iconGravity="textTop"
                             app:iconSize="38dp"
-                            app:iconTint="@color/md_theme_outlineVariant_mediumContrast" />
+                            app:iconTint="?attr/colorOnSurfaceVariant" />
 
                         <LinearLayout
                             android:layout_width="wrap_content"
@@ -204,7 +204,7 @@
                                 android:layout_height="wrap_content"
                                 android:fontFamily="@font/nunito_semi_bold"
                                 android:text="@string/device_name"
-                                android:textColor="@color/md_theme_onSurface"
+                                android:textColor="?attr/colorOnSurface"
                                 android:textSize="16sp"
                                 tools:text="Settings Title" />
 
@@ -213,7 +213,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:text="@{deviceName}"
-                                android:textColor="@color/md_theme_outlineVariant_highContrast"
+                                android:textColor="?attr/colorOnSurfaceVariant"
                                 tools:text="Setting Subtitle With More Details" />
                         </LinearLayout>
 
@@ -240,7 +240,7 @@
                             android:paddingLeft="22dp"
                             android:paddingTop="8dp"
                             android:text="@string/device_information"
-                            android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
                     </LinearLayout>
 
@@ -304,7 +304,7 @@
                                 android:paddingLeft="22dp"
                                 android:paddingTop="8dp"
                                 android:text="@string/debug_information"
-                                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                                android:textColor="?attr/colorOnSurfaceVariant" />
 
                         </LinearLayout>
 
@@ -446,7 +446,7 @@
                     android:layout_height="match_parent"
                     android:layout_marginTop="40dp"
                     android:background="@drawable/layout_rounded"
-                    android:backgroundTint="@color/md_theme_background"
+                    android:backgroundTint="?android:attr/colorBackground"
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:elevation="30dp"

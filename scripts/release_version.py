@@ -1,13 +1,13 @@
 """Read a release's version out of the source, and check its tag against it.
 
-Covers both things this repository releases: the macOS exporter, whose version is `VERSION` in
-`python/main/wizard.py`, and the Android app, whose version is `versionName` in
+Covers both things this repository releases: the desktop exporter, whose version is `VERSION` in
+`python/exporter/version.py`, and the Android app, whose version is `versionName` in
 `app/build.gradle.kts`. Neither is rewritten at build time, so in both cases the tag is a claim
 about the source that nothing verifies unless something like this does.
 
-`VERSION` in `python/main/wizard.py` is the single source of truth for the exporter. It is
+`VERSION` in `python/exporter/version.py` is the single source of truth for the exporter. It is
 shown in the window title and, more importantly, stamped into every export it produces as
-`via: OpenTagViewer.app:<version>`. That field is how anyone looking at a zip afterwards -
+`via: <producer>:<version>`. That field is how anyone looking at a zip afterwards -
 a maintainer triaging a bug report, `check_export_compatibility.py`, a future importer -
 works out which exporter built it, so a version that lies about itself costs real debugging
 time.
@@ -22,9 +22,9 @@ runs from source - the macOS VM bootstrap, anyone following CONTRIBUTING.md - an
 stamp `via:` too. A build-time patch would leave two artifacts from one commit disagreeing
 about their version, which is the same drift somewhere harder to notice.
 
-`VERSION` is read by parsing the module rather than importing it: importing `wizard` pulls in
-tkinter and yaml, neither of which is wanted on a lint runner, and one of which cannot even
-open a display in CI.
+`VERSION` is read by parsing the module rather than importing it. That module is deliberately
+tiny and importable anywhere, but parsing costs nothing and keeps the check working even if it
+ever grows an import that a lint runner does not have.
 
 The Android app has the same problem for the same reason: `versionName` is what the app
 reports about itself and what is baked into the APK, and the release workflow only parses the
@@ -39,8 +39,12 @@ Print the version the source declares:
 
 Check a release tag against it. Accepts a bare tag or a full ref, so `$GITHUB_REF` works:
 
-    python scripts/release_version.py --kind exporter --tag macos-exporter-v1.0.5
+    python scripts/release_version.py --kind exporter --tag exporter-v1.1.0
     python scripts/release_version.py --kind android --tag refs/tags/android-app-v1.0.5
+
+The exporter also answers to `macos-exporter-v`, which is what its tags were called while it
+only ran on macOS. Published tags keep their names, so that spelling has to keep resolving -
+but it is not the one to reach for when tagging something new.
 
 On success it prints the version, so a workflow can use it directly:
 
@@ -56,7 +60,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WIZARD_PATH = REPO_ROOT / "python" / "main" / "wizard.py"
+VERSION_PATH = REPO_ROOT / "python" / "exporter" / "version.py"
 GRADLE_PATH = REPO_ROOT / "app" / "build.gradle.kts"
 
 VERSION_CONSTANT = "VERSION"
@@ -83,7 +87,7 @@ def _display(path: Path) -> str:
 
 def read_version(path: Path | None = None) -> tuple[str, int]:
     """Return the `VERSION` string declared in `path`, with the line it is declared on."""
-    path = path or WIZARD_PATH
+    path = path or VERSION_PATH
     try:
         source = path.read_text(encoding="utf-8")
     except OSError as error:
@@ -136,14 +140,17 @@ def read_gradle_version(path: Path | None = None) -> tuple[str, int]:
 # source rather than typed, so the two cannot drift.
 KINDS = {
     "exporter": {
-        "prefix": "macos-exporter-v",
-        "path": WIZARD_PATH,
+        "prefix": "exporter-v",
+        # The old spelling, from when this only built for macOS. Still accepted so that tags
+        # already published resolve and a half-remembered release still works.
+        "also_accepts": ("macos-exporter-v",),
+        "path": VERSION_PATH,
         "read": read_version,
         "field": 'VERSION = "..."',
-        "docs": "CONTRIBUTING.md -> Releasing the macOS exporter",
+        "docs": "CONTRIBUTING.md -> Releasing the exporter",
         "why": (
             "Its VERSION is shown in the window title and stamped into every export as\n"
-            "`via: OpenTagViewer.app:<version>`, including exports made by running the wizard\n"
+            "`via: <producer>:<version>`, including exports made by running the wizard\n"
             "from source - which no build step can rewrite."
         ),
     },
@@ -167,20 +174,30 @@ def _kind(name: str) -> dict:
     return KINDS[name]
 
 
+def _prefixes(spec: dict) -> tuple[str, ...]:
+    """Every tag prefix this kind answers to, the canonical one first."""
+    return (spec["prefix"], *spec.get("also_accepts", ()))
+
+
 def version_from_tag(tag: str, kind: str = "exporter") -> str:
     """Return the version encoded in a release tag, accepting a bare tag or a full git ref."""
     spec = _kind(kind)
     prefix = spec["prefix"]
     name = tag[len(REF_PREFIX):] if tag.startswith(REF_PREFIX) else tag
 
-    if not name.startswith(prefix):
+    # The exporter was macOS-only and its tags said so. It builds for Windows and Linux now, so
+    # the name changed - and the old one still resolves, because tags already published keep
+    # their name forever and because nobody's muscle memory updates with a rename.
+    matched = next((p for p in _prefixes(spec) if name.startswith(p)), None)
+
+    if matched is None:
         raise VersionError(
             f"'{name}' is not a release tag for the {kind}.\n"
             f"Those are tagged {prefix}<version>, for example {prefix}1.0.5.\n"
             f"See {spec['docs']}."
         )
 
-    version = name[len(prefix):]
+    version = name[len(matched):]
     if not VERSION_PATTERN.match(version):
         raise VersionError(
             f"'{version}' (from tag '{name}') is not a version number.\n"

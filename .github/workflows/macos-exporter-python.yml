@@ -1,101 +1,106 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# Builds and publishes the desktop exporter, for every platform it now runs on.
+#
+# It used to be macOS-only, because the data came out of macOS-local files. It comes out of iCloud
+# now, so the binary runs anywhere - and the release has to actually produce one for anywhere,
+# which is what the matrix below is for. PyInstaller cannot cross-compile: each platform's binary
+# is built on that platform, and there is no way around that.
+#
+# The filename is still macos-exporter-python.yml so its history stays attached to it.
 
-name: MacOS Exporter App
+name: Exporter App
 
 on:
   release:
     types: published
 
+  # A release only fires `published` once, so a platform that failed its build cannot be
+  # retried by editing the release - and re-running the old run would re-run the old workflow
+  # file, which is no use when the fix is *in* the workflow. This builds against a tag that
+  # already has a release and uploads the missing asset to it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build for, e.g. exporter-v1.1.0"
+        required: true
+
 env:
   PYTHONPATH: "${{ github.workspace }}/python:$PYTHONPATH"
   PYINSTALLER_PYTHON_VER: 3.13
-  APP_NAME: OpenTagViewer-ExportWizardMacOS
+  APP_NAME: OpenTagViewer-Exporter
 
 jobs:
   test-release-version:
     runs-on: macos-14
 
-    # Only run this for 'macos-exporter-v<whatever>' tags!
+    # Only run this for exporter release tags. `macos-exporter-v` is the old spelling, still
+    # accepted by scripts/release_version.py so that existing tags and existing habits keep
+    # working - see CONTRIBUTING.md -> Releasing the exporter.
     if: |
-      github.event_name == 'release'
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'release'
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
-      && startsWith(github.event.release.tag_name, 'macos-exporter-v')
+      && (startsWith(github.event.release.tag_name, 'exporter-v')
+          || startsWith(github.event.release.tag_name, 'macos-exporter-v')))
 
-    # The version both build jobs name their artifacts with. It comes from here rather than
-    # from each job parsing the tag again, so there is exactly one place it can be wrong.
+    # The version every build job names its artifact with. It comes from here rather than from
+    # each job parsing the tag again, so there is exactly one place it can be wrong.
     outputs:
       app-version: ${{ steps.version.outputs.APP_VERSION }}
+      # Resolved once here so the upload does not have to work it out again.
+      tag: ${{ steps.version.outputs.TAG }}
 
-    steps: # (reuses steps from full flow!)
+    steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # Nothing in this pipeline rewrites VERSION in python/main/wizard.py: the tag names the
+    # Nothing in this pipeline rewrites VERSION in python/exporter/version.py: the tag names the
     # artifact, and the app keeps whatever was committed. So a tag that disagrees with the
     # source ships a build that calls itself the old version in its title bar and in the
     # `via:` field of every export it writes. This step is what makes that a failed release
-    # instead of a confusing zip. It runs before either build job (they `need` this one), so
-    # a mismatch costs one minute rather than two full PyInstaller builds.
+    # instead of a confusing zip. It runs before every build job (they `need` this one), so
+    # a mismatch costs one minute rather than four full PyInstaller builds.
     #
     # Deliberately not the reverse - patching the tag into the source - because the wizard
     # also runs from source, and those exports stamp `via:` too. See scripts/release_version.py.
     - name: Check the release tag matches the version in the source
       id: version
       run: |
-        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "${{ github.ref }}")"
+        TAG="${{ inputs.tag || github.ref }}"
+        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "$TAG")"
         echo "Tag and source agree on version: $APP_VERSION"
         echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
+        echo "TAG=${TAG#refs/tags/}" >> $GITHUB_OUTPUT
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    # --frozen: exactly what uv.lock records, or fail. FindMy.py is pinned there by commit,
+    # because it is a branch rather than a release - so a release build cannot silently pick up
+    # whatever that branch happened to be that day.
     - name: Install dependencies
       working-directory: ./python
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        pip install -r requirements.txt
+      run: uv sync --frozen
 
     - name: Lint with flake8
-      working-directory: . # run flake8 from repository root
+      working-directory: . # run flake8 from repository root, so it picks up .flake8
       run: |
-        # Run flake8 on the 'python' directory, letting it pick up the .flake8 config file
         # stop the build if there are Python syntax errors or undefined names
-        flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 ./python --count --exit-zero --statistics
+        uv run --project python flake8 ./python --count --select=E9,F63,F7,F82 --show-source --statistics
+        uv run --project python flake8 ./python --count --exit-zero --statistics
 
+    # Both suites: the wizard's own, and the shared export package's, which live with the package.
     - name: Test with pytest
       working-directory: ./python
-      run: |
-        pytest ./test
+      run: uv run --frozen pytest ./test ./opentagviewer_export
 
-# !!!!!
-#
-#   YES, THESE ARE DUPLICATED.
-#   I COULD NOT FIND A BETTER SOLUTION FOR THIS.
-#
-#   THERE IS SOME KIND OF SCHEDULING PROBLEM WHERE
-#   IF YOU PROVIDE THEM BOTH IN 'RUNS-ON', THE JOB
-#   JUST STRAIGHT UP WILL NEVER START (AT LEAST NOT
-#   FOR 20 MINS).
-#
-#   SEPARATING THEM FIXES IT.
-#
-#   - YAML ANCHORS ARE NOT SUPPORTED BY GITHUB.
-#   - WORKFLOWS MESS UP PERMISSIONS.
-#
-#   SO YES WE WILL HAVE TO TAKE THE DUPLICATION.
-#   UNTIL WE GET BETTER OPTIONS.
-#
-# !!!!!
-
-  build-apple-silicon:
+  build:
     needs: test-release-version
-    runs-on: macos-14 # Apple Silicon
     environment: 'MacOS Exporter App CI'
 
     # The repository default is read-only, which is what turned a missing token into a 403 at
@@ -104,51 +109,160 @@ jobs:
     permissions:
       contents: write
 
-    # Only run this for 'macos-exporter-v<whatever>' tags!
     if: |
-      github.event_name == 'release'
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'release'
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
-      && startsWith(github.event.release.tag_name, 'macos-exporter-v')
+      && (startsWith(github.event.release.tag_name, 'exporter-v')
+          || startsWith(github.event.release.tag_name, 'macos-exporter-v')))
 
-    # The version is not parsed out of the tag here. It is whatever test-release-version
-    # confirmed the tag and python/main/wizard.py agree on, so the zip name, the release
-    # name, and the version the app reports about itself cannot come apart.
+    # This was two hand-duplicated jobs, with a comment saying that naming both runners in
+    # `runs-on` made the job never start. That is because a list in `runs-on` is a set of labels a
+    # single runner must have *all* of, not a choice between runners - so it asked for a machine
+    # that is both Apple Silicon and Intel, and no such machine exists. A matrix is the construct
+    # that means "one job per entry", and it takes the duplication with it.
+    #
+    # fail-fast is off deliberately: one platform failing should not cancel the others and leave a
+    # release with some of its binaries attached, which is how 1.0.5 published with only ARM64.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14         # Apple Silicon
+            os: macos
+            arch: arm64
+          - runner: macos-15-intel   # macos-13 no longer exists; this is the current x64 label
+            os: macos
+            arch: x64
+          - runner: windows-latest
+            os: windows
+            arch: x64
+          # Deliberately not ubuntu-latest: PyInstaller links against the builder's glibc, so the
+          # oldest image available is the widest audience. A binary built on a newer one refuses
+          # to start on an older distribution with a message about GLIBC versions.
+          - runner: ubuntu-22.04
+            os: linux
+            arch: x64
+
+    runs-on: ${{ matrix.runner }}
+
     env:
+      # Not parsed out of the tag here. It is whatever test-release-version confirmed the tag and
+      # python/exporter/version.py agree on, so the zip name, the release name, and the version the
+      # app reports about itself cannot come apart.
       APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
+      # macOS must not build on a system interpreter: see the tkinter note below. Elsewhere this
+      # is uv's own default, stated rather than assumed.
+      UV_PYTHON_PREFERENCE: ${{ matrix.os == 'macos' && 'only-managed' || 'managed' }}
 
-      # The wizard only works on macOS 14 and earlier - 15 tightened keychain access so the
-      # BeaconStore key cannot be read - so every machine this binary has to run on is older
-      # than the machine building it. Setting the target explicitly stops the toolchain
-      # stamping the runner's own OS version onto the result and locking out every user.
+      # The macOS-local export route only works on macOS 14 and earlier - 15 tightened keychain
+      # access so the BeaconStore key cannot be read - so every Mac this binary has to run on is
+      # older than the machine building it. Setting the target explicitly stops the toolchain
+      # stamping the runner's own OS version onto the result and locking out every user. Ignored
+      # on the other platforms.
       MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ runner.arch }})
-      uses: actions/setup-python@v3
+    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ matrix.arch }})
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    # tkinter is not part of a stock Python on macOS or Linux, and the wizard is a tkinter app -
+    # without this the build succeeds and the binary dies at import on a user's machine. Windows
+    # ships it with the interpreter.
+    #
+    # macOS gets it from the uv-managed interpreter instead of from Homebrew. `brew install
+    # python-tk` used to be here, and it is what broke the Intel build: it pulls Homebrew's own
+    # python@3.13 and openssl@3, uv then builds the venv on that interpreter, and PyInstaller
+    # bundles Homebrew's libcrypto.3.dylib. A bottle's minimum macOS is baked in when Homebrew
+    # builds it, for *their* runner's OS - so MACOSX_DEPLOYMENT_TARGET below cannot lower it, and
+    # the binary demanded macOS 15. A uv-managed CPython carries tkinter, targets 11.0, and ships
+    # no OpenSSL dylib at all, which removes the offending file rather than arguing with it.
+    #
+    # The arm64 job only passed because its runner is macos-14 and 14.0 is the threshold; it would
+    # have failed the same way the moment GitHub moved that label to 15.
+
+    - name: Install tkinter (Linux)
+      if: matrix.os == 'linux'
+      run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+    # --no-default-groups drops the dev group: pytest and the linters have no business in a
+    # bundle handed to a user. `build` carries PyInstaller, pinned like everything else.
     - name: Install dependencies
       working-directory: ./python
-      run: |
-        brew install python-tk
-        python -m pip install --upgrade pip
-        pip install pyinstaller -r requirements.txt
+      run: uv sync --frozen --no-default-groups --group build
 
-    - name: Run PyInstaller for MacOS (${{ runner.arch }})
+    # The wizard is a tkinter app, and a missing Tk is invisible until a user double-clicks the
+    # result. Checked in the venv PyInstaller will actually bundle, not in whatever python is
+    # first on PATH.
+    - name: Check the interpreter has tkinter
+      working-directory: ./python
+      run: uv run --frozen python -c "import tkinter; print('Tk', tkinter.TkVersion)"
+
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
+    - name: Run PyInstaller (macOS, ${{ matrix.arch }})
+      if: matrix.os == 'macos'
       working-directory: ./python
       run: |
-        pyinstaller \
-          --onefile \
+        uv run --frozen pyinstaller \
           --windowed \
           --name "OpenTagViewer" \
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
+          --collect-all unicorn \
+          --collect-data findmy \
+          --collect-data anisette \
           --noconfirm \
-          ./main/wizard.py
+          ./exporter/wizard.py
+
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
+    - name: Run PyInstaller (Windows)
+      if: matrix.os == 'windows'
+      working-directory: ./python
+      run: |
+        uv run --frozen pyinstaller `
+          --windowed `
+          --name "OpenTagViewer" `
+          --icon=OpenTagViewer.ico `
+          --collect-all unicorn `
+          --collect-data findmy `
+          --collect-data anisette `
+          --noconfirm `
+          ./exporter/wizard.py
+
+    # No --windowed on Linux: it means "no console window" on the platforms that have that
+    # concept, and there is no bundle format here for it to produce either way.
+    # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
+    # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
+    # never sees it, and the build succeeds - producing a binary that dies at import with "Failed
+    # to load the Unicorn dynamic library". unicorn is there because local Anisette emulates
+    # Apple's ADI library, which is what lets sign-in work without a third-party server.
+    - name: Run PyInstaller (Linux)
+      if: matrix.os == 'linux'
+      working-directory: ./python
+      run: |
+        uv run --frozen pyinstaller \
+          --name "OpenTagViewer" \
+          --collect-all unicorn \
+          --collect-data findmy \
+          --collect-data anisette \
+          --noconfirm \
+          ./exporter/wizard.py
 
     # Verifies rather than assumes. A dependency built on the runner's own macOS - Homebrew
     # bottles especially, which are not backward compatible - can raise the whole bundle's
@@ -156,26 +270,77 @@ jobs:
     # refuses to launch, on a user's Mac, with no traceback and nothing in any build log.
     # Runs before the upload so a build nobody could use never reaches the release page.
     - name: Check the build can run on the macOS the wizard supports
+      if: matrix.os == 'macos'
       run: python3 scripts/check_macos_min_version.py python/dist
 
-    - name: Prepare and Upload MacOS App
-      working-directory: ./python
+    # Start the binary and have it print its version. Not a substitute for running the thing, but
+    # it catches a bundle missing an import - which is the failure PyInstaller actually produces,
+    # and it produces it at startup.
+    #
+    # **This ran everywhere except macOS, which is exactly where it was needed.** The first build
+    # of the iCloud exporter was missing unicorn's native library, built cleanly, and died at
+    # import; nothing in this workflow would have noticed. It costs a second, so it runs on all of
+    # them now.
+    #
+    # `--self-test` is the other half, and starting was not enough of a check on its own: the
+    # second build started, signed in, and *then* died, because FindMy.py keeps Apple's pinned
+    # root certificates as files beside its code and PyInstaller bundles code. That failure was
+    # several minutes and one Apple ID into the flow. The self-test reaches the same files with
+    # no network and no account.
+    - name: Check the built binary starts and can reach its data files
+      working-directory: ./python/dist
+      shell: bash
       run: |
-        echo "Going to build zip with version: $APP_VERSION"
-        APP_ZIP_NAME="${{ env.APP_NAME }}-$APP_VERSION-${{ runner.arch }}.zip"
-        cd ./dist
-        zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
-        mkdir -p ${{ github.workspace }}/output
-        mv ${{ github.workspace }}/python/dist/$APP_ZIP_NAME ${{ github.workspace }}/output/$APP_ZIP_NAME
+        BINARY="./OpenTagViewer/OpenTagViewer"
+        [ "${{ matrix.os }}" = "macos" ] && BINARY="./OpenTagViewer.app/Contents/MacOS/OpenTagViewer"
+        "$BINARY" --version
+        "$BINARY" --self-test
 
-        echo "UPLOAD_ASSET=$APP_ZIP_NAME" >> $GITHUB_ENV
-        echo "UPLOAD_PATH=${{ github.workspace }}/output/$APP_ZIP_NAME" >> $GITHUB_ENV
+    - name: Package (macOS)
+      if: matrix.os == 'macos'
+      working-directory: ./python/dist
+      shell: bash
+      run: |
+        ASSET="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-macos-${{ matrix.arch }}.zip"
+        # The .app only. In onedir mode COLLECT and BUNDLE each hold a full copy, so zipping both
+        # ships every file twice.
+        zip -qr "$ASSET" OpenTagViewer.app
+        mkdir -p "${{ github.workspace }}/output"
+        mv "$ASSET" "${{ github.workspace }}/output/$ASSET"
+        echo "UPLOAD_ASSET=$ASSET" >> $GITHUB_ENV
+        echo "UPLOAD_PATH=${{ github.workspace }}/output/$ASSET" >> $GITHUB_ENV
+
+    - name: Package (Windows)
+      if: matrix.os == 'windows'
+      working-directory: ./python/dist
+      shell: bash
+      run: |
+        ASSET="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-windows-${{ matrix.arch }}.zip"
+        # The whole directory: onedir keeps the interpreter and the libraries beside the .exe, and
+        # the .exe alone does nothing.
+        7z a "$ASSET" OpenTagViewer
+        mkdir -p "${{ github.workspace }}/output"
+        mv "$ASSET" "${{ github.workspace }}/output/$ASSET"
+        echo "UPLOAD_ASSET=$ASSET" >> $GITHUB_ENV
+        echo "UPLOAD_PATH=${{ github.workspace }}/output/$ASSET" >> $GITHUB_ENV
+
+    - name: Package (Linux)
+      if: matrix.os == 'linux'
+      working-directory: ./python/dist
+      shell: bash
+      run: |
+        ASSET="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-linux-${{ matrix.arch }}.tar.gz"
+        tar -czf "$ASSET" OpenTagViewer
+        mkdir -p "${{ github.workspace }}/output"
+        mv "$ASSET" "${{ github.workspace }}/output/$ASSET"
+        echo "UPLOAD_ASSET=$ASSET" >> $GITHUB_ENV
+        echo "UPLOAD_PATH=${{ github.workspace }}/output/$ASSET" >> $GITHUB_ENV
 
     - name: Upload PyInstaller Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
-        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
+        name: ${{ env.UPLOAD_ASSET }}
+        path: ${{ env.UPLOAD_PATH }}
 
     # The token goes in `with:`, not `env:`. This action's `token` input defaults to
     # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
@@ -185,110 +350,10 @@ jobs:
     # had already been built. The v1.0.5 release published with no assets attached.
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
-      if: github.event_name == 'release'
       with:
-        files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
-        name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
-        token: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }}
-
-  build-intel:
-    needs: test-release-version
-    # macos-13 no longer exists. GitHub's supported images are macOS 26, 15 and 14 (14 itself
-    # deprecated), so a job asking for macos-13 is never picked up - it sits queued until the
-    # six-hour timeout rather than failing, which is why the 1.0.5 release went out with only
-    # the ARM64 binary attached. macos-15-intel is the current standard-size x64 label.
-    runs-on: macos-15-intel # Intel
-    environment: 'MacOS Exporter App CI'
-
-    # The repository default is read-only, which is what turned a missing token into a 403 at
-    # the very last step. Granting it here means the upload still works if the PAT is ever
-    # unset or expires - the action treats an empty token as unset and falls back to this one.
-    permissions:
-      contents: write
-
-        # Only run this for 'macos-exporter-v<whatever>' tags!
-    if: |
-      github.event_name == 'release'
-      && (github.event.release.prerelease == true || github.event.release.published_at != null)
-      && startsWith(github.event.release.tag_name, 'macos-exporter-v')
-
-    # The version is not parsed out of the tag here. It is whatever test-release-version
-    # confirmed the tag and python/main/wizard.py agree on, so the zip name, the release
-    # name, and the version the app reports about itself cannot come apart.
-    env:
-      APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
-
-      # The wizard only works on macOS 14 and earlier - 15 tightened keychain access so the
-      # BeaconStore key cannot be read - so every machine this binary has to run on is older
-      # than the machine building it. Setting the target explicitly stops the toolchain
-      # stamping the runner's own OS version onto the result and locking out every user.
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ runner.arch }})
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
-
-    - name: Install dependencies
-      working-directory: ./python
-      run: |
-        brew install python-tk
-        python -m pip install --upgrade pip
-        pip install pyinstaller -r requirements.txt
-
-    - name: Run PyInstaller for MacOS (${{ runner.arch }})
-      working-directory: ./python
-      run: |
-        pyinstaller \
-          --onefile \
-          --windowed \
-          --name "OpenTagViewer" \
-          --osx-bundle-identifier "dev.wander.opentagviewer" \
-          --icon=OpenTagViewer.icns \
-          --noconfirm \
-          ./main/wizard.py
-
-    # Verifies rather than assumes. A dependency built on the runner's own macOS - Homebrew
-    # bottles especially, which are not backward compatible - can raise the whole bundle's
-    # floor to the builder's OS version. That produces a binary which installs fine and then
-    # refuses to launch, on a user's Mac, with no traceback and nothing in any build log.
-    # Runs before the upload so a build nobody could use never reaches the release page.
-    - name: Check the build can run on the macOS the wizard supports
-      run: python3 scripts/check_macos_min_version.py python/dist
-
-    - name: Prepare and Upload MacOS App
-      working-directory: ./python
-      run: |
-        echo "Going to build zip with version: $APP_VERSION"
-        APP_ZIP_NAME="${{ env.APP_NAME }}-$APP_VERSION-${{ runner.arch }}.zip"
-        cd ./dist
-        zip -r $APP_ZIP_NAME OpenTagViewer.app/ OpenTagViewer
-        mkdir -p ${{ github.workspace }}/output
-        mv ${{ github.workspace }}/python/dist/$APP_ZIP_NAME ${{ github.workspace }}/output/$APP_ZIP_NAME
-
-        echo "UPLOAD_ASSET=$APP_ZIP_NAME" >> $GITHUB_ENV
-        echo "UPLOAD_PATH=${{ github.workspace }}/output/$APP_ZIP_NAME" >> $GITHUB_ENV
-
-    - name: Upload PyInstaller Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
-        path: ${{ github.workspace }}/output/${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ runner.arch }}.zip
-
-    # The token goes in `with:`, not `env:`. This action's `token` input defaults to
-    # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
-    # GITHUB_TOKEN" - so the default is always non-empty and the env var was ignored
-    # entirely. It authenticated as the built-in token, whose contents permission is read-only
-    # here, and failed with 403 "Resource not accessible by integration" after both binaries
-    # had already been built. The v1.0.5 release published with no assets attached.
-    - name: Upload Release Asset to GitHub Release
-      uses: softprops/action-gh-release@v2
-      if: github.event_name == 'release'
-      with:
-        files: ${{ env.UPLOAD_PATH }} # Path to asset created in previous step
-        name: OpenTagViewer MacOS AirTag Exporter ${{ env.APP_VERSION }}
+        files: ${{ env.UPLOAD_PATH }}
+        # Explicit because a manual run is not on a tag: github.ref is the branch, and without
+        # this the action would create a release named after it.
+        tag_name: ${{ needs.test-release-version.outputs.tag }}
+        name: OpenTagViewer AirTag Exporter ${{ env.APP_VERSION }}
         token: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }}

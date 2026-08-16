@@ -15,7 +15,7 @@ from Crypto.Random import get_random_bytes
 
 from test.unittestutils import DIRNAME, skip_unless_macos_le14, skip_unless_unix
 
-from main.airtag_decryptor import (
+from exporter.airtag_decryptor import (
     AbstractSubprocessRunner,
     KEY_ALIGNMENT_RECORDS,
     KeyStoreKeyNotFoundException,

@@ -137,13 +137,6 @@
     <string name="anisette_local_status_checking">正在檢查…</string>
     <string name="anisette_login_needs_server">此裝置無法自行完成登入準備，因此這次將使用伺服器。你可以稍後在設定中變更。</string>
     <string name="anisette_provider">Anisette 提供者</string>
-    <string name="export_history">匯出歷史記錄</string>
-    <string name="export_tag">匯出標籤</string>
-    <string name="selected">已選擇</string>
-    <string name="x_selected">已選擇 %1$d 個</string>
-    <string name="exit_selection">結束選擇</string>
-    <string name="history_exported">歷史記錄已匯出</string>
-    <string name="error_occurred_while_exporting_the_history">無法匯出歷史記錄</string>
-    <string name="are_you_sure_you_want_to_remove_these_devices">確定要移除這些裝置嗎？移除後需要重新匯入才能復原。</string>
-    <string name="remove_devices">移除裝置</string>
+    <string name="use_system_colors">使用系統配色</string>
+    <string name="use_system_colors_description">根據桌布為應用程式配色。需要 Android 12 或更新版本。</string>
 </resources>

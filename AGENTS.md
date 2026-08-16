@@ -108,23 +108,31 @@ rather than copying file contents into your own commit. Credit them in the PR de
 
 ### 9. Bump the exporter's `VERSION` before tagging a release
 
-`VERSION` in `python/main/wizard.py` is the only place the macOS exporter's version is
+`VERSION` in `python/exporter/version.py` is the only place the desktop exporter's version is
 written. It reaches the window title and, more importantly, every export it produces, as
-`via: OpenTagViewer.app:<version>` in `OPENTAGVIEWER.yml` — which is how anyone looking at a
-zip later works out which exporter built it.
+`via: <producer>:<version>` in `OPENTAGVIEWER.yml` — which is how anyone looking at a zip later
+works out what built it.
+
+**There is more than one producer, and they must not claim to be each other.** The windowed
+exporter stamps `OpenTagViewer.wizard:<version>`, its CLI stamps `OpenTagViewer.cli:<version>`, and
+the Android app will stamp its own. They share `VERSION` because they ship together; the name in
+front of it is what makes a bug report answerable. The shared writer takes `via` as a parameter
+and never invents one — see `python/opentagviewer_export/bundle.py`.
 
 Nothing patches it at build time, and nothing should: the wizard also runs from source (the
-VM bootstrap, `python main/wizard.py`), and those exports stamp `via:` too, so a build-time
+VM bootstrap, `python -m exporter.wizard`), and those exports stamp `via:` too, so a build-time
 patch would make two artifacts from one commit disagree.
 
 So releasing is two steps, in this order:
 
 1. Commit the `VERSION` bump to `main`
-2. Tag that commit `macos-exporter-v<the same version>` and publish the release
+2. Tag that commit `exporter-v<the same version>` and publish the release
 
 `scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`
-before either build job. A tag that disagrees fails the release rather than shipping a build
-that lies about itself. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-macos-exporter).
+before any build job. A tag that disagrees fails the release rather than shipping a build that
+lies about itself. `macos-exporter-v` is the old spelling and still resolves, because tags already
+published keep their name — but it stopped being true when the exporter started building for
+Windows and Linux. Full procedure: [CONTRIBUTING.md](./CONTRIBUTING.md#releasing-the-exporter).
 
 ### 10. Update the docs that index what you added
 
@@ -143,6 +151,40 @@ If you add or change one of these, update its index in the same commit:
 The test for whether it belongs here rather than in a comment: would somebody hit it *before*
 reading the code that explains it? Anisette's machine-identity binding is the example — it
 presents as auth failing for no reason, hours away from the code responsible.
+
+### 11. The app is one device, and every path must say the same thing
+
+Everything this app does against Apple is attributed to a device identity it invents, and the
+user sees the result: an entry in their Apple account's device list, with a *Remove from Account*
+button next to the words "If you do not recognise this device".
+
+**So the identity has to be one identity.** It is assembled in more than one place — the client
+info string in `anisette/AdiDeviceIdentity.java`, the hardware headers, the serial the FindMy.py
+providers take as a parameter — and paths that disagree do not fail. They register **separate
+devices**, and the user is invited to remove things they cannot identify, which breaks the
+session that was working.
+
+Under the iCloud export route the same identity reaches two further places a person reads: the
+escrow record's metadata, which is the only way to recognise a record in a listing, and the
+peer's `serialNumber` in the keychain trust circle. A serial that differs between them makes one
+client look like several — and by
+[findmy-export §5.2](./docs/findmy-export/03-keychain-trust.md), serials are exactly what
+distinguishes devices there.
+
+Three things follow:
+
+- **One source of truth.** A path that needs the identity reads it; it does not compose its own.
+- **The parts must agree with each other.** Model, OS version, build, CFNetwork and Darwin
+  describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
+  Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
+  never produce.
+- **The serial is a label, and the only field here the user actually sees.** `0PENTAGVIEWR` is
+  confirmed accepted and displayed. Without one, Apple omits the row entirely, leaving an entry
+  with nothing to tell it apart from real hardware.
+
+**Changing it later adds an entry rather than renaming one**, and may require signing in again,
+so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
+user reading their device list can recognise it — see the wiki.
 
 ---
 

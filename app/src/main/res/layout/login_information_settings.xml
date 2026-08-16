@@ -26,7 +26,7 @@
                 android:fontFamily="@font/nunito_bold"
                 android:paddingLeft="8dp"
                 android:text="@string/logged_in_as"
-                android:textColor="@color/md_theme_outlineVariant_mediumContrast" />
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
         </LinearLayout>
 
@@ -35,7 +35,7 @@
             android:layout_height="match_parent"
             android:layout_margin="0dp"
             android:background="@drawable/layout_rounded"
-            android:backgroundTint="@color/md_theme_surfaceContainerLow_highContrast"
+            android:backgroundTint="?attr/colorSurfaceContainerLow"
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:padding="16dp">
@@ -53,20 +53,20 @@
                     android:layout_height="24dp"
                     android:layout_marginBottom="4dp"
                     android:background="@drawable/layout_rounded"
-                    android:backgroundTint="@color/md_theme_outlineVariant" />
+                    android:backgroundTint="?attr/colorOutlineVariant" />
 
                 <dev.wander.android.opentagviewer.ui.widget.SkeletonView
                     android:layout_width="220dp"
                     android:layout_height="18dp"
                     android:background="@drawable/layout_rounded"
-                    android:backgroundTint="@color/md_theme_outlineVariant" />
+                    android:backgroundTint="?attr/colorOutlineVariant" />
 
                 <dev.wander.android.opentagviewer.ui.widget.SkeletonView
                     android:layout_width="96dp"
                     android:layout_height="40dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/layout_rounded"
-                    android:backgroundTint="@color/md_theme_outlineVariant" />
+                    android:backgroundTint="?attr/colorOutlineVariant" />
 
             </LinearLayout>
 
@@ -83,7 +83,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/nunito_bold"
-                    android:textColor="@color/md_theme_onPrimaryContainer"
+                    android:textColor="?attr/colorOnPrimaryContainer"
                     android:textSize="20sp"
                     tools:text="Firstname Lastname"
                     />

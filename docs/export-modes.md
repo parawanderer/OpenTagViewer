@@ -1,0 +1,238 @@
+# How exporting works, and who runs it
+
+> **Status: plan, not description.** None of this is built yet. It records decisions taken while
+> the protocol work was being specified, so that the UI work does not have to re-derive them.
+>
+> The protocol itself is in [findmy-export/](./findmy-export/). This document is about product
+> shape: which flows exist, what each one costs the user, and which of them writes to their Apple
+> account.
+
+---
+
+## The change this plans for
+
+Today, getting tags out of an Apple account needs a **Mac** — the exporter reads the plists Find
+My leaves on disk, which is why there is a VM bootstrap and why the wizard is macOS-only. The
+protocol work replaces that with reading the same records out of iCloud.
+
+**So the Mac disappears, and with it the operating system requirement.** What is left is an Apple
+ID, the screen-lock passcode of a device already on that account, and Python — which runs
+anywhere, including inside the Android app through Chaquopy.
+
+The one thing it does not remove is the iPhone or iPad that paired the tag in the first place.
+See [findmy-export/README.md](./findmy-export/README.md#the-one-thing-left-and-why-it-is-not-worth-starting).
+
+---
+
+## Three roles, and only one of them writes
+
+| | Who | Needs | Writes to the account |
+| --- | --- | --- | --- |
+| **Owner, connected** | has an Apple account with tags, wants live tracking on Android | Apple ID, device passcode | **yes** — a peer and an escrow record |
+| **Owner, exporting** | has tags, wants a zip — for themselves or a friend | Apple ID, device passcode | no |
+| **Recipient** | has no tags of their own | a free Apple ID | no |
+| **Sharee** *(not reachable yet)* | has tags **shared to them** through Apple's own sharing | Apple ID, device passcode | no |
+
+**The sharee is a real case and the one thing here that does not work yet.** Someone who was sent
+an AirTag through Apple's own sharing sees the accessory in Find My on an iPhone, and this route
+can see that the share exists — the records come back in the ordinary `BeaconStore` fetch — but a
+shared accessory record **carries no key material**, so nothing can locate or export it. The keys
+sit behind a sharing circle secret, which is a second key hierarchy and is not part of Stages 1
+to 6. See
+[findmy-export/README.md](./findmy-export/README.md#shared-accessories-reachable-and-new) for what
+it would take; the short version is that the records are already in hand, so the remaining work
+is the unwrapping rather than another fetch path.
+
+**Worth knowing because it is the natural workaround people will reach for.** "Just have the owner
+share it with me in Find My" does not substitute for an export today, and the app should say so
+rather than showing a tag it cannot place. Until then, an owner sharing with an Android user
+exports a bundle; Apple's sharing is not a route in.
+
+**The recipient's Apple ID is not optional and is often misremembered as being so.** Fetching
+location reports is authenticated: any Apple ID may fetch reports for any tag's hashed keys, but
+some Apple ID must. That is exactly why the app has a login flow today, and it is what makes an
+export to a friend work at all — the service does not check that the requesting account owns the
+tag. No Apple *device* is needed, and the account can be free and new.
+
+---
+
+## Two exporters, one artefact
+
+The zip is the interface, and it does not care what produced it:
+
+- **The Android app**, for an owner who has an Android phone anyway.
+- **The desktop wizard** (`python/`), repointed at the iCloud route, for an owner who does not —
+  or who would rather not put an Apple ID into an Android app.
+
+Both emit the layout in [findmy-export/06-output.md](./findmy-export/06-output.md), and both stamp
+`via:` in `OPENTAGVIEWER.yml`, which is how anyone looking at a bundle later works out which
+produced it. That stamping rule already exists — `AGENTS.md` rule 9 — and now has two producers to
+distinguish rather than one to version.
+
+**Repointing the wizard is the larger user-visible win of the two.** It retires the VM bootstrap
+and the macOS-only packaging, and it is the step people actually complain about.
+
+> ### The wizard persists nothing, and must keep not doing so
+>
+> Today it holds no credential at all: the password it asks for is macOS keychain access, used to
+> unwrap the local plists, and nothing is written anywhere. Every run starts from nothing.
+>
+> **The new route raises the stakes of keeping that property**, because the credential stops being
+> a local keychain password and becomes the user's **Apple ID password**, alongside a device
+> passcode. Both should be read, used, and dropped.
+>
+> This needs saying because FindMy.py's default is the opposite: `to_json()` writes the account —
+> Apple ID password included — to `account.json` in plaintext, and every example script in that
+> library does exactly that. A wizard built by following those examples would start persisting a
+> credential it has never held, on a desktop with no keystore behind it. The app is not exposed to
+> this, because it encrypts the blob under a key held in `AndroidKeyStore` and never writes the
+> library's own file.
+
+---
+
+## Joining the trust circle is a separate decision from signing in
+
+**It is tempting to always join**, on the reasoning that a user who buys a tag later should see it
+appear without being asked for anything. The outcome is right; the mechanism is not what it looks
+like, and the difference decides the design.
+
+**A new tag does not need a join to be visible.** It arrives as a new record in the same zone,
+protected under keys already held, and an incremental fetch finds it.
+
+**What a join actually buys is surviving key rotation.** A non-member receives no new key shares,
+so when Apple's view keys roll — which happens for reasons outside this app, such as a device
+being removed from the account — a non-member's keys go stale and the user is asked for the
+device passcode again. A member is handed the new keys and notices nothing.
+
+So the choice is between *one passcode prompt, occasionally, at an unpredictable moment* and
+*permanent artefacts on the user's Apple account*. That is a real trade, not an obvious one.
+
+> ### The route being replaced already joined, and nobody called it that
+>
+> The macOS export is easy to think of as the local, private, offline option. It is not. It reads
+> files macOS wrote, and macOS wrote them by signing into iCloud, **joining the keychain trust
+> circle as a peer**, and syncing the records down. The VM bootstrap does exactly that with a Mac
+> that does not exist.
+>
+> So the status quo leaves a **full device peer and its escrow record** on the user's account —
+> more than anything planned here — and it was invisible only because Apple's own software created
+> it rather than ours. An export-only flow that writes nothing is a genuine improvement on that,
+> not a compromise against it.
+
+### The decision
+
+**Join only when the user has asked for the connected experience.** Export is a read and must not
+write anything.
+
+| Flow | Joins |
+| --- | --- |
+| One-off export, in the app or the wizard | **no** — recover keys, decrypt, write the zip, leave nothing |
+| Live tracking of your own account's tags | yes, and say so before doing it |
+
+Bundling the join into sign-in would give every user who wanted a single export a peer in their
+keychain trust circle and an escrow record that **no Apple interface displays**, acquired without
+being asked. The residue rules in
+[findmy-export/README.md](./findmy-export/README.md#account-side-residue-is-a-first-class-design-problem)
+exist for precisely this.
+
+### What joining costs, in words a user should see
+
+- a **peer** in the keychain trust circle — the circle that protects every password on the account
+- an **escrow record**, sealed under a passcode the user chooses, which is what recovers this
+  client later
+- both permanent; only the record can be deleted afterwards
+
+The second passcode is only ever needed for this flow. **An export never asks for it**, because
+nothing is created that would need protecting.
+
+---
+
+## What this actually supports
+
+> **Status column, because half of this is not built.** *Shipped* means it works in a released
+> app today. *Built* means the exporter does it and the app cannot read it yet. *Planned* is
+> [android-import-handover.md](./android-import-handover.md) item 5.
+
+### There are two kinds of "live", and conflating them is the usual confusion
+
+**Location updates** are one thing: where a tag was last seen. They come from Apple's Find My
+network, are fetched by hashed key, and need **any** Apple ID — not the owner's. Anyone holding
+the keys gets them, forever, with no further contact with the owner.
+
+**iCloud state** is the other: which tags exist, what they are called in Apple's Find My, and
+which have been removed. That lives in the owner's account and needs access to it. A bundle is a
+**snapshot** of it.
+
+So a recipient's map keeps updating indefinitely while their *list of tags* is frozen at the
+moment of export. A tag bought afterwards never appears; a rename made in Apple's Find My never
+arrives.
+
+| Person | Locations | New tags appear | Apple's names sync | Rename back to Apple | Passcode | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Owner, connected** — signed into iCloud in the app, joined the trust circle | yes | yes | yes | yes | once | planned |
+| **Owner, signed in without joining** | yes | yes | yes | yes | again after each key rotation | planned |
+| **Owner, exporting from the desktop** | yes | at the next export | at the next export | no | each run | shipped |
+| **Recipient of a bundle** | yes | **no** | **no** — local rename only | no | never | shipped |
+| **Sharee** — a tag shared to their Apple ID by its owner, in Apple's Find My | **no** | — | — | — | — | **not supported** |
+
+**The sharee is the one real gap.** The records are visible in the account and carry **no key
+material**, so nothing can locate the tag; the keys sit behind a sharing circle secret, which is a
+second key hierarchy on top of PCS. See
+[findmy-export/README.md](./findmy-export/README.md#shared-accessories-reachable-and-new). Until
+then the answer is that the owner runs the exporter, which produces a bundle rather than a share.
+
+### Which tags
+
+| Kind | Locatable | Has an iCloud name | Status |
+| --- | --- | --- | --- |
+| **AirTag** | yes | yes, from a `BeaconNamingRecord` | shipped |
+| **The owner's own iPhone, iPad, Mac** | yes | yes, but from the device rather than a naming record | built — see the privacy note in [06-output.md](./findmy-export/06-output.md) §3 |
+| **AirPods and other Find My accessories** | where the record carries a private key | yes | built, lightly exercised |
+| **OpenHaystack / self-generated** | yes | **no — there is no iCloud record at all** | built in the exporter, [not readable by the app yet](https://github.com/parawanderer/OpenTagViewer/issues/45) |
+| **A tag shared to you by another Apple ID** | no | — | not supported |
+
+> **A self-generated tag has no name to sync, and that is structural rather than missing.** It was
+> never paired to an Apple account, so no `BeaconNamingRecord` exists, nothing in iCloud knows it,
+> and no rename can be written back. Its name is whatever the importing app calls it — which makes
+> the local rename the *only* name it will ever have, rather than a stopgap until the real one
+> arrives.
+>
+> This is worth surfacing in the UI rather than leaving as a surprise: for these tags, renaming is
+> authoritative; for an AirTag on a connected account, a local rename is shadowed by Apple's.
+
+## Edge cases worth handling deliberately
+
+**An account with no circle at all.** An Apple ID that has never had an Apple device has nothing
+to recover from — no bottles, no peers, no keys. The only way in is `establish`, which creates a
+circle, and this project never calls it (see
+[findmy-export/03-keychain-trust.md](./findmy-export/03-keychain-trust.md) §6.7). It does not
+matter in practice: such an account cannot have paired a tag, so it owns nothing to export. Detect
+it and say so plainly rather than failing at a lower layer.
+
+**A recipient signing in.** Their account has tags of nobody's; the keychain path should never run
+for them at all. Importing a zip must not require a passcode, a circle, or anything from Stage 3.
+
+**A user who exports and later wants live tracking.** They will be asked for the device passcode a
+second time, because the first flow deliberately kept nothing. That is the correct trade and
+should be explained at the point it happens, not treated as a bug.
+
+---
+
+## Open decisions
+
+- **`sourceUser` in `OPENTAGVIEWER.yml`** names a person and travels inside a bundle that is meant
+  to be shared. Keep, drop, or make optional.
+- **Tag selection in the app.** The wizard already does this — `_create_zip` takes a list of
+  beacon ids — so only the Android side is open, and it is a UI question rather than a design one.
+  The platform convention fits: long-press to enter a selection mode, tap to add, act on the
+  selection, as the mail and photo pickers do. **The default must be an explicit list, never
+  everything**, because sharing one tag with a friend is the common case and sharing all of them
+  by accident is the failure worth designing against.
+
+  **[observed] This is sharper than it first looked.** The owner's own iPhone, iPad and Mac are in
+  the same zone as the tags, they carry private keys, and they are locatable — so they pass the
+  export rule and can end up in a bundle. Finding your own phone from your own Android phone is a
+  feature; handing a friend the ability to follow it is not. **The selection must therefore show
+  which entries are devices**, using the discriminators in
+  [findmy-export/06-output.md](./findmy-export/06-output.md) §3, so the choice is informed rather
+  than inferred from a name.
