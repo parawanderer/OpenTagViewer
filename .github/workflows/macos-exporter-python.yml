@@ -13,6 +13,16 @@ on:
   release:
     types: published
 
+  # A release only fires `published` once, so a platform that failed its build cannot be
+  # retried by editing the release - and re-running the old run would re-run the old workflow
+  # file, which is no use when the fix is *in* the workflow. This builds against a tag that
+  # already has a release and uploads the missing asset to it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build for, e.g. exporter-v1.1.0"
+        required: true
+
 env:
   PYTHONPATH: "${{ github.workspace }}/python:$PYTHONPATH"
   PYINSTALLER_PYTHON_VER: 3.13
@@ -26,15 +36,18 @@ jobs:
     # accepted by scripts/release_version.py so that existing tags and existing habits keep
     # working - see CONTRIBUTING.md -> Releasing the exporter.
     if: |
-      github.event_name == 'release'
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'release'
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
       && (startsWith(github.event.release.tag_name, 'exporter-v')
-          || startsWith(github.event.release.tag_name, 'macos-exporter-v'))
+          || startsWith(github.event.release.tag_name, 'macos-exporter-v')))
 
     # The version every build job names its artifact with. It comes from here rather than from
     # each job parsing the tag again, so there is exactly one place it can be wrong.
     outputs:
       app-version: ${{ steps.version.outputs.APP_VERSION }}
+      # Resolved once here so the upload does not have to work it out again.
+      tag: ${{ steps.version.outputs.TAG }}
 
     steps:
     - name: Checkout code
@@ -52,9 +65,11 @@ jobs:
     - name: Check the release tag matches the version in the source
       id: version
       run: |
-        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "${{ github.ref }}")"
+        TAG="${{ inputs.tag || github.ref }}"
+        APP_VERSION="$(python3 scripts/release_version.py --kind exporter --tag "$TAG")"
         echo "Tag and source agree on version: $APP_VERSION"
         echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
+        echo "TAG=${TAG#refs/tags/}" >> $GITHUB_OUTPUT
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
@@ -95,10 +110,11 @@ jobs:
       contents: write
 
     if: |
-      github.event_name == 'release'
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'release'
       && (github.event.release.prerelease == true || github.event.release.published_at != null)
       && (startsWith(github.event.release.tag_name, 'exporter-v')
-          || startsWith(github.event.release.tag_name, 'macos-exporter-v'))
+          || startsWith(github.event.release.tag_name, 'macos-exporter-v')))
 
     # This was two hand-duplicated jobs, with a comment saying that naming both runners in
     # `runs-on` made the job never start. That is because a list in `runs-on` is a set of labels a
@@ -135,6 +151,9 @@ jobs:
       # python/exporter/version.py agree on, so the zip name, the release name, and the version the
       # app reports about itself cannot come apart.
       APP_VERSION: ${{ needs.test-release-version.outputs.app-version }}
+      # macOS must not build on a system interpreter: see the tkinter note below. Elsewhere this
+      # is uv's own default, stated rather than assumed.
+      UV_PYTHON_PREFERENCE: ${{ matrix.os == 'macos' && 'only-managed' || 'managed' }}
 
       # The macOS-local export route only works on macOS 14 and earlier - 15 tightened keychain
       # access so the BeaconStore key cannot be read - so every Mac this binary has to run on is
@@ -158,9 +177,17 @@ jobs:
     # tkinter is not part of a stock Python on macOS or Linux, and the wizard is a tkinter app -
     # without this the build succeeds and the binary dies at import on a user's machine. Windows
     # ships it with the interpreter.
-    - name: Install tkinter (macOS)
-      if: matrix.os == 'macos'
-      run: brew install python-tk
+    #
+    # macOS gets it from the uv-managed interpreter instead of from Homebrew. `brew install
+    # python-tk` used to be here, and it is what broke the Intel build: it pulls Homebrew's own
+    # python@3.13 and openssl@3, uv then builds the venv on that interpreter, and PyInstaller
+    # bundles Homebrew's libcrypto.3.dylib. A bottle's minimum macOS is baked in when Homebrew
+    # builds it, for *their* runner's OS - so MACOSX_DEPLOYMENT_TARGET below cannot lower it, and
+    # the binary demanded macOS 15. A uv-managed CPython carries tkinter, targets 11.0, and ships
+    # no OpenSSL dylib at all, which removes the offending file rather than arguing with it.
+    #
+    # The arm64 job only passed because its runner is macos-14 and 14.0 is the threshold; it would
+    # have failed the same way the moment GitHub moved that label to 15.
 
     - name: Install tkinter (Linux)
       if: matrix.os == 'linux'
@@ -171,6 +198,13 @@ jobs:
     - name: Install dependencies
       working-directory: ./python
       run: uv sync --frozen --no-default-groups --group build
+
+    # The wizard is a tkinter app, and a missing Tk is invisible until a user double-clicks the
+    # result. Checked in the venv PyInstaller will actually bundle, not in whatever python is
+    # first on PATH.
+    - name: Check the interpreter has tkinter
+      working-directory: ./python
+      run: uv run --frozen python -c "import tkinter; print('Tk', tkinter.TkVersion)"
 
     # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the
     # result. unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis
@@ -316,8 +350,10 @@ jobs:
     # had already been built. The v1.0.5 release published with no assets attached.
     - name: Upload Release Asset to GitHub Release
       uses: softprops/action-gh-release@v2
-      if: github.event_name == 'release'
       with:
         files: ${{ env.UPLOAD_PATH }}
+        # Explicit because a manual run is not on a tag: github.ref is the branch, and without
+        # this the action would create a release named after it.
+        tag_name: ${{ needs.test-release-version.outputs.tag }}
         name: OpenTagViewer AirTag Exporter ${{ env.APP_VERSION }}
         token: ${{ secrets.MACOS_EXPORTER_APP_GITHUB_TOKEN }}
