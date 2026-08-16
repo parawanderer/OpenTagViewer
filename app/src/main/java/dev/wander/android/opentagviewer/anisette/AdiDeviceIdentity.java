@@ -1,5 +1,8 @@
 package dev.wander.android.opentagviewer.anisette;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.UUID;
@@ -166,6 +169,40 @@ public final class AdiDeviceIdentity {
 
         public String darwin() {
             return this.darwin;
+        }
+
+        /**
+         * This profile as FindMy.py's {@code DeviceIdentity} mapping.
+         *
+         * <p><b>This is the whole point of the enum being reachable from Python.</b> The Python
+         * side used to hold its own copy of these six values, which meant one install could
+         * claim a Mac in its ADI provisioning headers and something else at login - the
+         * contradiction rule 11 exists to prevent, and the one Apple's own clients never
+         * produce. It reads them from here instead, so there is one source of truth and a
+         * profile added later needs no second edit.
+         *
+         * <p>The key names are <b>FindMy.py's</b>, not this class's: they are fed straight to
+         * {@code DeviceIdentity.from_json}. That is deliberate but it is also a trap, because
+         * {@code from_json} fills a missing key from the library's own defaults rather than
+         * failing - so a rename on either side would silently produce a half-Apple, half-us
+         * identity. {@code IdentityBridgeTest} asserts the two agree, on device, through
+         * Chaquopy.
+         */
+        public String toJson() {
+            try {
+                return new JSONObject()
+                        .put("model", this.model)
+                        .put("os_name", this.osName)
+                        .put("os_version", this.osVersion)
+                        .put("os_build", this.osBuild)
+                        .put("cfnetwork", this.cfnetwork)
+                        .put("darwin", this.darwin)
+                        .toString();
+            } catch (final JSONException e) {
+                // Six string literals into a fresh object. Unreachable short of the platform
+                // being broken, and there is no sensible half-identity to return instead.
+                throw new IllegalStateException("could not describe " + name(), e);
+            }
         }
     }
 

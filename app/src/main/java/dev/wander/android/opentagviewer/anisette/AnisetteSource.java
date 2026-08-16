@@ -50,6 +50,20 @@ public interface AnisetteSource {
     /** What {@link #recordSessionProvenance} last recorded. False if nothing has. */
     boolean wasSessionEstablishedLocally();
 
+    /**
+     * The machine this install claims to be, as FindMy.py's {@code DeviceIdentity} mapping.
+     *
+     * <p><b>Answerable when nothing else here is.</b> Every other method on this interface
+     * describes locally produced Anisette, and returns nothing useful when it is unavailable -
+     * but a sign-in relayed through a remote server still has to tell Apple which machine it
+     * is, and it must be the same answer either way. So this does not consult ADI, does not
+     * download anything, and does not care whether {@link #ensureReady} succeeded: the profile
+     * is persisted beside the device identity and read straight back.
+     *
+     * <p>Called from Python at sign-in. See {@code identity.identityForNewSession}.
+     */
+    String hardwareProfileJson();
+
     /** Short human-readable state, for logs and diagnostics. */
     String describe();
 }

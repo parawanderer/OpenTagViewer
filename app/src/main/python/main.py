@@ -241,11 +241,15 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
         # A new sign-in, so this is the one place the app's own identity is used. Everything
         # restored from a stored account keeps whatever it was established with - see
         # identity.identityForRestore, and the warning on identity.APP_SERIAL.
+        #
+        # The machine half comes from Java, which persists it per install: an install from
+        # before there was a choice keeps the Mac its ADI was provisioned with, and a fresh one
+        # is an iPhone. Passed even when local Anisette turns out to be unusable, because a
+        # sign-in relayed through a server must still claim the same machine.
         anisette = _anisetteProvider(
             anisetteServerUrl,
             localAnisette,
-            serial=app_identity.APP_SERIAL,
-            identity=app_identity.APP_IDENTITY,
+            **app_identity.identityForNewSession(localAnisette),
         )
         acc = AppleAccount(anisette)
 

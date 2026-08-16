@@ -93,6 +93,30 @@ public final class FakeAnisetteSource implements AnisetteSource {
         this.recordedProvenance = establishedLocally;
     }
 
+    private AdiDeviceIdentity.Hardware hardware = AdiDeviceIdentity.Hardware.IPHONE;
+
+    /**
+     * Claim a different machine. Not a named constructor because it is orthogonal to the
+     * states above - every one of them can be either profile, and the interesting case is an
+     * install that is {@link AdiDeviceIdentity.Hardware#LEGACY_MAC} <i>and</i> unavailable.
+     */
+    public FakeAnisetteSource claiming(AdiDeviceIdentity.Hardware hardware) {
+        this.hardware = hardware;
+        return this;
+    }
+
+    /**
+     * The real profile's own JSON, not a hand-written copy.
+     *
+     * <p>A literal here would keep passing after the real thing changed shape, which is the
+     * failure this fake would otherwise introduce - it is substituted into the sign-in path
+     * that feeds Python.
+     */
+    @Override
+    public String hardwareProfileJson() {
+        return this.hardware.toJson();
+    }
+
     @Override
     public String describe() {
         return this.ready ? "fake, ready" : "fake, unavailable: " + this.unavailableReason;
