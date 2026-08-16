@@ -103,6 +103,11 @@ def save(uid: str, devid: str, anisette: Any, path: Path | None = None) -> None:
         path.write_text(json.dumps(document, indent=2), encoding="utf-8")
         # Readable by its owner alone. It is not secret, but it names this installation to Apple
         # and there is no reason for anybody else on the machine to have it.
+        #
+        # **A no-op on Windows**, where chmod only toggles the read-only attribute and the group
+        # and other bits cannot be cleared at all. Left in rather than made conditional: it is
+        # correct where it works, harmless where it does not, and the alternative - real ACLs -
+        # needs icacls or pywin32. Worth knowing that this file is not protected there.
         path.chmod(0o600)
     except OSError as e:
         logger.warning("Could not store the device identity at %s: %s", path, e)

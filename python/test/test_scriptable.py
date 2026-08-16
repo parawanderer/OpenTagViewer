@@ -16,10 +16,12 @@ legitimately ends in a space would otherwise fail as though it were wrong.
 from __future__ import annotations
 
 import asyncio
+import re
 
 import pytest
 
 from exporter import cli, prompts, secrets
+from test.unittestutils import skip_unless_posix_permissions as POSIX_PERMISSIONS
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +82,7 @@ class TestReadingASecretFromAFile:
     def test_a_second_line_is_not_part_of_the_secret(self, secret_file):
         assert secrets.read(secret_file("hunter2\n# a note\n"), "UNSET_VAR") == "hunter2"
 
+    @POSIX_PERMISSIONS
     def test_a_world_readable_file_is_refused(self, secret_file):
         # Refused rather than warned about. The reason to prefer a file over an environment
         # variable is that a file can have permissions; one that does not is worse than what it
@@ -89,16 +92,20 @@ class TestReadingASecretFromAFile:
         with pytest.raises(secrets.SecretError, match="readable by other users"):
             secrets.read(path, "UNSET_VAR")
 
+    @POSIX_PERMISSIONS
     def test_a_group_readable_file_is_refused_too(self, secret_file):
         path = secret_file("hunter2\n", mode=0o640)
 
         with pytest.raises(secrets.SecretError, match="readable by other users"):
             secrets.read(path, "UNSET_VAR")
 
+    @POSIX_PERMISSIONS
     def test_the_advice_names_the_fix(self, secret_file):
         path = secret_file("hunter2\n", mode=0o644)
 
-        with pytest.raises(secrets.SecretError, match=f"chmod 600 {path}"):
+        # re.escape because `match` is a regex and a Windows path is full of backslashes -
+        # the second, unrelated reason this one failed there.
+        with pytest.raises(secrets.SecretError, match=re.escape(f"chmod 600 {path}")):
             secrets.read(path, "UNSET_VAR")
 
     def test_an_empty_file_is_an_error_rather_than_an_empty_password(self, secret_file):
