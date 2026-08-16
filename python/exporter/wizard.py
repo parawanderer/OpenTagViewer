@@ -17,6 +17,7 @@ cursor and eventually an offer to force-quit, in the middle of a network call.
 
 from __future__ import annotations
 
+import atexit
 import datetime
 import getpass
 import logging
@@ -778,6 +779,70 @@ def log_file() -> Path:
     return directory / "exporter.log"
 
 
+_WARNED_AT_THE_BOTTOM = False
+
+_CAUTION = (
+    "=" * 88,
+    "  This log is for debugging and is NOT safe to publish as-is.",
+    "",
+    "  It names your devices by name, model and serial, records keychain item attributes",
+    "  as Apple stores them, and identifies every device in your account's trust circle.",
+    "  No key, password or passcode is written here, and payloads appear only as byte",
+    "  counts - but nothing can promise a given identifier never appears, because the text",
+    "  comes from a library reading Apple's own structures.",
+    "",
+    "  READ THIS FILE AND REMOVE ANYTHING THAT IDENTIFIES YOU BEFORE SENDING IT ANYWHERE.",
+    "=" * 88,
+)
+
+
+def _warn_at_the_top_of_the_log() -> None:
+    """
+    Put the caution in the file, at the start of every run.
+
+    **The CLI can warn the person before they turn logging on. The wizard cannot**: it logs at
+    INFO unconditionally, because a windowed build has no console and a log that has to be
+    enabled is a log nobody has when it is needed. So the file exists on every machine that has
+    ever run this, and it holds what INFO holds - escrow records described by device name, model
+    and serial, keychain item attributes as Apple stores them, an identifier per peer in the
+    trust circle.
+
+    The warning goes *in the file* rather than only in the window because that is what travels.
+    Somebody asked to "attach exporter.log" sends the file and never sees the window again, so
+    the caution has to be in what they open.
+
+    **At both ends, for different reasons.** The file is appended to across runs and the end is
+    where anybody looks first, because that is where the failure they came for is - a banner only
+    at the top of a run is buried under that run's own output within seconds. But the end can only
+    be written on the way out, and the interesting runs are the ones that die. So the head copy is
+    the one that is always there, and the tail copy is the one that is actually read.
+    """
+    for line in _CAUTION:
+        logging.getLogger("exporter.privacy").warning(line)
+
+    atexit.register(_warn_at_the_bottom_of_the_log)
+
+
+def _warn_at_the_bottom_of_the_log() -> None:
+    """
+    Leave the caution as the last thing in the file, since that is where a reader starts.
+
+    Guarded against running twice: `configure_logging` is called again by `--self-test`, and two
+    registrations would print the banner twice at exit. Harmless, and it reads like a bug in the
+    thing whose whole job is to be believed.
+    """
+    global _WARNED_AT_THE_BOTTOM
+    if _WARNED_AT_THE_BOTTOM:
+        return
+
+    _WARNED_AT_THE_BOTTOM = True
+
+    for line in _CAUTION:
+        logging.getLogger("exporter.privacy").warning(line)
+
+    logging.shutdown()
+
+
 def configure_logging() -> None:
     """Log to a file always, and to the console as well when there is one."""
     handlers: list[logging.Handler] = [logging.FileHandler(log_file(), encoding="utf-8")]
@@ -793,6 +858,8 @@ def configure_logging() -> None:
         handlers=handlers,
         force=True,
     )
+
+    _warn_at_the_top_of_the_log()
 
     # Anything that escapes Tk's callback handling as well, which otherwise vanishes the same way.
     def _report(exc_type, value, tb) -> None:
