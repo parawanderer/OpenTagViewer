@@ -102,17 +102,32 @@ class TestTheKnownMismatch:
         )
 
     def test_it_records_what_the_library_actually_sends(self):
-        # Pinned to the library rather than to a copy of it, so a fork bump that changes the
-        # identity is noticed here instead of in somebody's device list.
+        """
+        Composed from the library's own constants, not scraped out of its source.
+
+        The first version of this searched `anisette.py` for the finished string, and broke
+        the moment the fork split the identity into parts - which it had already done at the
+        commit the app pins, so the test failed on a library that had not changed its identity
+        at all. Reading the values means a refactor is free and a *changed identity* is not.
+        """
         from findmy.reports import anisette
 
-        _, theirs = identity.KNOWN_IDENTITY_MISMATCH
-        source = anisette.__file__
+        parts = ("CLIENT_MODEL", "CLIENT_OS", "CLIENT_OS_VERSION", "CLIENT_OS_BUILD")
+        missing = [name for name in parts if not hasattr(anisette, name)]
+        assert not missing, (
+            f"findmy.reports.anisette has no {', '.join(missing)}. The installed FindMy is not"
+            " the commit app/build.gradle.kts pins - check requirements.txt and your venv."
+        )
 
-        with open(source, encoding="utf-8") as handle:
-            contents = handle.read()
+        theirs_now = (
+            f"<{anisette.CLIENT_MODEL}> "
+            f"<{anisette.CLIENT_OS};{anisette.CLIENT_OS_VERSION};{anisette.CLIENT_OS_BUILD}>"
+        )
 
-        assert theirs in contents, (
-            f"FindMy.py no longer sends {theirs}. Update KNOWN_IDENTITY_MISMATCH, and check"
-            " whether it now agrees with AdiDeviceIdentity.CLIENT_INFO."
+        _, theirs_recorded = identity.KNOWN_IDENTITY_MISMATCH
+
+        assert theirs_recorded == theirs_now, (
+            f"FindMy.py now presents {theirs_now}, not {theirs_recorded}. Update"
+            " KNOWN_IDENTITY_MISMATCH - and check whether it now agrees with"
+            " AdiDeviceIdentity.CLIENT_INFO, in which case the mismatch is over."
         )
