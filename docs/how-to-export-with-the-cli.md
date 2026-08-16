@@ -247,7 +247,90 @@ would fall in seconds.
 | `--anisette-url` | Use a remote Anisette server instead of running one locally |
 | `--anisette-libs` | Cache Apple's ADI libraries in a file, so a later run does not download them |
 | `-v`, `--verbose` | Show what the library is doing. Worth having on the first run |
-| `-vv` | Everything, including the CloudKit and keychain protocol steps. This is what to send with a bug report |
+| `-vv` | Everything, including the CloudKit and keychain protocol steps. This is what to send with a bug report — **read the warning below first** |
+
+> [!CAUTION]
+> **Read `-v` and `-vv` output before you paste it anywhere, and strip anything that identifies
+> you.** It is written for debugging, not for publishing, and it names real things:
+>
+> - **Your devices, by name, model and serial number.** Escrow records are described the way a
+>   person recognises them, so "Paula's iPhone, iPhone14,2, serial F2L…" is a normal line.
+> - **Keychain item attributes, verbatim.** The account and label fields are printed as they are
+>   stored, and what is in them is Apple's choice rather than this program's.
+> - **Peer identifiers** for every device in your account's trust circle. Pseudonymous, but stable
+>   and unique to you.
+>
+> No key material, passcode or password is logged, and payloads appear only as byte counts. But
+> **this cannot promise a given identifier never reaches the output** — the text comes from a
+> library reading Apple's structures, and a field that is innocuous on one account may not be on
+> another. So the check is yours to make, every time, before it goes in an issue.
+
+---
+
+## Running it from a script
+
+**Sign in by hand once first.** The first run registers this machine as a device on your Apple
+account and remembers it, so later runs usually go straight through without a verification code.
+Until that has happened, no amount of flags will make it unattended — a code is sent to your
+phone and something has to type it.
+
+After that, every other answer can be given up front:
+
+```shell
+export OPENTAGVIEWER_APPLE_PASSWORD='...'
+export OPENTAGVIEWER_DEVICE_PASSCODE='...'
+
+uv run python -m exporter.cli \
+  --non-interactive \
+  --apple-id me@example.com \
+  --device F2LX9Q \
+  --all-tags \
+  --no-password \
+  --output tags.zip
+```
+
+`--non-interactive` is the one that matters. Without it a missing answer is *prompted for*, and a
+scheduled job sits waiting on a keystroke that never arrives — no error, no output, no end. With
+it, the run fails and names the question it wanted to ask.
+
+### Where to put the password
+
+**There is no `--password` flag and there will not be one.** Anything on a command line is
+readable by every other user on the machine through `ps`, and it lands in your shell history.
+
+Worst last:
+
+| | |
+| --- | --- |
+| **A file, or a pipe** | `--password-file secret.txt`, or `--password-file -` to read one line from standard input. Nothing in `ps`, nothing in the environment, nothing in history. The file must not be readable by other users — `chmod 600` it, or the run refuses it |
+| **An environment variable** | `OPENTAGVIEWER_APPLE_PASSWORD` and `OPENTAGVIEWER_DEVICE_PASSCODE`. Fine in a CI secret store. Weaker than a file: on Linux another process of yours can read `/proc/<pid>/environ`, it is inherited by every child, and setting it inline on a command puts it in history anyway |
+| **Being asked** | What happens when neither is given |
+
+If you use a variable, set it from something that is not itself the secret — a secret store, or
+`read -s`, not a literal in a checked-in script. In most shells, prefixing a command with a space
+also keeps it out of history.
+
+### The other flags
+
+| Option | |
+| --- | --- |
+| `--apple-id` | Sign in as this, instead of being asked |
+| `--password-file` | Read the Apple ID password from a file, or `-` for standard input |
+| `--passcode-file` | The same, for the device screen-lock passcode |
+| `--device SERIAL` | Unlock with this device's escrow record instead of choosing from a list. Fails, listing what is available, if nothing matches |
+| `--all-tags` | Export everything found, instead of choosing |
+| `--include-my-devices` | Let `--all-tags` include your own iPhones, iPads and Macs. **Never implied** |
+| `--non-interactive` | Fail rather than ask |
+
+> [!WARNING]
+> **`--all-tags` leaves your own devices out on purpose.** "All my tags" and "all my tags plus the
+> laptop I am sitting at" are different requests, and a bundle holding your MacBook lets whoever
+> receives it locate *you*. Interactively the CLI names each device and asks again; a scheduled run
+> has nobody to ask, so it takes the safe half and prints what it left out.
+
+Exit codes: `0` if everything asked for was exported, `1` if not — including the case where a
+bundle *was* written but the account could not be read, which is worth checking for rather than
+assuming a file on disk means success.
 
 ---
 

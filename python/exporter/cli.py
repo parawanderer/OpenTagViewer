@@ -23,16 +23,19 @@ import argparse
 import asyncio
 import getpass
 import logging
+import os
 import pydoc
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Sequence
 
 from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, TermsError
 from findmy.errors import UnhandledProtocolError
+from findmy.keychain.recovery import RecoveryError
 
-from exporter import icloud, localsource, prompts, source, terms
+from exporter import icloud, localsource, prompts, secrets, source, terms
 from exporter.codes import (
     VERIFICATION_CODE_LENGTH,
     is_verification_code,
@@ -69,12 +72,23 @@ def build_parser() -> argparse.ArgumentParser:
             "Nothing is saved: your Apple ID password and your device passcode are used once and"
             " dropped, and no account file is written."
         ),
+        # **Off because it silently recreates the flag this deliberately does not have.** argparse
+        # accepts any unambiguous prefix by default, so `--password hunter2` is taken as
+        # `--password-file hunter2` - the exact spelling somebody reaches for when they want to put
+        # a secret on the command line, quietly accepted. It then fails looking for a file named
+        # `hunter2`, by which point the password is already in `ps` output and shell history.
+        #
+        # Abbreviations worth having are spelled out as aliases instead, which is the same
+        # convenience without a rule that invents flag names nobody wrote down.
+        allow_abbrev=False,
     )
 
     parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument(
         "-o",
         "--output",
+        # Spelled out rather than left to prefix matching, which is off - see allow_abbrev above.
+        "--out",
         type=Path,
         help="Where to write the bundle. Defaults to a timestamped zip in the current directory.",
     )
@@ -125,6 +139,68 @@ def build_parser() -> argparse.ArgumentParser:
             " account at all, for a bundle of nothing but --add-keys tags."
         ),
     )
+    scripted = parser.add_argument_group(
+        "Running without a person",
+        "Answers given up front are not asked for. Sign in once by hand first: this machine is"
+        " then a device Apple knows, and later runs usually skip the verification code.",
+    )
+    scripted.add_argument(
+        "--apple-id",
+        help="The Apple ID to sign in as, instead of being asked for it.",
+    )
+    scripted.add_argument(
+        "--password-file",
+        type=Path,
+        metavar="PATH",
+        help=(
+            f"Read the Apple ID password from this file, or from standard input if it is '-'."
+            f" The file must not be readable by other users. ${secrets.APPLE_PASSWORD_VAR} is"
+            f" also read, and is second best. There is deliberately no --password flag: a"
+            f" command line is visible to everyone on the machine."
+        ),
+    )
+    scripted.add_argument(
+        "--passcode-file",
+        type=Path,
+        metavar="PATH",
+        help=(
+            f"Read the device screen-lock passcode the same way."
+            f" ${secrets.DEVICE_PASSCODE_VAR} is also read."
+        ),
+    )
+    scripted.add_argument(
+        "--device",
+        metavar="SERIAL",
+        help=(
+            "Unlock using the escrow record of the device with this serial, instead of asking"
+            " which one. Match is case-insensitive."
+        ),
+    )
+    scripted.add_argument(
+        "--all-tags",
+        action="store_true",
+        help=(
+            "Export every accessory found, instead of asking which. Your own iPhones, iPads and"
+            " Macs are left out unless --include-my-devices is given as well."
+        ),
+    )
+    scripted.add_argument(
+        "--include-my-devices",
+        action="store_true",
+        help=(
+            "Let --all-tags include your own devices. A bundle holding your MacBook lets whoever"
+            " receives it locate you, so this is never implied."
+        ),
+    )
+    scripted.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help=(
+            "Fail rather than ask anything. Without it, a missing answer is prompted for and a"
+            " scripted run hangs waiting for a keystroke that never comes."
+        ),
+    )
+
     parser.add_argument(
         "--anisette-url",
         help=(
@@ -166,8 +242,65 @@ def configure_logging(verbosity: int) -> None:
     )
 
     if verbosity >= 2:
-        for name in ("findmy.cloudkit", "findmy.keychain", "findmy.icloud", "exporter"):
+        # **The package, not a list of its subpackages.** This used to name `findmy.cloudkit`,
+        # `findmy.keychain` and `findmy.icloud`, which is every part anybody had needed so far and
+        # therefore wrong the first time a new one mattered: `announce_device` logs under
+        # `findmy.reports`, so the diagnostic written specifically to explain a failure was
+        # discarded by the flag turned on to see it.
+        #
+        # The reason it was a list is still real - the *root* logger at DEBUG carries aiohttp and
+        # asyncio, which drown everything about Apple in socket chatter. `findmy` is the level that
+        # excludes those without having to predict which of its modules will matter next.
+        for name in ("findmy", "exporter"):
             logging.getLogger(name).setLevel(logging.DEBUG)
+
+    if verbosity:
+        warn_about_sharing_logs()
+
+
+def warn_about_sharing_logs() -> None:
+    """
+    Say what is about to be printed, before it is printed.
+
+    **Said here rather than only in the docs**, because the person who turns this on is usually
+    about to paste the result into an issue, and by then it has scrolled past. The docs are read
+    before a first run; this is read at the moment it matters.
+
+    The list is specific on purpose. "Contains personal information" is easy to skim past and
+    tells nobody what to look for; a device serial and a keychain `acct` field are things somebody
+    can actually find and delete.
+    """
+    lines = [
+        "  Verbose output is for debugging, not for publishing. It names your devices by",
+        "  name, model and serial, prints keychain item attributes as Apple stores them,",
+        "  and identifies every device in your trust circle.",
+        "",
+        "  No key, password or passcode is logged. But this cannot promise a given",
+        "  identifier never appears, because the text comes from a library reading",
+        "  Apple's own structures.",
+        "",
+        "  Read it and strip anything that identifies you before pasting it anywhere.",
+    ]
+
+    print("", file=sys.stderr)
+    for line in lines:
+        print(_red(line), file=sys.stderr)
+    print("", file=sys.stderr)
+
+
+def _red(text: str) -> str:
+    """
+    Colour, when there is a terminal to colour and the reader has not asked otherwise.
+
+    **Guarded rather than unconditional.** The likely next step after reading this is piping the
+    run to a file to attach it, and escape codes written into that file are noise in the issue -
+    which is the opposite of what the warning is for. `NO_COLOR` is honoured because it costs one
+    lookup and somebody has already decided.
+    """
+    if not sys.stderr.isatty() or os.environ.get("NO_COLOR"):
+        return text
+
+    return f"\033[31m{text}\033[0m"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -181,6 +314,46 @@ async def ask_choice(question: str, options: Sequence[str]) -> int:
         question,
         [prompts.Option(label=option, value=index) for index, option in enumerate(options)],
     )
+
+
+async def _retry_credentials(error, attempt: int):
+    """
+    Offer the Apple ID and password again after Apple rejects them.
+
+    Both are asked for again rather than only the password: the Apple ID may be the wrong one, and
+    a screen that will not let you correct it is worse than one extra field to press enter on.
+    """
+    print(f"\nApple would not accept that sign-in:\n\n  {error}\n", file=sys.stderr)
+    print(f"Attempt {attempt} of {icloud.MAX_LOGIN_ATTEMPTS}. Apple locks an account after enough",
+          file=sys.stderr)
+    print("failed sign-ins, so it is worth being sure rather than guessing.\n", file=sys.stderr)
+
+    if not await prompts.confirm("Try again?"):
+        return None
+
+    email = await prompts.text("Apple ID")
+
+    return email, await prompts.password("Password")
+
+
+async def _retry_code(error, attempt: int):
+    """
+    Offer the verification code again, and only send a new one if asked.
+
+    **Re-typing is the default and sending a new code is not**, because a resend invalidates the
+    code Apple already sent - so somebody who simply mistyped the code in front of them would have
+    it taken away by the recovery step.
+    """
+    print(f"\nApple would not accept that code:\n\n  {error}\n", file=sys.stderr)
+    print(f"Attempt {attempt} of {icloud.MAX_CODE_ATTEMPTS}.", file=sys.stderr)
+
+    choice = await ask_choice("What now?", [
+        "Type the code again (the one Apple sent is still valid)",
+        "Send a new code (this cancels the one already sent)",
+        "Stop",
+    ])
+
+    return [icloud.CODE_AGAIN, icloud.CODE_RESEND, None][choice]
 
 
 async def _ask_verification_code() -> str:
@@ -292,8 +465,11 @@ async def sign_in(arguments: argparse.Namespace):
     print("program, not a Mac you own. Remove it any time at account.apple.com > Devices.\n",
           file=sys.stderr)
 
-    email = await prompts.text("Apple ID")
-    password = await prompts.password("Password")
+    email = arguments.apple_id or await prompts.text("Apple ID")
+    password = (
+        secrets.read(arguments.password_file, secrets.APPLE_PASSWORD_VAR)
+        or await prompts.password("Password")
+    )
 
     try:
         # Nested rather than another `except` clause beside the one below, and that is not a style
@@ -307,6 +483,8 @@ async def sign_in(arguments: argparse.Namespace):
                 password,
                 choose_second_factor=lambda methods: ask_choice("How should Apple send the code?", methods),
                 get_code=_ask_verification_code,
+                retry_credentials=_retry_credentials,
+                retry_code=_retry_code,
             )
         except MobileMeDelegateError as e:
             # Authentication itself worked; the exchange that follows it did not. Unaccepted terms
@@ -340,7 +518,7 @@ async def sign_in(arguments: argparse.Namespace):
     return account
 
 
-async def unlock(client) -> bool:
+async def unlock(client, arguments: argparse.Namespace) -> bool:
     """
     Recover the keychain keys, which needs the passcode of one of the account's devices.
 
@@ -359,18 +537,77 @@ async def unlock(client) -> bool:
     print("\nUnlocking needs the screen-lock passcode of one of your Apple devices -", file=sys.stderr)
     print("its PIN or login password, not your Apple ID password.\n", file=sys.stderr)
 
-    chosen = options.recoverable[await ask_choice(
-        "Which device's passcode do you have?",
-        [record.describe() for record in options.recoverable],
-    )]
+    chosen = _pick_device(options.recoverable, arguments.device) or options.recoverable[
+        await ask_choice(
+            "Which device's passcode do you have?",
+            [record.describe() for record in options.recoverable],
+        )
+    ]
 
-    passcode = await prompts.password(f"Screen-lock passcode for {chosen.serial}")
-    try:
-        await client.unlock(chosen, passcode)
-    finally:
-        del passcode
+    # Read once, outside the loop: re-reading a file or the environment on every attempt would
+    # retry the identical value three times and report it as three rejections.
+    supplied = secrets.read(arguments.passcode_file, secrets.DEVICE_PASSCODE_VAR)
+
+    async def ask(attempt: int) -> str:
+        if attempt == 1 and supplied is not None:
+            return supplied
+
+        again = " (try again)" if attempt > 1 else ""
+        return await prompts.password(f"Screen-lock passcode for {chosen.serial}{again}")
+
+    async def rejected(error, attempt: int) -> bool:
+        # The library's own text, printed whole. It says what was rejected and then three things
+        # worth doing about it, in the order worth doing them - the first being to try the same
+        # passcode again, because this call has been seen to fail intermittently.
+        print(f"\nThat was not accepted:\n\n{error}\n", file=sys.stderr)
+        print(f"Attempt {attempt} of {icloud.MAX_UNLOCK_ATTEMPTS}.", file=sys.stderr)
+
+        return await prompts.confirm("Try again?")
+
+    await icloud.unlock(client, chosen, ask, rejected)
 
     return True
+
+
+def _pick_device(recoverable, serial: str | None):
+    """
+    Find the escrow record `--device` names, so a scripted run does not have to answer a menu.
+
+    :raises ExportSourceError: If nothing matches. Naming what is available, because a serial is
+        easy to mistype and the alternative is a run that silently unlocks with the wrong device.
+    """
+    if serial is None:
+        return None
+
+    wanted = serial.strip().casefold()
+    for record in recoverable:
+        if (record.serial or "").strip().casefold() == wanted:
+            return record
+
+    available = ", ".join(sorted(r.serial for r in recoverable if r.serial)) or "none"
+    msg = f"No recoverable device on this account has the serial {serial!r}. Available: {available}"
+    raise ExportSourceError(msg)
+
+
+def _take_all(candidates: list[Candidate], *, include_my_devices: bool) -> list[Candidate]:
+    """
+    Everything, for `--all-tags`, with the account's own hardware left out by default.
+
+    **"All my tags" and "all my tags plus the laptop I am sitting at" are different requests**, and
+    only one of them is what somebody writing a cron job meant. The interactive path names each
+    device and asks again before including one; a scripted run has nobody to ask, so the safe half
+    is the default and the other half has its own flag.
+    """
+    if include_my_devices:
+        return list(candidates)
+
+    keeping = [c for c in candidates if not is_own_device(c.owned_beacon)]
+
+    for left_out in [c for c in candidates if is_own_device(c.owned_beacon)]:
+        print(f"Leaving out {left_out.label}: it is one of your own devices."
+              " --include-my-devices exports it anyway.", file=sys.stderr)
+
+    return keeping
 
 
 async def choose(candidates: list[Candidate], *, or_nothing: bool = False) -> list[Candidate]:
@@ -549,7 +786,7 @@ async def read_icloud(arguments: argparse.Namespace):
 
     try:
         async with await icloud.open_client(account) as client:
-            if not await unlock(client):
+            if not await unlock(client, arguments):
                 return None
 
             return await icloud.fetch(client)
@@ -591,7 +828,12 @@ async def run(arguments: argparse.Namespace) -> int:
             print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
 
         if fetched.candidates:
-            exports = await name_the_nameless(await choose(fetched.candidates, or_nothing=bool(prepared)))
+            picked = (
+                _take_all(fetched.candidates, include_my_devices=arguments.include_my_devices)
+                if arguments.all_tags
+                else await choose(fetched.candidates, or_nothing=bool(prepared))
+            )
+            exports = await name_the_nameless(picked)
         else:
             print(f"\nNothing on {where} can be exported.", file=sys.stderr)
 
@@ -633,6 +875,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     configure_logging(arguments.verbose)
 
+    if arguments.non_interactive:
+        prompts.forbid_prompting()
+
+    try:
+        return _run_and_return(arguments)
+    finally:
+        # **Again, at the end.** The copy printed when logging was turned on is thousands of
+        # lines up by now, and the end of the run is both where somebody is looking and where
+        # they start selecting from. A warning that has scrolled away is one that was not given.
+        if arguments.verbose:
+            warn_about_sharing_logs()
+
+
+def _run_and_return(arguments: argparse.Namespace) -> int:
     try:
         return asyncio.run(run(arguments))
     except prompts.Abandoned:
@@ -647,13 +903,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("password are both worth checking - a code expires quickly, and Apple reports", file=sys.stderr)
         print("either as a credentials failure at this point. Nothing was written.", file=sys.stderr)
         return 1
-    except (ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError) as e:
+    except (
+        ExportError, ExportSourceError, KeyFileError, CustomTagError, TermsError,
+        secrets.SecretError, prompts.PromptForbidden,
+    ) as e:
         print(f"\n{e}", file=sys.stderr)
+        return 1
+    except RecoveryError as e:
+        # **Before the handler below, and deliberately not through it.** RecoveryError is an
+        # UnhandledProtocolError by inheritance, but it is not an unmodelled shape: it is a
+        # documented rejection that carries its own advice, and "Apple returned something
+        # unexpected" over the top of that is both wrong and in the way. A stack says nothing here
+        # either, so it does not print one.
+        print(f"\nThe keychain could not be unlocked:\n\n{e}\n", file=sys.stderr)
+        print("Nothing was written.", file=sys.stderr)
         return 1
     except UnhandledProtocolError as e:
         # Apple said something this library does not model. Worth its own message: it is not the
         # user's mistake and there is nothing for them to correct.
         print(f"\nApple returned something unexpected: {e}", file=sys.stderr)
+
+        # **And the traceback, because this is the one error where it is the whole diagnosis.**
+        # The message names a symptom - a length that disagrees with the bytes around it - and
+        # says nothing about which structure was being read. There are a dozen places that parse
+        # DER here and the message is identical from all of them, so without the stack a report
+        # of this cannot be acted on at all. That is not hypothetical: issue #89 arrived with
+        # exactly this line and nothing else, and it could not be placed.
+        if arguments.verbose:
+            traceback.print_exc()
+        else:
+            print("\nRe-run with -vv and include the output if you report this. Without the",
+                  file=sys.stderr)
+            print("stack this message names a symptom and not a place. That run will say what",
+                  file=sys.stderr)
+            print("it prints about you, and it is worth reading before pasting it anywhere.",
+                  file=sys.stderr)
+
         return 1
     except KeyboardInterrupt:
         print("\nStopped. Nothing was written.", file=sys.stderr)

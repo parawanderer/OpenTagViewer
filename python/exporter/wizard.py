@@ -17,6 +17,7 @@ cursor and eventually an offer to force-quit, in the middle of a network call.
 
 from __future__ import annotations
 
+import atexit
 import datetime
 import getpass
 import logging
@@ -46,6 +47,9 @@ from exporter.custom_tags import (
     suggested_identifier,
     suggested_name,
 )
+from findmy import InvalidCredentialsError
+from findmy.keychain.recovery import RecoveryError
+
 from exporter.icloud import Candidate, ExportSourceError
 from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION
 from opentagviewer_export import (
@@ -230,6 +234,25 @@ class WizardApp(tk.Tk):
         except (ExportSourceError, ExportError) as e:
             messagebox.showerror("Could not read your accessories", str(e))
             return
+        except InvalidCredentialsError as e:
+            # **Not the handler below, which asks for a bug report.** A password Apple rejected is
+            # the most ordinary thing that can happen here, and being told to go and file an issue
+            # about your own typo is both wrong and slightly insulting. Nothing was changed and the
+            # button is still there, so this says that and stops.
+            messagebox.showerror(
+                "Apple did not accept that sign-in",
+                f"{e}\n\nNothing was changed. You can try again whenever you like.",
+            )
+            return
+        except RecoveryError as e:
+            # Same reasoning, for the passcode. Its message already carries FindMy.py's advice -
+            # starting with trying again, because this call fails intermittently - so it is shown
+            # whole rather than summarised.
+            messagebox.showerror(
+                "Could not unlock your keychain",
+                f"{e}\n\nNothing was changed. You can try again whenever you like.",
+            )
+            return
         except Exception as e:  # noqa: BLE001 - anything else is still the user's problem to see
             logger.exception("Reading accessories failed")
             messagebox.showerror(
@@ -296,6 +319,12 @@ class WizardApp(tk.Tk):
                         transform=verification_code,
                     )),
                 ),
+                retry_credentials=lambda error, attempt: _async(
+                    _ask_again_for_credentials(self, asker, error, attempt),
+                ),
+                retry_code=lambda error, attempt: _async(
+                    _ask_again_for_code(self, asker, error, attempt),
+                ),
             )
 
             # Registered a device by now; remembering it stops the next export registering another.
@@ -318,11 +347,30 @@ class WizardApp(tk.Tk):
                 ))
                 chosen = options.recoverable[index]
 
-                passcode = asker.ask(lambda: _ask_string(
-                    self, "Unlock", f"Screen-lock passcode for {chosen.serial}:", secret=True,
-                ))
+                async def ask_passcode(attempt: int, chosen=chosen) -> str:
+                    again = "\n\nThat last one was not accepted." if attempt > 1 else ""
+                    return asker.ask(lambda: _ask_string(
+                        self,
+                        "Unlock",
+                        f"Screen-lock passcode for {chosen.serial}:{again}",
+                        secret=True,
+                    ))
 
-                await client.unlock(chosen, passcode)
+                async def rejected(error, attempt: int) -> bool:
+                    # Offered rather than taken: the attempt cap is Apple's and unknown, so
+                    # spending another one is the user's call. The library's text says why the
+                    # first thing to try is the same passcode over again.
+                    if asker.ask(lambda: messagebox.askyesno(
+                        "Unlock",
+                        f"That passcode was not accepted (attempt {attempt} of"
+                        f" {icloud.MAX_UNLOCK_ATTEMPTS}).\n\n{error}\n\nTry again?",
+                        parent=self,
+                    )):
+                        return True
+
+                    raise _stopped()
+
+                await icloud.unlock(client, chosen, ask_passcode, rejected)
 
                 return await icloud.fetch(client)
         finally:
@@ -757,6 +805,68 @@ async def _async(value):
     return value
 
 
+def _ask_again_for_credentials(parent: tk.Tk, asker: Asker, error, attempt: int):
+    """
+    Offer the Apple ID and password again after Apple rejects them.
+
+    Both fields, not only the password: the Apple ID may be the one that is wrong, and a retry that
+    will not let it be corrected is a dead end with a text box in it.
+    """
+    keep_going = asker.ask(lambda: messagebox.askretrycancel(
+        "Sign in",
+        f"Apple would not accept that sign-in (attempt {attempt} of"
+        f" {icloud.MAX_LOGIN_ATTEMPTS}).\n\n{error}\n\n"
+        "Apple locks an account after enough failed sign-ins, so it is worth being sure"
+        " rather than guessing.",
+        parent=parent,
+    ))
+    if not keep_going:
+        raise _stopped()
+
+    email, password = asker.ask(lambda: _ask_credentials(parent))
+    if not email or not password:
+        raise _stopped()
+
+    return email, password
+
+
+def _stopped() -> ExportSourceError:
+    """
+    What a user pressing Cancel means, as distinct from what Apple said.
+
+    **Returning None here would re-raise Apple's rejection**, and the window would then report
+    "Password authentication failed" to somebody whose last action was to deliberately stop. Worse,
+    it used to arrive through the generic handler, so choosing to give up on a typo ended in a
+    dialog asking them to file a bug with a log attached.
+    """
+    return ExportSourceError("Signing in was stopped. Nothing was changed.")
+
+
+def _ask_again_for_code(parent: tk.Tk, asker: Asker, error, attempt: int):
+    """
+    Offer the verification code again, and send a new one only if asked.
+
+    **Yes re-types, No sends a new one, Cancel stops**, and that order is deliberate: a resend
+    invalidates the code Apple already sent, so the common case - a mistyped code that is still
+    sitting on somebody's phone - must be the answer that does not destroy it. The legend is in the
+    message because a three-button dialog cannot label its own buttons here.
+    """
+    answer = asker.ask(lambda: messagebox.askyesnocancel(
+        "Verification",
+        f"Apple would not accept that code (attempt {attempt} of"
+        f" {icloud.MAX_CODE_ATTEMPTS}).\n\n{error}\n\n"
+        "Yes - type the code again. The one Apple sent is still valid.\n"
+        "No - send a new code. This cancels the one already sent.\n"
+        "Cancel - stop signing in.",
+        parent=parent,
+    ))
+
+    if answer is None:
+        raise _stopped()
+
+    return icloud.CODE_AGAIN if answer else icloud.CODE_RESEND
+
+
 def log_file() -> Path:
     """
     Where this writes its log.
@@ -778,6 +888,70 @@ def log_file() -> Path:
     return directory / "exporter.log"
 
 
+_WARNED_AT_THE_BOTTOM = False
+
+_CAUTION = (
+    "=" * 88,
+    "  This log is for debugging and is NOT safe to publish as-is.",
+    "",
+    "  It names your devices by name, model and serial, records keychain item attributes",
+    "  as Apple stores them, and identifies every device in your account's trust circle.",
+    "  No key, password or passcode is written here, and payloads appear only as byte",
+    "  counts - but nothing can promise a given identifier never appears, because the text",
+    "  comes from a library reading Apple's own structures.",
+    "",
+    "  READ THIS FILE AND REMOVE ANYTHING THAT IDENTIFIES YOU BEFORE SENDING IT ANYWHERE.",
+    "=" * 88,
+)
+
+
+def _warn_at_the_top_of_the_log() -> None:
+    """
+    Put the caution in the file, at the start of every run.
+
+    **The CLI can warn the person before they turn logging on. The wizard cannot**: it logs at
+    INFO unconditionally, because a windowed build has no console and a log that has to be
+    enabled is a log nobody has when it is needed. So the file exists on every machine that has
+    ever run this, and it holds what INFO holds - escrow records described by device name, model
+    and serial, keychain item attributes as Apple stores them, an identifier per peer in the
+    trust circle.
+
+    The warning goes *in the file* rather than only in the window because that is what travels.
+    Somebody asked to "attach exporter.log" sends the file and never sees the window again, so
+    the caution has to be in what they open.
+
+    **At both ends, for different reasons.** The file is appended to across runs and the end is
+    where anybody looks first, because that is where the failure they came for is - a banner only
+    at the top of a run is buried under that run's own output within seconds. But the end can only
+    be written on the way out, and the interesting runs are the ones that die. So the head copy is
+    the one that is always there, and the tail copy is the one that is actually read.
+    """
+    for line in _CAUTION:
+        logging.getLogger("exporter.privacy").warning(line)
+
+    atexit.register(_warn_at_the_bottom_of_the_log)
+
+
+def _warn_at_the_bottom_of_the_log() -> None:
+    """
+    Leave the caution as the last thing in the file, since that is where a reader starts.
+
+    Guarded against running twice: `configure_logging` is called again by `--self-test`, and two
+    registrations would print the banner twice at exit. Harmless, and it reads like a bug in the
+    thing whose whole job is to be believed.
+    """
+    global _WARNED_AT_THE_BOTTOM
+    if _WARNED_AT_THE_BOTTOM:
+        return
+
+    _WARNED_AT_THE_BOTTOM = True
+
+    for line in _CAUTION:
+        logging.getLogger("exporter.privacy").warning(line)
+
+    logging.shutdown()
+
+
 def configure_logging() -> None:
     """Log to a file always, and to the console as well when there is one."""
     handlers: list[logging.Handler] = [logging.FileHandler(log_file(), encoding="utf-8")]
@@ -793,6 +967,8 @@ def configure_logging() -> None:
         handlers=handlers,
         force=True,
     )
+
+    _warn_at_the_top_of_the_log()
 
     # Anything that escapes Tk's callback handling as well, which otherwise vanishes the same way.
     def _report(exc_type, value, tb) -> None:
