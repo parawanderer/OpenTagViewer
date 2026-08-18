@@ -67,6 +67,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -1396,8 +1397,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private void fetchAndUpdateCurrentBeacons() {
-        var beacons = this.beacons.values().stream()
-                .collect(Collectors.toMap(b -> b.getInfo().getBeaconId(), b -> b.getInfo().getOwnedBeaconPlistRaw()));
+        // **Not Collectors.toMap**, which throws on a null value. This is the periodic refresh
+        // for every tag at once, so a single self-generated tag - which has no plist - took
+        // down the refresh for all of them, not just for itself.
+        final Map<String, String> beacons = new HashMap<>();
+        this.beacons.values().forEach(b ->
+                beacons.put(b.getInfo().getBeaconId(), b.getInfo().getOwnedBeaconPlistRaw()));
 
         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
 
@@ -1487,7 +1492,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.beaconRepo.toAccessoryRequests(Map.of(beaconId, pList))
+        // Not Map.of - see BeaconRepository.plistFallback. A self-generated tag has no plist.
+        return this.beaconRepo.toAccessoryRequests(BeaconRepository.plistFallback(beaconId, pList))
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
                 .flatMap(this.beaconRepo::storeFetchResult)
