@@ -372,7 +372,10 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
     private Observable<List<BeaconLocationReport>> fetchReports(final long beginningOfDay, final long endOfDay, final String cacheKey) {
         final boolean isForToday = this.daysBack == 0;
 
-        var reqData = Map.of(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
+        // Not Map.of: a self-generated tag has no plist, and Map.of throws on a null value -
+        // which crashed this screen the moment one was opened.
+        var reqData = BeaconRepository.plistFallback(
+                this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
         // asyncReq emits Observable<FetchResult> (reports + updated accessory state per beacon)
         var asyncReq = this.beaconRepo.toAccessoryRequests(reqData)
                 .flatMap(requests -> this.appleService.getReportsBetween(requests, beginningOfDay, endOfDay));

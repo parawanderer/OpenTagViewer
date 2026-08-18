@@ -135,6 +135,20 @@ public class BeaconRepository {
     }
 
     /**
+     * One beacon's fallback entry, tolerating the tag having no plist.
+     *
+     * <p>Exists because {@code Map.of} rejects a null value with a
+     * {@link NullPointerException}, and the obvious guard - skipping the entry - is worse than
+     * the crash: the map is what decides which tags get fetched, so an omitted key is a tag
+     * that silently never updates.
+     */
+    public static Map<String, String> plistFallback(final String beaconId, final String plist) {
+        final Map<String, String> fallback = new HashMap<>();
+        fallback.put(beaconId, plist);
+        return fallback;
+    }
+
+    /**
      * Build the FindMy 0.9.x fetch input for the given beacons. For each beacon we use
      * the persisted {@code accessory_json} if present, otherwise lazily backfill it
      * from the legacy XML plist via {@code main.py:convertPlistToJson} (and persist
@@ -148,6 +162,14 @@ public class BeaconRepository {
      * @param beaconIdToPlistFallback beacon ID → legacy XML plist (used only when the
      *                                row's accessory_json is still NULL, e.g. for rows
      *                                imported under FindMy 0.7.6).
+     *                                <p><b>A null value is meaningful and must be allowed
+     *                                through.</b> A self-generated tag has no plist and never
+     *                                needs one - its accessory_json is written at import and
+     *                                the fallback branch below is never reached for it. So the
+     *                                key must still be present, or the tag is simply never
+     *                                fetched: build these maps with {@link #plistFallback} or a
+     *                                {@link java.util.HashMap}, because {@code Map.of} and
+     *                                {@code Collectors.toMap} both throw on a null value.
      */
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
         return Observable.fromCallable(() -> {
