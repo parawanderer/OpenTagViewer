@@ -116,8 +116,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Write a plain zip. The bundle is locked with a generated code by default, because it"
-            " holds keys that cannot be revoked - but no OpenTagViewer release can open a locked"
-            " one yet."
+            " holds keys that cannot be revoked - but no released version of the Android app can"
+            " open a locked one yet, so a bundle for somebody else needs this."
         ),
     )
     parser.add_argument(
