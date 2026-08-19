@@ -111,9 +111,24 @@ jobs:
     - name: Start the binary and run its self-test
       working-directory: ./python/dist
       shell: pwsh
+    # **Asserted on the output, not on the exit code**, because the exit code cannot be trusted
+    # here and trusting it already produced a green run over a dead binary. A process Windows
+    # kills leaves `$LASTEXITCODE` unset, `exit $null` is `exit 0`, and the check passed while the
+    # self-test was still dying at `emu_start`. A build check that goes green over the failure it
+    # was written for is worse than not having one, because it reads as coverage.
+    #
+    # So success is the line the self-test prints when it finishes, and nothing else counts.
       run: |
         ./OpenTagViewer/OpenTagViewer --version
-        ./OpenTagViewer/OpenTagViewer --self-test
+
+        $output = (& ./OpenTagViewer/OpenTagViewer --self-test 2>&1 | Out-String)
         $code = $LASTEXITCODE
-        Write-Host ("self-test exit code: {0} (0x{1:X8})" -f $code, $code)
-        exit $code
+
+        Write-Host $output
+        Write-Host ("self-test exit code: '{0}'" -f $code)
+
+        if ($output -notmatch 'self-test passed') {
+          Write-Host "The self-test did not report success. The last line above is the call that"
+          Write-Host "killed it - a native fault raises nothing, so there is no traceback to find."
+          exit 1
+        }
