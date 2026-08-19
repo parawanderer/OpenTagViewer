@@ -66,6 +66,7 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
@@ -646,8 +647,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             .flatMapCompletable(storedBeacons -> RxFlows.allThen(
                     // Once, after every accessory has landed, rather than per accessory.
                     this.updateBeaconGeocodings(),
-                    this.fetchLastReports(storedBeacons.getOwnedBeacons().stream()
-                            .collect(Collectors.toMap(b -> b.id, b -> b.content)), HOURS_TO_GO_BACK_24H)
+                    this.fetchLastReports(
+                            BeaconRepository.plistFallbacks(storedBeacons.getOwnedBeacons()), HOURS_TO_GO_BACK_24H)
                             .doOnNext(this::addBeaconLocationsToCurrent),
                     BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
                             .doOnNext(this::addBeaconToCurrent)
@@ -1405,9 +1406,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // **Not Collectors.toMap**, which throws on a null value. This is the periodic refresh
         // for every tag at once, so a single self-generated tag - which has no plist - took
         // down the refresh for all of them, not just for itself.
+        // Same null-tolerant shape as the import path - see BeaconRepository.plistFallbacks.
         final Map<String, String> beacons = new HashMap<>();
         this.beacons.values().forEach(b ->
                 beacons.put(b.getInfo().getBeaconId(), b.getInfo().getOwnedBeaconPlistRaw()));
+
 
         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
 
