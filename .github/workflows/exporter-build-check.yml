@@ -108,9 +108,17 @@ jobs:
     # an NTSTATUS and it names the mechanism. 0xC0000005 is an access violation, 0xC0000409 is a
     # security check - Control Flow Guard or a stack cookie - and those point at very different
     # fixes for a library that JITs its own code the way unicorn does.
-    - name: Start the binary and run its self-test
-      working-directory: ./python/dist
-      shell: pwsh
+    # **Control Flow Guard has to come off, or the program cannot sign in.** unicorn compiles
+    # ARM64 into native code at runtime and jumps to it; CFG checks every indirect call against
+    # targets the linker knew about, and code that did not exist at link time is not among them.
+    # The process is then killed by __fastfail with no exception and no traceback - observed here
+    # as exit `0xC0000409` from `emu_start`, and reported by a user as "parou de funcionar".
+    #
+    # PyInstaller's bootloader is built with CFG on and the flag is process-wide, so no packaging
+    # option avoids it. See the script for why giving up the mitigation is the right trade.
+    - name: Turn off Control Flow Guard, so the emulator can run
+      run: python scripts/clear_windows_cfg.py python/dist/OpenTagViewer/OpenTagViewer.exe
+
     # **Asserted on the output, not on the exit code**, because the exit code cannot be trusted
     # here and trusting it already produced a green run over a dead binary. A process Windows
     # kills leaves `$LASTEXITCODE` unset, `exit $null` is `exit 0`, and the check passed while the
@@ -118,6 +126,9 @@ jobs:
     # was written for is worse than not having one, because it reads as coverage.
     #
     # So success is the line the self-test prints when it finishes, and nothing else counts.
+    - name: Start the binary and run its self-test
+      working-directory: ./python/dist
+      shell: pwsh
       run: |
         ./OpenTagViewer/OpenTagViewer --version
 
