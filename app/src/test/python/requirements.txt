@@ -11,5 +11,6 @@
 # the fork's Anisette providers take `serial=` and PyPI's do not.
 git+https://github.com/parawanderer/FindMy.py@23a9b8d7109b405f8362ea1e69ebe51f9ca82fca
 NSKeyedUnArchiver==1.5
+PyYAML==6.0.2
 
 pytest>=8.0

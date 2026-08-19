@@ -277,8 +277,15 @@ Report: `app/build/reports/tests/testDebugUnitTest/index.html`
 
 ### Chaquopy bridge tests
 
-Cover `app/src/main/python/main.py`, the module Chaquopy packages into the APK. It imports
-no Android or Java types, so it runs on plain CPython.
+Cover everything under `app/src/main/python/`, which Chaquopy packages into the APK: `main.py`,
+`identity.py` and `icloud_bridge.py`. None of them import Android or Java types, so they run on
+plain CPython — that constraint is what makes them testable at all, and it is worth keeping.
+
+They also reach the shared `python/` tree, because `conftest.py` puts it on the path exactly as
+the build packages it. What that cannot tell you is whether a module survives *being* packaged —
+`icloud_bridge` reaches `findmy.cloudkit` and therefore protobuf, which resolves on a laptop and
+is the shape of thing that goes missing on a phone. `PythonPackagingTest`, on the managed device,
+is what answers that half.
 
 ```bash
 python -m venv .venv
