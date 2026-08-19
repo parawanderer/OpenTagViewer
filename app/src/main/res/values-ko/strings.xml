@@ -164,4 +164,7 @@
 
 태그와 위치 기록은 이 휴대전화에 그대로 남아 있습니다. 사라진 것은 없습니다.</string>
     <string name="ok">확인</string>
+    <string name="custom_tag">직접 만든 태그</string>
+    <string name="custom_tag_explained">OpenHaystack 방식의 태그입니다. 키는 만든 사람이 직접 생성했고 Apple 계정에 등록된 적이 없어, Apple에서 받은 이름·이모지·배터리 정보가 없습니다. 아래에서 직접 설정하세요.</string>
+    <string name="custom_tag_keys_remaining">미리 생성된 키 %1$d개</string>
 </resources>
