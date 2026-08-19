@@ -183,6 +183,28 @@ public class PythonPackagingTest {
     }
 
     /**
+     * And the app's own side of it imports, presenting the app's identity rather than the
+     * exporter's.
+     *
+     * <p>The one thing a desktop test suite cannot say. {@code test_icloud_bridge.py} runs the
+     * whole flow against fakes on CPython, which proves the logic and proves nothing about
+     * whether the module survives being packaged - it reaches {@code findmy.cloudkit}, and
+     * therefore protobuf, which is a dependency with a native half and the exact shape of thing
+     * that resolves on a laptop and is missing on a phone.
+     *
+     * <p>The serial is asserted here as well as in the Python tests because this is where it is
+     * real. Rule 11: a phone presenting {@code 0PENTAGXPORT} would share a device-list entry
+     * with the desktop exporter, and removing either would break the other.
+     */
+    @Test
+    public void theappsIcloudBridgeIsPackagedAndKnowsWhoItIs() {
+        final PyObject bridge = Python.getInstance().getModule("icloud_bridge");
+
+        assertNotNull("icloud_bridge must be importable in the APK", bridge);
+        assertEquals("0PENTAGVIEWR", bridge.get("APP_IDENTITY").get("serial").toString());
+    }
+
+    /**
      * The shared package's own tests are not shipped either.
      *
      * <p>They came along at first, because the include pattern that picks up the package picks

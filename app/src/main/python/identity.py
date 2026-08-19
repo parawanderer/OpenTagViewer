@@ -51,7 +51,21 @@ Without this a session presents FindMy.py's default, `0FINDMYPY001` - which name
 rather than the program, in the one place the user ever looks.
 """
 
-# **There is deliberately no device name here, and no announce_device() call.**
+APP_CLOUDKIT_DEVICE_NAME = "OpenTagViewer"
+"""
+What this app calls itself *to CloudKit*, in the `AsyncCloudKitClient` device name.
+
+**Not the device-list name**, despite reading like one - see the note below on why that entry
+cannot be named. This is a separate field on a separate service, sent when the app reads the
+account's beacon records, and it is not optional: `AsyncCloudKitClient` takes a string, so a
+client that set nothing here would be named by the library instead. That is the same
+second-identity problem as the serial, one layer down.
+
+Distinct from the exporter's `OpenTagViewer Exporter` for the same reason `APP_SERIAL` is
+distinct from `0PENTAGXPORT`: two programs, two devices, deliberately.
+"""
+
+# **There is deliberately no device-list name here, and no announce_device() call.**
 #
 # Naming the device-list entry needs `announce_device()`, which authenticates with the
 # `com.apple.gs.idms.hb` heartbeat token. That token arrives once, in the same set as the PET,
