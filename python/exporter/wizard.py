@@ -564,9 +564,18 @@ class WizardApp(tk.Tk):
             messagebox.showerror("That selection cannot be exported", str(e))
             return
 
-        # No password from the window yet: nothing that imports these can open a locked one, so
-        # offering it here would produce a file the recipient cannot use. See the CLI's
-        # --no-password, and docs/android-import-handover.md.
+        # **No password yet, and the reason is release ordering rather than a missing feature.**
+        # The app on `main` imports locked bundles - zip4j is in `app/build.gradle.kts` and
+        # `AppleZipImporterUtil` uses it - but no *released* APK does: the newest is 1.0.5, from
+        # before that work, and `versionName` has not moved past it.
+        #
+        # So locking bundles now would produce files that nobody's installed app can open, and the
+        # people worst affected would be recipients, who did not choose the exporter's version and
+        # cannot fix it from their side.
+        #
+        # **What unblocks this is an Android release containing zip4j, not a change here.** Once
+        # one exists, this becomes a decision about how long to keep supporting the versions before
+        # it. See the CLI's --no-password, and docs/android-import-handover.md.
         write_zip(bundle, path, password=None)
 
         messagebox.showinfo(
