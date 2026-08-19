@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
+import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import lombok.Getter;
 
@@ -140,10 +141,16 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
         final String beaconId = beacon.getBeaconId();
 
         viewHolder.getDeviceName().setText(beacon.getName());
+        // **Both branches set both views, because these are recycled.** With only the emoji
+        // branch, a row reused from a tag that had one kept showing that tag's emoji.
         if (beacon.isEmojiFilled()) {
             viewHolder.getItemEmoji().setText(beacon.getEmoji());
             viewHolder.getItemEmoji().setVisibility(VISIBLE);
             viewHolder.getItemImage().setVisibility(GONE);
+        } else {
+            viewHolder.getItemImage().setImageResource(BeaconIcon.forBeacon(beacon));
+            viewHolder.getItemImage().setVisibility(VISIBLE);
+            viewHolder.getItemEmoji().setVisibility(GONE);
         }
 
         // locations?

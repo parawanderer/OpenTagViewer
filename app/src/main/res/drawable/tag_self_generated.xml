@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A tag somebody generated themselves - OpenHaystack-style.
+
+    **Drawn here rather than borrowed.** OpenHaystack's own logo is their branding, and this app
+    is handed around outside any store; evoking the idea is enough and costs nobody a trademark
+    argument. A haystack with a needle stuck in it, which is the joke the project is named for.
+
+    Two things learned by rendering the first attempt rather than reasoning about it: an outlined
+    mound reads as an igloo or a gauge, so this one is **filled**, with the straw as cut-outs
+    through it; and a floating ground line reads as an unrelated bar, so there is none.
+
+    Tinted at the point of use, like apple.xml, so the fill is flat black here and the theme
+    decides the colour.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!--
+        The stack, solid, with three straw cut-outs. One path with evenOdd so the inner subpaths
+        punch holes rather than painting over it - the straw has to be absent, not drawn, because
+        everything here is a single tinted colour.
+    -->
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M12,7.4c-3.9,0 -7.2,4.4 -8.3,9.7c-0.2,1 0.6,1.9 1.6,1.9h13.4c1,0 1.8,-0.9 1.6,-1.9C19.2,11.8 15.9,7.4 12,7.4zM11.5,10.4h1v6.2h-1zM8.7,11.9l0.9,-0.3l1.2,5.3l-0.9,0.2zM14.4,11.6l0.9,0.3l-1.2,5.2l-0.9,-0.2z" />
+
+    <!--
+        The needle, stuck in at an angle with an eye at the top. Slim rather than the earlier
+        thick bar, which read as a broom handle.
+    -->
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M19.6,3.2c-0.4,-0.4 -1,-0.4 -1.4,0l-5.6,5.6l1.4,1.4l5.6,-5.6C20,4.2 20,3.6 19.6,3.2zM18.8,3.9c0.3,0 0.5,0.2 0.5,0.5s-0.2,0.5 -0.5,0.5s-0.5,-0.2 -0.5,-0.5S18.5,3.9 18.8,3.9z" />
+</vector>

@@ -59,7 +59,13 @@ import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
+import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.BeaconIcon;
+import dev.wander.android.opentagviewer.python.HardwareDescriber;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
 
 public class DeviceInfoActivity extends AppCompatActivity {
@@ -80,6 +86,15 @@ public class DeviceInfoActivity extends AppCompatActivity {
     private EmojiPickerView emojiPickerView;
     private Button currentIconButton;
     private ActivityDeviceInfoBinding binding;
+
+    /**
+     * The in-flight call to the shared heuristic, so it can be cancelled.
+     *
+     * <p>It hops back to the main thread to set a label. If the screen is gone by then, that is
+     * an update to a binding whose views are detached - held here so {@link #onDestroy()} can
+     * stop it rather than letting it land wherever it lands.
+     */
+    private Disposable hardwareLookup;
 
     private boolean hasNameChanges = false;
 
@@ -125,15 +140,11 @@ public class DeviceInfoActivity extends AppCompatActivity {
         binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
         binding.setExportedBy(this.importData.sourceUser);
 
-        // Checked first, and not as another guess. The other two read a plist field, and a
-        // self-generated tag has no plist at all - so without this it falls through both and
-        // reports "Unknown", which is the one answer that is definitely wrong: this is the kind
-        // of tag we know the most about, not the least.
-        binding.setDeviceType(this.beaconInformation.isCustomAccessory()
-                ? this.getString(R.string.custom_tag)
-                : this.beaconInformation.isIpad() ? this.getString(R.string.ipad)
-                : this.beaconInformation.isAirTag() ? this.getString(R.string.airtag)
-                : this.getString(R.string.unknown));
+        // What is known without asking anything, drawn immediately. The shared heuristic can
+        // improve on it, but it costs a Python interpreter, so this screen must be readable
+        // before that answers rather than flashing "Unknown" and correcting itself.
+        binding.setDeviceType(this.knownDeviceType());
+        this.describeHardwareInTheBackground();
 
         // debug info
         binding.setDeviceNameOriginal(this.beaconInformation.getOriginalName());
@@ -246,7 +257,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
             ((MaterialButton)currentIconButton).setIcon(null);
         } else {
             currentIconButton.setText(null);
-            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(this, R.drawable.apple));
+            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(
+                    this, BeaconIcon.forBeacon(this.beaconInformation)));
         }
     }
 
@@ -364,6 +376,70 @@ public class DeviceInfoActivity extends AppCompatActivity {
                     emojiPicker.setVisibility(GONE);
                 })
                 .start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (this.hardwareLookup != null && !this.hardwareLookup.isDisposed()) {
+            this.hardwareLookup.dispose();
+        }
+        super.onDestroy();
+    }
+
+    /**
+     * The best description available without asking Python.
+     *
+     * <p>A self-generated tag is checked first, and not as another guess: the other two read a
+     * plist field and it has no plist at all, so without this it falls through both and reports
+     * "Unknown" - the one answer that is definitely wrong, since it is the kind of tag the app
+     * knows the most about.
+     */
+    private String knownDeviceType() {
+        if (this.beaconInformation.isCustomAccessory()) {
+            return this.getString(R.string.custom_tag);
+        }
+        if (this.beaconInformation.isIpad()) {
+            return this.getString(R.string.ipad);
+        }
+        if (this.beaconInformation.isAirTag()) {
+            return this.getString(R.string.airtag);
+        }
+        return this.getString(R.string.unknown);
+    }
+
+    /**
+     * Ask the shared heuristic what this actually is, and improve the label if it knows.
+     *
+     * <p><b>Why bother, when {@link #knownDeviceType()} already answered.</b> That answer is the
+     * older, narrower version of the same question: it recognises an AirTag and an iPad and
+     * nothing else, so a pair of AirPods, a Tile or a Chipolo all arrive as "Unknown". The shared
+     * heuristic names them, knows which AirPod it is, and falls back to the vendor and product
+     * ids with somewhere to look them up. It lives in {@code opentagviewer_export/hardware.py}
+     * and the desktop exporter uses the same module - see AGENTS.md rule on not porting the
+     * table, because the vendor list grows and two copies means one goes stale.
+     *
+     * <p><b>Off the main thread, and only ever an improvement.</b> The call starts a Python
+     * interpreter and parses a plist. A null answer means nothing recognised the record, and
+     * then the label already on screen stands - a wrong name is believed, where a hex number
+     * gets looked up.
+     */
+    private void describeHardwareInTheBackground() {
+        final String plist = this.beaconInformation.getOwnedBeaconPlistRaw();
+        if (plist == null || plist.isEmpty()) {
+            // A self-generated tag, which describes itself and has no plist to read.
+            return;
+        }
+
+        final HardwareDescriber describer = AppDependencies.hardwareDescriber();
+
+        this.hardwareLookup = Observable
+                .fromCallable(() -> Optional.ofNullable(describer.describe(plist)))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        described -> described.ifPresent(this.binding::setDeviceType),
+                        error -> Log.w(TAG, "Could not describe this accessory; "
+                                + "keeping the label already shown", error));
     }
 
     private String getDeviceNameForTitle() {

@@ -58,8 +58,21 @@ public final class AppDependencies {
     private static Function<CronetEngine, AnisetteServerTesterService> serverTesterFactory =
             AnisetteServerTesterService::new;
 
+    /**
+     * Names an accessory from its plist, through the shared Python heuristic.
+     *
+     * <p>Here for the same reason as the rest: the real one starts Chaquopy and imports a
+     * package, so a screen that used it directly could not be launched in a test. It also makes
+     * "an accessory nothing recognises" renderable on demand, rather than needing such a tag.
+     */
+    private static HardwareDescriber hardwareDescriber = new ChaquopyHardwareDescriber();
+
     public static AppleAuthService authService() {
         return authService;
+    }
+
+    public static HardwareDescriber hardwareDescriber() {
+        return hardwareDescriber;
     }
 
     public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
@@ -82,6 +95,11 @@ public final class AppDependencies {
     }
 
     @VisibleForTesting
+    public static void replaceHardwareDescriber(final HardwareDescriber replacement) {
+        hardwareDescriber = replacement;
+    }
+
+    @VisibleForTesting
     public static void replaceAnisette(final Function<UserSettings, AnisetteSource> replacement) {
         anisetteFactory = (context, settings, hasSession) -> replacement.apply(settings);
     }
@@ -92,5 +110,6 @@ public final class AppDependencies {
         authService = new PythonAppleAuthService();
         anisetteFactory = LocalAnisette::new;
         serverTesterFactory = AnisetteServerTesterService::new;
+        hardwareDescriber = new ChaquopyHardwareDescriber();
     }
 }
