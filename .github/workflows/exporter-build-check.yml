@@ -1,0 +1,88 @@
+# Builds the exporter on Windows and proves the binary runs, on pull requests.
+#
+# **The release workflow only fires on `release: published`**, so until this existed the Windows
+# binary was first built at the moment it was published, and the first person to run it was a user.
+# That is how 1.2.0 shipped an .exe that died with `OpenTagViewer.exe parou de funcionar` - the
+# process killed by Windows, no traceback, nothing in any log, because a native fault does not
+# raise. Nothing in CI had ever started it.
+#
+# This does not upload anything and is not part of releasing. It exists to fail a pull request
+# rather than a download.
+#
+# **Windows only, deliberately.** It is the platform whose build had no coverage at all before a
+# release, and the one that broke. Adding `macos-14` or `ubuntu-22.04` to the matrix is a two-line
+# change if the same happens elsewhere - the steps below are otherwise platform-agnostic - but
+# every entry costs a PyInstaller build on every pull request, so they are not there by default.
+
+name: Exporter Build Check
+
+on:
+  pull_request:
+    paths:
+      - "python/**"
+      - ".github/workflows/exporter-build-check.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "python/**"
+      - ".github/workflows/exporter-build-check.yml"
+  workflow_dispatch:
+
+env:
+  PYINSTALLER_PYTHON_VER: 3.13
+
+jobs:
+  windows:
+    name: Build and start the Windows binary
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    # --frozen: exactly what uv.lock records. A build check that resolved something else would be
+    # checking a bundle nobody is going to ship.
+    - name: Install dependencies
+      working-directory: ./python
+      run: uv sync --frozen
+
+    # Kept identical to the release workflow's Windows step on purpose. If the two drift, this
+    # stops testing what gets published, which is worse than not testing at all because it reads
+    # as coverage.
+    #
+    # --collect-all unicorn is not optional and its absence is invisible until somebody runs the
+    # result: unicorn loads its native library through ctypes, so PyInstaller's analysis never sees
+    # it. --collect-data covers the pinned root certificates FindMy.py keeps as files beside its
+    # code, which a build once omitted and which failed several minutes into a real sign-in.
+    - name: Run PyInstaller
+      working-directory: ./python
+      run: |
+        uv run --frozen pyinstaller `
+          --windowed `
+          --name "OpenTagViewer" `
+          --icon=OpenTagViewer.ico `
+          --collect-all unicorn `
+          --collect-data findmy `
+          --collect-data anisette `
+          --noconfirm `
+          ./exporter/wizard.py
+
+    # Two checks, and the second is the one that would have caught the crash this workflow exists
+    # for. `--version` proves the bundle can import everything it was built with, Tk included.
+    # `--self-test` reaches the data files *and* runs four bytes of ARM64 through the emulator,
+    # which is the part that is native, the part PyInstaller cannot see, and the part that killed
+    # the process on a user's machine rather than raising anything a log could hold.
+    - name: Start the binary and run its self-test
+      working-directory: ./python/dist
+      shell: bash
+      run: |
+        ./OpenTagViewer/OpenTagViewer --version
+        ./OpenTagViewer/OpenTagViewer --self-test

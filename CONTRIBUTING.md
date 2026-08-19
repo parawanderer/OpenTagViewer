@@ -570,6 +570,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
+| `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
 | `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 

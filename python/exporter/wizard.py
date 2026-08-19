@@ -1006,8 +1006,47 @@ def self_test() -> int:
     if not roots or not found:
         return 1
 
+    if not _emulator_runs():
+        return 1
+
     print("self-test passed")
     return 0
+
+
+def _emulator_runs() -> bool:
+    """
+    Actually run the CPU emulator, rather than checking its file is present.
+
+    **The two are not the same check, and the difference is a hard crash.** `unicorn` loads its
+    native library through ctypes at runtime, so PyInstaller never sees it and `--collect-all
+    unicorn` is what puts the file in the bundle. That makes the file *present*; it says nothing
+    about whether the library loads and executes on the machine that ends up running it.
+
+    A Windows user on 1.2.0 reported `OpenTagViewer.exe parou de funcionar` - the process killed
+    by Windows, no Python traceback, nothing in any log, because a native fault does not raise. The
+    checks above would all have passed: the data files were there. Nothing exercised the code.
+
+    So this emulates four bytes of ARM64 and reads the register back. Local, instant, no network
+    and no account - and it fails a build rather than a user's machine, which is the entire point.
+    Anisette needs this to work, because emulating Apple's ADI library is how a sign-in happens
+    without a third-party server.
+    """
+    try:
+        from unicorn import UC_ARCH_ARM64, UC_MODE_ARM, Uc  # noqa: PLC0415
+        from unicorn.arm64_const import UC_ARM64_REG_X0  # noqa: PLC0415
+
+        emulator = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
+        emulator.mem_map(0x1000, 0x1000)
+        emulator.mem_write(0x1000, bytes.fromhex("400580d2"))  # movz x0, #42
+        emulator.emu_start(0x1000, 0x1004)
+        answer = emulator.reg_read(UC_ARM64_REG_X0)
+    except Exception as e:  # noqa: BLE001 - any failure here is a broken bundle, not a bug to raise
+        print(f"cpu emulator: FAILED ({type(e).__name__}: {e})")
+        return False
+
+    print(f"cpu emulator: ran ARM64 and read back {answer}")
+
+    return answer == 42
 
 
 if __name__ == "__main__":
