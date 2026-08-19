@@ -33,18 +33,6 @@ final class CustomAccessoryParser {
     /** FindMy.py's tag for the mapping. The same string {@code main.py} dispatches on. */
     private static final String CUSTOM_TYPE = "custom_rolling_key_accessory";
 
-    /**
-     * The emoji a self-generated tag gets when nothing has named it.
-     *
-     * <p>Every other tag arrives with whatever its owner set on an Apple device. These have
-     * nobody to have set one, so without a default they render as a blank where every other row
-     * has a picture - which reads as something failing to load rather than as a kind of tag.
-     *
-     * <p>A haystack, for OpenHaystack, which is the family of tools these come from. It is a
-     * default and not a label: the user can change it, and {@link UserBeaconOptions} stores that
-     * exactly as it does for any other tag.
-     */
-    static final String DEFAULT_EMOJI = "🌾";
 
     private CustomAccessoryParser() {
     }
@@ -100,7 +88,11 @@ final class CustomAccessoryParser {
                 // nothing that was ever "modified by" a device. Left null rather than invented.
                 .namingRecordId(null)
                 .originalName(name)
-                .originalEmoji(DEFAULT_EMOJI)
+                // **No emoji, deliberately.** It used to default to a haystack so the row was
+                // not blank, but that sent it down the emoji path and past the icon. There is a
+                // drawable for exactly this kind now - see BeaconIcon - and leaving this null is
+                // what lets it through.
+                .originalEmoji(null)
                 .customAccessory(true)
                 .customAccessoryKeyCount(keyCount)
                 // Not an Apple product, so it has no product or vendor id to report and no

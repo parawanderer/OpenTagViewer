@@ -60,6 +60,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.HardwareDescriber;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
@@ -256,7 +257,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
             ((MaterialButton)currentIconButton).setIcon(null);
         } else {
             currentIconButton.setText(null);
-            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(this, R.drawable.apple));
+            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(
+                    this, BeaconIcon.forBeacon(this.beaconInformation)));
         }
     }
 
