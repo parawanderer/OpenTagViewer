@@ -102,9 +102,18 @@ jobs:
     # `--self-test` reaches the data files *and* runs four bytes of ARM64 through the emulator,
     # which is the part that is native, the part PyInstaller cannot see, and the part that killed
     # the process on a user's machine rather than raising anything a log could hold.
+    #
+    # PowerShell rather than bash, only so the exit code survives. bash reports a process killed
+    # by Windows as 127, which is its own "command not found" and says nothing; the real value is
+    # an NTSTATUS and it names the mechanism. 0xC0000005 is an access violation, 0xC0000409 is a
+    # security check - Control Flow Guard or a stack cookie - and those point at very different
+    # fixes for a library that JITs its own code the way unicorn does.
     - name: Start the binary and run its self-test
       working-directory: ./python/dist
-      shell: bash
+      shell: pwsh
       run: |
         ./OpenTagViewer/OpenTagViewer --version
         ./OpenTagViewer/OpenTagViewer --self-test
+        $code = $LASTEXITCODE
+        Write-Host ("self-test exit code: {0} (0x{1:X8})" -f $code, $code)
+        exit $code
