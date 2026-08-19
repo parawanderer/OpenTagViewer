@@ -69,7 +69,7 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
-FindMy = { git = "https://github.com/parawanderer/FindMy.py", rev = "102dd8ea14767d2a2aa745186ac23276f32689f1" }
+FindMy = { git = "https://github.com/parawanderer/FindMy.py", rev = "23a9b8d7109b405f8362ea1e69ebe51f9ca82fca" }
 
 [dependency-groups]
 # Only the release build installs this, with `uv sync --no-default-groups --group build`. It is

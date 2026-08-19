@@ -149,6 +149,25 @@ def _convertToJavaDictWrapper(method: SyncSecondFactorMethod) -> dict[str, Any]:
     return return_obj
 
 
+LOGIN_TIMEOUT_SECONDS = 30
+"""
+How long a single request to Apple may take.
+
+FindMy.py defaults to five seconds total per request, which suits a desktop on a good connection
+and does not suit a phone. Signing in is several round trips measured separately, and there may
+be an Anisette server in the middle generating its data on demand.
+
+**Thirty, to match the other half of the same sign-in.** `AdiProvisioning` already uses thirty
+second connect and read timeouts for the exchange it makes with Apple directly, and it is the
+same network at the same moment - so the two halves having different patience only meant that
+whichever ran second was the one that failed.
+
+Measured rather than guessed: a login on an emulator with roughly 500ms round trips to Apple, and
+a site-local IPv6 address that routes nowhere, spent its whole five second budget inside
+happy-eyeballs and arrived as a bare `TimeoutError`. Provisioning survived the identical network.
+"""
+
+
 class LocalAnisetteProvider(BaseAnisetteProvider):
     """Anisette produced on this device, rather than by somebody else's server.
 
@@ -192,6 +211,10 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
             {
                 "type": "aniRemote",
                 "url": self._fallbackServerUrl,
+                # Carried even though nothing here spends it. This serializes as the *remote*
+                # provider, so this mapping is what a restored session is rebuilt from - and
+                # omitting it would quietly hand that session back the five second default.
+                "timeout": LOGIN_TIMEOUT_SECONDS,
             },
             dst,
         )
@@ -233,7 +256,10 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None, **ident
         except Exception:
             print(f"Local Anisette failed, using the remote server: {traceback.format_exc()}")
 
-    return RemoteAnisetteProvider(anisetteServerUrl, **identityKwargs)
+    # Passed here rather than through identityKwargs, which also reach LocalAnisetteProvider -
+    # BaseAnisetteProvider takes no timeout, and there is no HTTP in the local one to spend it on.
+    return RemoteAnisetteProvider(
+        anisetteServerUrl, timeout=LOGIN_TIMEOUT_SECONDS, **identityKwargs)
 
 
 def loginSync(email: str, password: str, anisetteServerUrl: str,
@@ -255,7 +281,13 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
         # And the two ids the same install already used when it provisioned ADI, so this is one
         # device rather than two that happen to share a serial. Empty when Java cannot say, in
         # which case FindMy.py mints its own pair exactly as it always did.
-        acc = AppleAccount(anisette, **app_identity.deviceIdsForNewSession(localAnisette))
+        # The account and the Anisette provider hold separate sessions, so both need this:
+        # the Anisette fetch happens inside the login but from the provider's own client.
+        acc = AppleAccount(
+            anisette,
+            timeout=LOGIN_TIMEOUT_SECONDS,
+            **app_identity.deviceIdsForNewSession(localAnisette),
+        )
 
         state = acc.login(email, password)
 
