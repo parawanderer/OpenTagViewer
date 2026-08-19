@@ -21,6 +21,7 @@ import base64
 import logging
 import uuid
 from io import BytesIO
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Sequence
@@ -46,6 +47,7 @@ from findmy.cloudkit.beacons import (
     to_owned_beacon_plist,
 )
 from findmy.cloudkit.client import AsyncCloudKitClient
+from findmy.reports.anisette import BaseAnisetteProvider
 from findmy.icloud import AsyncFindMyClient
 from findmy.keychain.recovery import RecoveryError
 from findmy.keychain.session import AsyncKeychainSession
@@ -131,7 +133,44 @@ class Fetched:
     skipped: list[Skipped]
 
 
-def make_account(anisette_url: str | None = None, libs_path: str | None = None) -> AsyncAppleAccount:
+@dataclass(frozen=True)
+class ClientIdentity:
+    """
+    Who a client says it is, in the two fields Apple shows the user.
+
+    **There is more than one client now.** This module was written for the desktop exporter and
+    read :mod:`exporter.identity` directly, which was right while it was the only caller. The
+    Android app runs the same flow through Chaquopy and must present its own serial - two
+    programs sharing one are one device to Apple, so removing either from the device list breaks
+    the other. Rule 11 in AGENTS.md.
+
+    Defaulted everywhere to the exporter's, so nothing on the desktop side changes.
+
+    :param serial: `X-Apple-I-SRL-NO`, and the one field in the device-list row a person can
+        actually read.
+    :param device_name: What CloudKit is told this client is called. **Not the device-list name**,
+        which needs the `postdata` announce Apple refuses without a push token - see
+        :func:`remember`. Required rather than optional because `AsyncCloudKitClient` takes a
+        string; a client that set nothing here would be named by the library instead, which is
+        the same second-identity problem one layer down.
+    """
+
+    serial: str
+    device_name: str
+
+
+EXPORTER_IDENTITY = ClientIdentity(serial=EXPORTER_SERIAL, device_name=DEVICE_NAME)
+"""The desktop exporter's, and the default for every entry point here."""
+
+
+def make_account(
+    anisette_url: str | None = None,
+    libs_path: str | None = None,
+    *,
+    provider: BaseAnisetteProvider | None = None,
+    identity: ClientIdentity = EXPORTER_IDENTITY,
+    identity_path: Path | None = None,
+) -> AsyncAppleAccount:
     """
     Build an account that presents this exporter's identity - the same one as last time.
 
@@ -146,13 +185,22 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
         headers, and a session is bound to whichever established it.
     :param libs_path: Where to cache Apple's ADI libraries, so a later run does not fetch them
         again. They are downloaded on first use when this is None.
+    :param provider: An Anisette provider to use instead of building one. **This is what makes
+        the flow runnable on Android at all**: the local provider built below is FindMy.py's,
+        which reaches the `anisette` package and therefore `unicorn`, a CPU emulator that cannot
+        be built for Android. The app produces Anisette from Apple's own ADI libraries in-process
+        and passes the result here. See AGENTS.md rule 4.
+    :param identity: Who this client says it is. Defaults to the exporter's.
+    :param identity_path: Where the device identity is kept between runs. Defaults to the
+        desktop's per-platform location; the app passes its own storage.
     """
-    stored = device.load()
+    stored = device.load(identity_path)
 
-    provider = _make_provider(anisette_url, libs_path, stored)
+    if provider is None:
+        provider = _make_provider(anisette_url, libs_path, stored, identity)
 
     if stored is None:
-        return AsyncAppleAccount(provider, device_name=DEVICE_NAME)
+        return AsyncAppleAccount(provider, device_name=identity.device_name)
 
     # Only the ids are restored. The rest of the shape has to be there because the library reads
     # it, and every field of it is empty on purpose - this is a logged-out account that happens to
@@ -167,17 +215,18 @@ def make_account(anisette_url: str | None = None, libs_path: str | None = None) 
 
     logger.info("Reusing the stored device identity, so this is not a new device to Apple")
 
-    return AsyncAppleAccount(provider, state_info=state, device_name=DEVICE_NAME)
+    return AsyncAppleAccount(provider, state_info=state, device_name=identity.device_name)
 
 
 def _make_provider(
     anisette_url: str | None,
     libs_path: str | None,
     stored: dict[str, Any] | None,
+    identity: ClientIdentity = EXPORTER_IDENTITY,
 ) -> LocalAnisetteProvider | RemoteAnisetteProvider:
     """Build the Anisette provider, restoring its provisioning data if there is any."""
     if anisette_url is not None:
-        return RemoteAnisetteProvider(anisette_url, serial=EXPORTER_SERIAL)
+        return RemoteAnisetteProvider(anisette_url, serial=identity.serial)
 
     saved = (stored or {}).get("anisette")
     state_blob = None
@@ -190,10 +239,11 @@ def _make_provider(
         except (ValueError, TypeError):
             logger.warning("The stored Anisette provisioning could not be read; starting fresh")
 
-    return LocalAnisetteProvider(libs_path=libs_path, serial=EXPORTER_SERIAL, state_blob=state_blob)
+    return LocalAnisetteProvider(
+        libs_path=libs_path, serial=identity.serial, state_blob=state_blob)
 
 
-def remember(account: AsyncAppleAccount) -> None:
+def remember(account: AsyncAppleAccount, identity_path: Path | None = None) -> None:
     """
     Store this account's device identity, so the next export is the same device.
 
@@ -221,7 +271,8 @@ def remember(account: AsyncAppleAccount) -> None:
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
-    device.save(state["ids"]["uid"], state["ids"]["devid"], state["anisette"])
+    device.save(
+        state["ids"]["uid"], state["ids"]["devid"], state["anisette"], identity_path)
 
 
 MAX_LOGIN_ATTEMPTS = 3
@@ -360,7 +411,9 @@ def _describe_factor(method: object) -> str:
     return type(method).__name__
 
 
-async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
+async def open_client(
+    account: AsyncAppleAccount, identity: ClientIdentity = EXPORTER_IDENTITY,
+) -> AsyncFindMyClient:
     """
     Open a Find My client that reports this exporter's identity to CloudKit as well.
 
@@ -374,8 +427,8 @@ async def open_client(account: AsyncAppleAccount) -> AsyncFindMyClient:
             account,
             client=AsyncCloudKitClient(
                 account,
-                device_name=DEVICE_NAME,
-                device_serial=EXPORTER_SERIAL,
+                device_name=identity.device_name,
+                device_serial=identity.serial,
             ),
         )
     except Exception:
