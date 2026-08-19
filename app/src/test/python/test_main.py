@@ -12,6 +12,7 @@ cover the parts of the FindMy 0.9.x migration that are pure logic:
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import asyncio
 import json
 import re
 
@@ -705,3 +706,58 @@ def test_pinned_versions_match_the_app_build():
             assert f"{package}=={version}" in required_lines, (
                 f"{package} is {version} in build.gradle.kts but not in requirements.txt"
             )
+
+
+# --------------------------------------------------------------------------
+# Describing a failed sign-in
+#
+# The screen showed "Login failed:" and nothing after the colon, because the failure
+# people actually hit is a connection timeout and `str(TimeoutError())` is "".
+# --------------------------------------------------------------------------
+
+class TestDescribingAFailedLogin:
+    def test_an_exception_with_no_message_still_says_something(self):
+        """The bug exactly: several asyncio errors carry no message at all."""
+        assert main.describeLoginFailure(TimeoutError()) == "TimeoutError"
+        assert main.describeLoginFailure(asyncio.CancelledError()) == "CancelledError"
+
+    def test_a_message_is_kept_and_named(self):
+        described = main.describeLoginFailure(ValueError("that password is wrong"))
+
+        assert "that password is wrong" in described
+        assert "ValueError" in described
+
+    @pytest.mark.parametrize("blank", ["", "   ", "\n"])
+    def test_a_whitespace_only_message_counts_as_none(self, blank):
+        assert main.describeLoginFailure(RuntimeError(blank)) == "RuntimeError"
+
+    def test_nothing_ever_describes_itself_as_empty(self):
+        for error in (TimeoutError(), asyncio.CancelledError(), OSError(), Exception()):
+            assert main.describeLoginFailure(error).strip()
+
+
+class TestClassifyingAFailedLogin:
+    @pytest.mark.parametrize("error", [
+        TimeoutError(),
+        asyncio.TimeoutError(),
+        asyncio.CancelledError(),
+        ConnectionRefusedError(),
+        OSError("network is unreachable"),
+    ])
+    def test_not_reaching_apple_is_a_network_failure(self, error):
+        assert main.classifyLoginFailure(error) == main.REASON_NETWORK
+
+    def test_anything_else_is_left_unclassified(self):
+        """
+        Deliberately not guessed at. Telling somebody to check their connection when their
+        password was wrong sends them to fix the wrong thing.
+        """
+        assert main.classifyLoginFailure(ValueError("bad password")) == main.REASON_UNKNOWN
+
+    def test_a_library_error_is_recognised_by_its_module(self):
+        class ClientConnectorError(Exception):
+            pass
+
+        ClientConnectorError.__module__ = "aiohttp.client_exceptions"
+
+        assert main.classifyLoginFailure(ClientConnectorError()) == main.REASON_NETWORK

@@ -144,6 +144,37 @@ public class BeaconRepositoryBackfillTest {
     }
 
     /**
+     * The crash a real import produced.
+     *
+     * <p>The import path built this map with {@code Collectors.toMap}, which throws on a null
+     * value - so importing a self-generated tag ended in a {@link NullPointerException} deep in
+     * the stream machinery, with nothing naming the tag or the import. It is the only kind of
+     * tag that arrives here with no plist, so it was also the only way to find it.
+     */
+    @Test
+    public void amixOfBothKindsSurvivesBeingCollected() {
+        final Map<String, String> fallbacks = BeaconRepository.plistFallbacks(List.of(
+                OwnedBeacon.builder().id("paired-1").content(PLIST).build(),
+                OwnedBeacon.builder().id("oh-1").content(null).accessoryJson(CUSTOM_JSON).build()));
+
+        assertEquals(2, fallbacks.size());
+        assertEquals(PLIST, fallbacks.get("paired-1"));
+        assertNull("a tag with no plist keeps its key and a null value", fallbacks.get("oh-1"));
+        assertTrue("the key must be there, or that tag is simply never fetched",
+                fallbacks.containsKey("oh-1"));
+    }
+
+    /** And an import of nothing but self-generated tags is still a map of tags. */
+    @Test
+    public void anImportOfOnlySelfGeneratedTagsCollectsFine() {
+        final Map<String, String> fallbacks = BeaconRepository.plistFallbacks(List.of(
+                OwnedBeacon.builder().id("oh-1").content(null).accessoryJson(CUSTOM_JSON).build()));
+
+        assertEquals(1, fallbacks.size());
+        assertTrue(fallbacks.containsKey("oh-1"));
+    }
+
+    /**
      * The alignment record is what stops the first fetch searching the tag's whole
      * history, so the backfill has to hand it to the converter rather than dropping it.
      */

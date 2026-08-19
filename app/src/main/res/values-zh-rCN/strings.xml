@@ -167,4 +167,5 @@
     <string name="custom_tag">自制标签</string>
     <string name="custom_tag_explained">OpenHaystack 类型的标签。它的密钥由制作者生成，从未存在于 Apple 账户中，因此没有来自 Apple 的名称、表情或电量信息 — 请在下方自行设置。</string>
     <string name="custom_tag_keys_remaining">%1$d 个预生成密钥</string>
+    <string name="login_failed_network">无法连接 Apple。请检查网络连接后重试。</string>
 </resources>
