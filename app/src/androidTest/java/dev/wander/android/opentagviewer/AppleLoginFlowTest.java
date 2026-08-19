@@ -12,6 +12,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -262,6 +263,50 @@ public class AppleLoginFlowTest {
         Eventually.check(() -> onView(withId(R.id.login_error_container)).check(matches(isDisplayed())));
         onView(withId(R.id.login_maininfo_container)).check(matches(isDisplayed()));
         onView(withId(R.id.login_button_main)).check(matches(isDisplayed()));
+    }
+
+    /**
+     * A sign-in that could not reach Apple says so, in words.
+     *
+     * <p><b>The screen used to show "Login failed:" and nothing else.</b> The most common real
+     * failure is a connection timeout, and `str(TimeoutError())` is the empty string, so the
+     * message it echoed was empty - leaving somebody unable to tell a wrong password from a dead
+     * network from a broken app.
+     *
+     * <p>Asserted on the text, not on "an error appeared". The previous version showed an error
+     * too; it just did not say anything.
+     */
+    @Test
+    public void afailureToReachAppleSaysSoRatherThanShowingAnEmptyError() {
+        this.apple = FakeAppleAuthService.cannotReachApple();
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        final String expected = getInstrumentation().getTargetContext()
+                .getString(R.string.login_failed_network);
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text))
+                .check(matches(withText(expected))));
+    }
+
+    /**
+     * And an unrecognised failure still names something.
+     *
+     * <p>The fallback matters as much as the classified case: it is what anything unexpected
+     * lands in, and it must not be able to render as a bare colon again.
+     */
+    @Test
+    public void anunrecognisedFailureStillShowsItsDetail() {
+        this.apple = FakeAppleAuthService.rejectsTheSignIn("Bad password");
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text))
+                .check(matches(withText(containsString("Bad password")))));
     }
 
     /** A rejected code says so, and gives the boxes back rather than stranding them. */

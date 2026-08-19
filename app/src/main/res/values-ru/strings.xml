@@ -167,4 +167,5 @@
     <string name="custom_tag">Самодельная метка</string>
     <string name="custom_tag_explained">Метка в стиле OpenHaystack. Её ключи создал тот, кто её сделал, и они никогда не были в учётной записи Apple, поэтому у неё нет ни имени, ни эмодзи, ни уровня заряда от Apple — задайте свои ниже.</string>
     <string name="custom_tag_keys_remaining">%1$d заранее созданных ключей</string>
+    <string name="login_failed_network">Не удалось связаться с Apple. Проверьте подключение и повторите попытку.</string>
 </resources>

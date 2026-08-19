@@ -167,4 +167,5 @@
     <string name="custom_tag">직접 만든 태그</string>
     <string name="custom_tag_explained">OpenHaystack 방식의 태그입니다. 키는 만든 사람이 직접 생성했고 Apple 계정에 등록된 적이 없어, Apple에서 받은 이름·이모지·배터리 정보가 없습니다. 아래에서 직접 설정하세요.</string>
     <string name="custom_tag_keys_remaining">미리 생성된 키 %1$d개</string>
+    <string name="login_failed_network">Apple에 연결할 수 없습니다. 연결 상태를 확인한 후 다시 시도해 주세요.</string>
 </resources>

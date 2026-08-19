@@ -294,7 +294,8 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
     except Exception as e:
         print(f"Failed to log in due to error: {traceback.format_exc()}")
         return {
-            "error": str(e)
+            "error": describeLoginFailure(e),
+            "reason": classifyLoginFailure(e),
         }
 
 
@@ -357,6 +358,64 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
     except Exception:
         print(f"Could not inspect anisette configuration: {traceback.format_exc()}")
         return "This saved login could not be read."
+
+
+# What went wrong at sign-in, in a form the screen can act on.
+#
+# **`str(e)` is not enough, and that is not a nitpick.** The failure people actually hit is a
+# connection timeout, and `str(TimeoutError())` is the empty string - so the screen said
+# "Login failed:" with nothing after the colon. Several of the exceptions that reach here carry
+# no message at all: TimeoutError, CancelledError and most of asyncio's.
+
+REASON_NETWORK = "network"
+"""Could not reach Apple. Nothing was refused - nothing answered."""
+
+REASON_UNKNOWN = "unknown"
+"""Anything else. The detail is shown as-is, because a wrong guess is worse than raw text."""
+
+# Matched by type rather than by message, because the messages are empty or English prose from
+# three libraries deep. aiohttp's errors all derive from ClientError, and the asyncio ones are
+# what a stalled connection raises.
+_NETWORK_ERRORS = (
+    TimeoutError,
+    ConnectionError,
+    OSError,
+)
+
+
+def classifyLoginFailure(error: BaseException) -> str:
+    """Which kind of failure this is, as a code the Java side maps to a localised sentence."""
+    import asyncio
+
+    if isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
+        return REASON_NETWORK
+    if isinstance(error, _NETWORK_ERRORS):
+        return REASON_NETWORK
+
+    # aiohttp is not imported here directly - matching on the module keeps this working
+    # whether or not the library is present, and without importing it for a failure path.
+    module = type(error).__module__ or ""
+    if module.startswith("aiohttp") or module.startswith("aiohappyeyeballs"):
+        return REASON_NETWORK
+
+    return REASON_UNKNOWN
+
+
+def describeLoginFailure(error: BaseException) -> str:
+    """
+    A detail string that is **never empty**.
+
+    Falls back to the exception's type name, which is the whole point: an empty message is how
+    the screen came to show a colon and nothing at all. Kept as a detail rather than a sentence
+    because it is untranslatable Python text - the sentence the user reads is chosen on the Java
+    side from the reason code.
+    """
+    detail = str(error).strip()
+    name = type(error).__name__
+
+    if not detail:
+        return name
+    return f"{name}: {detail}"
 
 
 def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:
