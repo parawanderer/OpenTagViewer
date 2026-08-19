@@ -17,7 +17,9 @@ import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
+import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 
 import org.json.JSONObject;
@@ -199,5 +201,86 @@ public class CustomAccessoryImportTest {
         assertTrue("a row with a plist is not a self-generated tag",
                 !CustomAccessoryParser.isCustomAccessory(
                         new BeaconData(paired.id, paired, null, null)));
+    }
+
+    /**
+     * The one that was missing, and the reason all of the above passed while the feature did not
+     * work.
+     *
+     * <p>Every test before this hands {@link BeaconDataParser} a {@code BeaconData} it built
+     * itself, which skips the step that actually decides what reaches a screen.
+     * {@link BeaconCombinerUtil#combine} used to iterate the <i>naming records</i> - so a tag
+     * with none was dropped on the floor before the parser was ever asked about it. The import
+     * reported "1 device", the fetch path collected reports for it happily, and it appeared
+     * nowhere.
+     *
+     * <p>So this goes through the join, and the two that follow go through it for the two
+     * screens that call it.
+     */
+    @Test
+    public void itsurvivesTheJoinThatFeedsEveryScreen() {
+        final List<BeaconData> joined = BeaconCombinerUtil.combine(imported());
+
+        assertEquals("a tag with no naming record must not be dropped by the join",
+                1, joined.size());
+        assertEquals(IDENTIFIER, joined.get(0).getBeaconId());
+        assertNotNull("and it must keep the row that has its keys in it",
+                joined.get(0).getOwnedBeaconInfo());
+        assertNull("nothing ever named it, so there is nothing to join to",
+                joined.get(0).getBeaconNamingRecord());
+    }
+
+    /**
+     * The device list's own call, which passes user options as a third list.
+     *
+     * <p>A separate case because it is a different overload, and because the options have to
+     * survive the change of what the join iterates - they are keyed by beacon id either way,
+     * but that is worth an assertion rather than an assumption.
+     */
+    @Test
+    public void thedeviceListSeesItToo() {
+        final OwnedBeacon row = imported().getOwnedBeacons().get(0);
+        final UserBeaconOptions chosen = new UserBeaconOptions(
+                row.id, System.currentTimeMillis(), "My hidden bike", "🚲");
+
+        final List<BeaconData> joined = BeaconCombinerUtil.combine(
+                List.of(row), List.of(), List.of(chosen));
+
+        assertEquals(1, joined.size());
+        assertNotNull("the user's own name and emoji must still find it",
+                joined.get(0).getUserBeaconOptions());
+    }
+
+    /** End to end, as the screen does it: import, join, parse, and read the name off it. */
+    @Test
+    public void thewholeChainProducesSomethingToShow() {
+        final BeaconInformation info =
+                BeaconDataParser.parse(BeaconCombinerUtil.combine(imported())).get(0);
+
+        assertEquals(NAME, info.getName());
+        assertTrue(info.isCustomAccessory());
+    }
+
+    /**
+     * And an Apple tag still comes out of the join whole.
+     *
+     * <p>The risk in turning the join around is the mirror of the bug it fixes: driving from the
+     * owned beacons could just as easily leave the naming record behind, which would cost every
+     * real tag its name.
+     */
+    @Test
+    public void anapplePairedTagKeepsItsNamingRecord() {
+        final String id = "2C2A1B0C-9D8E-4F6A-8B4C-3D2E1F0A9B8C";
+        final OwnedBeacon paired = OwnedBeacon.builder().id(id).content("<plist/>").build();
+        final BeaconNamingRecord named =
+                BeaconNamingRecord.builder().id(id).content("<plist/>").build();
+
+        final List<BeaconData> joined =
+                BeaconCombinerUtil.combine(List.of(paired), List.of(named), List.of());
+
+        assertEquals(1, joined.size());
+        assertNotNull(joined.get(0).getOwnedBeaconInfo());
+        assertNotNull("without this an Apple tag loses its name and emoji",
+                joined.get(0).getBeaconNamingRecord());
     }
 }
