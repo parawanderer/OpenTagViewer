@@ -994,20 +994,109 @@ def self_test() -> int:
     # Reads every `.crt` beside the library's code and checks each against its own fingerprint,
     # so this proves the files are both present and intact.
     roots = PinnedRoots.bundled().by_version
-    print(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
+    _say(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
 
     # A namespace package would have no __file__, and a build that produced one would be broken in
     # a way worth reporting rather than crashing on.
     anisette_module = sys.modules["anisette"].__file__
     anisette_root = Path(anisette_module).parent / "apple-root.pem" if anisette_module else None
     found = anisette_root is not None and anisette_root.is_file()
-    print(f"anisette root: {'present' if found else 'MISSING'}")
+    _say(f"anisette root: {'present' if found else 'MISSING'}")
 
     if not roots or not found:
         return 1
 
-    print("self-test passed")
+    if not _emulator_runs():
+        return 1
+
+    _say("self-test passed")
     return 0
+
+
+def _say(line: str) -> None:
+    """
+    Print, and flush before the next thing can kill the process.
+
+    **A native fault loses buffered output**, and stdout is block-buffered the moment it is a pipe
+    rather than a terminal - which it always is in CI. So the first run of this on Windows died
+    with no output at all: every line was still sitting in the buffer when the process was killed,
+    and a self-test that cannot say how far it got is only marginally better than no self-test.
+    """
+    print(line, flush=True)
+
+
+def _emulator_runs() -> bool:
+    """
+    Actually run the CPU emulator, rather than checking its file is present.
+
+    **The two are not the same check, and the difference is a hard crash.** `unicorn` loads its
+    native library through ctypes at runtime, so PyInstaller never sees it and `--collect-all
+    unicorn` is what puts the file in the bundle. That makes the file *present*; it says nothing
+    about whether the library loads and executes on the machine that ends up running it.
+
+    A Windows user on 1.2.0 reported `OpenTagViewer.exe parou de funcionar` - the process killed
+    by Windows, no Python traceback, nothing in any log, because a native fault does not raise. The
+    checks above would all have passed: the data files were there. Nothing exercised the code.
+
+    So this emulates four bytes of ARM64 and reads the register back. Local, instant, no network
+    and no account - and it fails a build rather than a user's machine, which is the entire point.
+    Anisette needs this to work, because emulating Apple's ADI library is how a sign-in happens
+    without a third-party server.
+
+    **Reported one call at a time**, because a native fault produces no exception and no
+    traceback - so the only thing that says where it died is the last line that made it out.
+    Each stage announces itself before it runs, and the failing call is whichever one has no
+    answer after it. That is what turned "the Windows build dies somewhere" into a line number.
+    """
+    state: dict = {}
+
+    for name, step in (
+        ("import", _emu_import),
+        ("construct", _emu_construct),
+        ("mem_map", _emu_map),
+        ("mem_write", _emu_write),
+        ("emu_start", _emu_run),
+    ):
+        _say(f"cpu emulator: {name} …")
+        try:
+            step(state)
+        except Exception as e:  # noqa: BLE001 - a broken bundle, not a bug worth raising
+            _say(f"cpu emulator: {name} FAILED ({type(e).__name__}: {e})")
+            return False
+
+    answer = state["answer"]
+    _say(f"cpu emulator: ran ARM64 and read back {answer}")
+
+    return answer == 42
+
+
+def _emu_import(state: dict) -> None:
+    import unicorn  # noqa: PLC0415
+    from unicorn import arm64_const  # noqa: PLC0415
+
+    state["unicorn"] = unicorn
+    state["arm64"] = arm64_const
+    # The path matters: a bundle can carry the Python package and miss the native library beside
+    # it, and then this is the last line before the process disappears.
+    _say(f"cpu emulator: loaded {getattr(unicorn, '__file__', '?')}")
+
+
+def _emu_construct(state: dict) -> None:
+    unicorn = state["unicorn"]
+    state["uc"] = unicorn.Uc(unicorn.UC_ARCH_ARM64, unicorn.UC_MODE_ARM)
+
+
+def _emu_map(state: dict) -> None:
+    state["uc"].mem_map(0x1000, 0x1000)
+
+
+def _emu_write(state: dict) -> None:
+    state["uc"].mem_write(0x1000, bytes.fromhex("400580d2"))  # movz x0, #42
+
+
+def _emu_run(state: dict) -> None:
+    state["uc"].emu_start(0x1000, 0x1004)
+    state["answer"] = state["uc"].reg_read(state["arm64"].UC_ARM64_REG_X0)
 
 
 if __name__ == "__main__":

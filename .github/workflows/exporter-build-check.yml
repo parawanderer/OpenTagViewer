@@ -1,0 +1,145 @@
+# Builds the exporter on Windows and proves the binary runs, on pull requests.
+#
+# **The release workflow only fires on `release: published`**, so until this existed the Windows
+# binary was first built at the moment it was published, and the first person to run it was a user.
+# That is how 1.2.0 shipped an .exe that died with `OpenTagViewer.exe parou de funcionar` - the
+# process killed by Windows, no traceback, nothing in any log, because a native fault does not
+# raise. Nothing in CI had ever started it.
+#
+# This does not upload anything and is not part of releasing. It exists to fail a pull request
+# rather than a download.
+#
+# **Windows only, deliberately.** It is the platform whose build had no coverage at all before a
+# release, and the one that broke. Adding `macos-14` or `ubuntu-22.04` to the matrix is a two-line
+# change if the same happens elsewhere - the steps below are otherwise platform-agnostic - but
+# every entry costs a PyInstaller build on every pull request, so they are not there by default.
+
+name: Exporter Build Check
+
+on:
+  pull_request:
+    paths:
+      - "python/**"
+      - ".github/workflows/exporter-build-check.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "python/**"
+      - ".github/workflows/exporter-build-check.yml"
+  workflow_dispatch:
+
+env:
+  PYINSTALLER_PYTHON_VER: 3.13
+
+jobs:
+  windows:
+    name: Build and start the Windows binary
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    # --frozen: exactly what uv.lock records. A build check that resolved something else would be
+    # checking a bundle nobody is going to ship.
+    #
+    # `--group build` is where PyInstaller lives, and without it this fails with "Failed to spawn:
+    # pyinstaller / program not found" - which is what the first run of this workflow did. Copied
+    # from the release workflow's install step for the same reason its PyInstaller call is copied:
+    # a build check that installs a different set is checking a different bundle.
+    - name: Install dependencies
+      working-directory: ./python
+      run: uv sync --frozen --no-default-groups --group build
+
+    # **Before freezing anything**, because it separates two very different faults that look
+    # identical from outside. The frozen binary dies inside `emu_start` after importing unicorn,
+    # constructing it and mapping memory - so the native library loads and the bundle is fine.
+    # What is not yet known is whether *executing* emulated ARM64 works on Windows at all.
+    #
+    # If this passes and the frozen one fails, it is PyInstaller. If both fail, unicorn cannot run
+    # here and local Anisette can never work on Windows - which is a product decision, not a build
+    # fix, because the sign-in would have to use a remote Anisette server instead.
+    #
+    # `continue-on-error` so the answer is recorded even when it is "no": this step is an
+    # experiment, and a red X here would hide the frozen result below it.
+    - name: Does the emulator run under plain Python on this machine
+      continue-on-error: true
+      working-directory: ./python
+      run: |
+        uv run --frozen python -c "import unicorn, sys; print('unicorn', unicorn.__file__, flush=True); uc = unicorn.Uc(unicorn.UC_ARCH_ARM64, unicorn.UC_MODE_ARM); print('constructed', flush=True); uc.mem_map(0x1000, 0x1000); uc.mem_write(0x1000, bytes.fromhex('400580d2')); print('written', flush=True); uc.emu_start(0x1000, 0x1004); from unicorn.arm64_const import UC_ARM64_REG_X0; print('x0 =', uc.reg_read(UC_ARM64_REG_X0), flush=True)"
+
+    # Kept identical to the release workflow's Windows step on purpose. If the two drift, this
+    # stops testing what gets published, which is worse than not testing at all because it reads
+    # as coverage.
+    #
+    # --collect-all unicorn is not optional and its absence is invisible until somebody runs the
+    # result: unicorn loads its native library through ctypes, so PyInstaller's analysis never sees
+    # it. --collect-data covers the pinned root certificates FindMy.py keeps as files beside its
+    # code, which a build once omitted and which failed several minutes into a real sign-in.
+    - name: Run PyInstaller
+      working-directory: ./python
+      run: |
+        uv run --frozen pyinstaller `
+          --windowed `
+          --name "OpenTagViewer" `
+          --icon=OpenTagViewer.ico `
+          --collect-all unicorn `
+          --collect-data findmy `
+          --collect-data anisette `
+          --noconfirm `
+          ./exporter/wizard.py
+
+    # Two checks, and the second is the one that would have caught the crash this workflow exists
+    # for. `--version` proves the bundle can import everything it was built with, Tk included.
+    # `--self-test` reaches the data files *and* runs four bytes of ARM64 through the emulator,
+    # which is the part that is native, the part PyInstaller cannot see, and the part that killed
+    # the process on a user's machine rather than raising anything a log could hold.
+    #
+    # PowerShell rather than bash, only so the exit code survives. bash reports a process killed
+    # by Windows as 127, which is its own "command not found" and says nothing; the real value is
+    # an NTSTATUS and it names the mechanism. 0xC0000005 is an access violation, 0xC0000409 is a
+    # security check - Control Flow Guard or a stack cookie - and those point at very different
+    # fixes for a library that JITs its own code the way unicorn does.
+    # **Control Flow Guard has to come off, or the program cannot sign in.** unicorn compiles
+    # ARM64 into native code at runtime and jumps to it; CFG checks every indirect call against
+    # targets the linker knew about, and code that did not exist at link time is not among them.
+    # The process is then killed by __fastfail with no exception and no traceback - observed here
+    # as exit `0xC0000409` from `emu_start`, and reported by a user as "parou de funcionar".
+    #
+    # PyInstaller's bootloader is built with CFG on and the flag is process-wide, so no packaging
+    # option avoids it. See the script for why giving up the mitigation is the right trade.
+    - name: Turn off Control Flow Guard, so the emulator can run
+      run: python scripts/clear_windows_cfg.py python/dist/OpenTagViewer/OpenTagViewer.exe
+
+    # **Asserted on the output, not on the exit code**, because the exit code cannot be trusted
+    # here and trusting it already produced a green run over a dead binary. A process Windows
+    # kills leaves `$LASTEXITCODE` unset, `exit $null` is `exit 0`, and the check passed while the
+    # self-test was still dying at `emu_start`. A build check that goes green over the failure it
+    # was written for is worse than not having one, because it reads as coverage.
+    #
+    # So success is the line the self-test prints when it finishes, and nothing else counts.
+    - name: Start the binary and run its self-test
+      working-directory: ./python/dist
+      shell: pwsh
+      run: |
+        ./OpenTagViewer/OpenTagViewer --version
+
+        $output = (& ./OpenTagViewer/OpenTagViewer --self-test 2>&1 | Out-String)
+        $code = $LASTEXITCODE
+
+        Write-Host $output
+        Write-Host ("self-test exit code: '{0}'" -f $code)
+
+        if ($output -notmatch 'self-test passed') {
+          Write-Host "The self-test did not report success. The last line above is the call that"
+          Write-Host "killed it - a native fault raises nothing, so there is no traceback to find."
+          exit 1
+        }

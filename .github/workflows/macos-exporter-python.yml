@@ -262,6 +262,23 @@ jobs:
           --noconfirm `
           ./exporter/wizard.py
 
+    # **Without this the Windows build cannot sign in**, and fails in the way that is hardest to
+    # report: the process vanishes, with no exception, no traceback and nothing in the log.
+    #
+    # unicorn compiles ARM64 into native code at runtime and jumps to it, which is how Apple's ADI
+    # library is emulated and therefore how a login happens without a third-party Anisette server.
+    # Control Flow Guard checks every indirect call against targets the linker knew about, and code
+    # that did not exist at link time is not among them, so the jump is refused and __fastfail
+    # terminates the process. PyInstaller's bootloader is built with CFG on and the flag applies to
+    # the whole process, so nothing about how the Python side is packaged avoids it.
+    #
+    # Reported by a user as "OpenTagViewer.exe parou de funcionar" on 1.2.0, and reproduced in
+    # exporter-build-check.yml as exit 0xC0000409 from `emu_start`. The script explains why giving
+    # up the mitigation is the right trade for this program.
+    - name: Turn off Control Flow Guard (Windows), so the emulator can run
+      if: matrix.os == 'windows'
+      run: python scripts/clear_windows_cfg.py python/dist/OpenTagViewer/OpenTagViewer.exe
+
     # No --windowed on Linux: it means "no console window" on the platforms that have that
     # concept, and there is no bundle format here for it to produce either way.
     # --collect-all unicorn is not optional, and its absence is invisible until somebody runs the

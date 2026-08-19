@@ -19,7 +19,7 @@ exports stamp `via:` too, so a build-time patch would make two artifacts from on
 
 from __future__ import annotations
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
