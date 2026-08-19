@@ -51,6 +51,7 @@ import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.AppleAuthService;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
@@ -522,8 +523,36 @@ public class AppleLoginActivity extends AppCompatActivity {
                 loginErrorMessage.setVisibility(VISIBLE);
 
                 TextView loginErrorText = this.findViewById(R.id.login_error_message_text);
-                loginErrorText.setText(this.getString(R.string.login_failed_x, error.getLocalizedMessage()));
+                loginErrorText.setText(this.describeLoginFailure(error));
             });
+    }
+
+    /**
+     * What to put on screen when a sign-in fails.
+     *
+     * <p><b>Never an empty message.</b> This used to be {@code login_failed_x} with
+     * {@code getLocalizedMessage()}, and the most common real failure - a connection timeout -
+     * carries no message at all, so the screen showed "Login failed:" and stopped. A person
+     * cannot tell from that whether they typed their password wrong, whether Apple is down, or
+     * whether the app is broken.
+     *
+     * <p>A recognised reason gets a translated sentence that says what to do. Anything else
+     * falls back to the detail, which at least names the exception - unhelpful, but honest,
+     * and better than a guess at a cause we have not established.
+     */
+    private String describeLoginFailure(final Throwable error) {
+        final String reason = error instanceof PythonAccountLoginException
+                ? ((PythonAccountLoginException) error).getReason()
+                : PythonAccountLoginException.REASON_UNKNOWN;
+
+        if (PythonAccountLoginException.REASON_NETWORK.equals(reason)) {
+            return this.getString(R.string.login_failed_network);
+        }
+
+        final String detail = error.getLocalizedMessage();
+        return detail == null || detail.isBlank()
+                ? this.getString(R.string.login_failed_x, error.getClass().getSimpleName())
+                : this.getString(R.string.login_failed_x, detail);
     }
 
     private void handleLoginResponse(PythonAuthResponse authResponse) {

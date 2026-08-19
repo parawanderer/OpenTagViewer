@@ -85,6 +85,22 @@ public final class FakeAppleAuthService implements AppleAuthService {
         return fake;
     }
 
+    /**
+     * Apple could not be reached at all - the failure that produced an empty error message.
+     *
+     * <p>Worth its own named state rather than {@code rejectsTheSignIn("")}, because the shape
+     * is what matters: a timeout carries <b>no message</b>, so the screen has to build the
+     * sentence from the reason instead of echoing what it was handed.
+     */
+    public static FakeAppleAuthService cannotReachApple() {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
+        // Empty, exactly as str(TimeoutError()) arrives from Python.
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "", PythonAccountLoginException.REASON_NETWORK);
+        return fake;
+    }
+
     /** Signing in works, but the code that gets typed is refused. */
     public FakeAppleAuthService thatRejectsTheCode(final String message) {
         this.codeFailsWith = new PythonAccountLoginException(message);

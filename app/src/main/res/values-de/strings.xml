@@ -167,4 +167,5 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="custom_tag">Selbst erzeugter Tag</string>
     <string name="custom_tag_explained">Ein Tag im OpenHaystack-Stil. Seine Schlüssel wurden von seinem Ersteller erzeugt und waren nie in einem Apple-Konto, daher gibt es von Apple weder Namen noch Emoji oder Akkustand – legen Sie unten Ihre eigenen fest.</string>
     <string name="custom_tag_keys_remaining">%1$d vorab erzeugte Schlüssel</string>
+    <string name="login_failed_network">Apple konnte nicht erreicht werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
 </resources>

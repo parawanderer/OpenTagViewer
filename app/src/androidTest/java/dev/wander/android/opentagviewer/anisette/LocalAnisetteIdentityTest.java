@@ -102,11 +102,17 @@ public class LocalAnisetteIdentityTest {
         assertEquals("MacBookPro13,2", modelOf(subject().hardwareProfileJson()));
     }
 
-    /** Nothing stored at all is a genuinely new install, and gets the profile worth having. */
+    /**
+     * Nothing stored at all is a genuinely new install - and it claims the Mac.
+     *
+     * <p>It claimed an iPhone until Apple answered 401 to {@code get_2fa_methods} for clients
+     * presenting that profile. See {@code AdiDeviceIdentity#generate()}.
+     */
     @Test
-    public void afreshInstallIsAnIphone() throws Exception {
-        assertEquals(AdiDeviceIdentity.Hardware.IPHONE.toJson(), subject().hardwareProfileJson());
-        assertEquals("iPhone15,2", modelOf(subject().hardwareProfileJson()));
+    public void afreshInstallIsTheMac() throws Exception {
+        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+                subject().hardwareProfileJson());
+        assertEquals("MacBookPro13,2", modelOf(subject().hardwareProfileJson()));
     }
 
     /**
@@ -140,7 +146,7 @@ public class LocalAnisetteIdentityTest {
     public void afreshInstallRecordsWhatItDecided() {
         subject().hardwareProfileJson();
 
-        assertEquals(AdiDeviceIdentity.Hardware.IPHONE.name(),
+        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.name(),
                 this.preferences.getString(LocalAnisette.KEY_HARDWARE, null));
         assertNotNull(this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
         assertNotNull(this.preferences.getString(LocalAnisette.KEY_ADI_ID, null));
@@ -267,6 +273,11 @@ public class LocalAnisetteIdentityTest {
                 .putString(LocalAnisette.KEY_DEVICE_ID, OLD_DEVICE_ID)
                 .commit());
 
-        assertEquals(AdiDeviceIdentity.Hardware.IPHONE.toJson(), subject().hardwareProfileJson());
+        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+                subject().hardwareProfileJson());
+        // Not the point of this test, but worth pinning: it wrote a *new* identity rather than
+        // adopting the orphaned device id.
+        assertNotEquals(OLD_DEVICE_ID,
+                this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
     }
 }

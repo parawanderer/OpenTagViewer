@@ -407,3 +407,109 @@ class TestTheLibraryDefaultIsStillWhereWeLeftIt:
         # Deliberately a character short of a real macOS build (13.4.1 is 22F82). Kept wrong
         # because every existing session is bound to it; correcting it would cost a re-login.
         assert CLIENT_IDENTITY.os_build == "22F8"
+
+
+class TestHowLongASignInMayTake:
+    """
+    FindMy.py allows five seconds per request by default, which is a desktop assumption.
+
+    A phone signing in makes several round trips, each measured separately, possibly through an
+    Anisette server generating its data on demand. Five seconds is how a working login on a slow
+    network arrives as a bare `TimeoutError`.
+    """
+
+    def test_the_remote_provider_is_given_longer(self):
+        # Asserted through what it serializes rather than through `_timeout`: the library
+        # exposes `serial` and `identity` as properties but not this one, and a test that
+        # reaches into a private attribute breaks on a rename that changed nothing real.
+        provider = main._anisetteProvider("https://example.invalid")
+
+        assert provider.to_json()["timeout"] == main.LOGIN_TIMEOUT_SECONDS
+
+    def test_it_is_longer_than_the_librarys_default(self):
+        from findmy.util.http import DEFAULT_TIMEOUT
+
+        assert main.LOGIN_TIMEOUT_SECONDS > DEFAULT_TIMEOUT
+
+    def test_it_matches_what_the_java_side_allows_itself(self):
+        """
+        AdiProvisioning uses 30s connect and read timeouts for the exchange it makes with Apple
+        directly. Same network, same moment - so different patience only decided which half
+        failed first.
+        """
+        assert main.LOGIN_TIMEOUT_SECONDS == 30
+
+    def test_a_local_provider_carries_it_into_what_it_serializes_as(self):
+        """
+        The one that is easy to miss. `LocalAnisetteProvider` serializes as the *remote*
+        provider, and that mapping is what a restored session is rebuilt from - so omitting the
+        timeout would quietly hand every restored session back the five second default.
+        """
+        stored = main.LocalAnisetteProvider(Bridge(), "https://example.invalid").to_json()
+
+        assert stored["timeout"] == main.LOGIN_TIMEOUT_SECONDS
+
+    def test_a_restored_provider_keeps_it(self):
+        from findmy.reports import RemoteAnisetteProvider
+
+        stored = main.LocalAnisetteProvider(Bridge(), "https://example.invalid").to_json()
+        restored = RemoteAnisetteProvider.from_json(stored)
+
+        assert restored.to_json()["timeout"] == main.LOGIN_TIMEOUT_SECONDS
+
+
+class TestWhatSurvivesBeingStored:
+    """
+    The mapping a local provider writes is the whole of what a restored session is rebuilt from.
+
+    A field left out of it is not defaulted, it is **reverted** - silently, on a session Apple
+    has already bound to the value that was dropped. Both of these shipped: a session established
+    as `0PENTAGVIEWR` came back as `0FINDMYPY001`, and one established as a MacBookPro13,2 came
+    back as FindMy.py's MacBookPro18,3.
+    """
+
+    MAC = DeviceIdentity(**LEGACY_MAC)
+
+    def _stored(self):
+        return main.LocalAnisetteProvider(
+            Bridge(), "https://example.invalid",
+            serial=identity.APP_SERIAL, identity=self.MAC,
+        ).to_json()
+
+    def test_the_serial_the_session_was_established_with_survives(self):
+        assert self._stored()["serial"] == identity.APP_SERIAL
+
+    def test_the_machine_it_was_established_as_survives(self):
+        assert self._stored()["identity"] == self.MAC.to_json()
+
+    def test_a_restored_provider_presents_both_again(self):
+        restored = RemoteAnisetteProvider.from_json(self._stored())
+
+        assert restored.serial == identity.APP_SERIAL
+        assert restored.identity == self.MAC
+
+    def test_and_identityForRestore_then_carries_them_onward(self):
+        """
+        The end of the loop. `_preferLocalAnisette` swaps the transport on a restored account and
+        reads the identity off the rebuilt provider - so if the mapping had dropped it, the swap
+        would hand the session a third identity again.
+        """
+        restored = RemoteAnisetteProvider.from_json(self._stored())
+
+        carried = identity.identityForRestore(restored)
+
+        assert carried["serial"] == identity.APP_SERIAL
+        assert carried["identity"] == self.MAC
+
+    def test_a_provider_that_imposed_nothing_writes_nothing(self):
+        """
+        A session established before any of this stays byte-identical.
+
+        Writing the library's own defaults explicitly would be harmless today and a trap later:
+        it pins a value the library promises never to move, into files it would then have to keep
+        honouring.
+        """
+        stored = main.LocalAnisetteProvider(Bridge(), "https://example.invalid").to_json()
+
+        assert "serial" not in stored
+        assert "identity" not in stored

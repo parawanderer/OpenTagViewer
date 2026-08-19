@@ -17,7 +17,11 @@ from findmy.reports import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
-from findmy.reports.anisette import BaseAnisetteProvider
+from findmy.reports.anisette import (
+    CLIENT_IDENTITY,
+    CLIENT_SERIAL,
+    BaseAnisetteProvider,
+)
 from findmy.util import files as util_files
 from findmy.reports.twofactor import (
     SyncSecondFactorMethod
@@ -149,6 +153,25 @@ def _convertToJavaDictWrapper(method: SyncSecondFactorMethod) -> dict[str, Any]:
     return return_obj
 
 
+LOGIN_TIMEOUT_SECONDS = 30
+"""
+How long a single request to Apple may take.
+
+FindMy.py defaults to five seconds total per request, which suits a desktop on a good connection
+and does not suit a phone. Signing in is several round trips measured separately, and there may
+be an Anisette server in the middle generating its data on demand.
+
+**Thirty, to match the other half of the same sign-in.** `AdiProvisioning` already uses thirty
+second connect and read timeouts for the exchange it makes with Apple directly, and it is the
+same network at the same moment - so the two halves having different patience only meant that
+whichever ran second was the one that failed.
+
+Measured rather than guessed: a login on an emulator with roughly 500ms round trips to Apple, and
+a site-local IPv6 address that routes nowhere, spent its whole five second budget inside
+happy-eyeballs and arrived as a bare `TimeoutError`. Provisioning survived the identical network.
+"""
+
+
 class LocalAnisetteProvider(BaseAnisetteProvider):
     """Anisette produced on this device, rather than by somebody else's server.
 
@@ -187,14 +210,36 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
         return str(self._bridge.machine())
 
     def to_json(self, dst=None, /):
-        # Deliberately the remote mapping - see the class docstring.
-        return util_files.save_and_return_json(
-            {
-                "type": "aniRemote",
-                "url": self._fallbackServerUrl,
-            },
-            dst,
-        )
+        """Deliberately the remote mapping - see the class docstring.
+
+        **Everything the session was established with has to be in here.** This mapping is the
+        whole of what a restored session is rebuilt from, so a field left out is not "defaulted",
+        it is *reverted* - and silently, on a session Apple has already bound to the value that
+        was dropped.
+
+        That is not hypothetical: writing only the type and the URL meant a session established
+        as `0PENTAGVIEWR` came back as FindMy.py's `0FINDMYPY001` on the next launch, and one
+        established as a MacBookPro13,2 came back as a MacBookPro18,3. Two names and two machines
+        for one session, which is exactly what rule 11 exists to prevent.
+
+        Written only when it differs from the library's own default, matching what
+        `RemoteAnisetteProvider.to_json` does - so a bundle from a version that imposed nothing
+        stays byte-identical.
+        """
+        state: dict[str, Any] = {
+            "type": "aniRemote",
+            "url": self._fallbackServerUrl,
+            # Carried even though nothing here spends it: a restored session is rebuilt from
+            # this mapping, and omitting it would hand it back the five second default.
+            "timeout": LOGIN_TIMEOUT_SECONDS,
+        }
+
+        if self.serial != CLIENT_SERIAL:
+            state["serial"] = self.serial
+        if self.identity != CLIENT_IDENTITY:
+            state["identity"] = self.identity.to_json()
+
+        return util_files.save_and_return_json(state, dst)
 
     @classmethod
     def from_json(cls, val):
@@ -233,7 +278,10 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None, **ident
         except Exception:
             print(f"Local Anisette failed, using the remote server: {traceback.format_exc()}")
 
-    return RemoteAnisetteProvider(anisetteServerUrl, **identityKwargs)
+    # Passed here rather than through identityKwargs, which also reach LocalAnisetteProvider -
+    # BaseAnisetteProvider takes no timeout, and there is no HTTP in the local one to spend it on.
+    return RemoteAnisetteProvider(
+        anisetteServerUrl, timeout=LOGIN_TIMEOUT_SECONDS, **identityKwargs)
 
 
 def loginSync(email: str, password: str, anisetteServerUrl: str,
@@ -255,7 +303,13 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
         # And the two ids the same install already used when it provisioned ADI, so this is one
         # device rather than two that happen to share a serial. Empty when Java cannot say, in
         # which case FindMy.py mints its own pair exactly as it always did.
-        acc = AppleAccount(anisette, **app_identity.deviceIdsForNewSession(localAnisette))
+        # The account and the Anisette provider hold separate sessions, so both need this:
+        # the Anisette fetch happens inside the login but from the provider's own client.
+        acc = AppleAccount(
+            anisette,
+            timeout=LOGIN_TIMEOUT_SECONDS,
+            **app_identity.deviceIdsForNewSession(localAnisette),
+        )
 
         state = acc.login(email, password)
 
@@ -294,7 +348,8 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
     except Exception as e:
         print(f"Failed to log in due to error: {traceback.format_exc()}")
         return {
-            "error": str(e)
+            "error": describeLoginFailure(e),
+            "reason": classifyLoginFailure(e),
         }
 
 
@@ -357,6 +412,64 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
     except Exception:
         print(f"Could not inspect anisette configuration: {traceback.format_exc()}")
         return "This saved login could not be read."
+
+
+# What went wrong at sign-in, in a form the screen can act on.
+#
+# **`str(e)` is not enough, and that is not a nitpick.** The failure people actually hit is a
+# connection timeout, and `str(TimeoutError())` is the empty string - so the screen said
+# "Login failed:" with nothing after the colon. Several of the exceptions that reach here carry
+# no message at all: TimeoutError, CancelledError and most of asyncio's.
+
+REASON_NETWORK = "network"
+"""Could not reach Apple. Nothing was refused - nothing answered."""
+
+REASON_UNKNOWN = "unknown"
+"""Anything else. The detail is shown as-is, because a wrong guess is worse than raw text."""
+
+# Matched by type rather than by message, because the messages are empty or English prose from
+# three libraries deep. aiohttp's errors all derive from ClientError, and the asyncio ones are
+# what a stalled connection raises.
+_NETWORK_ERRORS = (
+    TimeoutError,
+    ConnectionError,
+    OSError,
+)
+
+
+def classifyLoginFailure(error: BaseException) -> str:
+    """Which kind of failure this is, as a code the Java side maps to a localised sentence."""
+    import asyncio
+
+    if isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
+        return REASON_NETWORK
+    if isinstance(error, _NETWORK_ERRORS):
+        return REASON_NETWORK
+
+    # aiohttp is not imported here directly - matching on the module keeps this working
+    # whether or not the library is present, and without importing it for a failure path.
+    module = type(error).__module__ or ""
+    if module.startswith("aiohttp") or module.startswith("aiohappyeyeballs"):
+        return REASON_NETWORK
+
+    return REASON_UNKNOWN
+
+
+def describeLoginFailure(error: BaseException) -> str:
+    """
+    A detail string that is **never empty**.
+
+    Falls back to the exception's type name, which is the whole point: an empty message is how
+    the screen came to show a colon and nothing at all. Kept as a detail rather than a sentence
+    because it is untranslatable Python text - the sentence the user reads is chosen on the Java
+    side from the reason code.
+    """
+    detail = str(error).strip()
+    name = type(error).__name__
+
+    if not detail:
+        return name
+    return f"{name}: {detail}"
 
 
 def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:

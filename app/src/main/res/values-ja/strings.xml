@@ -167,4 +167,5 @@
     <string name="custom_tag">自作タグ</string>
     <string name="custom_tag_explained">OpenHaystack 方式のタグです。鍵は作成者が生成したもので、Apple アカウントに登録されたことがありません。そのため Apple 由来の名前・絵文字・バッテリー残量はありません。以下でご自身で設定してください。</string>
     <string name="custom_tag_keys_remaining">事前生成された鍵 %1$d 個</string>
+    <string name="login_failed_network">Apple に接続できませんでした。通信環境を確認して、もう一度お試しください。</string>
 </resources>

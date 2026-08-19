@@ -13,6 +13,16 @@
         <item name="android:statusBarColor">?attr/colorPrimary</item>
         <!-- Customize your theme here. -->
 
+        <!--
+            Also set in values/themes.xml, and it has to be set in both. The night theme
+            redeclares Theme.OpenTagViewer from scratch rather than inheriting the day one, so
+            anything listed there and not here silently falls back to the platform default -
+            which is why the dropdown had rounded corners in light mode and square ones in dark.
+        -->
+        <item name="android:popupMenuStyle">@style/PopupMenu</item>
+
+        <item name="android:fontFamily">@font/nunito_regular</item>
+
         <item name="android:buttonStyle">@style/Theme.OpenTagViewer.Button</item>
 
 
