@@ -125,12 +125,61 @@ public class PythonPackagingTest {
      *
      * <p>It imports tkinter, which does not exist here - so a build that shipped it would fail
      * at import time on a phone rather than at build time on a desktop.
+     *
+     * <p><b>Note this is now a statement about named modules, not about the package.</b> Four
+     * files from {@code exporter/} are packaged deliberately - see below - so "the directory is
+     * absent" stopped being the guarantee and "the interactive parts are absent" took over.
      */
     @Test
     public void theDesktopWizardIsNotPackaged() {
-        assertThrows("python/exporter/ is the tkinter wizard and must not reach the APK",
+        assertThrows("exporter/asyncui.py drives tkinter and must not reach the APK",
                 Exception.class,
                 () -> Python.getInstance().getModule("exporter.asyncui"));
+        assertThrows("exporter/wizard.py is the tkinter window itself",
+                Exception.class,
+                () -> Python.getInstance().getModule("exporter.wizard"));
+        assertThrows("exporter/prompts.py needs prompt_toolkit and a terminal",
+                Exception.class,
+                () -> Python.getInstance().getModule("exporter.prompts"));
+        assertThrows("exporter/cli.py needs questionary",
+                Exception.class,
+                () -> Python.getInstance().getModule("exporter.cli"));
+    }
+
+    /**
+     * The iCloud pipeline imports, which is what lets the app read an account without a zip.
+     *
+     * <p><b>Packaged and importable are different claims, and only the second one matters.</b>
+     * These four modules are named individually in the Chaquopy {@code include} precisely because
+     * their neighbours cannot be imported here - so the thing worth asserting is that pulling
+     * {@code exporter.icloud} in does not transitively reach tkinter, questionary or
+     * prompt_toolkit. A build where it did would fail on a phone, at the moment somebody tried
+     * to sign in, having built cleanly on a desktop.
+     */
+    @Test
+    public void theicloudPipelineIsPackagedAndImports() {
+        for (final String module : new String[]{
+                "exporter", "exporter.icloud", "exporter.device", "exporter.identity"}) {
+            assertNotNull(module + " must be importable in the APK",
+                    Python.getInstance().getModule(module));
+        }
+    }
+
+    /**
+     * And it still knows who the exporter is, so the desktop side is unchanged.
+     *
+     * <p>The identity became a parameter so the app can present its own serial rather than the
+     * exporter's - two programs sharing one are one device to Apple, and removing either from
+     * the device list would break the other. This asserts the default did not move while that
+     * was done.
+     */
+    @Test
+    public void theexporterKeepsItsOwnIdentityByDefault() {
+        final PyObject icloud = Python.getInstance().getModule("exporter.icloud");
+        final PyObject identity = icloud.get("EXPORTER_IDENTITY");
+
+        assertNotNull("exporter.icloud must still expose its default identity", identity);
+        assertEquals("0PENTAGXPORT", identity.get("serial").toString());
     }
 
     /**

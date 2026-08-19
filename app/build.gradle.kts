@@ -290,6 +290,12 @@ chaquopy {
             install("git+https://github.com/parawanderer/FindMy.py@23a9b8d7109b405f8362ea1e69ebe51f9ca82fca")
 
             install("NSKeyedUnArchiver==1.5")
+
+            // OPENTAGVIEWER.yml, read and written by opentagviewer_export.bundle - which the app
+            // reaches as soon as it touches AccessoryExport, and will need in earnest once it
+            // writes bundles of its own. Pinned to the exporter's version in python/pyproject.toml
+            // so one repository ships one PyYAML, for the same reason it ships one FindMy.py.
+            install("PyYAML==6.0.2")
         }
     }
     productFlavors {}
@@ -315,7 +321,22 @@ chaquopy {
             // has no top-level .py files for it to catch by accident, and the test is what
             // notices if that stops being true.
             srcDir("../python")
-            include("*.py", "opentagviewer_export/**")
+            // **Named files from `exporter/`, not the package.** That directory also holds the
+            // tkinter wizard, the questionary CLI and prompt_toolkit prompts, none of which
+            // exist on Android - importing the package wholesale would drag them in. These four
+            // are stdlib plus FindMy.py, and `exporter/__init__.py` is empty, so importing
+            // `exporter.icloud` reaches none of the rest.
+            //
+            // A list rather than a glob for the same reason: a module added to `exporter/` later
+            // should have to be considered before it ships in the APK, not swept in.
+            include(
+                "*.py",
+                "opentagviewer_export/**",
+                "exporter/__init__.py",
+                "exporter/icloud.py",
+                "exporter/device.py",
+                "exporter/identity.py",
+            )
             // The package's own test suite is not part of the app. It imports pytest, which is
             // not in the APK, so it is dead weight that would fail if anything ever touched it.
             exclude("opentagviewer_export/tests/**")
