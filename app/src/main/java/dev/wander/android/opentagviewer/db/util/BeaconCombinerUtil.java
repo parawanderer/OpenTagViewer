@@ -18,24 +18,42 @@ import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BeaconCombinerUtil {
+    /**
+     * Join a tag's rows into the shape the UI reads.
+     *
+     * <p><b>Driven by the owned beacons, because that is what a tag is.</b> A
+     * {@link BeaconNamingRecord} is something an Apple device wrote <i>about</i> a tag - a name,
+     * an emoji - and a tag that was never in an Apple account has none, because no iPad ever
+     * named it. Iterating the naming records instead made those tags invisible to every screen
+     * built on this, while the fetch path - which reads owned beacons directly - went on
+     * collecting reports for them perfectly happily. An imported self-generated tag reported
+     * "1 device imported" and then appeared nowhere.
+     *
+     * <p>For an Apple tag nothing changes: the importer inner-joins the two sets, so every owned
+     * beacon has exactly one naming record and vice versa. Driving from this side is in fact the
+     * safer of the two - the old direction could hand out a {@code BeaconData} whose
+     * {@code ownedBeaconInfo} was null, which is the half nothing downstream can work without.
+     *
+     * @return one entry per owned beacon, with a null naming record where there is none.
+     */
     public static List<BeaconData> combine(
             final List<OwnedBeacon> ownedBeacons,
             final List<BeaconNamingRecord> beaconNamingRecords,
             final List<UserBeaconOptions> userBeaconOptions) {
 
-        Map<String, OwnedBeacon> idToBeaconMap = ownedBeacons.stream()
-                .collect(Collectors.toMap((beacon) -> beacon.id, beacon -> beacon));
+        Map<String, BeaconNamingRecord> idToNamingRecordMap = beaconNamingRecords.stream()
+                .collect(Collectors.toMap((namingRec) -> namingRec.id, namingRec -> namingRec));
 
         Map<String, UserBeaconOptions> idToOptionsMap = userBeaconOptions.stream()
                 .collect(Collectors.toMap((options) -> options.beaconId, options -> options));
 
 
-        return beaconNamingRecords.stream()
-                .map(namingRec -> new BeaconData(
-                        namingRec.id,
-                        idToBeaconMap.get(namingRec.id),
-                        namingRec,
-                        idToOptionsMap.getOrDefault(namingRec.id, null)
+        return ownedBeacons.stream()
+                .map(beacon -> new BeaconData(
+                        beacon.id,
+                        beacon,
+                        idToNamingRecordMap.getOrDefault(beacon.id, null),
+                        idToOptionsMap.getOrDefault(beacon.id, null)
                 ))
                 .collect(Collectors.toList());
     }
