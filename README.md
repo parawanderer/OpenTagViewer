@@ -5,7 +5,7 @@
 </h1>
 
 [![Android build & tests](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-debug.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-debug.yml)
-[![macOS export wizard](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml)
+[![Exporter tests](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml)
 [![Release](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml/badge.svg)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml)
 
 Apparently, this is the first **<img src="https://github.com/user-attachments/assets/aa0531f6-6a5e-4c9f-b3c4-dfc3899c8a49" width="20"/> Android App** to allow you to view/track your **<img src="https://github.com/user-attachments/assets/fa3b912f-d204-4252-9449-465eb62f128c" height="20"/> official Apple AirTags**.
