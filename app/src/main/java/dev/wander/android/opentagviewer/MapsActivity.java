@@ -92,6 +92,7 @@ import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
@@ -1325,15 +1326,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             deviceNameView.setText(beacon.getName());
 
             // icon
+            TextView emojiContainer = v.findViewById(R.id.device_icon_emoji);
+            ImageView iconContainer = v.findViewById(R.id.device_icon_img);
             if (beacon.isEmojiFilled()) {
-                // use emoji
-                TextView emojiContainer = v.findViewById(R.id.device_icon_emoji);
-                ImageView iconContainer = v.findViewById(R.id.device_icon_img);
+                // Whatever the user or their Apple device set always wins.
                 emojiContainer.setText(beacon.getEmoji());
                 emojiContainer.setVisibility(VISIBLE);
                 iconContainer.setVisibility(GONE);
+            } else {
+                // Was always Apple's logo, for a Chipolo and an OpenHaystack tag alike.
+                iconContainer.setImageResource(BeaconIcon.forBeacon(beacon));
+                iconContainer.setVisibility(VISIBLE);
+                emojiContainer.setVisibility(GONE);
             }
-            // ^ ELSE: show default apple icon
 
 
             // the location

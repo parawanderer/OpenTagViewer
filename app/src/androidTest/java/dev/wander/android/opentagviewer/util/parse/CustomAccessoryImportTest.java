@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.util.parse;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -11,7 +12,9 @@ import android.net.Uri;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
+import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
@@ -153,8 +156,10 @@ public class CustomAccessoryImportTest {
         assertEquals(IDENTIFIER, info.getBeaconId());
         assertEquals(NAME, info.getName());
         assertEquals(KEY_COUNT, info.getCustomAccessoryKeyCount());
-        assertTrue("it needs some emoji, or it renders as a gap where every other row has one",
+        assertFalse("no emoji: nobody has ever named this tag, and the icon covers it",
                 info.isEmojiFilled());
+        assertEquals("so it must fall to the self-generated icon, not Apple's logo",
+                R.drawable.tag_self_generated, BeaconIcon.forBeacon(info));
     }
 
     /**
