@@ -49,10 +49,27 @@ public final class AdiDeviceIdentity {
         this.hardware = hardware;
     }
 
-    /** A fresh identity, claiming to be an iPhone. Call once, persist, never call again. */
+    /**
+     * A fresh identity. Call once, persist, never call again.
+     *
+     * <p><b>The Mac, not the iPhone, and that is a retreat from evidence rather than a
+     * preference.</b> Claiming an iPhone provisioned fine and signed in fine, and then Apple
+     * answered 401 to the very next request - {@code get_2fa_methods}, asking which phone
+     * numbers could receive a code. The desktop exporter makes the same call against the same
+     * account and is answered, and the largest remaining difference between them was this.
+     *
+     * <p>An iPhone <i>is</i> a trusted device, so a client claiming to be one asking where to
+     * send an SMS code is a question a real iPhone would not ask. That is a guess at the
+     * mechanism; what is not a guess is that this profile works and that one did not get past
+     * sign-in, and a nicer icon is not worth an app nobody can log into.
+     *
+     * <p>These values are byte-identical to what the {@code anisette} package provisions with,
+     * which is what the exporter uses - so the app and the working program now introduce
+     * themselves to Apple as the same machine.
+     */
     public static AdiDeviceIdentity generate() {
         final SecureRandom random = new SecureRandom();
-        final Hardware hardware = Hardware.IPHONE;
+        final Hardware hardware = Hardware.LEGACY_MAC;
 
         return new AdiDeviceIdentity(
                 UUID.randomUUID().toString().toUpperCase(Locale.ROOT),
@@ -78,7 +95,8 @@ public final class AdiDeviceIdentity {
      * <p>Two profiles, and <b>which one an install has is not a preference</b>: it is part of
      * what Apple binds a session to, so moving an install from one to the other costs that user
      * a sign-in and leaves a second entry in their device list. An install that already has an
-     * ADI identity keeps {@link #LEGACY_MAC} forever; only a fresh one gets {@link #IPHONE}.
+     * ADI identity keeps {@link #LEGACY_MAC}, and so, for now, does a fresh one - see
+     * {@link #generate()} for why {@link #IPHONE} is built but not chosen.
      *
      * <p>Each carries all six parts because <b>they describe one real release and move
      * together</b> - model, OS, build, CFNetwork and Darwin. FindMy.py's {@code DeviceIdentity}
@@ -122,7 +140,12 @@ public final class AdiDeviceIdentity {
         },
 
         /**
-         * What a fresh install claims: an iPhone 14 Pro.
+         * An iPhone 14 Pro. <b>Built, tested, and not currently used.</b>
+         *
+         * <p>It was what a fresh install claimed until Apple started answering 401 to
+         * {@code get_2fa_methods} for clients presenting it - see {@link #generate()}. Kept
+         * rather than deleted because the values are right and the reasoning below still holds
+         * if the 2FA question is ever answered; deleting it would mean rediscovering all of it.
          *
          * <p><b>For the icon, and for the words next to it.</b> Apple synthesises the device-list
          * entry from the claimed model, so {@code iPhone15,2} renders as "iPhone 14 Pro" with a

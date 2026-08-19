@@ -142,10 +142,21 @@ public class AdiDeviceIdentityTest {
         }
     }
 
-    /** A fresh install is the new profile. The old one is only ever recovered, never chosen. */
+    /**
+     * A fresh install claims the Mac.
+     *
+     * <p>It claimed the iPhone until Apple began answering 401 to {@code get_2fa_methods} for
+     * clients presenting that profile - provisioning and password auth both succeeded, and the
+     * very next request did not. The desktop exporter makes the same call against the same
+     * account and is answered, and this profile is byte-identical to what it provisions with.
+     *
+     * <p>So this asserts a decision taken from evidence, not a preference. If it ever changes
+     * back, that has to be because the 2FA question was answered - not because an iPhone icon
+     * looks better in a device list.
+     */
     @Test
-    public void afreshIdentityIsAnIphone() {
-        assertEquals(Hardware.IPHONE, AdiDeviceIdentity.generate().hardware());
+    public void afreshIdentityIsTheMacTheExporterAlsoUses() {
+        assertEquals(Hardware.LEGACY_MAC, AdiDeviceIdentity.generate().hardware());
     }
 
     /**
@@ -167,15 +178,15 @@ public class AdiDeviceIdentityTest {
     }
 
     /**
-     * A fresh install's local user id is a UUID, because FindMy.py's is.
+     * The iPhone profile's local user id is a UUID, because FindMy.py's is.
      *
      * <p>Not cosmetic. The value Java provisions ADI with is handed to FindMy.py verbatim and
      * encoded there, so it has to be a string both sides can carry and that Apple has seen in
      * this shape before - which is the UUID every FindMy.py client already sends.
      */
     @Test
-    public void afreshInstallsLocalUserIdIsAUuid() {
-        final String id = AdiDeviceIdentity.generate().localUserUuid();
+    public void theiphoneProfilesLocalUserIdIsAUuid() {
+        final String id = Hardware.IPHONE.newLocalUserId(new java.security.SecureRandom());
 
         assertEquals(36, id.length());
         assertEquals(id.toUpperCase(java.util.Locale.ROOT), id);
@@ -191,12 +202,11 @@ public class AdiDeviceIdentityTest {
      * itself to Apple as two.
      */
     @Test
-    public void afreshInstallProvisionsUnderWhatFindMyWillSend() {
-        final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
-        final String whatJavaSends =
-                fresh.hardware().localUserHeader(fresh.localUserUuid());
+    public void theiphoneProfileProvisionsUnderWhatFindMyWouldSend() {
+        final String id = Hardware.IPHONE.newLocalUserId(new java.security.SecureRandom());
+        final String whatJavaSends = Hardware.IPHONE.localUserHeader(id);
         final String whatFindMyWillSend = Base64.encodeToString(
-                fresh.localUserUuid().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+                id.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
 
         assertEquals(whatFindMyWillSend, whatJavaSends);
     }

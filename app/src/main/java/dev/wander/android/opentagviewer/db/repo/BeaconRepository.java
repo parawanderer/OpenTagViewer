@@ -149,6 +149,21 @@ public class BeaconRepository {
     }
 
     /**
+     * The same, for a whole list of stored rows.
+     *
+     * <p><b>This exists because fixing the three call sites I found was not the same as fixing
+     * all of them.</b> A fourth - the import path - kept {@code Collectors.toMap} and crashed
+     * with a {@link NullPointerException} the moment somebody imported a self-generated tag,
+     * which is the only kind that reaches it with no plist. One helper is harder to miss than a
+     * rule about which collectors happen to be null-safe.
+     */
+    public static Map<String, String> plistFallbacks(final List<OwnedBeacon> beacons) {
+        final Map<String, String> fallbacks = new HashMap<>();
+        beacons.forEach(beacon -> fallbacks.put(beacon.id, beacon.content));
+        return fallbacks;
+    }
+
+    /**
      * Build the FindMy 0.9.x fetch input for the given beacons. For each beacon we use
      * the persisted {@code accessory_json} if present, otherwise lazily backfill it
      * from the legacy XML plist via {@code main.py:convertPlistToJson} (and persist

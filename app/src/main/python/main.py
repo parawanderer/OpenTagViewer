@@ -17,7 +17,11 @@ from findmy.reports import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
-from findmy.reports.anisette import BaseAnisetteProvider
+from findmy.reports.anisette import (
+    CLIENT_IDENTITY,
+    CLIENT_SERIAL,
+    BaseAnisetteProvider,
+)
 from findmy.util import files as util_files
 from findmy.reports.twofactor import (
     SyncSecondFactorMethod
@@ -206,18 +210,36 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
         return str(self._bridge.machine())
 
     def to_json(self, dst=None, /):
-        # Deliberately the remote mapping - see the class docstring.
-        return util_files.save_and_return_json(
-            {
-                "type": "aniRemote",
-                "url": self._fallbackServerUrl,
-                # Carried even though nothing here spends it. This serializes as the *remote*
-                # provider, so this mapping is what a restored session is rebuilt from - and
-                # omitting it would quietly hand that session back the five second default.
-                "timeout": LOGIN_TIMEOUT_SECONDS,
-            },
-            dst,
-        )
+        """Deliberately the remote mapping - see the class docstring.
+
+        **Everything the session was established with has to be in here.** This mapping is the
+        whole of what a restored session is rebuilt from, so a field left out is not "defaulted",
+        it is *reverted* - and silently, on a session Apple has already bound to the value that
+        was dropped.
+
+        That is not hypothetical: writing only the type and the URL meant a session established
+        as `0PENTAGVIEWR` came back as FindMy.py's `0FINDMYPY001` on the next launch, and one
+        established as a MacBookPro13,2 came back as a MacBookPro18,3. Two names and two machines
+        for one session, which is exactly what rule 11 exists to prevent.
+
+        Written only when it differs from the library's own default, matching what
+        `RemoteAnisetteProvider.to_json` does - so a bundle from a version that imposed nothing
+        stays byte-identical.
+        """
+        state: dict[str, Any] = {
+            "type": "aniRemote",
+            "url": self._fallbackServerUrl,
+            # Carried even though nothing here spends it: a restored session is rebuilt from
+            # this mapping, and omitting it would hand it back the five second default.
+            "timeout": LOGIN_TIMEOUT_SECONDS,
+        }
+
+        if self.serial != CLIENT_SERIAL:
+            state["serial"] = self.serial
+        if self.identity != CLIENT_IDENTITY:
+            state["identity"] = self.identity.to_json()
+
+        return util_files.save_and_return_json(state, dst)
 
     @classmethod
     def from_json(cls, val):
