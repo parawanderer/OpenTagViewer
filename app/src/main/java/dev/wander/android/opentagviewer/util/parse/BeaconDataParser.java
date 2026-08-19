@@ -75,6 +75,18 @@ public final class BeaconDataParser {
                     continue;
                 }
 
+                // An Apple tag with no naming record cannot be rendered - the name, the emoji
+                // and the CloudKit metadata all live in that plist. It should not happen, since
+                // the importer inner-joins the two, but skipping one beacon is a far better
+                // failure than throwing here: this runs over the whole list, so an NPE takes
+                // out every other tag too and the screen comes up empty.
+                if (beaconData.getBeaconNamingRecord() == null) {
+                    Log.e(TAG, "Skipping beaconId=" + beaconData.getBeaconId()
+                            + ": it has an OwnedBeacons plist but no BeaconNamingRecord, so there"
+                            + " is nothing to name it with");
+                    continue;
+                }
+
                 final String beaconNamingRecordPList = beaconData.getBeaconNamingRecord().content;
                 final String ownedBeaconPList = beaconData.getOwnedBeaconInfo().content;
 
