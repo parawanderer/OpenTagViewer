@@ -164,4 +164,7 @@
 
 標籤及其位置紀錄仍保留在這支手機上，沒有任何資料遺失。</string>
     <string name="ok">好</string>
+    <string name="custom_tag">自製標籤</string>
+    <string name="custom_tag_explained">OpenHaystack 類型的標籤。它的金鑰由製作者產生，從未存在於 Apple 帳戶中，因此沒有來自 Apple 的名稱、表情符號或電量資訊 — 請在下方自行設定。</string>
+    <string name="custom_tag_keys_remaining">%1$d 個預先產生的金鑰</string>
 </resources>

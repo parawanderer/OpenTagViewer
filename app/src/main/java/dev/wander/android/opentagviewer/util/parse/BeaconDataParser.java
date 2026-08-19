@@ -66,6 +66,15 @@ public final class BeaconDataParser {
             for (var beaconData : rawBeaconData) {
                 UserBeaconOptions userOverrides = beaconData.getUserBeaconOptions();
 
+                // A tag that was never in an Apple account has neither plist to read - no
+                // OwnedBeacons entry, and no naming record, because nobody's iPad ever named
+                // it. Everything below is XPath over those two documents, so it is a different
+                // construction rather than the same one with nulls threaded through it.
+                if (CustomAccessoryParser.isCustomAccessory(beaconData)) {
+                    res.add(CustomAccessoryParser.parse(beaconData, userOverrides));
+                    continue;
+                }
+
                 final String beaconNamingRecordPList = beaconData.getBeaconNamingRecord().content;
                 final String ownedBeaconPList = beaconData.getOwnedBeaconInfo().content;
 

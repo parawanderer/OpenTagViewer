@@ -18,6 +18,7 @@ import org.junit.runner.RunWith;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -89,6 +90,57 @@ public class BeaconRepositoryBackfillTest {
                 .accessoryJson(accessoryJson)
                 .alignmentPlist(alignmentPlist)
                 .build());
+    }
+
+    private static final String CUSTOM_JSON =
+            "{\"type\":\"custom_rolling_key_accessory\",\"identifier\":\"oh-1\","
+            + "\"name\":\"Bike\",\"private_keys\":[\"11\"]}";
+
+    /**
+     * A self-generated tag is fetched, and it is asked for with no plist.
+     *
+     * <p>It has none - its keys are a flat list, and its {@code accessory_json} is written at
+     * import rather than converted from anything - so the fallback branch must not run for it.
+     * A converter call here would mean the app trying to parse a null plist on every refresh.
+     */
+    @Test
+    public void aselfGeneratedTagIsRequestedWithoutAPlist() {
+        insertBeacon("oh-1", null, CUSTOM_JSON);
+        var converter = new RecordingConverter(CONVERTED_JSON);
+        var repo = new BeaconRepository(this.db, converter);
+
+        var requests = repo.toAccessoryRequests(
+                BeaconRepository.plistFallback("oh-1", null)).blockingFirst();
+
+        assertEquals(1, requests.size());
+        assertEquals(CUSTOM_JSON, requests.get(0).getAccessoryJson());
+        assertTrue("nothing should have been converted - there is no plist to convert",
+                converter.calls.isEmpty());
+    }
+
+    /**
+     * The bug this pair exists for, and the reason it mattered so much.
+     *
+     * <p>The refresh built its argument with {@code Collectors.toMap}, which throws on a null
+     * value. So one self-generated tag did not merely fail to update - it took down the
+     * periodic refresh for <b>every</b> tag the user owns, before a single request was made.
+     */
+    @Test
+    public void amixOfBothKindsRefreshesTogether() {
+        insertBeacon("paired-1", PLIST, null);
+        insertBeacon("oh-1", null, CUSTOM_JSON);
+        var converter = new RecordingConverter(CONVERTED_JSON);
+        var repo = new BeaconRepository(this.db, converter);
+
+        // Exactly the shape the map screen builds, nulls and all.
+        final Map<String, String> fallback = new HashMap<>();
+        fallback.put("paired-1", PLIST);
+        fallback.put("oh-1", null);
+
+        var requests = repo.toAccessoryRequests(fallback).blockingFirst();
+
+        assertEquals("both tags must be asked for", 2, requests.size());
+        assertEquals("only the paired one needs converting", 1, converter.calls.size());
     }
 
     /**
