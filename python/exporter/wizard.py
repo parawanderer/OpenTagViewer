@@ -1042,23 +1042,61 @@ def _emulator_runs() -> bool:
     and no account - and it fails a build rather than a user's machine, which is the entire point.
     Anisette needs this to work, because emulating Apple's ADI library is how a sign-in happens
     without a third-party server.
+
+    **Reported one call at a time**, because a native fault produces no exception and no
+    traceback - so the only thing that says where it died is the last line that made it out.
+    Each stage announces itself before it runs, and the failing call is whichever one has no
+    answer after it. That is what turned "the Windows build dies somewhere" into a line number.
     """
-    try:
-        from unicorn import UC_ARCH_ARM64, UC_MODE_ARM, Uc  # noqa: PLC0415
-        from unicorn.arm64_const import UC_ARM64_REG_X0  # noqa: PLC0415
+    state: dict = {}
 
-        emulator = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
-        emulator.mem_map(0x1000, 0x1000)
-        emulator.mem_write(0x1000, bytes.fromhex("400580d2"))  # movz x0, #42
-        emulator.emu_start(0x1000, 0x1004)
-        answer = emulator.reg_read(UC_ARM64_REG_X0)
-    except Exception as e:  # noqa: BLE001 - any failure here is a broken bundle, not a bug to raise
-        _say(f"cpu emulator: FAILED ({type(e).__name__}: {e})")
-        return False
+    for name, step in (
+        ("import", _emu_import),
+        ("construct", _emu_construct),
+        ("mem_map", _emu_map),
+        ("mem_write", _emu_write),
+        ("emu_start", _emu_run),
+    ):
+        _say(f"cpu emulator: {name} …")
+        try:
+            step(state)
+        except Exception as e:  # noqa: BLE001 - a broken bundle, not a bug worth raising
+            _say(f"cpu emulator: {name} FAILED ({type(e).__name__}: {e})")
+            return False
 
+    answer = state["answer"]
     _say(f"cpu emulator: ran ARM64 and read back {answer}")
 
     return answer == 42
+
+
+def _emu_import(state: dict) -> None:
+    import unicorn  # noqa: PLC0415
+    from unicorn import arm64_const  # noqa: PLC0415
+
+    state["unicorn"] = unicorn
+    state["arm64"] = arm64_const
+    # The path matters: a bundle can carry the Python package and miss the native library beside
+    # it, and then this is the last line before the process disappears.
+    _say(f"cpu emulator: loaded {getattr(unicorn, '__file__', '?')}")
+
+
+def _emu_construct(state: dict) -> None:
+    unicorn = state["unicorn"]
+    state["uc"] = unicorn.Uc(unicorn.UC_ARCH_ARM64, unicorn.UC_MODE_ARM)
+
+
+def _emu_map(state: dict) -> None:
+    state["uc"].mem_map(0x1000, 0x1000)
+
+
+def _emu_write(state: dict) -> None:
+    state["uc"].mem_write(0x1000, bytes.fromhex("400580d2"))  # movz x0, #42
+
+
+def _emu_run(state: dict) -> None:
+    state["uc"].emu_start(0x1000, 0x1004)
+    state["answer"] = state["uc"].reg_read(state["arm64"].UC_ARM64_REG_X0)
 
 
 if __name__ == "__main__":
