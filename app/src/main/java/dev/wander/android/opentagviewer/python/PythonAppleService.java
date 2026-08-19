@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import io.reactivex.rxjava3.core.Observable;
@@ -37,33 +36,14 @@ public class PythonAppleService {
     }
 
     /**
-     * Serialises all calls into Python.
-     * <br>
-     * FindMy.py's synchronous AppleAccount wraps an async one and drives it with a single
-     * asyncio event loop. RxJava schedules our fetches on a thread pool, and the periodic
-     * refresh in MapsActivity fires every 60 seconds regardless of whether the previous
-     * fetch has finished. Two fetches overlapping means two threads calling
-     * run_until_complete on the same loop, which fails with
-     * "RuntimeError: This event loop is already running" and then keeps failing.
-     * <br>
-     * A fetch that takes longer than the refresh interval is entirely normal for an
-     * accessory with no alignment yet, so this is not a rare race.
-     * <br>
-     * Serialising alone is not enough: the periodic refresh would still queue up behind a
-     * slow fetch, one entry per minute, and then fire the whole stale backlog at once when
-     * it finally drained. Callers on the periodic path should check {@link #isBusy()} and
-     * skip their turn instead - a refresh that is minutes late has no value.
-     */
-    private static final ReentrantLock PYTHON_LOCK = new ReentrantLock();
-
-    /**
      * Whether a call into Python is currently in progress.
-     * <br>
-     * Advisory only. A caller that acts on this can still be beaten to the lock, which is
-     * harmless: it just waits, exactly as it did before.
+     *
+     * <p>Delegates to {@link PythonLock}, which is where the lock moved when the iCloud flow
+     * started driving the same event loop. Kept here because the periodic refresh asks this
+     * service, and where the lock lives is not its business.
      */
     public static boolean isBusy() {
-        return PYTHON_LOCK.isLocked();
+        return PythonLock.isBusy();
     }
 
     private PythonAppleService(PythonAppleAccount account) {
@@ -76,8 +56,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            PYTHON_LOCK.lock();
-            try {
+            return PythonLock.holding(() -> {
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
@@ -94,9 +73,7 @@ public class PythonAppleService {
                 }
 
                 return mapResults(returned);
-            } finally {
-                PYTHON_LOCK.unlock();
-            }
+            });
         }).subscribeOn(Schedulers.io());
     }
 
@@ -106,8 +83,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            PYTHON_LOCK.lock();
-            try {
+            return PythonLock.holding(() -> {
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
@@ -125,9 +101,7 @@ public class PythonAppleService {
                 }
 
                 return mapResults(returned);
-            } finally {
-                PYTHON_LOCK.unlock();
-            }
+            });
         }).subscribeOn(Schedulers.io());
     }
 
