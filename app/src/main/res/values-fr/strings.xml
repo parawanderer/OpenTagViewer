@@ -167,4 +167,5 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="custom_tag">Balise auto-générée</string>
     <string name="custom_tag_explained">Une balise de type OpenHaystack. Ses clés ont été générées par la personne qui l’a créée et n’ont jamais été dans un compte Apple : elle n’a donc ni nom, ni emoji, ni niveau de batterie venant d’Apple — définissez les vôtres ci-dessous.</string>
     <string name="custom_tag_keys_remaining">%1$d clés pré-générées</string>
+    <string name="login_failed_network">Impossible de joindre Apple. Vérifiez votre connexion et réessayez.</string>
 </resources>

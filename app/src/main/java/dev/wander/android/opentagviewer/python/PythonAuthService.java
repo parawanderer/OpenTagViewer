@@ -57,7 +57,11 @@ public final class PythonAuthService {
             if (resultMap.containsKey("error")) {
                 Log.e(TAG, "Failed to log in to account! (check python for errors)");
                 final String errorMessage = resultMap.get("error").toString();
-                throw new PythonAccountLoginException(errorMessage);
+                // The reason decides what the user is told; the message is the detail behind it.
+                // Absent from anything that raised before main.py classified failures.
+                final var reason = resultMap.get("reason");
+                throw new PythonAccountLoginException(
+                        errorMessage, reason == null ? null : reason.toString());
             }
 
             // need to do an annoying conversion here...
