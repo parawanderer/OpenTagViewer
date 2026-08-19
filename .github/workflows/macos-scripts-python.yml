@@ -1,7 +1,14 @@
 # Lints and tests everything under python/: the desktop exporter and the shared export package.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: MacOS Scripts
+# **"MacOS Scripts" was the old name and described none of this.** There are no scripts here, and
+# macOS is only where the runner happens to be - the local export route needs a Mac of 14 or older
+# to test, and everything else under python/ is platform-agnostic. The name is what shows on the
+# README badge, so it was telling every visitor that the exporter's tests were something else.
+#
+# The filename stays as it is: the badge URL is built from it, and renaming would break the badge
+# on every page that already links it, for a cosmetic gain.
+name: Exporter Tests
 
 on:
   push:
