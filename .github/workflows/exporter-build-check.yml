@@ -50,9 +50,14 @@ jobs:
 
     # --frozen: exactly what uv.lock records. A build check that resolved something else would be
     # checking a bundle nobody is going to ship.
+    #
+    # `--group build` is where PyInstaller lives, and without it this fails with "Failed to spawn:
+    # pyinstaller / program not found" - which is what the first run of this workflow did. Copied
+    # from the release workflow's install step for the same reason its PyInstaller call is copied:
+    # a build check that installs a different set is checking a different bundle.
     - name: Install dependencies
       working-directory: ./python
-      run: uv sync --frozen
+      run: uv sync --frozen --no-default-groups --group build
 
     # Kept identical to the release workflow's Windows step on purpose. If the two drift, this
     # stops testing what gets published, which is worse than not testing at all because it reads
