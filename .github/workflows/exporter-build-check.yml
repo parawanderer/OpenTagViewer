@@ -59,6 +59,23 @@ jobs:
       working-directory: ./python
       run: uv sync --frozen --no-default-groups --group build
 
+    # **Before freezing anything**, because it separates two very different faults that look
+    # identical from outside. The frozen binary dies inside `emu_start` after importing unicorn,
+    # constructing it and mapping memory - so the native library loads and the bundle is fine.
+    # What is not yet known is whether *executing* emulated ARM64 works on Windows at all.
+    #
+    # If this passes and the frozen one fails, it is PyInstaller. If both fail, unicorn cannot run
+    # here and local Anisette can never work on Windows - which is a product decision, not a build
+    # fix, because the sign-in would have to use a remote Anisette server instead.
+    #
+    # `continue-on-error` so the answer is recorded even when it is "no": this step is an
+    # experiment, and a red X here would hide the frozen result below it.
+    - name: Does the emulator run under plain Python on this machine
+      continue-on-error: true
+      working-directory: ./python
+      run: |
+        uv run --frozen python -c "import unicorn, sys; print('unicorn', unicorn.__file__, flush=True); uc = unicorn.Uc(unicorn.UC_ARCH_ARM64, unicorn.UC_MODE_ARM); print('constructed', flush=True); uc.mem_map(0x1000, 0x1000); uc.mem_write(0x1000, bytes.fromhex('400580d2')); print('written', flush=True); uc.emu_start(0x1000, 0x1004); from unicorn.arm64_const import UC_ARM64_REG_X0; print('x0 =', uc.reg_read(UC_ARM64_REG_X0), flush=True)"
+
     # Kept identical to the release workflow's Windows step on purpose. If the two drift, this
     # stops testing what gets published, which is worse than not testing at all because it reads
     # as coverage.
