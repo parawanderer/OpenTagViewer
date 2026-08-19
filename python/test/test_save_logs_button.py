@@ -12,12 +12,18 @@ feature under test exists to prevent, and would have committed them to the histo
 
 from __future__ import annotations
 
-import tkinter as tk
 from unittest import mock
 
 import pytest
 
-from exporter import wizard
+# **Before anything that imports tkinter, `exporter.wizard` included.** A `pytest.skip` inside a
+# fixture is too late: the module is imported during collection, so a Python built without Tk
+# fails the whole run before any fixture can decline. Not hypothetical - CI runs a matrix, and
+# 3.12 resolved to a framework interpreter with no `_tkinter` while 3.13 had one, so this took
+# down four jobs and reported the failure against the three it cancelled.
+tk = pytest.importorskip("tkinter", reason="needs a Python built with Tk")
+
+from exporter import wizard  # noqa: E402 - has to follow the importorskip above
 
 # Random, and shaped like the real thing: a peer hash is base64 of a SHA-256, a serial is ten
 # uppercase alphanumerics, a home directory carries somebody's login name.
