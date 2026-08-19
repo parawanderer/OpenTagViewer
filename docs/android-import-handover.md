@@ -240,6 +240,24 @@ Catch it where it happens rather than asking users to classify themselves up fro
 Then drop them into the import path. The sold-or-wiped-device case reaches the same screen and
 needs no branch of its own — that user still has Apple's own routes to restore keychain access.
 
+**It is reached earlier than this section implies, and one thing that looks like it must not
+reach it at all.** Written above as though the app fetches and finds nothing. It does not get
+that far: an account with no Apple device has no escrow record either, so the flow stops one
+step sooner, at unlocking the keychain — before the user is ever asked for a passcode they do
+not have. Better, in fact. The screen is right; the trigger is `recoveryOptions` returning
+nothing, not `fetch` returning nothing.
+
+Which makes the distinction the bridge already draws load-bearing:
+
+| `icloud_bridge` reason | What to show |
+| --- | --- |
+| `nothing_to_recover_from` | the screen above — final, and the import path is the answer |
+| `service_unsure` | **not that screen.** Nothing was reported usable *at all*, which reads as a service having a bad day rather than every record on an account going bad at once. Say so, and offer to try again later |
+
+Collapsing the two would tell somebody with a perfectly good account that they own no tags,
+permanently, because Apple had a bad afternoon — and send them off to find a friend with a Mac.
+FindMy.py draws the same line for the same reason, in `viability_is_trustworthy`.
+
 ### Settings: one switch
 
 **Read my tags from my Apple account — on or off.** On joins. There is no separate "stay
