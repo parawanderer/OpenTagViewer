@@ -7,6 +7,7 @@ import org.w3c.dom.Node;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -75,19 +76,6 @@ public final class BeaconDataParser {
                     continue;
                 }
 
-                // An Apple tag with no naming record cannot be rendered - the name, the emoji
-                // and the CloudKit metadata all live in that plist. It should not happen, since
-                // the importer inner-joins the two, but skipping one beacon is a far better
-                // failure than throwing here: this runs over the whole list, so an NPE takes
-                // out every other tag too and the screen comes up empty.
-                if (beaconData.getBeaconNamingRecord() == null) {
-                    Log.e(TAG, "Skipping beaconId=" + beaconData.getBeaconId()
-                            + ": it has an OwnedBeacons plist but no BeaconNamingRecord, so there"
-                            + " is nothing to name it with");
-                    continue;
-                }
-
-                final String beaconNamingRecordPList = beaconData.getBeaconNamingRecord().content;
                 final String ownedBeaconPList = beaconData.getOwnedBeaconInfo().content;
 
                 // Extract the most relevant fields from decrypted plist files
@@ -99,13 +87,34 @@ public final class BeaconDataParser {
                 // multiple `<some id>.plist` files per `beacon-identifier`.
                 // In my testing thus far the directory for a single `beacon-identifier`
                 // only contained a single `<some id>.plist` file.
-                final Document beaconNamingData = XmlParser.parse(beaconNamingRecordPList);
-                final String beaconNamingRecordIdentifier = getString(beaconNamingData, identifierQuery);
-                final String associatedBeacon = getString(beaconNamingData, associatedBeaconQuery);
-                final String emoji = getString(beaconNamingData, emojiQuery);
-                final String name = getString(beaconNamingData, nameQuery);
-                // nested PLIST evaluation (this contains some useful info)
-                var metaData = BeaconNamingRecordInnerParser.extractBeaconNamingRecordMetadata(xPath, beaconNamingData);
+                //
+                // **All of it is optional.** A zip always carries the pair, because its importer
+                // inner-joins them, but an account read directly does not have to: CloudKit
+                // holds no naming record for an accessory nobody ever named. That is not a
+                // broken tag and must not be treated as one - it is a tag with no name yet,
+                // which the user can give it like any other. Skipping it here made it look like
+                // the import had lost it.
+                String beaconId = beaconData.getBeaconId();
+                String beaconNamingRecordIdentifier = null;
+                String emoji = null;
+                String name = null;
+                Optional<BeaconNamingRecordCloudKitMetadata> metaData = Optional.empty();
+
+                if (beaconData.getBeaconNamingRecord() != null) {
+                    final Document beaconNamingData =
+                            XmlParser.parse(beaconData.getBeaconNamingRecord().content);
+                    beaconNamingRecordIdentifier = getString(beaconNamingData, identifierQuery);
+                    final String associatedBeacon =
+                            getString(beaconNamingData, associatedBeaconQuery);
+                    if (associatedBeacon != null && !associatedBeacon.isEmpty()) {
+                        beaconId = associatedBeacon;
+                    }
+                    emoji = getString(beaconNamingData, emojiQuery);
+                    name = getString(beaconNamingData, nameQuery);
+                    // nested PLIST evaluation (this contains some useful info)
+                    metaData = BeaconNamingRecordInnerParser.extractBeaconNamingRecordMetadata(
+                            xPath, beaconNamingData);
+                }
 
 
                 // Extract the most relevant fields from decrypted plist files
@@ -132,10 +141,14 @@ public final class BeaconDataParser {
 
                 var extractedData = BeaconInformation.builder()
                         // BeaconNamingRecord
-                        .beaconId(associatedBeacon)
+                        .beaconId(beaconId)
                         .namingRecordId(beaconNamingRecordIdentifier)
                         .originalEmoji(emoji)
-                        .originalName(name)
+                        // What the tag's own record says it is, when nobody has ever named it -
+                        // "AirTag" rather than a blank row. Not a name pretending to be the
+                        // user's choice: it is what Find My shows for an unnamed accessory,
+                        // and renaming it works exactly as it does for any other tag.
+                        .originalName(name == null || name.isEmpty() ? model : name)
                         // BeaconNamingRecord->cloudKitMetadata
                         .namingRecordModifiedTime(
                                 metaData.map(BeaconNamingRecordCloudKitMetadata::getModifiedTime).orElse(null))

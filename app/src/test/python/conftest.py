@@ -11,14 +11,14 @@ from pathlib import Path
 APP_PYTHON = Path(__file__).resolve().parents[2] / "main" / "python"
 RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 
-# The shared export package. Put on the path here so these tests can exercise it, and **the app
-# cannot yet**: Chaquopy is not given it as a second source directory, so `import
-# opentagviewer_export` fails inside the APK and main.py's two bridge functions return None there.
+# The shared export package, and the four modules of `exporter/` that are stdlib plus FindMy.py.
+# Chaquopy is given `../python` as a second source directory, so the same imports work inside the
+# APK - `PythonPackagingTest` is what says so, and it names the wizard, the CLI and the prompts as
+# things that must *not* be in there. They import tkinter, questionary and prompt_toolkit, none of
+# which exist on a phone.
 #
-# That is a known gap rather than an oversight - `../python` also holds the tkinter wizard and a
-# top-level package called `test`, which would shadow the standard library's on a phone. See
-# "Wire the shared package into Chaquopy" in docs/android-import-handover.md for the two ways out.
-# Whichever is taken changes the layout, and this line with it.
+# So this line is not a test-only convenience: it mirrors what the build packages, and the two
+# have to move together.
 SHARED_PYTHON = Path(__file__).resolve().parents[4] / "python"
 
 sys.path.insert(0, str(APP_PYTHON))

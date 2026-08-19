@@ -250,6 +250,24 @@ Turning it off should say what it does not undo: it stops reading the tag list, 
 remove the entry from the user's Apple device list. That removal is theirs to do, in Apple's
 interface.
 
+### A tag should say where it came from
+
+Once both routes exist, a tag in the list can have arrived three ways, and the device details
+screen should say which — it already carries this kind of line for a self-generated tag:
+
+| | What it means to the user |
+| --- | --- |
+| **From your Apple account** | live; it updates because the app can read the account |
+| **Imported** | from a zip; it updates only as far as the keys in that zip reach |
+| **Self-generated** | never in an Apple account at all |
+
+Worth having because the three behave differently and nothing else on the screen distinguishes
+them. A recipient wondering why their shared tag stopped updating is looking at an *imported*
+one, and the answer is on the screen the moment the screen says so.
+
+Not a schema question: `OwnedBeacon` already records enough to tell them apart — a self-generated
+tag has no `content`, and an account-read one can be marked when it is written.
+
 ### The one prompt that interrupts a connected app
 
 Once joined, key rotation is handled — a member is given the new keys. So the only thing that
