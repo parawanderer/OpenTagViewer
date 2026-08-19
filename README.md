@@ -36,13 +36,34 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 - UI customisation options
 
 
+## What it works with 🏷️
+
+**The short version: if it shows up under _Items_ in Apple's own Find My app, it is in scope.**
+AirTags are not a special case — they are just the most common thing in that list, and third-party
+trackers that advertise "Works with Apple Find My" use the same network and the same keys.
+
+| What | Works? | |
+| --- | --- | --- |
+| **AirTag** | ✅ Yes | What most people are here for |
+| **Third-party trackers that work with Apple Find My** — Chipolo, Pebblebee, Mili MiTag, eufy and similar | ✅ Should work | Same network, same keys, nothing special about them. Not tested by the maintainers, who do not own any — [reports welcome](https://github.com/parawanderer/OpenTagViewer/issues) |
+| **AirPods, and other Find My accessories** | ✅ Mostly | Works where Apple stores a usable key for it. Lightly tested |
+| **Your own iPhone, iPad or Mac** | ✅ Yes | They are findable devices too, and appear alongside your tags |
+| **Self-made tags** — [OpenHaystack](https://github.com/seemoo-lab/openhaystack), [Macless Haystack](https://github.com/dchristl/macless-haystack) | ⚠️ Exporter only | The exporter can package them; the app cannot read them yet ([#45](https://github.com/parawanderer/OpenTagViewer/issues/45)) |
+| **A tag someone shared with you** through Apple's own sharing | ❌ No | Only the account that *owns* a tag can export it. Ask the owner to export it and send you the zip |
+| **Tile, Samsung SmartTag, Google Find My Device trackers** | ❌ No | Different networks entirely, with nothing in common with Apple's. Out of scope |
+
+> [!NOTE]
+> This app reads Apple's Find My network. Anything not on that network cannot be tracked with it,
+> no matter how similar the device looks.
+
+
 ## How To Use 📖
 
 ### Requirements 🤓
 
 1. An Android phone with [the `OpenTagViewer` app installed](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Install-App)
 2. A (free) [Apple Account](https://account.apple.com/) with 2FA enabled to be via either `SMS` or `Trusted Device`
-3. One or more **AirTags**, which need to be already registered to some Apple account via the `FindMy` app
+3. One or more **AirTags** — or any other tracker that appears under *Items* in Apple's `FindMy` app (see [what it works with](#what-it-works-with-)) — already registered to an Apple account you own
 4. Any computer to run the exporter on — Windows, Linux or a Mac (only needed once/initially). See [the export guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags#prerequisites)
 
 
