@@ -994,14 +994,14 @@ def self_test() -> int:
     # Reads every `.crt` beside the library's code and checks each against its own fingerprint,
     # so this proves the files are both present and intact.
     roots = PinnedRoots.bundled().by_version
-    print(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
+    _say(f"pinned roots: {len(roots)} ({', '.join(str(v) for v in sorted(roots))})")
 
     # A namespace package would have no __file__, and a build that produced one would be broken in
     # a way worth reporting rather than crashing on.
     anisette_module = sys.modules["anisette"].__file__
     anisette_root = Path(anisette_module).parent / "apple-root.pem" if anisette_module else None
     found = anisette_root is not None and anisette_root.is_file()
-    print(f"anisette root: {'present' if found else 'MISSING'}")
+    _say(f"anisette root: {'present' if found else 'MISSING'}")
 
     if not roots or not found:
         return 1
@@ -1009,8 +1009,20 @@ def self_test() -> int:
     if not _emulator_runs():
         return 1
 
-    print("self-test passed")
+    _say("self-test passed")
     return 0
+
+
+def _say(line: str) -> None:
+    """
+    Print, and flush before the next thing can kill the process.
+
+    **A native fault loses buffered output**, and stdout is block-buffered the moment it is a pipe
+    rather than a terminal - which it always is in CI. So the first run of this on Windows died
+    with no output at all: every line was still sitting in the buffer when the process was killed,
+    and a self-test that cannot say how far it got is only marginally better than no self-test.
+    """
+    print(line, flush=True)
 
 
 def _emulator_runs() -> bool:
@@ -1041,10 +1053,10 @@ def _emulator_runs() -> bool:
         emulator.emu_start(0x1000, 0x1004)
         answer = emulator.reg_read(UC_ARM64_REG_X0)
     except Exception as e:  # noqa: BLE001 - any failure here is a broken bundle, not a bug to raise
-        print(f"cpu emulator: FAILED ({type(e).__name__}: {e})")
+        _say(f"cpu emulator: FAILED ({type(e).__name__}: {e})")
         return False
 
-    print(f"cpu emulator: ran ARM64 and read back {answer}")
+    _say(f"cpu emulator: ran ARM64 and read back {answer}")
 
     return answer == 42
 
