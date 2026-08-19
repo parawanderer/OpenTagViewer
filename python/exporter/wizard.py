@@ -39,6 +39,7 @@ from exporter.codes import (
     is_verification_code,
     verification_code,
 )
+from exporter.redact import redact, summarise
 from exporter.tkutil import centre_on_screen, centre_over
 from exporter.custom_tags import (
     CustomTagError,
@@ -199,9 +200,72 @@ class WizardApp(tk.Tk):
         help_label.grid(row=0, column=2)
         help_label.bind("<Button-1>", lambda _event: webbrowser.open(WIKI_LINK, new=2, autoraise=True))
 
-        ttk.Button(buttons, text="Cancel", command=self.destroy).grid(row=0, column=3, padx=(0, 8))
+        # **Where Cancel used to be**, which did exactly what the window's own close button does
+        # and so earned none of that space. This does something nothing else here can.
+        #
+        # A button rather than a link, because being findable is the whole point: somebody asked
+        # for "the logs" who cannot find them attaches one of two wrong things instead - a
+        # screenshot of an error dialog, which never contains the useful part, or their export zip,
+        # which holds the keys to their tags and cannot be un-shared once it is posted.
+        ttk.Button(buttons, text="Save logs…", command=self._save_logs).grid(
+            row=0, column=3, padx=(0, 8),
+        )
         self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
         self.confirm_button.grid(row=0, column=4)
+
+    def _save_logs(self) -> None:
+        """
+        Copy the log somewhere the user can find, under a name nothing else here could be.
+
+        **The point is the name, as much as the copy.** The two files this program produces are a
+        bundle of tag keys and a log, and one of them can be handed out safely. Somebody asked for
+        "the file" attaches whichever they can find, and the wrong answer publishes the keys to
+        their tags permanently - so the log is written as `.txt`, with `logs` in its name, and the
+        dialog afterwards says which is which rather than assuming it is obvious.
+        """
+        log = log_file()
+
+        if not log.is_file() or log.stat().st_size == 0:
+            messagebox.showinfo(
+                "Save logs",
+                "There is nothing in the log yet.\n\n"
+                "It is written as the exporter runs, so try again after the step that went wrong.",
+                parent=self,
+            )
+            return
+
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        chosen = asksaveasfilename(
+            parent=self,
+            title="Save logs",
+            # Deliberately not .zip. The extension is the fastest way to tell this from an export,
+            # and a text file is also one somebody can read before sending, which is the whole ask.
+            defaultextension=".txt",
+            initialfile=f"OpenTagViewer-logs-{stamp}.txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+
+        if not chosen:
+            return
+
+        try:
+            cleaned, counts = redact(log.read_text(encoding="utf-8", errors="replace"))
+            Path(chosen).write_text(cleaned, encoding="utf-8")
+        except OSError as e:
+            logger.exception("Could not save the log")
+            messagebox.showerror("Save logs", f"Could not write that file:\n\n{e}", parent=self)
+            return
+
+        messagebox.showinfo(
+            "Save logs",
+            f"Saved to:\n{chosen}\n\n"
+            f"{summarise(counts)} The copy on disk is untouched.\n\n"
+            "This is the log, not your tags. Your tags are the .zip the Export… button writes.\n\n"
+            "**Read it before you post it.** Identifiers were removed by pattern-matching, which"
+            " cannot promise it caught everything - the text comes from a library reading Apple's"
+            " structures, and a field that is harmless on one account may not be on another.",
+            parent=self,
+        )
 
     def _read_label(self) -> str:
         """What the button that reads the account says, which is not the same on both routes."""
