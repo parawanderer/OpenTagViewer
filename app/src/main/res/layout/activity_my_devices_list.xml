@@ -7,6 +7,7 @@
         <variable name="handleClickBack" type="Runnable" />
         <variable name="handleClickCloseSelection" type="Runnable" />
         <variable name="handleClickSelectionMenu" type="Runnable" />
+        <variable name="handleClickPageMenu" type="Runnable" />
         <variable name="selectedCount" type="String" />
     </data>
 
@@ -19,11 +20,16 @@
             The two bars occupy the same place and only one is ever shown: swapping them
             rather than mutating one keeps the normal screen exactly as it was, so nothing
             about selection can leak into it.
+
+            The first is the variant with an overflow button, so getting tags in is reachable
+            from a screen that already has some. Both ways in used to live in the empty state
+            below, which is hidden as soon as anything is imported.
         -->
         <include
             android:id="@+id/settings_top_toolbar"
-            layout="@layout/inline_top_toolbar"
+            layout="@layout/inline_top_toolbar_with_button"
             app:onClickBack="@{handleClickBack}"
+            app:onClickMenu="@{handleClickPageMenu}"
             app:pageTitle="@{@string/my_devices}" />
 
         <include
