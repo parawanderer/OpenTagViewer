@@ -99,6 +99,9 @@ final class CustomAccessoryParser {
                 // today, but nothing about this parser requires that, and a wrong answer here
                 // would decide whether the user is allowed to remove it.
                 .fromAccount(beaconData.getOwnedBeaconInfo().fromAccount)
+                .ignoredAt(beaconData.getOwnedBeaconInfo().ignoredAt)
+                .fruitlessScans(beaconData.getOwnedBeaconInfo().fruitlessScans)
+                .lastScanAt(beaconData.getOwnedBeaconInfo().lastScanAt)
                 // Not an Apple product, so it has no product or vendor id to report and no
                 // battery it can tell us about. Zero rather than a guess.
                 .productId(0)

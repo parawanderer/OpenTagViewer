@@ -216,4 +216,15 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="icloud_fetch_from_settings_subtitle">Die Tags aus deinem Konto hinzufügen oder die vorhandenen aktualisieren</string>
     <string name="icloud_fetch_from_settings_linked">Mit deinem Apple-Konto verknüpft. Tippe, um nach neuen oder geänderten Tags zu suchen.</string>
     <string name="icloud_link_account_action">Tags über Apple-Konto verknüpfen</string>
+    <string name="tag_ignored_summary">Seit Monaten keine Updates – Suche pausiert</string>
+    <string name="tag_ignored_retry">Jetzt prüfen</string>
+    <string name="debug_last_scan_attempt">Letzter Abrufversuch</string>
+    <string name="debug_last_result_at">Letztes Ergebnis</string>
+    <string name="debug_backoff_state">Abruf-Verzögerung</string>
+    <string name="debug_backoff_normal">Normal</string>
+    <string name="debug_backoff_waiting">Verzögert – %1$d ergebnislose Suchen, nächster Versuch %2$s</string>
+    <string name="debug_backoff_ignored">Seit %1$s ignoriert – über Monate der Historie nichts gefunden</string>
+    <string name="debug_never">Nie</string>
+    <string name="tag_ignored_explanation">Für diesen Tag wurde über Monate hinweg nichts gefunden, deshalb sucht die App nicht mehr automatisch danach. Eine solche Suche dauert lange und findet selten etwas. Tippe unten, um sofort erneut zu suchen.</string>
+    <string name="tag_ignored_retrying">Es wird erneut nach diesem Tag gesucht. Das kann einige Minuten dauern.</string>
 </resources>

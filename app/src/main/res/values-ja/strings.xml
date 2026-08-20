@@ -216,4 +216,15 @@
     <string name="icloud_fetch_from_settings_subtitle">アカウントのタグを追加、または取り込み済みのタグを更新します</string>
     <string name="icloud_fetch_from_settings_linked">Apple アカウントと連携済みです。タップすると新しいタグや変更を確認します。</string>
     <string name="icloud_link_account_action">Apple アカウントでタグを連携</string>
+    <string name="tag_ignored_summary">数か月間更新がありません — 検索を停止中</string>
+    <string name="tag_ignored_retry">今すぐ確認</string>
+    <string name="debug_last_scan_attempt">最後の取得試行</string>
+    <string name="debug_last_result_at">最後の結果</string>
+    <string name="debug_backoff_state">取得の間隔調整</string>
+    <string name="debug_backoff_normal">通常</string>
+    <string name="debug_backoff_waiting">間隔を延長中 — 空振り %1$d 回、次回は %2$s</string>
+    <string name="debug_backoff_ignored">%1$s から無視 — 数か月分の履歴で何も見つかりません</string>
+    <string name="debug_never">なし</string>
+    <string name="tag_ignored_explanation">このタグは数か月分の履歴のどこにも見つからなかったため、自動の検索を停止しました。この種の検索は時間がかかり、見つかることもまれです。下をタップすると今すぐ再検索します。</string>
+    <string name="tag_ignored_retrying">このタグをもう一度探しています。数分かかることがあります。</string>
 </resources>

@@ -259,6 +259,78 @@ public class OpenTagViewerDatabaseMigrationTest {
         }
     }
 
+    /**
+     * <b>v4 to v5, from a v1 database - the path a long-standing user actually takes.</b>
+     *
+     * <p>Users skip releases, so the only migration that matters is the whole chain. What must
+     * survive is the beacon itself; what must be true afterwards is that it looks healthy -
+     * never scanned, nothing held against it, not ignored - because the alternative is an
+     * upgrade that silently decides somebody's tags have stopped broadcasting and stops looking
+     * for them.
+     */
+    @Test
+    public void migrate4To5_existingBeaconsStartHealthyRatherThanIgnored() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, OpenTagViewerDatabase.MIGRATION_2_3);
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, OpenTagViewerDatabase.MIGRATION_3_4);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 5, true, OpenTagViewerDatabase.MIGRATION_4_5);
+
+        try (Cursor cursor = db.query(
+                "SELECT content, fruitless_scans, last_scan_at, ignored_at FROM OwnedBeacons"
+                        + " WHERE id = ?",
+                new Object[]{BEACON_ID})) {
+            assertTrue("beacon row did not survive v4 to v5", cursor.moveToFirst());
+            assertEquals(BEACON_PLIST, cursor.getString(0));
+            assertEquals("an upgraded beacon must not start with strikes against it",
+                    0, cursor.getInt(1));
+            assertTrue("an upgraded beacon must look never-scanned", cursor.isNull(2));
+            assertTrue("an upgrade must never mark somebody's tag as ignored", cursor.isNull(3));
+        }
+    }
+
+    /** And a soft-deleted row still survives the whole chain, as it does at every other step. */
+    @Test
+    public void migrate4To5_preservesRemovedBeaconsToo() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
+            insertOwnedBeaconV1(db, "beacon-b", 1L, BEACON_PLIST, true);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, OpenTagViewerDatabase.MIGRATION_2_3);
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, OpenTagViewerDatabase.MIGRATION_3_4);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 5, true, OpenTagViewerDatabase.MIGRATION_4_5);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("beacons were lost during v4 to v5", 2, cursor.getInt(0));
+        }
+    }
+
+    @Test
+    public void migrate4To5_handlesEmptyDatabase() throws IOException {
+        helper.createDatabase(TEST_DB, 1).close();
+
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, OpenTagViewerDatabase.MIGRATION_1_2);
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, OpenTagViewerDatabase.MIGRATION_2_3);
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, OpenTagViewerDatabase.MIGRATION_3_4);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 5, true, OpenTagViewerDatabase.MIGRATION_4_5);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(0, cursor.getInt(0));
+        }
+    }
+
     @Test
     public void migrate3To4_handlesEmptyDatabase() throws IOException {
         helper.createDatabase(TEST_DB, 1).close();

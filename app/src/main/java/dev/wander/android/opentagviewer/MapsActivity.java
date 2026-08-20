@@ -291,6 +291,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             || data.getStringExtra("deviceWasChanged") != null)) {
                         this.handleDeviceListChanged();
                     }
+
+                    // The tag page has no way to fetch - the picker, the Python service and the
+                    // card that shows the answer all live here - so it asks. See
+                    // DeviceInfoActivity#lookForItAgainNow.
+                    final String retry = data == null
+                            ? null : data.getStringExtra(DeviceInfoActivity.RETRY_IGNORED_BEACON);
+                    if (retry != null) {
+                        this.lookForAnIgnoredTagAgain(retry);
+                    }
                 }
             }
     );
@@ -553,6 +562,39 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .subscribe(
                         held -> this.accountIsLinked = held.isPresent(),
                         error -> Log.w(TAG, "Could not tell whether an account is linked", error));
+    }
+
+    /**
+     * Search for one tag the app had given up on, because somebody asked.
+     *
+     * <p><b>Through the manual fetch path, which the backoff does not touch.</b> That is the
+     * whole point of the button: the tag is skipped by the scheduled fetches precisely because
+     * it has answered nothing for months, and a person pressing "check now" is overriding that
+     * judgement, which they are entitled to do.
+     *
+     * <p>Nothing here clears the ignored flag. A successful search does that on its own, in the
+     * same place every other successful search does - see
+     * {@code OwnedBeaconDao#recordSuccessfulScan}. A second path that cleared it separately
+     * could disagree with the first, and would be the version that quietly un-ignores a tag that
+     * still found nothing.
+     */
+    private void lookForAnIgnoredTagAgain(final String beaconId) {
+        final BeaconData beacon = this.beacons.get(beaconId);
+        if (beacon == null) {
+            Log.w(TAG, "Asked to look for " + beaconId + " again, but it is not on this screen");
+            return;
+        }
+
+        Log.i(TAG, "Looking again for " + beaconId + ", which had been set aside");
+        Toast.makeText(this.getApplicationContext(), R.string.tag_ignored_retrying, LENGTH_LONG)
+                .show();
+
+        var async = this.fetchLastReportsFor(
+                        beaconId, beacon.getInfo().getOwnedBeaconPlistRaw(), HOURS_TO_GO_BACK_24H)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        reports -> this.handleDeviceListChanged(),
+                        error -> Log.e(TAG, "Looking again for " + beaconId + " failed", error));
     }
 
     public void onClickMoreSettings(View view)
@@ -1541,7 +1583,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         final int hoursToGoBack = this.refreshPolicy.hoursToGoBack(now);
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+        // **The scheduled variant, and the only caller of it.** This overload is the periodic
+        // tick - it is the one that reads refreshPolicy for its window - so it is where tags
+        // that have gone quiet are allowed to be skipped. Every other fetch here is somebody
+        // asking, and asks about whatever it was given.
+        return this.beaconRepo.toScheduledAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.

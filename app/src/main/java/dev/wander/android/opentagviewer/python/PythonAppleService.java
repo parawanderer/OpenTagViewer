@@ -117,7 +117,7 @@ public class PythonAppleService {
     }
 
     private static FetchResult emptyResult() {
-        return new FetchResult(Collections.emptyMap(), Collections.emptyMap());
+        return new FetchResult(Collections.emptyMap(), Collections.emptyMap(), java.util.Set.of());
     }
 
     /**
@@ -130,6 +130,7 @@ public class PythonAppleService {
     private static FetchResult mapResults(final PyObject locationReportsResult) {
         Map<String, List<BeaconLocationReport>> results = new HashMap<>();
         Map<String, String> updatedAccessoryJson = new HashMap<>();
+        java.util.Set<String> exhaustedWideSearch = new java.util.HashSet<>();
 
         var mapBeaconIdToResult = locationReportsResult.asMap();
         for (var key : mapBeaconIdToResult.keySet()) {
@@ -137,6 +138,14 @@ public class PythonAppleService {
 
             var locationReportList = perBeacon.get("reports").asList();
             var updatedAccessory = perBeacon.get("updatedAccessoryJson");
+
+            // Absent on any answer from an older bridge, which reads as "not exhausted" - the
+            // cautious way round, since the consequence of a wrong true is the app quietly
+            // giving up on somebody's tag.
+            final var exhausted = perBeacon.get("exhaustedWideSearch");
+            if (exhausted != null && exhausted.toBoolean()) {
+                exhaustedWideSearch.add(key.toString());
+            }
 
             List<BeaconLocationReport> reports = new LinkedList<>();
             final int numReports = locationReportList.size();
@@ -174,6 +183,6 @@ public class PythonAppleService {
             }
         }
 
-        return new FetchResult(results, updatedAccessoryJson);
+        return new FetchResult(results, updatedAccessoryJson, exhaustedWideSearch);
     }
 }

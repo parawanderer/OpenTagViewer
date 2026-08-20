@@ -38,6 +38,33 @@ public interface OwnedBeaconDao {
     @Delete
     void delete(OwnedBeacon ownedBeaconWithId);
 
+    /**
+     * Record that a search for this tag found something.
+     *
+     * <p>Clears everything held against it: a tag that reports is a normal tag, whatever it was
+     * doing before. A coat comes out of storage, a bike is found, and the app must go straight
+     * back to asking about it as often as any other.
+     */
+    @Query("UPDATE OwnedBeacons SET fruitless_scans = 0, last_scan_at = :at, ignored_at = NULL"
+            + " WHERE id = :beaconId")
+    void recordSuccessfulScan(String beaconId, long at);
+
+    /** Record that a search found nothing, which lengthens the wait before the next one. */
+    @Query("UPDATE OwnedBeacons SET fruitless_scans = fruitless_scans + 1, last_scan_at = :at"
+            + " WHERE id = :beaconId")
+    void recordFruitlessScan(String beaconId, long at);
+
+    /**
+     * Give up on this tag until somebody asks again.
+     *
+     * <p>Only for a search that covered months and found nothing anywhere - see
+     * {@code _DEAD_TAG_WIDTH_INDICES}. An ignored tag is skipped by the automatic fetches
+     * entirely, which is the point: each one costs a full-history search that will not repay it.
+     */
+    @Query("UPDATE OwnedBeacons SET ignored_at = :at, last_scan_at = :at,"
+            + " fruitless_scans = fruitless_scans + 1 WHERE id = :beaconId")
+    void markIgnored(String beaconId, long at);
+
     /** The beacons currently held as a cache of the Apple account. */
     @Query("SELECT id FROM OwnedBeacons WHERE from_account = 1 AND is_removed = 0")
     List<String> getAccountBeaconIds();

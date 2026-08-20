@@ -216,4 +216,15 @@
     <string name="icloud_fetch_from_settings_subtitle">Добавить метки из вашей учётной записи или обновить уже добавленные</string>
     <string name="icloud_fetch_from_settings_linked">Связано с вашей учётной записью Apple. Нажмите, чтобы проверить новые или изменённые метки.</string>
     <string name="icloud_link_account_action">Связать метки через учётную запись Apple</string>
+    <string name="tag_ignored_summary">Нет обновлений уже несколько месяцев — поиск приостановлен</string>
+    <string name="tag_ignored_retry">Проверить сейчас</string>
+    <string name="debug_last_scan_attempt">Последняя попытка запроса</string>
+    <string name="debug_last_result_at">Последний результат</string>
+    <string name="debug_backoff_state">Задержка запросов</string>
+    <string name="debug_backoff_normal">Обычная</string>
+    <string name="debug_backoff_waiting">Отложено — %1$d безрезультатных поисков, следующая попытка %2$s</string>
+    <string name="debug_backoff_ignored">Игнорируется с %1$s — за месяцы истории ничего не найдено</string>
+    <string name="debug_never">Никогда</string>
+    <string name="tag_ignored_explanation">Для этой метки за месяцы истории ничего не найдено, поэтому приложение перестало искать её автоматически. Такой поиск идёт долго и редко что-то даёт. Нажмите ниже, чтобы поискать сейчас.</string>
+    <string name="tag_ignored_retrying">Метка ищется заново. Это может занять несколько минут.</string>
 </resources>

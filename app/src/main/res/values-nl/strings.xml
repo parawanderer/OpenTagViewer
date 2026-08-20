@@ -216,4 +216,15 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="icloud_fetch_from_settings_subtitle">Voeg de tags uit je account toe, of werk de tags hier bij</string>
     <string name="icloud_fetch_from_settings_linked">Gekoppeld aan je Apple-account. Tik om te zoeken naar nieuwe of gewijzigde tags.</string>
     <string name="icloud_link_account_action">Tags koppelen via Apple-account</string>
+    <string name="tag_ignored_summary">Al maanden geen updates — zoeken gepauzeerd</string>
+    <string name="tag_ignored_retry">Nu controleren</string>
+    <string name="debug_last_scan_attempt">Laatste ophaalpoging</string>
+    <string name="debug_last_result_at">Laatste resultaat</string>
+    <string name="debug_backoff_state">Ophaalvertraging</string>
+    <string name="debug_backoff_normal">Normaal</string>
+    <string name="debug_backoff_waiting">Vertraagd — %1$d zoekopdrachten zonder resultaat, volgende poging %2$s</string>
+    <string name="debug_backoff_ignored">Genegeerd sinds %1$s — niets gevonden in maanden geschiedenis</string>
+    <string name="debug_never">Nooit</string>
+    <string name="tag_ignored_explanation">Er is voor deze tag in maanden geschiedenis niets gevonden, dus de app zoekt er niet meer automatisch naar. Zo’n zoekopdracht is traag en levert zelden iets op. Tik hieronder om nu opnieuw te zoeken.</string>
+    <string name="tag_ignored_retrying">Er wordt opnieuw naar deze tag gezocht. Dit kan enkele minuten duren.</string>
 </resources>

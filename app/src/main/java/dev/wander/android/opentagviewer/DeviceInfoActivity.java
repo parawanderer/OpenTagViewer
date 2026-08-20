@@ -14,6 +14,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.format.DateFormat;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -65,6 +66,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
+import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.HardwareDescriber;
@@ -186,6 +188,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
         } else {
             findViewById(R.id.device_settings_source).setVisibility(View.GONE);
         }
+
+        this.describeHowItIsBeingLookedFor(timestampFormat);
 
         // What is known without asking anything, drawn immediately. The shared heuristic can
         // improve on it, but it costs a Python interpreter, so this screen must be readable
@@ -699,6 +703,81 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 startActivity(viewHistoryIntent);
             });
     }
+
+    /**
+     * Say when this tag was last looked for, and how hard the app is still trying.
+     *
+     * <p><b>Otherwise "no last location known" is the whole story</b>, and it covers three
+     * different situations that need different reactions: a tag nobody has walked past today, a
+     * tag being asked about less and less because it keeps answering nothing, and a tag the app
+     * has given up on. Only the last of those is worth a person's attention, and only it has
+     * anything they can do about it.
+     *
+     * <p>The notice is for everybody; the three rows below it are behind the debug switch,
+     * because "3 fruitless searches, next attempt in 4h" is a sentence for whoever is diagnosing
+     * a bug report rather than for the person who just wants their keys.
+     */
+    private void describeHowItIsBeingLookedFor(final SimpleDateFormat timestamps) {
+        final boolean ignored = this.beaconInformation.isIgnored();
+
+        this.findViewById(R.id.device_ignored_notice).setVisibility(ignored ? VISIBLE : GONE);
+        if (ignored) {
+            this.findViewById(R.id.device_ignored_retry)
+                    .setOnClickListener(view -> this.lookForItAgainNow());
+        }
+
+        final Long lastScan = this.beaconInformation.getLastScanAt();
+        this.binding.setLastScanAttempt(lastScan == null
+                ? this.getString(R.string.debug_never)
+                : timestamps.format(new Date(lastScan)));
+
+        final Long newest = this.beaconRepo.newestReportTimeFor(this.beaconId).blockingFirst()
+                .orElse(null);
+        this.binding.setLastResultAt(newest == null
+                ? this.getString(R.string.debug_never)
+                : timestamps.format(new Date(newest)));
+
+        this.binding.setBackoffState(this.describeBackoff(timestamps));
+    }
+
+    private String describeBackoff(final SimpleDateFormat timestamps) {
+        final Long ignoredAt = this.beaconInformation.getIgnoredAt();
+        if (ignoredAt != null) {
+            return this.getString(
+                    R.string.debug_backoff_ignored, timestamps.format(new Date(ignoredAt)));
+        }
+
+        final int scans = this.beaconInformation.getFruitlessScans();
+        if (scans <= 0) {
+            return this.getString(R.string.debug_backoff_normal);
+        }
+
+        final Long lastScan = this.beaconInformation.getLastScanAt();
+        final long dueAt = (lastScan == null ? System.currentTimeMillis() : lastScan)
+                + WideScanBackoff.waitMillisAfter(scans);
+
+        return this.getString(R.string.debug_backoff_waiting, scans,
+                DateUtils.getRelativeTimeSpanString(
+                        dueAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS));
+    }
+
+    /**
+     * Hand the request back to the map, which owns fetching.
+     *
+     * <p><b>Deliberately the manual path.</b> That one is not subject to the backoff at all, so a
+     * tag the app had stopped asking about is asked about immediately - which is the entire point
+     * of the button. Anything found clears the flag as an ordinary consequence of a successful
+     * search, rather than through a second code path that could disagree with the first.
+     */
+    private void lookForItAgainNow() {
+        final Intent data = new Intent();
+        data.putExtra(RETRY_IGNORED_BEACON, this.beaconId);
+        this.setResult(RESULT_OK, data);
+        this.finish();
+    }
+
+    /** Asks whoever launched this screen to search for the named tag right now. */
+    public static final String RETRY_IGNORED_BEACON = "retryIgnoredBeacon";
 
     private void onClickDeviceDelete() {
         // A tag read from the Apple account is a cache of what Apple holds, so marking it

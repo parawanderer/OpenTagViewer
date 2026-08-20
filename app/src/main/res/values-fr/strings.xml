@@ -216,4 +216,15 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="icloud_fetch_from_settings_subtitle">Ajouter les balises de votre compte, ou mettre à jour celles déjà présentes</string>
     <string name="icloud_fetch_from_settings_linked">Associé à votre compte Apple. Touchez pour rechercher des balises nouvelles ou modifiées.</string>
     <string name="icloud_link_account_action">Associer des balises via le compte Apple</string>
+    <string name="tag_ignored_summary">Aucune mise à jour depuis des mois – recherche en pause</string>
+    <string name="tag_ignored_retry">Vérifier maintenant</string>
+    <string name="debug_last_scan_attempt">Dernière tentative de récupération</string>
+    <string name="debug_last_result_at">Dernier résultat</string>
+    <string name="debug_backoff_state">Temporisation des requêtes</string>
+    <string name="debug_backoff_normal">Normale</string>
+    <string name="debug_backoff_waiting">Temporisé – %1$d recherches sans résultat, prochaine tentative %2$s</string>
+    <string name="debug_backoff_ignored">Ignorée depuis le %1$s – rien trouvé sur des mois d’historique</string>
+    <string name="debug_never">Jamais</string>
+    <string name="tag_ignored_explanation">Rien n’a été trouvé pour cette balise sur des mois d’historique, l’app a donc cessé de la rechercher automatiquement. Ce type de recherche est lent et aboutit rarement. Touchez ci-dessous pour chercher à nouveau maintenant.</string>
+    <string name="tag_ignored_retrying">Nouvelle recherche de cette balise. Cela peut prendre quelques minutes.</string>
 </resources>

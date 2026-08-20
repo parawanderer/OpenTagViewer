@@ -31,7 +31,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         DailyHistoryFetchRecord.class,
         UserBeaconOptions.class
     },
-    version = 4
+    version = 5
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -86,6 +86,27 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v4 → v5: three columns on {@code OwnedBeacons} for tags that have stopped broadcasting.
+     *
+     * <p>A tag with no key alignment record searches its whole life on every refresh, at a
+     * request per ~290 keys. For a tag that will never answer that is the most expensive thing
+     * in the batch, repeated forever - so {@code fruitless_scans} and {@code last_scan_at} drive
+     * a backoff, and {@code ignored_at} marks the ones given up on entirely.
+     *
+     * <p>Additive, with defaults that mean "healthy, never scanned, not ignored" - so every
+     * existing row keeps behaving exactly as it did until its first fruitless search.
+     */
+    public static final Migration MIGRATION_4_5 = new Migration(4, 5) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE OwnedBeacons"
+                    + " ADD COLUMN fruitless_scans INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE OwnedBeacons ADD COLUMN last_scan_at INTEGER");
+            db.execSQL("ALTER TABLE OwnedBeacons ADD COLUMN ignored_at INTEGER");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -100,7 +121,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     context,
                     OpenTagViewerDatabase.class,
                     DATABASE_NAME)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build();
         }
 
