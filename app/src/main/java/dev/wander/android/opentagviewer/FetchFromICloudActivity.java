@@ -18,6 +18,8 @@ import com.google.android.material.textfield.TextInputEditText;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.ICloudAccessory;
 import dev.wander.android.opentagviewer.python.icloud.ICloudException;
@@ -63,10 +65,17 @@ public class FetchFromICloudActivity extends AppCompatActivity {
      */
     private int attempt = 1;
 
+    /** Whether anything was written, so the caller knows to redraw its list. */
+    private boolean importedSomething = false;
+
+    private BeaconRepository beaconRepo;
+
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.activity_fetch_from_icloud);
+        this.beaconRepo = new BeaconRepository(
+                OpenTagViewerDatabase.getInstance(this.getApplicationContext()));
         WindowPaddingUtil.insertUITopPadding(this.findViewById(R.id.icloud_scroll));
 
         if (this.getSupportActionBar() != null) {
@@ -216,7 +225,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         var async = this.icloud.unlock(this.chosenDevice.getSerial(), passcode)
                 .andThen(this.icloud.fetch())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::showResults, this::onUnlockFailed);
+                .subscribe(this::importEverything, this::onUnlockFailed);
     }
 
     /**
@@ -248,6 +257,36 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.findViewById(R.id.icloud_passcode_error_container).setVisibility(VISIBLE);
         this.updateAttemptCounter();
         this.showOnly(R.id.icloud_passcode_container, R.string.icloud_unlock_title);
+    }
+
+    /**
+     * Take everything the account holds, write it, and then show what was taken.
+     *
+     * <p><b>Everything, with nothing to choose.</b> Importing from the account is all of it; the
+     * screen that follows is an overview of what arrived, not a picker. Choosing a subset is what
+     * exporting is for, and that lives on the device list behind a long press.
+     */
+    private void importEverything(final ICloudFetch fetched) {
+        if (fetched.isEmpty()) {
+            this.showResults(fetched);
+            return;
+        }
+
+        this.setLoadingText(R.string.icloud_fetch_my_tags);
+
+        final List<String> wanted = new ArrayList<>();
+        for (final ICloudAccessory accessory : fetched.getAccessories()) {
+            wanted.add(accessory.getBeaconId());
+        }
+
+        var async = this.icloud.records(wanted)
+                .flatMap(this.beaconRepo::refreshAccountBeacons)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(held -> {
+                    Log.i(TAG, "Holding " + held.size() + " beacons for the account");
+                    this.importedSomething = true;
+                    this.showResults(fetched);
+                }, this::showFailure);
     }
 
     private void showResults(final ICloudFetch fetched) {
@@ -326,6 +365,19 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                                 : detail);
                 break;
         }
+    }
+
+    /** Whether this screen brought anything in, so the device list knows to redraw. */
+    public static final String RESULT_IMPORTED = "importedFromAccount";
+
+    @Override
+    public void finish() {
+        if (this.importedSomething) {
+            final android.content.Intent data = new android.content.Intent();
+            data.putExtra(RESULT_IMPORTED, true);
+            this.setResult(RESULT_OK, data);
+        }
+        super.finish();
     }
 
     private void leaveForFileImport() {
