@@ -194,8 +194,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
     /** Open a session and ask what the keychain can be recovered from. */
     private void start() {
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
-        this.setLoadingText(R.string.icloud_fetch_my_tags);
+        this.showWaiting(R.string.icloud_loading_looking_for_devices);
 
         if (this.icloud != null) {
             this.icloud.close();
@@ -226,7 +225,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             return;
         }
 
-        this.setLoadingText(R.string.icloud_fetch_my_tags);
+        this.showWaiting(R.string.icloud_loading_importing);
 
         var async = this.icloud.resume(membership.get().getPeerJson())
                 .andThen(this.icloud.fetch())
@@ -262,7 +261,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     }
 
     private void askForADevice() {
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
+        this.showWaiting(R.string.icloud_loading_looking_for_devices);
 
         var async = this.icloud.recoveryOptions()
                 .observeOn(AndroidSchedulers.mainThread())
@@ -319,8 +318,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             return;
         }
 
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
-        this.setLoadingText(R.string.icloud_unlock_title);
+        this.showWaiting(R.string.icloud_loading_unlocking);
 
         // Unlock, join, store, then read - in that order, and the store is not optional.
         //
@@ -381,7 +379,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             return;
         }
 
-        this.setLoadingText(R.string.icloud_fetch_my_tags);
+        this.setLoadingText(R.string.icloud_loading_importing);
 
         final List<String> wanted = new ArrayList<>();
         for (final ICloudAccessory accessory : fetched.getAccessories()) {
@@ -523,6 +521,19 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         data.putExtra(RESULT_WANTS_FILE_IMPORT, true);
         this.setResult(RESULT_OK, data);
         this.finish();
+    }
+
+    /**
+     * Show the spinner, saying what is being waited for.
+     *
+     * <p><b>Its own heading, not the next step's.</b> Every wait used to borrow "Unlock your
+     * Apple keychain", so the screen looked like the device list failing to populate rather than
+     * like work happening - which is exactly how it read to somebody watching.
+     */
+    private void showWaiting(final int captionResId) {
+        this.showOnly(R.id.icloud_loading_container, R.string.icloud_loading_title,
+                Direction.NONE);
+        this.setLoadingText(captionResId);
     }
 
     private void setLoadingText(final int stringResId) {

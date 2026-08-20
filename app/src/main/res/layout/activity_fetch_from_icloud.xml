@@ -60,11 +60,20 @@
             android:visibility="gone"
             tools:visibility="gone">
 
+            <!--
+              The same spinner the sign-in screen uses, configured the same way. Left bare it is
+              an arc with square ends and no ring behind it, which at this size reads as a stray
+              refresh glyph rather than as something turning.
+            -->
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:id="@+id/icloud_spinner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:indeterminate="true" />
+                android:indeterminate="true"
+                app:hideAnimationBehavior="inward"
+                app:showAnimationBehavior="inward"
+                app:trackColor="?attr/colorSurfaceVariant"
+                app:trackCornerRadius="2dp" />
 
             <TextView
                 android:id="@+id/icloud_loading_text"

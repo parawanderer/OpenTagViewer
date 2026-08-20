@@ -200,4 +200,8 @@
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">%1$s에 추가됨</string>
     <string name="icloud_send_your_friend_the_guide">친구에게 내보내는 방법 보여주기</string>
+    <string name="icloud_loading_title">Apple 계정을 읽는 중</string>
+    <string name="icloud_loading_looking_for_devices">잠금을 해제할 수 있는 기기를 찾는 중…</string>
+    <string name="icloud_loading_unlocking">잠금을 해제한 뒤 태그를 읽는 중…</string>
+    <string name="icloud_loading_importing">태그를 가져오는 중…</string>
 </resources>
