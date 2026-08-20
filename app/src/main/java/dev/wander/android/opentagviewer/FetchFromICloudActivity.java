@@ -203,9 +203,15 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.icloud = AppDependencies.icloud();
 
         if (this.icloud == null) {
-            // No usable signed-in account. Same recovery as a session that has expired, and
-            // handled by whoever launched this rather than by showing a dead screen.
-            Log.e(TAG, "No signed-in account, so the iCloud flow cannot start");
+            // Same recovery as a session that has expired, and handled by whoever launched this
+            // rather than by showing a dead screen.
+            //
+            // **Deliberately does not name a cause.** It used to say "no signed-in account",
+            // which is only one of the two ways this is null - the other is a session that could
+            // not be opened - and when that happened the log confidently blamed the sign-in while
+            // the real error sat two lines above it. Whatever failed has already logged why.
+            Log.e(TAG, "No usable iCloud session, so the flow cannot start."
+                    + " Either nobody is signed in, or opening the session failed - see above.");
             this.finish();
             return;
         }

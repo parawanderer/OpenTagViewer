@@ -213,4 +213,5 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="vendor_lookup_hint">%1$s est un identifiant d’entreprise Bluetooth SIG. Touchez pour le rechercher et découvrir qui a fabriqué cet accessoire.</string>
     <string name="rename_failed_title">Le nom n’a pas été modifié</string>
     <string name="rename_failed_message">Cette balise est nommée dans votre compte Apple : la renommer doit donc atteindre Apple, ce qui vient d’échouer. Rien n’a été modifié. Vérifiez votre connexion et réessayez.</string>
+    <string name="icloud_fetch_from_settings_subtitle">Ajouter les balises de votre compte, ou mettre à jour celles déjà présentes</string>
 </resources>

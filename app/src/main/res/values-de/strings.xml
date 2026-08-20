@@ -213,4 +213,5 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="vendor_lookup_hint">%1$s ist eine Firmenkennung der Bluetooth SIG. Tippe darauf, um nachzuschlagen, wer das hergestellt hat.</string>
     <string name="rename_failed_title">Der Name wurde nicht geändert</string>
     <string name="rename_failed_message">Dieser Tag wird in deinem Apple-Konto benannt, eine Umbenennung muss also Apple erreichen – und das hat gerade nicht geklappt. Es wurde nichts geändert. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="icloud_fetch_from_settings_subtitle">Die Tags aus deinem Konto hinzufügen oder die vorhandenen aktualisieren</string>
 </resources>
