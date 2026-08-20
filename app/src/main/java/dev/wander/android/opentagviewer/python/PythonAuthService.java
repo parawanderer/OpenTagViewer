@@ -8,6 +8,9 @@ import com.chaquo.python.Kwarg;
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,8 +63,15 @@ public final class PythonAuthService {
                 // The reason decides what the user is told; the message is the detail behind it.
                 // Absent from anything that raised before main.py classified failures.
                 final var reason = resultMap.get("reason");
+                // Present only for a terms failure, where authentication worked and the
+                // exchange after it did not - so this account still holds the session that
+                // agreeing needs. Null for every other reason, which is what stops it being
+                // stored in a state that fails every later fetch (issues #43 and #119).
+                final var pendingAccount = resultMap.get("account");
                 throw new PythonAccountLoginException(
-                        errorMessage, reason == null ? null : reason.toString());
+                        errorMessage,
+                        reason == null ? null : reason.toString(),
+                        pendingAccount);
             }
 
             // need to do an annoying conversion here...
@@ -104,6 +114,75 @@ public final class PythonAuthService {
                     loginState,
                     authMethods
             );
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Fetch the terms Apple is waiting on, rendered as text a person can read.
+     *
+     * <p>Only for the account carried by a {@link PythonAccountLoginException#REASON_TERMS}
+     * failure - it holds the authenticated session, and a fresh one would mean asking for the
+     * password again to reach a screen the user is already looking at.
+     */
+    public static Observable<List<TermsDocument>> pendingTerms(final PyObject account) {
+        return Observable.fromCallable(() -> {
+            var py = Python.getInstance();
+            var module = py.getModule(MODULE_MAIN);
+
+            final var answer = new JSONObject(
+                    module.callAttr("pendingTerms", account).toString());
+
+            if (!answer.optBoolean("ok", false)) {
+                throw new PythonAccountLoginException(
+                        answer.optString("message", "The terms of service could not be fetched."),
+                        PythonAccountLoginException.REASON_TERMS);
+            }
+
+            final JSONArray documents = answer.getJSONArray("documents");
+            final List<TermsDocument> found = new ArrayList<>();
+            for (int i = 0; i < documents.length(); i++) {
+                final JSONObject one = documents.getJSONObject(i);
+                found.add(new TermsDocument(
+                        one.getString("pageId"),
+                        one.getString("text"),
+                        one.getBoolean("canAccept")));
+            }
+
+            Log.d(TAG, "Apple is waiting on " + found.size() + " terms document(s)");
+
+            return found;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Agree to one document, and finish signing in once it was the last one.
+     *
+     * <p>One at a time, and only one that was shown - the page id names a document this sign-in
+     * actually fetched, and anything else is refused rather than guessed at. Recording agreement
+     * to something nobody saw is the failure worth designing against here.
+     */
+    public static Observable<TermsAcceptance> acceptTerms(
+            final PyObject account, final String pageId) {
+        return Observable.fromCallable(() -> {
+            var py = Python.getInstance();
+            var module = py.getModule(MODULE_MAIN);
+
+            final var answer = new JSONObject(
+                    module.callAttr("acceptTerms", account, pageId).toString());
+
+            if (!answer.optBoolean("ok", false)) {
+                throw new PythonAccountLoginException(
+                        answer.optString("message", "The terms of service could not be accepted."),
+                        PythonAccountLoginException.REASON_TERMS);
+            }
+
+            final int remaining = answer.getInt("remaining");
+            final String loginState =
+                    answer.isNull("loginState") ? null : answer.optString("loginState", null);
+
+            Log.d(TAG, "Accepted " + pageId + "; " + remaining + " left, state " + loginState);
+
+            return new TermsAcceptance(remaining, loginState);
         }).subscribeOn(Schedulers.io());
     }
 

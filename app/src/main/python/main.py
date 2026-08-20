@@ -8,7 +8,7 @@ from io import BytesIO
 import base64
 import NSKeyedUnArchiver
 
-from findmy import FindMyAccessory
+from findmy import FindMyAccessory, MobileMeDelegateError
 from findmy.accessory import FixedRollingKeyPairAccessory
 from findmy.reports import (
     RemoteAnisetteProvider,
@@ -286,6 +286,11 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None, **ident
 
 def loginSync(email: str, password: str, anisetteServerUrl: str,
               localAnisette: Any = None) -> dict:
+    # Bound before the try so the failure path can tell "no account was ever built" from "the
+    # account exists and the exchange after authentication failed" - which is the terms case,
+    # and the one where the account is still worth something.
+    acc: AppleAccount | None = None
+
     try:
         # A new sign-in, so this is the one place the app's own identity is used. Everything
         # restored from a stored account keeps whatever it was established with - see
@@ -347,10 +352,27 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
 
     except Exception as e:
         print(f"Failed to log in due to error: {traceback.format_exc()}")
-        return {
+
+        reason = classifyLoginFailure(e)
+        failure: dict[str, Any] = {
             "error": describeLoginFailure(e),
-            "reason": classifyLoginFailure(e),
+            "reason": reason,
         }
+
+        # **The account survives a terms failure, and only a terms failure.**
+        #
+        # Authentication itself worked here - it is the delegate exchange after it that did not
+        # - so this account holds the authenticated session that `fetch_terms`, `accept_terms`
+        # and `complete_login` all need. Building a second one would mean asking for the
+        # password again to reach a screen the user is already looking at.
+        #
+        # Withheld for every other reason on purpose. An account that failed for some other
+        # cause is not usable, and handing it to Java is an invitation to store it - which is
+        # the bad *write* that issues #43 and #119 are about.
+        if reason == REASON_TERMS and acc is not None:
+            failure["account"] = acc
+
+        return failure
 
 
 def exportToString(account: AppleAccount) -> str:
@@ -424,6 +446,16 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
 REASON_NETWORK = "network"
 """Could not reach Apple. Nothing was refused - nothing answered."""
 
+REASON_TERMS = "terms"
+"""
+Apple wants agreement to updated terms before this account can be used.
+
+**Not a broken sign-in, and the one failure here with a remedy inside the app.** Apple takes
+acceptance on one of its own devices or on iCloud.com and nowhere else - so a user of this app
+generally has neither, and without `pendingTerms`/`acceptTerms` they are stuck on a sign-in
+screen that keeps refusing them for a reason nothing tells them.
+"""
+
 REASON_UNKNOWN = "unknown"
 """Anything else. The detail is shown as-is, because a wrong guess is worse than raw text."""
 
@@ -440,6 +472,15 @@ _NETWORK_ERRORS = (
 def classifyLoginFailure(error: BaseException) -> str:
     """Which kind of failure this is, as a code the Java side maps to a localised sentence."""
     import asyncio
+
+    # First, because it is the only one of these the user can do anything about from here.
+    # Authentication itself worked and the delegate exchange that follows it did not; unaccepted
+    # terms are the one cause of that with a remedy in this app. **Which error value means
+    # "terms pending" is not established**, so this reports the possibility rather than asserting
+    # it - the screen offers to fetch them and says plainly that if the cause is something else,
+    # accepting terms will not fix it. The desktop CLI makes the same judgement the same way.
+    if isinstance(error, MobileMeDelegateError):
+        return REASON_TERMS
 
     if isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
         return REASON_NETWORK
@@ -470,6 +511,139 @@ def describeLoginFailure(error: BaseException) -> str:
     if not detail:
         return name
     return f"{name}: {detail}"
+
+
+_PENDING_TERMS: dict[str, Any] = {}
+"""
+The terms documents this sign-in fetched, by page id.
+
+**Held rather than round-tripped through Java, because acceptance takes the fetched object.**
+FindMy.py's `require_fetched` refuses a `Terms` that was rebuilt rather than returned by
+`fetch_terms`, and it is right to: agreeing is a legal act, and the thing agreed to must be the
+thing that was shown. A page id can cross the bridge; the document cannot.
+
+Module-level because signing in is one flow with one user at a time, and cleared on every fetch
+so a second attempt cannot accept a document from the first.
+"""
+
+_ACCEPTED_TERMS: set[str] = set()
+"""Which of them have been agreed to, so the last one knows it is the last one."""
+
+_UNWRAPPED = 10_000
+"""
+Wide enough that the renderer does not wrap, because on Android something else does.
+
+`exporter.terms.render` wraps to a terminal width, which is right for a terminal and wrong for a
+phone: a `TextView` re-wraps whatever it is given, so text already broken at 88 columns comes out
+ragged - short lines with a hard break in the middle of each. Passing a width nothing reaches
+leaves each paragraph as one line and lets the view lay it out for the screen it is actually on.
+
+The structure still survives, which is the part that matters: headings are upper-cased and
+underlined to their own length, and list items keep their `-` and indent.
+"""
+
+
+def pendingTerms(account: AppleAccount) -> str:
+    """
+    Fetch the terms Apple is waiting on, rendered as text a person can actually read.
+
+    **What arrives is a web page**, and putting its tags in front of somebody is not showing them
+    anything. `exporter.terms.render` turns it into text with its structure intact - headings that
+    read as headings, paragraphs wrapped, lists that look like lists - and nothing there shortens,
+    reorders or omits, because what is displayed is what gets agreed to.
+
+    Rendered here rather than in a WebView on the Java side deliberately: Apple's HTML references
+    external stylesheets and images, so a WebView would make network requests to display a legal
+    document, and this reuses the renderer the desktop exporter already has tests for.
+
+    Returns JSON. `documents` is in the order Apple gave them, each with the id it is accepted by,
+    the text to show, and whether it can be accepted at all - `agree_url` is empty for a document
+    Apple will not take agreement to here, which is a thing to say rather than a button to fail.
+    """
+    # Imported here rather than at module scope so an ordinary app start does not pay for bs4,
+    # and so main.py still imports where the shared package is absent.
+    from exporter import terms as termsRenderer
+
+    try:
+        documents = account.fetch_terms()
+    except Exception:
+        err = traceback.format_exc()
+        print(f"Could not fetch the terms of service: {err}")
+        return json.dumps({
+            "ok": False,
+            "reason": REASON_UNKNOWN,
+            "message": err.strip().splitlines()[-1] if err.strip() else "fetch_terms failed",
+        })
+
+    _PENDING_TERMS.clear()
+    _ACCEPTED_TERMS.clear()
+
+    rendered = []
+    for document in documents:
+        _PENDING_TERMS[document.page_id] = document
+        rendered.append({
+            "pageId": document.page_id,
+            "text": termsRenderer.render(document.html, width=_UNWRAPPED),
+            "canAccept": bool(document.agree_url),
+        })
+
+    print(f"Apple is waiting on {len(rendered)} terms document(s): "
+          f"{[d['pageId'] for d in rendered]}")
+
+    return json.dumps({"ok": True, "documents": rendered})
+
+
+def acceptTerms(account: AppleAccount, pageId: str) -> str:
+    """
+    Agree to one document, and finish signing in once the last one is done.
+
+    **One at a time, and only one that was shown.** The caller accepts the document the user just
+    read; a call naming anything else is refused rather than guessed at, because the alternative
+    is recording agreement to something nobody saw.
+
+    Signing in is completed only when every fetched document has been agreed to - `complete_login`
+    is the delegate exchange that failed in the first place, and running it with terms still
+    outstanding would just fail again.
+
+    Returns JSON carrying `remaining`, and on the last one `loginState`. **The caller must not
+    store the account unless that reads `LOGGED_IN`**: a blob written in any other state fails
+    every later fetch inside FindMy.py's own state check, which is issue #43 and issue #119.
+    """
+    document = _PENDING_TERMS.get(pageId)
+
+    if document is None:
+        return json.dumps({
+            "ok": False,
+            "reason": "no_such_document",
+            "message": f"No terms document called {pageId!r} was fetched for this sign-in.",
+        })
+
+    try:
+        account.accept_terms(document)
+        _ACCEPTED_TERMS.add(pageId)
+
+        remaining = [i for i in _PENDING_TERMS if i not in _ACCEPTED_TERMS]
+        print(f"Accepted terms {pageId!r}; {len(remaining)} document(s) still outstanding")
+
+        if remaining:
+            return json.dumps({"ok": True, "remaining": len(remaining)})
+
+        state = account.complete_login()
+        print(f"All terms accepted; signing in ended at {state}")
+
+        return json.dumps({
+            "ok": True,
+            "remaining": 0,
+            "loginState": str(getattr(state, "name", state)),
+        })
+    except Exception:
+        err = traceback.format_exc()
+        print(f"Could not accept the terms of service: {err}")
+        return json.dumps({
+            "ok": False,
+            "reason": REASON_UNKNOWN,
+            "message": err.strip().splitlines()[-1] if err.strip() else "accept_terms failed",
+        })
 
 
 def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:

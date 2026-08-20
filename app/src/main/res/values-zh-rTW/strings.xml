@@ -168,4 +168,12 @@
     <string name="custom_tag_explained">OpenHaystack 類型的標籤。它的金鑰由製作者產生，從未存在於 Apple 帳戶中，因此沒有來自 Apple 的名稱、表情符號或電量資訊 — 請在下方自行設定。</string>
     <string name="custom_tag_keys_remaining">%1$d 個預先產生的金鑰</string>
     <string name="login_failed_network">無法連線至 Apple。請檢查網路連線後再試一次。</string>
+    <string name="terms_title">Apple 需要你的同意</string>
+    <string name="terms_intro">你的密碼已被接受，但 Apple 需要你先同意這些條款才能使用該帳戶。下方為全文——這就是你將要同意的內容。</string>
+    <string name="terms_document_x_of_y">第 %1$d 份文件，共 %2$d 份</string>
+    <string name="terms_agree">同意</string>
+    <string name="terms_cannot_be_accepted_here">Apple 沒有提供記錄同意此文件的方式，因此無法在此同意。改為在 icloud.com 登入也許可行。</string>
+    <string name="terms_recording_agreement">正在記錄你的同意…</string>
+    <string name="terms_fetching">正在從 Apple 取得條款…</string>
+    <string name="login_failed_terms">登入已到達你的帳戶後停止。如果這與服務條款有關，可以在此查看並同意。如果是別的原因，同意條款並不能解決。</string>
 </resources>

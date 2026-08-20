@@ -1,5 +1,7 @@
 package dev.wander.android.opentagviewer.python;
 
+import com.chaquo.python.PyObject;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -47,6 +49,21 @@ public final class FakeAppleAuthService implements AppleAuthService {
     private AuthMethod codeSubmittedAgainst;
     private AnisetteSource anisetteUsed;
     private String serverUrlUsed;
+
+    /**
+     * Stands in for the half-signed-in account a terms failure carries.
+     *
+     * <p>Never called into - the screen only passes it back - so any non-null PyObject does.
+     * A real one would need Python and an Apple session, which is the whole reason this class
+     * exists.
+     */
+    public static final PyObject AN_ACCOUNT = PyObject.fromJava("an account");
+
+    private List<TermsDocument> termsDocuments = List.of();
+    private final List<String> acceptedPageIds = new ArrayList<>();
+    private String stateAfterAcceptingTerms = "LOGGED_IN";
+    private RuntimeException termsFetchFailsWith;
+    private RuntimeException acceptFailsWith;
 
     private FakeAppleAuthService(LOGIN_STATE loginState, List<AuthMethod> authMethods) {
         this.loginState = loginState;
@@ -150,6 +167,84 @@ public final class FakeAppleAuthService implements AppleAuthService {
     public Observable<byte[]> retrieveAuthData(final PythonAuthResponse authResponse) {
         this.calls.add("retrieveAuthData");
         return Observable.just(SESSION);
+    }
+
+    @Override
+    public Observable<List<TermsDocument>> pendingTerms(final PyObject account) {
+        this.calls.add("pendingTerms");
+
+        if (this.termsFetchFailsWith != null) {
+            return Observable.error(this.termsFetchFailsWith);
+        }
+
+        return Observable.just(this.termsDocuments);
+    }
+
+    @Override
+    public Observable<TermsAcceptance> acceptTerms(final PyObject account, final String pageId) {
+        this.calls.add("acceptTerms");
+        this.acceptedPageIds.add(pageId);
+
+        if (this.acceptFailsWith != null) {
+            return Observable.error(this.acceptFailsWith);
+        }
+
+        final int remaining = this.termsDocuments.size() - this.acceptedPageIds.size();
+
+        return Observable.just(new TermsAcceptance(
+                Math.max(remaining, 0),
+                remaining > 0 ? null : this.stateAfterAcceptingTerms));
+    }
+
+    /**
+     * An account Apple is waiting on terms for.
+     *
+     * <p>The documents are the point: what reaches the screen is what somebody would be agreeing
+     * to, so a test can assert the text on screen is the text that was handed over, unshortened.
+     */
+    public static FakeAppleAuthService wantsTermsAccepted(final TermsDocument... documents) {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, List.of());
+        fake.termsDocuments = List.of(documents);
+        // Carries an account, which is what tells "terms, and they can be shown" apart from a
+        // sign-in that merely stopped at the same place.
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "MobileMeDelegateError: TERMS",
+                PythonAccountLoginException.REASON_TERMS,
+                AN_ACCOUNT);
+
+        return fake;
+    }
+
+    /**
+     * Terms were the reported cause and there turned out to be none - so it was something else.
+     *
+     * <p>The case the screen must not present as "here are your terms", because which failure
+     * means "terms pending" is not established and this is how it finds out.
+     */
+    public static FakeAppleAuthService reportsTermsButHasNone() {
+        return wantsTermsAccepted();
+    }
+
+    /** Signing in ends somewhere other than LOGGED_IN even after every document is agreed. */
+    public FakeAppleAuthService endingAt(final String loginState) {
+        this.stateAfterAcceptingTerms = loginState;
+        return this;
+    }
+
+    public FakeAppleAuthService whereFetchingTermsFails(final RuntimeException failure) {
+        this.termsFetchFailsWith = failure;
+        return this;
+    }
+
+    public FakeAppleAuthService whereAgreeingFails(final RuntimeException failure) {
+        this.acceptFailsWith = failure;
+        return this;
+    }
+
+    /** Which documents were agreed to, in order, so a test can check nothing was skipped. */
+    public List<String> acceptedPageIds() {
+        return this.acceptedPageIds;
     }
 
     public List<String> calls() {

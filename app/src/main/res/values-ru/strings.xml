@@ -168,4 +168,12 @@
     <string name="custom_tag_explained">Метка в стиле OpenHaystack. Её ключи создал тот, кто её сделал, и они никогда не были в учётной записи Apple, поэтому у неё нет ни имени, ни эмодзи, ни уровня заряда от Apple — задайте свои ниже.</string>
     <string name="custom_tag_keys_remaining">%1$d заранее созданных ключей</string>
     <string name="login_failed_network">Не удалось связаться с Apple. Проверьте подключение и повторите попытку.</string>
+    <string name="terms_title">Apple требуется ваше согласие</string>
+    <string name="terms_intro">Пароль принят, но Apple ждёт вашего согласия с этими условиями, прежде чем учётной записью можно будет пользоваться. Ниже они приведены полностью — именно с этим вы соглашаетесь.</string>
+    <string name="terms_document_x_of_y">Документ %1$d из %2$d</string>
+    <string name="terms_agree">Согласен</string>
+    <string name="terms_cannot_be_accepted_here">Apple не предоставила способа зафиксировать согласие с этим документом, поэтому принять его здесь нельзя. Возможно, поможет вход на icloud.com.</string>
+    <string name="terms_recording_agreement">Отправка вашего согласия…</string>
+    <string name="terms_fetching">Загрузка условий от Apple…</string>
+    <string name="login_failed_terms">Вход дошёл до вашей учётной записи и остановился. Если дело в условиях обслуживания, их можно показать и принять здесь. Если в чём-то другом, принятие условий не поможет.</string>
 </resources>
