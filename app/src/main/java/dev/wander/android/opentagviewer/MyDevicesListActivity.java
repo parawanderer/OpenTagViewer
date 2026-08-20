@@ -97,10 +97,22 @@ public class MyDevicesListActivity extends AppCompatActivity {
             new ActivityResultContracts.StartActivityForResult(),
             (ActivityResult result) -> {
                 final Intent data = result.getData();
-                if (data != null
-                        && data.getBooleanExtra(
-                                FetchFromICloudActivity.RESULT_WANTS_FILE_IMPORT, false)) {
+                if (data == null) {
+                    return;
+                }
+
+                if (data.getBooleanExtra(
+                        FetchFromICloudActivity.RESULT_WANTS_FILE_IMPORT, false)) {
                     this.handleStartImport();
+                    return;
+                }
+
+                if (data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false)) {
+                    // Rebuilt rather than appended to. This screen accumulates into `beaconInfo`
+                    // on load, so fetching again would list everything twice - and the tags that
+                    // just arrived have to appear without the user backing out and returning.
+                    this.devicesListChanged = true;
+                    this.recreate();
                 }
             }
     );

@@ -37,4 +37,26 @@ public interface OwnedBeaconDao {
 
     @Delete
     void delete(OwnedBeacon ownedBeaconWithId);
+
+    /** The beacons currently held as a cache of the Apple account. */
+    @Query("SELECT id FROM OwnedBeacons WHERE from_account = 1 AND is_removed = 0")
+    List<String> getAccountBeaconIds();
+
+    /**
+     * Retire the account beacons that are no longer on the account.
+     *
+     * <p><b>Scoped to {@code from_account = 1}, and that scope is load-bearing.</b> A
+     * file-imported beacon is the only copy in existence - nobody else holds it and the export it
+     * came from may be long gone - so a refresh of what Apple holds must never reach one.
+     *
+     * <p>Marked removed rather than deleted, because {@code LocationReport} cascades on delete
+     * and a tag that leaves the account should not take its history with it.
+     */
+    @Query("UPDATE OwnedBeacons SET is_removed = 1"
+            + " WHERE from_account = 1 AND id NOT IN (:stillOnTheAccount)")
+    int retireAccountBeaconsMissingFrom(List<String> stillOnTheAccount);
+
+    /** The same, for an account that now holds nothing - `NOT IN ()` is not valid SQL. */
+    @Query("UPDATE OwnedBeacons SET is_removed = 1 WHERE from_account = 1")
+    int retireEveryAccountBeacon();
 }

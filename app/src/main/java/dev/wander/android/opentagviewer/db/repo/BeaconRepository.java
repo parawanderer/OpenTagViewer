@@ -24,6 +24,7 @@ import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
+import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.core.Completable;
@@ -74,6 +75,91 @@ public class BeaconRepository {
             }
         }).subscribeOn(Schedulers.io());
     }
+
+    /**
+     * Bring the beacons held for the Apple account into line with what it actually holds.
+     *
+     * <p><b>A refresh, not an import.</b> These rows are a cache of somebody's account: what is
+     * on it is written, and what has left it is retired. That is the whole reason
+     * {@code from_account} exists - a file-imported beacon is the only copy anyone has, so this
+     * must never touch one, and the DAO scopes every write accordingly.
+     *
+     * <p>Retired rather than deleted, so a tag that leaves the account does not take its location
+     * history with it on the way out.
+     *
+     * <p>Rows are written with {@code is_removed = 0}, which matters for a tag that left the
+     * account and later came back: without it the row would be restored still marked as gone.
+     *
+     * @return the ids now held for the account.
+     */
+    public Observable<List<String>> refreshAccountBeacons(
+            @NonNull final List<AccessoryRecords> fromAccount) {
+        return Observable.fromCallable(() -> {
+            try {
+                final List<String> ids = new ArrayList<>();
+                final List<OwnedBeacon> beacons = new ArrayList<>();
+                final List<BeaconNamingRecord> namingRecords = new ArrayList<>();
+
+                for (final AccessoryRecords record : fromAccount) {
+                    ids.add(record.getBeaconId());
+
+                    beacons.add(OwnedBeacon.builder()
+                            .id(record.getBeaconId())
+                            .importId(null)
+                            .version(ACCOUNT_SOURCED_VERSION)
+                            .content(record.getOwnedBeaconPlist())
+                            .alignmentPlist(record.getKeyAlignmentPlist())
+                            // Converted eagerly, exactly as a zip import does. Null on failure is
+                            // not fatal: the lazy backfill on first fetch handles it.
+                            .accessoryJson(this.accessoryJsonConverter.convert(
+                                    record.getOwnedBeaconPlist(), record.getKeyAlignmentPlist()))
+                            .fromAccount(true)
+                            .isRemoved(false)
+                            .build());
+
+                    if (record.getNamingRecordPlist() != null) {
+                        namingRecords.add(BeaconNamingRecord.builder()
+                                .id(record.getBeaconId())
+                                .importId(null)
+                                .version(ACCOUNT_SOURCED_VERSION)
+                                .content(record.getNamingRecordPlist())
+                                .build());
+                    }
+                }
+
+                if (!beacons.isEmpty()) {
+                    db.ownedBeaconDao().insertAll(beacons.toArray(new OwnedBeacon[0]));
+                }
+                if (!namingRecords.isEmpty()) {
+                    db.beaconNamingRecordDao()
+                            .insertAll(namingRecords.toArray(new BeaconNamingRecord[0]));
+                }
+
+                // `NOT IN ()` is not valid SQL, so an account that now holds nothing needs the
+                // other query rather than a list nobody can match against.
+                final int retired = ids.isEmpty()
+                        ? db.ownedBeaconDao().retireEveryAccountBeacon()
+                        : db.ownedBeaconDao().retireAccountBeaconsMissingFrom(ids);
+
+                Log.i(TAG, "Refreshed from the Apple account: " + ids.size()
+                        + " held, " + retired + " retired");
+
+                return ids;
+            } catch (Exception e) {
+                Log.e(TAG, "Error occurred while refreshing the beacons held for the account", e);
+                throw new RepoQueryException(e);
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The {@code version} recorded for a row that came from the account rather than a bundle.
+     *
+     * <p>A bundle's version is its export format, which is what tells a reader how to interpret
+     * the files in it. Nothing was exported here, so borrowing a format number would be a claim
+     * about a file that does not exist.
+     */
+    private static final String ACCOUNT_SOURCED_VERSION = "account";
 
     public Observable<Optional<Import>> getImportById(final long importId) {
         return Observable.fromCallable(() -> {
