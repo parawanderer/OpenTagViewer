@@ -158,6 +158,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
         this.binding.setHandleClickCloseSelection(this::endSelection);
         this.binding.setHandleClickSelectionMenu(this::showSelectionMenu);
+        this.binding.setHandleClickPageMenu(this::showPageMenu);
         this.showSelectionBar(false);
 
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
@@ -168,8 +169,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 .setOnClickListener(v -> this.handleStartImport());
 
         findViewById(R.id.my_devices_empty_fetch_button)
-                .setOnClickListener(v -> this.fetchFromICloudLauncher.launch(
-                        new Intent(this, FetchFromICloudActivity.class)));
+                .setOnClickListener(v -> this.openTheAccountFetch());
 
         findViewById(R.id.my_devices_empty_wiki_link)
                 .setOnClickListener(v -> this.openExportGuide());
@@ -315,6 +315,40 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * a menu that grows an item between versions is harder to learn than one where the item is
      * visibly not ready. The XML disables it; this is where to stop doing that.
      */
+    /**
+     * The two ways to get tags in, from a screen that already has some.
+     *
+     * <p><b>Both of these used to be reachable only from the empty state</b>, which is hidden the
+     * moment anything is imported - so after a first import there was no way back to either. It
+     * matters most for the account route: the app joins the keychain precisely so that a later
+     * read costs one tap and no device passcode, and there was nothing to tap.
+     */
+    private void showPageMenu() {
+        final PopupMenu menu = new PopupMenu(
+                this, this.binding.settingsTopToolbar.pageMenuButton);
+        menu.getMenuInflater().inflate(R.menu.my_devices_menu, menu.getMenu());
+
+        menu.setOnMenuItemClickListener(item -> {
+            final int id = item.getItemId();
+
+            if (id == R.id.action_fetch_from_account) {
+                this.openTheAccountFetch();
+                return true;
+            }
+            if (id == R.id.action_import_from_file) {
+                this.handleStartImport();
+                return true;
+            }
+            return false;
+        });
+
+        menu.show();
+    }
+
+    private void openTheAccountFetch() {
+        this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
+    }
+
     private void showSelectionMenu() {
         PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
         menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
