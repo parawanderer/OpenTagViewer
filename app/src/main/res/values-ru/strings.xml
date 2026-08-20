@@ -215,4 +215,5 @@
     <string name="rename_failed_message">Имя этой метки хранится в вашей учётной записи Apple, поэтому переименование должно дойти до Apple — сейчас этого не произошло. Ничего не изменилось. Проверьте подключение и повторите попытку.</string>
     <string name="icloud_fetch_from_settings_subtitle">Добавить метки из вашей учётной записи или обновить уже добавленные</string>
     <string name="icloud_fetch_from_settings_linked">Связано с вашей учётной записью Apple. Нажмите, чтобы проверить новые или изменённые метки.</string>
+    <string name="icloud_link_account_action">Связать метки через учётную запись Apple</string>
 </resources>

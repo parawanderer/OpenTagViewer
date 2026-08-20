@@ -215,4 +215,5 @@
     <string name="rename_failed_message">此标签的名称保存在你的 Apple 账户中，因此重命名需要送达 Apple，而刚才没有成功。没有任何更改。请检查网络连接后重试。</string>
     <string name="icloud_fetch_from_settings_subtitle">添加你账户中的标签，或更新已导入的标签</string>
     <string name="icloud_fetch_from_settings_linked">已关联你的 Apple 账户。点按可检查是否有新增或变更的标签。</string>
+    <string name="icloud_link_account_action">通过 Apple 账户关联标签</string>
 </resources>

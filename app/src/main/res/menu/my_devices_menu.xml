@@ -17,9 +17,16 @@
         apple.xml, whose paths are hardcoded black - it would be invisible in dark mode the day
         somebody rendered this menu somewhere that does show them.
     -->
+    <!--
+        **Linking, not fetching, and it goes away once done.** This is how somebody who has only
+        ever imported zips connects their account; after that the app is a member of the keychain
+        and reads it without asking anything, so offering "link" again describes work that has
+        already happened. Re-reading on demand lives in Settings, where the row says the account
+        is linked.
+    -->
     <item
         android:id="@+id/action_fetch_from_account"
-        android:title="@string/icloud_fetch_my_tags" />
+        android:title="@string/icloud_link_account_action" />
 
     <item
         android:id="@+id/action_import_from_file"
