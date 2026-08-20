@@ -25,6 +25,7 @@ import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
 import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
+import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import io.reactivex.rxjava3.core.Completable;
@@ -149,6 +150,40 @@ public class BeaconRepository {
                 Log.e(TAG, "Error occurred while refreshing the beacons held for the account", e);
                 throw new RepoQueryException(e);
             }
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Write a name and emoji that iCloud has already accepted into the stored naming record.
+     *
+     * <p><b>Only after the account has taken the change</b>, never before and never instead. This
+     * is what makes the tag's real name change rather than acquiring a nickname over the top of
+     * it - see {@link dev.wander.android.opentagviewer.util.parse.NamingRecordEditor} for why the
+     * difference is not cosmetic.
+     *
+     * <p>Silently does nothing for a tag with no naming record. CloudKit holds none for an
+     * accessory nobody ever named, and a rename of one of those is a change the next account read
+     * will bring back properly - there is nothing here to edit in the meantime, and inventing a
+     * record would put a document in the database that Apple never sent.
+     */
+    public Completable renameStoredAccessory(
+            @NonNull final String beaconId, final String name, final String emoji) {
+        return Completable.fromAction(() -> {
+            // **Any nickname over this tag has to go.** The name being written is now the tag's
+            // real one, and an override wins at display time - leaving one would hide the value
+            // that was just sent to Apple behind the value it replaced.
+            db.userBeaconOptionsDao().deleteById(beaconId);
+
+            final BeaconNamingRecord stored = db.beaconNamingRecordDao().getByBeaconId(beaconId);
+
+            if (stored == null) {
+                Log.i(TAG, "No stored naming record for " + beaconId
+                        + "; the next account read will bring the new name back");
+                return;
+            }
+
+            stored.content = NamingRecordEditor.with(stored.content, name, emoji);
+            db.beaconNamingRecordDao().insertAll(stored);
         }).subscribeOn(Schedulers.io());
     }
 

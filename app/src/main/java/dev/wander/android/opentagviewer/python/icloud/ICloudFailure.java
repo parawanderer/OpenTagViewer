@@ -68,6 +68,19 @@ public enum ICloudFailure {
     /** An accessory was asked for that this session never fetched. Also a bug in the screen. */
     NO_SUCH_ACCESSORY,
 
+    /**
+     * A rename was asked for on one of the owner's own devices.
+     *
+     * <p>An iPhone, iPad or Mac takes its name from more places than the naming record, so
+     * writing that one would leave Find My disagreeing with the device itself. The app nicknames
+     * those locally instead and goes on showing the real name beside the nickname.
+     *
+     * <p>Reaching here means the screen offered a write it should not have - the two sides
+     * decide from the same {@code is_own_device}, so it is a disagreement worth logging rather
+     * than a state a user can create.
+     */
+    NOT_AN_ACCESSORY,
+
     /** Anything else. The detail carries what there is to say. */
     UNKNOWN;
 
@@ -92,6 +105,7 @@ public enum ICloudFailure {
             case "not_unlocked": return NOT_UNLOCKED;
             case "membership_unusable": return MEMBERSHIP_UNUSABLE;
             case "no_such_accessory": return NO_SUCH_ACCESSORY;
+            case "not_an_accessory": return NOT_AN_ACCESSORY;
             default: return UNKNOWN;
         }
     }

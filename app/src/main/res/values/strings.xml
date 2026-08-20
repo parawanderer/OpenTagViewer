@@ -246,4 +246,6 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="source">Source</string>
     <string name="source_your_apple_account">Read from your Apple account</string>
     <string name="vendor_lookup_hint">%1$s is a Bluetooth SIG company identifier. Tap to look it up and find out who made this.</string>
+    <string name="rename_failed_title">The name was not changed</string>
+    <string name="rename_failed_message">This tag is named in your Apple account, so renaming it has to reach Apple — and that did not work just now. Nothing has changed. Check your connection and try again.</string>
 </resources>

@@ -54,6 +54,8 @@ import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -66,6 +68,8 @@ import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.HardwareDescriber;
+import dev.wander.android.opentagviewer.python.icloud.AccessoryRenamer;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -100,6 +104,18 @@ public class DeviceInfoActivity extends AppCompatActivity {
      * stop it rather than letting it land wherever it lands.
      */
     private Disposable hardwareLookup;
+
+    /**
+     * Whether this is one of the owner's own devices, once the shared heuristic has said.
+     *
+     * <p><b>Null until it answers, and null is not false.</b> Renaming writes to the account only
+     * when this is definitely false, so an unanswered question leaves the screen on the cautious
+     * road - a local nickname, which changes nothing anybody else can see.
+     */
+    private Boolean isOwnDevice;
+
+    /** The in-flight write to the account, so leaving the screen does not land on dead views. */
+    private Disposable accountRename;
 
     private boolean hasNameChanges = false;
 
@@ -318,10 +334,36 @@ public class DeviceInfoActivity extends AppCompatActivity {
         }));
     }
 
+    /**
+     * Whether renaming this tag changes the account or only this app.
+     *
+     * <p><b>An accessory read from iCloud keeps its name in one place</b> - the naming record -
+     * so renaming it there is the whole rename, and it shows up in Find My on the owner's own
+     * devices. Everything else gets a nickname: one of the owner's own devices takes its name
+     * from several places and writing this record would leave Find My disagreeing with the
+     * device, and a tag imported from a file was never on this account to begin with.
+     *
+     * <p><b>Both halves have to be true, and neither is guessed.</b> {@code isOwnDevice} is
+     * answered by the shared heuristic across the bridge, and is null until it does answer -
+     * which is treated as "not an accessory", because the cautious mistake is a local nickname
+     * and the other one writes to somebody's account.
+     */
+    private boolean renamingWritesToTheAccount() {
+        return this.beaconInformation.isFromAccount() && Boolean.FALSE.equals(this.isOwnDevice);
+    }
+
     private void saveUpdatedDeviceName(final String newDeviceName) {
         final String oldDeviceName = this.beaconInformation.getName();
 
         if (oldDeviceName.equals(newDeviceName)) return; // nothing to do, no change
+
+        if (this.renamingWritesToTheAccount()) {
+            this.writeToTheAccount(newDeviceName, "", () -> {
+                this.binding.setDeviceName(this.beaconInformation.getName());
+                this.binding.setPageTitle(this.getDeviceNameForTitle());
+            });
+            return;
+        }
 
         this.beaconInformation.setUserOverrideName(newDeviceName);
         // save changes...
@@ -338,6 +380,69 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 binding.setPageTitle(this.getDeviceNameForTitle());
             },
             error -> Log.e(TAG, "Error occurred while trying to update user-facing device name for beaconId=" + this.beaconId, error));
+    }
+
+    /**
+     * Write the change to iCloud, then to the stored record, then redraw.
+     *
+     * <p><b>In that order, and nothing local happens first.</b> A rename that failed on the
+     * network and still changed the screen would be the app telling the user something about
+     * their account that is not true - so a failure says so and leaves everything exactly as it
+     * was, rather than quietly demoting itself to a nickname.
+     *
+     * <p>The stored naming record is edited rather than covered with a nickname, because a
+     * nickname wins at display time forever: the next rename made on the owner's iPhone would
+     * arrive and be hidden behind it.
+     *
+     * @param name    the new name, or empty when only the emoji is changing.
+     * @param emoji   the new emoji, or empty when only the name is changing.
+     * @param redraw  what to run on the main thread once the change is real.
+     */
+    private void writeToTheAccount(final String name, final String emoji, final Runnable redraw) {
+        this.showRenameInProgress(true);
+
+        final AccessoryRenamer renamer = new AccessoryRenamer(new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil()));
+
+        this.accountRename = renamer
+                .rename(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw(),
+                        name, emoji)
+                .andThen(this.beaconRepo.renameStoredAccessory(
+                        this.beaconId,
+                        name.isEmpty() ? null : name,
+                        emoji.isEmpty() ? null : emoji))
+                .andThen(this.beaconRepo.getById(this.beaconId).firstOrError())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        reread -> {
+                            this.beaconData = reread;
+                            // Rebuilt from the record that was just written, so what is on screen
+                            // is what the account holds - not a value this screen remembered
+                            // sending.
+                            this.beaconInformation = BeaconDataParser.parse(List.of(reread)).get(0);
+                            this.hasNameChanges = true;
+                            this.showRenameInProgress(false);
+                            redraw.run();
+                        },
+                        error -> {
+                            Log.e(TAG, "Could not rename " + this.beaconId + " in iCloud", error);
+                            this.showRenameInProgress(false);
+                            this.sayTheRenameDidNotHappen();
+                        });
+    }
+
+    private void showRenameInProgress(final boolean busy) {
+        this.findViewById(R.id.device_rename_progress).setVisibility(busy ? VISIBLE : GONE);
+    }
+
+    private void sayTheRenameDidNotHappen() {
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.rename_failed_title)
+                .setIcon(R.drawable.warning_24px)
+                .setMessage(R.string.rename_failed_message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
     }
 
     private void handleEditDeviceEmoji() {
@@ -369,6 +474,14 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         final String oldEmoji = this.beaconInformation.getEmoji();
         if (oldEmoji != null && oldEmoji.equals(newEmoji)) return; // nothing to do, no change
+
+        if (this.renamingWritesToTheAccount()) {
+            this.writeToTheAccount("", newEmoji, () -> {
+                this.visualiseDeviceEmoji();
+                this.binding.setPageTitle(this.getDeviceNameForTitle());
+            });
+            return;
+        }
 
         this.beaconInformation.setUserOverrideEmoji(newEmoji);
 
@@ -413,6 +526,12 @@ public class DeviceInfoActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (this.hardwareLookup != null && !this.hardwareLookup.isDisposed()) {
             this.hardwareLookup.dispose();
+        }
+        // **Disposed, but the write is not cancelled** - it is already on its way to Apple, and
+        // there is no undoing that from here. What this stops is the result landing on views
+        // that have gone.
+        if (this.accountRename != null && !this.accountRename.isDisposed()) {
+            this.accountRename.dispose();
         }
         super.onDestroy();
     }
@@ -468,15 +587,20 @@ public class DeviceInfoActivity extends AppCompatActivity {
         this.hardwareLookup = Observable
                 .fromCallable(() -> Pair.create(
                         Optional.ofNullable(describer.describe(plist)),
-                        Optional.ofNullable(describer.whereToLookUp(plist))))
+                        Pair.create(
+                                Optional.ofNullable(describer.whereToLookUp(plist)),
+                                Optional.ofNullable(describer.isOwnDevice(plist)))))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         answers -> {
                             answers.first.ifPresent(this.binding::setDeviceType);
-                            if (answers.second.isPresent()) {
+                            if (answers.second.first.isPresent()) {
                                 this.offerToLookTheVendorUp();
                             }
+                            // Left null when the heuristic could not say, which keeps renaming
+                            // local. See the field.
+                            this.isOwnDevice = answers.second.second.orElse(null);
                         },
                         error -> Log.w(TAG, "Could not describe this accessory; "
                                 + "keeping the label already shown", error));

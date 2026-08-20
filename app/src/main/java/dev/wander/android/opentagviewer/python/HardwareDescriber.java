@@ -36,4 +36,24 @@ public interface HardwareDescriber {
      * there is nothing worth saying - which is the common case.
      */
     String whereToLookUp(String plistXml);
+
+    /**
+     * Whether this is one of the owner's own devices rather than an accessory.
+     *
+     * <p><b>What decides whether renaming writes to iCloud or stays a local nickname.</b> An
+     * AirTag or a Find My-certified tag keeps its name in the naming record and nowhere else, so
+     * writing that record is the whole rename. An iPhone, iPad or Mac takes its name from more
+     * places, so writing it would leave Find My disagreeing with the device itself.
+     *
+     * <p><b>Asked rather than worked out here</b>, for the same reason as {@link #describe}: the
+     * rule is two signals - an Apple model identifier like {@code iPad13,18}, or the
+     * {@code secureLocationsSharedSecret} only a device carries - and the exporter asks the same
+     * question to decide that handing over a Mac's keys is not the same act as handing over an
+     * AirTag's. Two copies of that would be one copy going stale.
+     *
+     * <p><b>Null means "not established"</b>, which is not the same as false. Python has not
+     * answered, or could not read the record, and the caller must then take the cautious road -
+     * a nickname changes nothing anybody else can see, and a wrong write cannot be taken back.
+     */
+    Boolean isOwnDevice(String plistXml);
 }

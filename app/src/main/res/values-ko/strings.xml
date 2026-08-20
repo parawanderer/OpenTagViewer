@@ -211,4 +211,6 @@
     <string name="source">출처</string>
     <string name="source_your_apple_account">Apple 계정에서 읽어옴</string>
     <string name="vendor_lookup_hint">%1$s은(는) Bluetooth SIG 회사 식별자입니다. 탭하면 어디에서 만든 것인지 찾아볼 수 있습니다.</string>
+    <string name="rename_failed_title">이름이 변경되지 않았습니다</string>
+    <string name="rename_failed_message">이 태그의 이름은 Apple 계정에 저장되어 있어 이름을 바꾸려면 Apple에 전달되어야 하는데, 방금은 실패했습니다. 변경된 내용은 없습니다. 연결을 확인한 뒤 다시 시도하세요.</string>
 </resources>

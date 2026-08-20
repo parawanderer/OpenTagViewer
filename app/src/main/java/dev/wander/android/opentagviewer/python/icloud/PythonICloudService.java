@@ -119,6 +119,14 @@ public class PythonICloudService implements ICloudService {
     }
 
     @Override
+    public Completable rename(final String beaconId, final String plistXml,
+                              final String name, final String emoji) {
+        return Completable.fromAction(
+                        () -> answered("rename", beaconId, plistXml, name, emoji))
+                .subscribeOn(Schedulers.io());
+    }
+
+    @Override
     public Observable<ICloudFetch> fetch() {
         return Observable.fromCallable(() -> {
             final JSONObject answer = answered("fetch");

@@ -1348,3 +1348,25 @@ def whereToLookUpHardware(plistXml: str) -> str | None:
     except Exception:
         print(f"whereToLookUpHardware failed, carrying on without it: {traceback.format_exc()}")
         return None
+
+
+def isOwnDeviceHardware(plistXml: str) -> str | None:
+    """
+    Whether this record is one of the owner's own devices rather than an accessory.
+
+    **What decides whether a rename writes to iCloud or stays a local nickname.** See
+    `opentagviewer_export.hardware.is_own_device`, and `icloud_bridge.ICloudSession.rename`, which
+    asks the same question again before writing - this one shapes the screen, that one is the
+    guard.
+
+    Returns `"True"` or `"False"` as a string, and **None when it could not be established**,
+    which is not the same as False. A record that will not parse must leave the caller cautious
+    rather than confidently writing to somebody's account.
+    """
+    try:
+        from opentagviewer_export.hardware import is_own_device
+
+        return str(is_own_device(util_files.read_data_plist(plistXml.encode("utf-8"))))
+    except Exception:
+        print(f"isOwnDeviceHardware failed, carrying on without it: {traceback.format_exc()}")
+        return None

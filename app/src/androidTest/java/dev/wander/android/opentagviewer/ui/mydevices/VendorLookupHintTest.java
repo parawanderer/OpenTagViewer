@@ -90,6 +90,12 @@ public class VendorLookupHintTest {
         public String whereToLookUp(final String plistXml) {
             return this.lookup;
         }
+
+        /** Not what this class is about; an accessory, so nothing here offers to write. */
+        @Override
+        public Boolean isOwnDevice(final String plistXml) {
+            return Boolean.FALSE;
+        }
     }
 
     @Before

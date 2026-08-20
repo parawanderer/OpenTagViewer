@@ -105,6 +105,33 @@ public interface ICloudService {
     Observable<List<AccessoryRecords>> records(List<String> beaconIds);
 
     /**
+     * Change an accessory's name and emoji in iCloud. <b>The other call that writes.</b>
+     *
+     * <p>Unlike {@link #join}, this changes something the owner sees: the name and emoji Find My
+     * shows for the accessory, on their own devices. For an AirTag or a Find My-certified tag the
+     * naming record is the only place those live, so writing it <i>is</i> the rename.
+     *
+     * <p><b>Refused for one of the owner's own devices</b>, with
+     * {@link ICloudFailure#NOT_AN_ACCESSORY}. An iPhone, iPad or Mac takes its name from more
+     * places than this record, so writing one would leave Find My disagreeing with the device
+     * itself - those get a local nickname instead. Python decides, from the stored plist, using
+     * the same {@code is_own_device} the exporter uses; the app must not re-derive that rule.
+     *
+     * <p>Needs keychain keys, so it follows {@link #resume} or {@link #unlock} in the same
+     * session. Without them it fails with {@link ICloudFailure#NOT_UNLOCKED}, which is a session
+     * to reopen rather than an error to show.
+     *
+     * @param beaconId  the accessory's identifier - what {@code associatedBeacon} names.
+     * @param plistXml  its stored {@code OwnedBeacons} plist, which is how Python tells an
+     *                  accessory from a device without reading the whole account.
+     * @param name      the new name, or empty to leave it as it is.
+     * @param emoji     the new emoji, or empty to leave it as it is. <b>Empty means "leave
+     *                  alone", not "clear it"</b> - sending both every time would blank the emoji
+     *                  of every accessory anybody renamed.
+     */
+    Completable rename(String beaconId, String plistXml, String name, String emoji);
+
+    /**
      * Close the client.
      *
      * <p>Call it from a {@code finally}: two of the steps hold sockets, and an abandoned session

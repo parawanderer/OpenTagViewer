@@ -273,6 +273,19 @@
                         app:title="@{@string/imported_at}" />
 
                     <!--
+                        Shown while a rename is on its way to iCloud. Renaming an accessory is a
+                        network round trip rather than a local edit, and without this the screen
+                        looks like it ignored the change for as long as that takes.
+                    -->
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/device_rename_progress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <!--
                         Shown instead of the three rows above for a tag read from the Apple
                         account: nothing was exported and nothing was imported, so those rows
                         have nothing true to say. Exactly one of the two sets is visible.

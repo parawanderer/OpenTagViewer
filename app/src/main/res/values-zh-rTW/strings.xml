@@ -211,4 +211,6 @@
     <string name="source">來源</string>
     <string name="source_your_apple_account">讀取自你的 Apple 帳戶</string>
     <string name="vendor_lookup_hint">%1$s 是藍牙技術聯盟（SIG）的廠商識別碼。點一下即可查詢它出自哪家廠商。</string>
+    <string name="rename_failed_title">名稱未變更</string>
+    <string name="rename_failed_message">此標籤的名稱儲存在你的 Apple 帳戶中，因此重新命名需要送達 Apple，而剛才沒有成功。沒有任何變更。請檢查網路連線後再試一次。</string>
 </resources>

@@ -211,4 +211,6 @@
     <string name="source">取得元</string>
     <string name="source_your_apple_account">Apple アカウントから読み取り</string>
     <string name="vendor_lookup_hint">%1$s は Bluetooth SIG の企業識別子です。タップすると、どこの製品か調べられます。</string>
+    <string name="rename_failed_title">名前は変更されませんでした</string>
+    <string name="rename_failed_message">このタグの名前は Apple アカウントにあるため、変更するには Apple に届く必要がありますが、今回は届きませんでした。何も変更されていません。接続を確認してもう一度お試しください。</string>
 </resources>
