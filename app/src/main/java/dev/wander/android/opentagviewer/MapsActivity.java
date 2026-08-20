@@ -81,6 +81,7 @@ import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityMapsBinding;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
@@ -102,6 +103,7 @@ import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
+import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PermissionUtil;
 import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
@@ -111,6 +113,7 @@ import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
 import dev.wander.android.opentagviewer.util.rx.BeaconLocationHistory;
 import dev.wander.android.opentagviewer.util.rx.LongFetchBannerState;
 import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
+import dev.wander.android.opentagviewer.util.rx.AccountReadPolicy;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -185,6 +188,29 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     /** When a refresh is allowed, and how much history it should ask for. See RefreshPolicyTest. */
     // Shared across activity instances on purpose - see RefreshPolicy.shared. Rebuilding this
     // screen must not look like an app that has never spoken to Apple.
+    /**
+     * How often the app re-reads the Apple account on its own.
+     *
+     * <p><b>Six hours, against the location refresh's one minute.</b> These answer different
+     * questions: locations change constantly and are the point of the map, while what tags exist
+     * changes when somebody adds one in Find My or renames it - rare, and never urgent. A read
+     * also decrypts every record on the account and queues behind the location fetches, so doing
+     * it eagerly costs the user's own work rather than just bandwidth.
+     */
+    private static final long WAIT_BEFORE_REREADING_ACCOUNT = 6L * 60 * 60 * 1000;
+
+    private final AccountReadPolicy accountReadPolicy =
+            new AccountReadPolicy(WAIT_BEFORE_REREADING_ACCOUNT);
+
+    /**
+     * Whether an Apple account is linked, as of the last time this screen resumed.
+     *
+     * <p>Cached rather than asked on every tick: the answer lives in the encrypted datastore, and
+     * the tick runs every minute. It can only become true while this screen is away - linking
+     * happens on another one - so resuming is exactly when it is worth asking again.
+     */
+    private volatile boolean accountIsLinked = false;
+
     private final RefreshPolicy refreshPolicy =
             RefreshPolicy.shared(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
 
@@ -427,6 +453,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
          // TODO: when a user changes their anisette URL in settings and returns here, this should be able to deal with querying the new URL
 
+        this.rememberWhetherAnAccountIsLinked();
         this.refreshIfAllowed();
         this.reSchedulePeriodicTagLocationRefresher();
         
@@ -454,6 +481,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.nextLocationRefreshTask = () -> {
             refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
             this.refreshIfAllowed();
+            this.rereadTheAccountIfAllowed();
         };
         refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
     }
@@ -476,6 +504,55 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
         this.fetchAndUpdateCurrentBeacons();
         Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
+    }
+
+    /**
+     * Ask the account what it holds now, if it is time and nothing else is running.
+     *
+     * <p><b>Silent by design.</b> Nobody asked for this, so there is nothing to show and nothing
+     * to report: it succeeds by the device list quietly being right, and by the map picking up a
+     * tag that was added in Find My without anybody going to look for a button.
+     *
+     * <p>The device list is only rebuilt when something actually changed, because rebuilding it
+     * moves rows under whoever is reading them.
+     */
+    private void rereadTheAccountIfAllowed() {
+        final long now = System.currentTimeMillis();
+
+        final AccountReadPolicy.Decision decision = this.accountReadPolicy.decide(
+                now, this.accountIsLinked, PythonAppleService.isBusy());
+
+        if (!decision.shouldRead()) {
+            return;
+        }
+
+        // Marked before it runs, not after. A read that takes twenty minutes queued behind a
+        // location fetch must not earn another one the moment it finishes.
+        this.accountReadPolicy.markRead(now);
+        Log.d(TAG, "Re-reading the Apple account in the background");
+
+        var async = new AccountRefresher(
+                new KeychainMembershipRepository(
+                        UserAuthDataStore.getInstance(this.getApplicationContext()),
+                        new AppCryptographyUtil()),
+                this.beaconRepo)
+                .refresh()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> Log.i(TAG, "Background account read holds " + held.size() + " tags"),
+                        error -> Log.w(TAG, "Background account read failed", error));
+    }
+
+    private void rememberWhetherAnAccountIsLinked() {
+        var async = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .get()
+                .firstOrError()
+                .subscribeOn(Schedulers.io())
+                .subscribe(
+                        held -> this.accountIsLinked = held.isPresent(),
+                        error -> Log.w(TAG, "Could not tell whether an account is linked", error));
     }
 
     public void onClickMoreSettings(View view)
