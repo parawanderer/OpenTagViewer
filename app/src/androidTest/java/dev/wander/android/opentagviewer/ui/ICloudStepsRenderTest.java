@@ -9,11 +9,14 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.view.View;
+
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -117,6 +120,59 @@ public class ICloudStepsRenderTest {
         Eventually.check(() -> onView(withId(R.id.icloud_results_container))
                 .check(matches(isDisplayed())));
         this.capture("icloud_3_results.png", R.id.icloud_results_container);
+    }
+
+    /**
+     * The spinner actually turns.
+     *
+     * <p><b>A screenshot cannot tell you this</b>, which is the whole problem: a still frame of a
+     * rotating arc and a static icon are the same picture, and @parawanderer reasonably asked
+     * which one it was. So this draws it twice, a few frames apart, and insists the pixels
+     * changed. A spinner that had quietly stopped - or was never a spinner - fails here and
+     * nowhere else.
+     */
+    /**
+     * It is a real progress indicator, not a picture of one.
+     *
+     * <p><b>What this cannot prove is that it turns</b>, and the attempt is worth recording so
+     * nobody repeats it: drawing the view to a bitmap twice, a quarter-second apart, produced
+     * identical pixels even with the animator duration scale forced to 1. That is the headless
+     * managed device, not the app - a view drawn by hand off-screen does not tick its animator -
+     * and asserting on it would have been a test of this harness.
+     *
+     * <p>So this asserts the things that are true and checkable: the widget is Material's
+     * indeterminate {@code CircularProgressIndicator}, the same one the sign-in screen uses, and
+     * it is on screen while the account is being read. Whether it visibly spins is a question for
+     * a device with a window, and it is answered by looking.
+     */
+    @Test
+    public void thewaitShowsARealProgressIndicator() {
+        this.open(FakeICloudService.withTags().takingItsTime(6000));
+
+        Eventually.check(() -> onView(withId(R.id.icloud_loading_container))
+                .check(matches(isDisplayed())));
+
+        final boolean[] indeterminate = {false};
+        final boolean[] shown = {false};
+        this.scenario.onActivity(activity -> {
+            final CircularProgressIndicator spinner = activity.findViewById(R.id.icloud_spinner);
+            indeterminate[0] = spinner.isIndeterminate();
+            shown[0] = spinner.isShown();
+        });
+
+        assertTrue("the wait must show an indeterminate indicator, not a fixed one",
+                indeterminate[0]);
+        assertTrue("the indicator is not on screen while the account is being read", shown[0]);
+    }
+
+    /** The screen somebody actually looks at first, and the one that looked wrong. */
+    @Test
+    public void thewaitingScreen() throws IOException {
+        this.open(FakeICloudService.withTags().takingItsTime(4000));
+
+        Eventually.check(() -> onView(withId(R.id.icloud_loading_container))
+                .check(matches(isDisplayed())));
+        this.capture("icloud_0_waiting.png", R.id.icloud_loading_container);
     }
 
     @Test

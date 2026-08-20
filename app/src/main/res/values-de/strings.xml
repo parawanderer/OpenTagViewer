@@ -200,4 +200,8 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">hinzugefügt %1$s</string>
     <string name="icloud_send_your_friend_the_guide">Deinem Kontakt zeigen, wie das Exportieren geht</string>
+    <string name="icloud_loading_title">Apple-Konto wird gelesen</string>
+    <string name="icloud_loading_looking_for_devices">Es wird nach einem Gerät gesucht, das entsperren kann …</string>
+    <string name="icloud_loading_unlocking">Entsperren, dann werden deine Tags gelesen …</string>
+    <string name="icloud_loading_importing">Deine Tags werden übernommen …</string>
 </resources>

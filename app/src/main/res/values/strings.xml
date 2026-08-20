@@ -235,4 +235,8 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">added %1$s</string>
     <string name="icloud_send_your_friend_the_guide">Show your friend how to export</string>
+    <string name="icloud_loading_title">Reading your Apple account</string>
+    <string name="icloud_loading_looking_for_devices">Looking for a device that can unlock it…</string>
+    <string name="icloud_loading_unlocking">Unlocking, then reading your tags…</string>
+    <string name="icloud_loading_importing">Bringing your tags in…</string>
 </resources>

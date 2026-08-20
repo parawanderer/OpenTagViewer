@@ -200,4 +200,8 @@
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">%1$s 新增</string>
     <string name="icloud_send_your_friend_the_guide">把匯出方法傳給朋友</string>
+    <string name="icloud_loading_title">正在讀取你的 Apple 帳戶</string>
+    <string name="icloud_loading_looking_for_devices">正在尋找可以解鎖的裝置…</string>
+    <string name="icloud_loading_unlocking">正在解鎖，然後讀取你的標籤…</string>
+    <string name="icloud_loading_importing">正在匯入你的標籤…</string>
 </resources>

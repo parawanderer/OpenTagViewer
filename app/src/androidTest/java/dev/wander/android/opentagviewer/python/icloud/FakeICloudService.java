@@ -63,6 +63,7 @@ public final class FakeICloudService implements ICloudService {
 
     /** How many times a passcode is refused before it starts being accepted. */
     private int refusalsBeforeAccepting = 0;
+    private long answerDelayMs = 0;
 
     private final List<String> calls = new ArrayList<>();
     private final List<String> unlockedWith = new ArrayList<>();
@@ -162,8 +163,23 @@ public final class FakeICloudService implements ICloudService {
     @Override
     public Observable<List<RecoverableDevice>> recoveryOptions() {
         this.calls.add("recoveryOptions");
-        return this.optionsFailsWith == null
-                ? Observable.just(this.devices) : Observable.error(this.optionsFailsWith);
+        if (this.optionsFailsWith != null) {
+            return Observable.error(this.optionsFailsWith);
+        }
+
+        final Observable<List<RecoverableDevice>> answer = Observable.just(this.devices);
+
+        // A real account takes a moment. Everything else here is instant, which is right for a
+        // test and useless for looking at the screen somebody sees while they wait.
+        return this.answerDelayMs > 0
+                ? answer.delay(this.answerDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                : answer;
+    }
+
+    /** Take this long to answer, so the waiting screen can be seen or captured. */
+    public FakeICloudService takingItsTime(final long millis) {
+        this.answerDelayMs = millis;
+        return this;
     }
 
     @Override

@@ -200,4 +200,8 @@
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">добавлено %1$s</string>
     <string name="icloud_send_your_friend_the_guide">Показать другу, как сделать экспорт</string>
+    <string name="icloud_loading_title">Чтение вашей учётной записи Apple</string>
+    <string name="icloud_loading_looking_for_devices">Поиск устройства, которое может разблокировать…</string>
+    <string name="icloud_loading_unlocking">Разблокировка, затем чтение ваших меток…</string>
+    <string name="icloud_loading_importing">Загрузка ваших меток…</string>
 </resources>

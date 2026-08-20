@@ -200,4 +200,8 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="icloud_device_badges">%1$s  ·  %2$s</string>
     <string name="icloud_device_added_on">ajouté le %1$s</string>
     <string name="icloud_send_your_friend_the_guide">Montrer à votre ami comment exporter</string>
+    <string name="icloud_loading_title">Lecture de votre compte Apple</string>
+    <string name="icloud_loading_looking_for_devices">Recherche d’un appareil capable de le déverrouiller…</string>
+    <string name="icloud_loading_unlocking">Déverrouillage, puis lecture de vos balises…</string>
+    <string name="icloud_loading_importing">Importation de vos balises…</string>
 </resources>
