@@ -32,7 +32,7 @@ from tkinter import messagebox, ttk
 from typing import Callable, Sequence
 from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
-from exporter import icloud, localsource, source
+from exporter import icloud, localsource, source, terms
 from exporter.asyncui import Asker, Cancelled, run_with_progress
 from exporter.codes import (
     VERIFICATION_CODE_LENGTH,
@@ -48,7 +48,12 @@ from exporter.custom_tags import (
     suggested_identifier,
     suggested_name,
 )
-from findmy import InvalidCredentialsError
+from findmy import (
+    InvalidCredentialsError,
+    LoginState,
+    MobileMeDelegateError,
+    TermsError,
+)
 from findmy.keychain.recovery import RecoveryError
 
 from exporter.icloud import Candidate, ExportSourceError
@@ -79,6 +84,11 @@ EXPORT_METADATA_VIA_NAME = EXPORT_VIA_WIZARD
 TICKED = "\u25a0"
 UNTICKED = "\u25a1"
 
+# How wide the terms are wrapped, and how wide the box that shows them is. One number rather than
+# two, because they have to agree: `terms.render` hard-wraps at whatever it is given, so a box
+# narrower than that wraps every line a second time and produces a ragged short line under each.
+_TERMS_COLUMNS = 88
+
 TICKED_ROW = "ticked"
 """
 The tag that colours a ticked row, using this platform's own selection colour.
@@ -94,6 +104,19 @@ _KEY_FILE_TYPES = [
     ("Key files", "*.json *.keys *.txt"),
     ("All files", "*.*"),
 ]
+
+
+class TermsDeclined(Exception):
+    """
+    The user read Apple's terms of service and said no.
+
+    **The one answer this window cannot carry on from**, and the only reason it is not just
+    another `ExportSourceError`. Everything else that goes wrong here leaves the button there to
+    try again, because trying again is a sensible thing to do. This does not: Apple will not
+    complete the delegate exchange for an account with terms pending, so a second attempt reaches
+    the same document and asks the same question. Offering a retry would be pretending the answer
+    might change by itself.
+    """
 
 
 class WizardApp(tk.Tk):
@@ -281,10 +304,13 @@ class WizardApp(tk.Tk):
         """
         Read whichever source this machine can use, and add what it holds to the list.
 
-        **Nothing closes the window from here.** This runs when a button is pressed rather than
-        when the program starts, so a sign-in that fails, or one the user changes their mind about
-        half way through, leaves them where they were - with whatever they had already added from
-        a key file still in the list, and the button still there to try again.
+        **Almost nothing closes the window from here.** This runs when a button is pressed rather
+        than when the program starts, so a sign-in that fails, or one the user changes their mind
+        about half way through, leaves them where they were - with whatever they had already added
+        from a key file still in the list, and the button still there to try again.
+
+        The single exception is refusing Apple's terms of service, which is not a failure that
+        trying again can get past - see :class:`TermsDeclined`.
         """
         try:
             fetched = (
@@ -294,6 +320,21 @@ class WizardApp(tk.Tk):
             )
         except Cancelled:
             # They closed the progress window, which says stop this - not close everything.
+            return
+        except TermsDeclined as declined:
+            # **The one exception to the paragraph above**, and it is deliberate. Every other
+            # failure leaves the window open because trying again might work; this one cannot,
+            # since the same terms are waiting on the next attempt and the answer was no. So it
+            # says what that means, confirms nothing was sent, and closes.
+            logger.info("Terms of service declined: %s", declined)
+            messagebox.showinfo(
+                "Terms not accepted",
+                f"Nothing was sent, and your Apple account is unchanged.\n\n"
+                f"Apple will not let anything read this account until the {declined} terms are"
+                " accepted, so there is nothing more this exporter can do. You can accept them"
+                " on an Apple device or at icloud.com, or run this again and read them here.",
+            )
+            self.destroy()
             return
         except (ExportSourceError, ExportError) as e:
             messagebox.showerror("Could not read your accessories", str(e))
@@ -367,29 +408,37 @@ class WizardApp(tk.Tk):
             if not email or not password:
                 raise ExportSourceError("Signing in was cancelled.")
 
-            await icloud.log_in(
-                account,
-                email,
-                password,
-                choose_second_factor=lambda methods: _async(
-                    asker.ask(lambda: _ask_choice(self, "Verification", "How should Apple send the code?", methods)),
-                ),
-                get_code=lambda: _async(
-                    asker.ask(lambda: _ask_string(
-                        self,
-                        "Verification",
-                        f"The {VERIFICATION_CODE_LENGTH}-digit code Apple sent:",
-                        valid=is_verification_code,
-                        transform=verification_code,
-                    )),
-                ),
-                retry_credentials=lambda error, attempt: _async(
-                    _ask_again_for_credentials(self, asker, error, attempt),
-                ),
-                retry_code=lambda error, attempt: _async(
-                    _ask_again_for_code(self, asker, error, attempt),
-                ),
-            )
+            try:
+                await icloud.log_in(
+                    account,
+                    email,
+                    password,
+                    choose_second_factor=lambda methods: _async(
+                        asker.ask(lambda: _ask_choice(
+                            self, "Verification", "How should Apple send the code?", methods,
+                        )),
+                    ),
+                    get_code=lambda: _async(
+                        asker.ask(lambda: _ask_string(
+                            self,
+                            "Verification",
+                            f"The {VERIFICATION_CODE_LENGTH}-digit code Apple sent:",
+                            valid=is_verification_code,
+                            transform=verification_code,
+                        )),
+                    ),
+                    retry_credentials=lambda error, attempt: _async(
+                        _ask_again_for_credentials(self, asker, error, attempt),
+                    ),
+                    retry_code=lambda error, attempt: _async(
+                        _ask_again_for_code(self, asker, error, attempt),
+                    ),
+                )
+            except MobileMeDelegateError as e:
+                # Authentication worked; the exchange that follows it did not. Unaccepted terms
+                # are the one cause of that with a remedy here - and which error value means
+                # "terms pending" is not established, so this looks rather than assumes.
+                await _accept_pending_terms(self, account, asker, e)
 
             # Registered a device by now; remembering it stops the next export registering another.
             icloud.remember(account)
@@ -871,6 +920,157 @@ def _ask_choice(parent: tk.Tk, title: str, prompt: str, options: Sequence[str]) 
     parent.wait_window(window)
 
     return chosen.get()
+
+
+def _build_terms_window(parent: tk.Tk, document, index: int, total: int):
+    """
+    Build the terms dialog, and hand back the answer it will write into.
+
+    **Split from :func:`_show_terms` so that it can be tested.** Everything worth checking here is
+    in the widgets - the document is shown whole, no markup survives, closing means no - and all
+    of it is unreachable from a test once `grab_set` and `wait_window` have been called, because
+    those hand control to a nested event loop and a window manager. Building and showing are two
+    steps for that reason and no other.
+
+    :returns: The window, and a dict whose `value` is the answer. It starts False: the default for
+        a contract nobody answered has to be the one that sends nothing, so Reject, Escape and the
+        window's close button all leave it alone and only Accept sets it.
+
+    **Fixed-pitch, and that is not a cosmetic choice.** :func:`exporter.terms.render` wraps to a
+    column count and underlines its headings with a row of dashes as long as the heading - which
+    lines up in a terminal and in nothing else. In a proportional font every heading rule comes
+    out the wrong length, and a contract that looks broken invites the reasonable conclusion that
+    it has been tampered with.
+
+    Nothing here shortens or summarises: what is on screen is the document Apple sent, because it
+    is what pressing Accept agrees to.
+    """
+    window = tk.Toplevel(parent)
+    window.title(f"Apple's terms of service - {document.page_id}")
+    window.transient(parent)
+
+    frame = ttk.Frame(window, padding=16)
+    frame.pack(fill="both", expand=True)
+    frame.grid_columnconfigure(0, weight=1)
+    frame.grid_rowconfigure(1, weight=1)
+
+    # Said above the document rather than after it: somebody who has just typed a password and is
+    # suddenly looking at a contract needs to know why before they start reading it.
+    counted = f" ({index} of {total})" if total > 1 else ""
+    ttk.Label(
+        frame,
+        text=(
+            f"Apple will not finish signing you in until these terms are accepted{counted}."
+            " They are shown in full - this is what you would be agreeing to.\n\n"
+            "Accepting records your agreement on your Apple account. Nothing has been sent yet."
+        ),
+        wraplength=560,
+        justify="left",
+    ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
+
+    text = tk.Text(frame, wrap="word", width=_TERMS_COLUMNS, height=28, font="TkFixedFont")
+    text.grid(row=1, column=0, sticky="nsew")
+
+    scrollbar = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+    scrollbar.grid(row=1, column=1, sticky="ns")
+    text.configure(yscrollcommand=scrollbar.set)
+
+    text.insert("1.0", terms.render(document.html, _TERMS_COLUMNS))
+    # Read-only rather than merely discouraged. A Text is editable by default, and a contract you
+    # can type into is not the document that was fetched.
+    text.configure(state="disabled")
+
+    accepted = {"value": False}
+
+    def _accept() -> None:
+        accepted["value"] = True
+        window.destroy()
+
+    buttons = ttk.Frame(frame)
+    buttons.grid(row=2, column=0, columnspan=2, sticky="e", pady=(12, 0))
+    ttk.Button(buttons, text="Reject", command=window.destroy).pack(side="right", padx=(8, 0))
+    ttk.Button(buttons, text="Accept", command=_accept).pack(side="right")
+
+    # No Return binding, deliberately. Every other dialog here submits on Return because its
+    # answer is something the user typed; this one's answer is agreement to a contract, and a
+    # stray keypress landing on it is not agreement.
+    window.bind("<Escape>", lambda _event: window.destroy())
+
+    return window, accepted
+
+
+def _show_terms(parent: tk.Tk, document, index: int, total: int) -> bool:
+    """
+    Show one terms document in full, and wait for it to be agreed to or refused.
+
+    :returns: True only if Accept was pressed. See :func:`_build_terms_window`, which is where
+        everything except the waiting lives.
+    """
+    window, accepted = _build_terms_window(parent, document, index, total)
+
+    centre_over(window, parent)
+    window.grab_set()
+    parent.wait_window(window)
+
+    return accepted["value"]
+
+
+async def _accept_pending_terms(parent: tk.Tk, account, asker: Asker, error) -> None:
+    """
+    Show whatever Apple wants agreeing to, and finish the sign-in if it is agreed to.
+
+    **Only reached when signing in has already failed** on the delegate exchange, which is what an
+    account with unaccepted terms does. Apple takes acceptance on one of its own devices or on
+    iCloud.com and nowhere else, so somebody with neither is stuck without this - which is the
+    whole reason the CLI grew it, and there was no reason for the window not to have it too.
+
+    **Unlike the CLI, this does not ask permission to fetch first.** The CLI asks because it is
+    about to page a document at a terminal and cannot take that back. Here the fetch decides
+    whether there is anything to show at all, so asking first would mean offering to look and then
+    reporting that there was nothing - where simply looking reports Apple's own message unchanged.
+
+    :param error: What the delegate exchange said. Carried so that a failure for some other reason
+        is reported as Apple worded it, rather than as "no terms found".
+    :raises TermsDeclined: If any document is rejected. Nothing is sent for it, and no later
+        document is shown.
+    """
+    try:
+        documents = await account.fetch_terms()
+    except TermsError as e:
+        raise ExportSourceError(
+            f"Signing in stopped at your account:\n\n{error}\n\n"
+            f"Asking Apple which terms are pending also failed:\n\n{e}",
+        ) from e
+
+    if not documents:
+        # Signing in failed for some other reason, and accepting nothing would not fix it. Apple's
+        # own words, because they are the only description of the actual problem anyone has.
+        raise ExportSourceError(
+            f"Signing in got as far as your account and then stopped:\n\n{error}\n\n"
+            "There are no terms of service waiting to be accepted, so this is something else.",
+        )
+
+    for index, document in enumerate(documents, start=1):
+        # Bound as a default argument: the lambda runs on the main thread after this iteration has
+        # moved on, and a closure over the loop variable would show the last document every time.
+        agreed = asker.ask(
+            lambda d=document, i=index: _show_terms(parent, d, i, len(documents)),
+        )
+        if not agreed:
+            raise TermsDeclined(document.page_id)
+
+        try:
+            await account.accept_terms(document)
+        except TermsError as e:
+            raise ExportSourceError(
+                f"Apple did not record agreement to the {document.page_id} terms:\n\n{e}",
+            ) from e
+
+    # The step `login` would have run itself had the terms not been pending. Without it the
+    # account is left at AUTHENTICATED - readable, and unusable for everything after this.
+    state = await account.complete_login()
+    if state != LoginState.LOGGED_IN:
+        raise ExportSourceError(f"The terms were accepted, but signing in ended at {state}.")
 
 
 async def _async(value):
