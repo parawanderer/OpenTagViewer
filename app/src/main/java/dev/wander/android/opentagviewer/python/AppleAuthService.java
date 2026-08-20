@@ -1,5 +1,9 @@
 package dev.wander.android.opentagviewer.python;
 
+import com.chaquo.python.PyObject;
+
+import java.util.List;
+
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethod;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
@@ -37,4 +41,16 @@ public interface AppleAuthService {
 
     /** The session to store, once signing in has succeeded. */
     Observable<byte[]> retrieveAuthData(PythonAuthResponse authResponse);
+
+    /**
+     * The terms Apple is waiting on, rendered as text, for the account a terms failure carried.
+     *
+     * <p>An empty list means the sign-in stopped for some other reason - which failure value
+     * means "terms pending" is not established, so this is how the screen finds out rather than
+     * by asserting a cause.
+     */
+    Observable<List<TermsDocument>> pendingTerms(PyObject account);
+
+    /** Agree to one document, and finish signing in if it was the last. */
+    Observable<TermsAcceptance> acceptTerms(PyObject account, String pageId);
 }

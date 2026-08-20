@@ -308,6 +308,74 @@ class TestAgreeing:
         assert not json.loads(main.acceptTerms(account, "iCloud"))["ok"]
 
 
+class FakeSigningIn:
+    """An account whose `login` raises, for driving `loginSync`'s failure path."""
+
+    def __init__(self, raising: BaseException) -> None:
+        self._raising = raising
+        self.login_state = LoginState.LOGGED_OUT
+
+    def login(self, email: str, password: str):
+        raise self._raising
+
+
+@pytest.fixture
+def signingIn(monkeypatch):
+    """`loginSync`, with the Anisette and identity machinery stubbed out."""
+
+    def attempt(raising: BaseException):
+        account = FakeSigningIn(raising)
+        monkeypatch.setattr(main, "AppleAccount", lambda *a, **k: account)
+        monkeypatch.setattr(main, "_anisetteProvider", lambda *a, **k: object())
+        monkeypatch.setattr(main.app_identity, "identityForNewSession", lambda _: {})
+        monkeypatch.setattr(main.app_identity, "deviceIdsForNewSession", lambda _: {})
+
+        return account, main.loginSync("someone@example.com", "hunter2", "https://ani.example")
+
+    return attempt
+
+
+class TestTheAccountSurvivesLongEnoughToAgree:
+    """
+    The seam the screen depends on, and the one that is easy to leave out.
+
+    Authentication worked and the exchange after it failed, so the account holds the session
+    `fetch_terms` and `complete_login` both need. Without it the app would have to ask for the
+    password again to reach a screen the user is already looking at.
+    """
+
+    def test_a_terms_failure_hands_the_account_back(self, signingIn):
+        account, answer = signingIn(MobileMeDelegateError(localized_error="TERMS"))
+
+        assert answer["reason"] == main.REASON_TERMS
+        assert answer["account"] is account
+
+    def test_any_other_failure_does_not(self, signingIn):
+        """
+        Withheld on purpose. An account that failed for another reason is not usable, and
+        handing it over is an invitation to store it - the bad write behind #43 and #119.
+        """
+        _, answer = signingIn(TimeoutError())
+
+        assert answer["reason"] == main.REASON_NETWORK
+        assert "account" not in answer
+
+    def test_a_failure_before_the_account_exists_is_not_a_crash(self, monkeypatch):
+        # `acc` is bound before the try precisely so this path cannot raise UnboundLocalError
+        # on top of the failure it is already reporting.
+        monkeypatch.setattr(main, "_anisetteProvider", _raising)
+
+        answer = main.loginSync("someone@example.com", "hunter2", "https://ani.example")
+
+        assert "account" not in answer
+        assert answer["error"]
+
+
+def _raising(*_args, **_kwargs):
+    msg = "no anisette today"
+    raise RuntimeError(msg)
+
+
 class TestRecognisingThatTermsAreWhyTheSignInFailed:
     def test_a_delegate_failure_is_reported_as_terms(self):
         assert main.classifyLoginFailure(

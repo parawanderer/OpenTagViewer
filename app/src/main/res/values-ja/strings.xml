@@ -168,4 +168,12 @@
     <string name="custom_tag_explained">OpenHaystack 方式のタグです。鍵は作成者が生成したもので、Apple アカウントに登録されたことがありません。そのため Apple 由来の名前・絵文字・バッテリー残量はありません。以下でご自身で設定してください。</string>
     <string name="custom_tag_keys_remaining">事前生成された鍵 %1$d 個</string>
     <string name="login_failed_network">Apple に接続できませんでした。通信環境を確認して、もう一度お試しください。</string>
+    <string name="terms_title">Apple の利用条件への同意が必要です</string>
+    <string name="terms_intro">パスワードは受け付けられましたが、アカウントを使用する前に Apple がこの利用条件への同意を求めています。以下に全文を表示します。これが同意する内容です。</string>
+    <string name="terms_document_x_of_y">%2$d 件中 %1$d 件目</string>
+    <string name="terms_agree">同意する</string>
+    <string name="terms_cannot_be_accepted_here">この文書への同意を記録する方法が Apple から提供されなかったため、ここでは同意できません。icloud.com でのサインインをお試しください。</string>
+    <string name="terms_recording_agreement">同意を記録しています…</string>
+    <string name="terms_fetching">Apple から利用条件を取得しています…</string>
+    <string name="login_failed_terms">サインインはアカウントまで進んで停止しました。利用規約が原因であれば、ここで表示して同意できます。別の原因であれば、同意しても解決しません。</string>
 </resources>

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Apple's terms of service, shown because there is nowhere else this user can accept them:
+  Apple takes agreement on one of its own devices or on iCloud.com, and somebody using this app
+  generally has neither.
+
+  **Its own file rather than another block inside activity_apple_login.** That layout pulls in
+  the settings panel, which cannot inflate outside an activity - so a test of this step would
+  have had to launch the whole sign-in screen, and the point of a layout test is that it needs
+  no activity, no account and no network. See TermsStepLayoutTest.
+
+  The document goes in a fixed-height scrolling box rather than growing the page. It runs to
+  tens of kilobytes, and a page that long turns the Agree button into something a person has to
+  scroll past an entire contract to find - which reads as the button being missing.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/login_terms_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:visibility="gone"
+    tools:visibility="visible">
+
+    <TextView
+        android:id="@+id/login_terms_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/nunito_medium"
+        android:paddingBottom="8dp"
+        android:text="@string/terms_title"
+        android:textSize="20sp" />
+
+    <TextView
+        android:id="@+id/login_terms_intro"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="8dp"
+        android:text="@string/terms_intro" />
+
+    <TextView
+        android:id="@+id/login_terms_counter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="8dp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textStyle="bold"
+        tools:text="Document 1 of 2" />
+
+    <ScrollView
+        android:id="@+id/login_terms_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/login_terms_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="13sp"
+            tools:text="ICLOUD TERMS OF SERVICE" />
+
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/login_terms_cannot_accept"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:text="@string/terms_cannot_be_accepted_here"
+        android:textColor="?attr/colorError"
+        android:visibility="gone"
+        tools:visibility="gone" />
+
+    <!-- Same two buttons the rest of this screen uses, so they look and behave the same. -->
+    <Button
+        android:id="@+id/login_terms_agree_button"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/nunito_medium"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:text="@string/terms_agree"
+        android:textSize="18sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="8dp"
+        android:gravity="left"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/login_terms_back_button"
+            style="?attr/materialIconButtonFilledTonalStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/arrow_back_24px"
+            app:iconTint="?attr/colorOnSecondaryContainer" />
+
+    </LinearLayout>
+
+</LinearLayout>

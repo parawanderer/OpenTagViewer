@@ -168,4 +168,12 @@
     <string name="custom_tag_explained">OpenHaystack 방식의 태그입니다. 키는 만든 사람이 직접 생성했고 Apple 계정에 등록된 적이 없어, Apple에서 받은 이름·이모지·배터리 정보가 없습니다. 아래에서 직접 설정하세요.</string>
     <string name="custom_tag_keys_remaining">미리 생성된 키 %1$d개</string>
     <string name="login_failed_network">Apple에 연결할 수 없습니다. 연결 상태를 확인한 후 다시 시도해 주세요.</string>
+    <string name="terms_title">Apple의 약관 동의가 필요합니다</string>
+    <string name="terms_intro">암호는 승인되었지만, 계정을 사용하려면 Apple이 이 약관에 대한 동의를 요구합니다. 아래에 전문이 표시됩니다. 이것이 동의하게 되는 내용입니다.</string>
+    <string name="terms_document_x_of_y">%2$d개 중 %1$d번째 문서</string>
+    <string name="terms_agree">동의</string>
+    <string name="terms_cannot_be_accepted_here">이 문서에 대한 동의를 기록할 방법을 Apple이 제공하지 않아 여기서는 동의할 수 없습니다. icloud.com에서 로그인하면 될 수 있습니다.</string>
+    <string name="terms_recording_agreement">동의를 기록하는 중…</string>
+    <string name="terms_fetching">Apple에서 약관을 가져오는 중…</string>
+    <string name="login_failed_terms">로그인이 계정까지 진행된 뒤 멈췄습니다. 서비스 약관 때문이라면 여기서 보고 동의할 수 있습니다. 다른 이유라면 약관에 동의해도 해결되지 않습니다.</string>
 </resources>
