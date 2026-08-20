@@ -17,6 +17,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.content.Intent;
 
 import androidx.test.core.app.ActivityScenario;
@@ -297,6 +299,112 @@ public class RemoveAccountTagTest {
         onView(withId(R.id.device_settings_exported_by)).check(matches(not(isDisplayed())));
         onView(withId(R.id.device_settings_exported_at)).check(matches(not(isDisplayed())));
         onView(withId(R.id.device_settings_imported_at)).check(matches(not(isDisplayed())));
+
+        this.capture("tag_page-from_account.png");
+    }
+
+    /**
+     * What the overflow menu offers for an account tag, and what tapping it says.
+     *
+     * <p>Remove is <b>listed</b> rather than hidden or greyed out, matching what
+     * {@code device_selection_menu.xml} already does with Export Tag: a menu that changes shape
+     * between one tag and the next is harder to learn than one where every item is always there.
+     * A disabled item would also be a dead end - it is the explanation, not the absence of the
+     * button, that tells somebody where to go.
+     *
+     * <p>Pictures only; the behaviour is asserted by the two tests above.
+     */
+    @Test
+    public void thepictureOfTheMenuAndWhatItSays() {
+        final Intent intent = new Intent(
+                getInstrumentation().getTargetContext(), DeviceInfoActivity.class);
+        intent.putExtra("beaconId", FROM_ACCOUNT);
+        this.scenario = ActivityScenario.launch(intent);
+
+        Eventually.check(() -> onView(withId(R.id.page_menu_button))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.page_menu_button)).perform(click());
+        Eventually.check(() -> onView(withText(R.string.remove_device))
+                .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
+        this.captureWindowShowing(withText(R.string.remove_device), "tag_page-menu.png");
+
+        onView(withText(R.string.remove_device)).inRoot(isPlatformPopup()).perform(click());
+        Eventually.check(() -> onView(withText(R.string.cannot_remove_account_tag_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        this.captureWindowShowing(
+                withText(R.string.cannot_remove_account_tag_title), "tag_page-cannot_remove.png");
+    }
+
+    /**
+     * The window as it stands, for a person to look at.
+     *
+     * <p>Not an assertion - every one of these screens is asserted on separately. It is here
+     * because "does the new row read like a fact or like a field that failed to load" is a
+     * question a picture answers and a matcher does not.
+     */
+    private void capture(final String name) {
+        final Bitmap[] shot = new Bitmap[1];
+        this.scenario.onActivity(activity -> shot[0] = draw(activity.getWindow().getDecorView()));
+        write(shot[0], name);
+    }
+
+    /**
+     * The same, for something that is not in the activity's window.
+     *
+     * <p><b>A popup menu and an alert dialog each get a window of their own</b>, so drawing the
+     * activity's decor view photographs the screen behind them - a plausible-looking picture of
+     * the wrong thing. {@code UiAutomation.takeScreenshot()} is the obvious answer and is worse:
+     * on the headless managed device it returned the same blank bitmap for every call, four
+     * byte-identical files, which is a screenshot test that can never fail.
+     *
+     * <p>So this reaches a view inside the window and draws upward from it. Whatever root that
+     * view belongs to is the window it is in, by definition.
+     */
+    private void captureWindowShowing(final org.hamcrest.Matcher<android.view.View> inside,
+                                      final String name) {
+        final Bitmap[] shot = new Bitmap[1];
+        onView(inside).perform(new androidx.test.espresso.ViewAction() {
+            @Override
+            public org.hamcrest.Matcher<android.view.View> getConstraints() {
+                return isDisplayed();
+            }
+
+            @Override
+            public String getDescription() {
+                return "draw the window this view is in";
+            }
+
+            @Override
+            public void perform(final androidx.test.espresso.UiController controller,
+                                final android.view.View view) {
+                controller.loopMainThreadUntilIdle();
+                shot[0] = draw(view.getRootView());
+            }
+        });
+        write(shot[0], name);
+    }
+
+    private static Bitmap draw(final android.view.View view) {
+        final Bitmap bitmap = Bitmap.createBitmap(
+                Math.max(view.getWidth(), 1), Math.max(view.getHeight(), 1),
+                Bitmap.Config.ARGB_8888);
+        view.draw(new Canvas(bitmap));
+        return bitmap;
+    }
+
+    private static void write(final Bitmap bitmap, final String name) {
+        final String directory = androidx.test.platform.app.InstrumentationRegistry
+                .getArguments().getString("additionalTestOutputDir");
+        if (directory == null || bitmap == null) {
+            return;
+        }
+
+        try (java.io.FileOutputStream out =
+                     new java.io.FileOutputStream(new java.io.File(directory, name))) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+        } catch (final java.io.IOException e) {
+            throw new AssertionError("could not write " + name, e);
+        }
     }
 
     /** And a tag that did come from a bundle still describes the bundle. */
@@ -312,6 +420,8 @@ public class RemoveAccountTagTest {
 
         onView(withId(R.id.device_settings_imported_at)).check(matches(isDisplayed()));
         onView(withId(R.id.device_settings_source)).check(matches(not(isDisplayed())));
+
+        this.capture("tag_page-from_a_file.png");
     }
 
     /** And it still offers it for a tag that is the app's own. */
