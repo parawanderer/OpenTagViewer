@@ -210,4 +210,5 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="remove_devices_but_keep_account_ones">%1$d hiervan komen uit je Apple-account en blijven staan — verwijder die in Zoek mijn op een Apple-apparaat. De rest wordt uit deze app verwijderd.</string>
     <string name="source">Bron</string>
     <string name="source_your_apple_account">Uitgelezen uit je Apple-account</string>
+    <string name="vendor_lookup_hint">%1$s is een bedrijfs-id van de Bluetooth SIG. Tik erop om op te zoeken wie dit heeft gemaakt.</string>
 </resources>

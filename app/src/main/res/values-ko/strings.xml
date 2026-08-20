@@ -210,4 +210,5 @@
     <string name="remove_devices_but_keep_account_ones">이 중 %1$d개는 Apple 계정에서 가져온 것이라 그대로 남습니다. 해당 항목은 Apple 기기의 \'나의 찾기\'에서 제거하세요. 나머지는 이 앱에서 제거됩니다.</string>
     <string name="source">출처</string>
     <string name="source_your_apple_account">Apple 계정에서 읽어옴</string>
+    <string name="vendor_lookup_hint">%1$s은(는) Bluetooth SIG 회사 식별자입니다. 탭하면 어디에서 만든 것인지 찾아볼 수 있습니다.</string>
 </resources>

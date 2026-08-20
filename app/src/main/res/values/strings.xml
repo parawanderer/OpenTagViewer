@@ -245,4 +245,5 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="remove_devices_but_keep_account_ones">%1$d of these came from your Apple account and will stay — remove those in Find My on an Apple device. The rest will be removed from this app.</string>
     <string name="source">Source</string>
     <string name="source_your_apple_account">Read from your Apple account</string>
+    <string name="vendor_lookup_hint">%1$s is a Bluetooth SIG company identifier. Tap to look it up and find out who made this.</string>
 </resources>

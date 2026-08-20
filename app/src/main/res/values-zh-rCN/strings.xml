@@ -210,4 +210,5 @@
     <string name="remove_devices_but_keep_account_ones">其中 %1$d 项来自你的 Apple 账户，将会保留——请在 Apple 设备的“查找”中移除它们。其余项将从本应用中移除。</string>
     <string name="source">来源</string>
     <string name="source_your_apple_account">读取自你的 Apple 账户</string>
+    <string name="vendor_lookup_hint">%1$s 是蓝牙技术联盟（SIG）的厂商识别码。点按即可查询它出自哪家厂商。</string>
 </resources>

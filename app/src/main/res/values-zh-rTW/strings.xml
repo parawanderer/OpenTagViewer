@@ -210,4 +210,5 @@
     <string name="remove_devices_but_keep_account_ones">其中 %1$d 項來自你的 Apple 帳戶，將會保留——請在 Apple 裝置的「尋找」中移除它們。其餘項目將從本 App 中移除。</string>
     <string name="source">來源</string>
     <string name="source_your_apple_account">讀取自你的 Apple 帳戶</string>
+    <string name="vendor_lookup_hint">%1$s 是藍牙技術聯盟（SIG）的廠商識別碼。點一下即可查詢它出自哪家廠商。</string>
 </resources>

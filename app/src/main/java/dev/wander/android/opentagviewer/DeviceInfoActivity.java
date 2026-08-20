@@ -11,6 +11,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.Log;
@@ -20,6 +21,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.util.Pair;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -59,6 +61,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
@@ -460,14 +463,65 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         final HardwareDescriber describer = AppDependencies.hardwareDescriber();
 
+        // Both answers in one crossing. Each call starts a Python interpreter and parses the
+        // same plist, and the second question is only ever asked about the first one's failure.
         this.hardwareLookup = Observable
-                .fromCallable(() -> Optional.ofNullable(describer.describe(plist)))
+                .fromCallable(() -> Pair.create(
+                        Optional.ofNullable(describer.describe(plist)),
+                        Optional.ofNullable(describer.whereToLookUp(plist))))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        described -> described.ifPresent(this.binding::setDeviceType),
+                        answers -> {
+                            answers.first.ifPresent(this.binding::setDeviceType);
+                            if (answers.second.isPresent()) {
+                                this.offerToLookTheVendorUp();
+                            }
+                        },
                         error -> Log.w(TAG, "Could not describe this accessory; "
                                 + "keeping the label already shown", error));
+    }
+
+    /**
+     * Say what the hex on the Type row is, and offer to settle it.
+     *
+     * <p>Shown only when nothing recognised the accessory, which is when Type reads something
+     * like {@code vendor 0x0ABC product 0x1234}. That is a real registry value rather than a
+     * failure, and somebody holding the thing can settle what it is in under a minute - but only
+     * if they are told the number means something.
+     *
+     * <p><b>Python decides whether there is anything to look up; this writes the sentence.</b>
+     * {@code where_to_look_up} returns one already, and it is deliberately not used: it is
+     * English, composed in a module the desktop exporter shares, and this app ships in ten
+     * languages. Splitting it this way keeps the judgement in the one place that has the vendor
+     * table and the wording in the one place that gets translated.
+     */
+    private void offerToLookTheVendorUp() {
+        final TextView hint = this.findViewById(R.id.device_type_lookup_hint);
+
+        hint.setText(this.getString(R.string.vendor_lookup_hint,
+                String.format(Locale.ROOT, "0x%04X", this.beaconInformation.getVendorId())));
+        hint.setVisibility(VISIBLE);
+        hint.setOnClickListener(view -> this.openBluetoothRegistry());
+    }
+
+    private void openBluetoothRegistry() {
+        final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        if (properties == null) {
+            Log.w(TAG, "Could not read app.properties; no registry link to open");
+            return;
+        }
+
+        final String url = properties.getProperty("bluetoothSigAssignedNumbers");
+        if (url == null || url.isBlank()) {
+            Log.w(TAG, "No bluetoothSigAssignedNumbers configured in app.properties");
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        if (intent.resolveActivity(this.getPackageManager()) != null) {
+            this.startActivity(intent);
+        }
     }
 
     private String getDeviceNameForTitle() {
