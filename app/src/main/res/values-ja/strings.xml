@@ -214,4 +214,5 @@
     <string name="rename_failed_title">名前は変更されませんでした</string>
     <string name="rename_failed_message">このタグの名前は Apple アカウントにあるため、変更するには Apple に届く必要がありますが、今回は届きませんでした。何も変更されていません。接続を確認してもう一度お試しください。</string>
     <string name="icloud_fetch_from_settings_subtitle">アカウントのタグを追加、または取り込み済みのタグを更新します</string>
+    <string name="icloud_fetch_from_settings_linked">Apple アカウントと連携済みです。タップすると新しいタグや変更を確認します。</string>
 </resources>

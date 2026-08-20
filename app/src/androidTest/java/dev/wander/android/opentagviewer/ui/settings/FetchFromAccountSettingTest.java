@@ -30,6 +30,10 @@ import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.SettingsActivity;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
+import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
 /**
  * Reading the Apple account from Settings.
@@ -49,14 +53,18 @@ import dev.wander.android.opentagviewer.SettingsActivity;
 public class FetchFromAccountSettingTest {
 
     private ActivityScenario<SettingsActivity> scenario;
+    private KeychainMembershipRepository memberships;
 
     @Before
     public void answerTheFetchScreenAtTheDoor() {
+        this.memberships = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
+                new AppCryptographyUtil());
+        this.memberships.forget().blockingAwait();
+
         Intents.init();
         intending(hasComponent(FetchFromICloudActivity.class.getName()))
                 .respondWith(new ActivityResult(Activity.RESULT_CANCELED, null));
-
-        this.scenario = ActivityScenario.launch(SettingsActivity.class);
     }
 
     @After
@@ -65,11 +73,45 @@ public class FetchFromAccountSettingTest {
             this.scenario.close();
         }
         Intents.release();
+        this.memberships.forget().blockingAwait();
+    }
+
+    private void openSettings() {
+        this.scenario = ActivityScenario.launch(SettingsActivity.class);
+    }
+
+    /** As if the app had already joined the account's keychain. */
+    private void givenTheAccountIsAlreadyLinked() {
+        this.memberships.store(new KeychainMembership(
+                "{\"peer_id\":\"peer-ours\"}", "ZW50cm9weQ==", "a-generated-passcode",
+                "a-label", 2)).blockingAwait();
     }
 
     @Test
     public void settingsOffersToReadTheAppleAccount() {
+        this.openSettings();
+
         Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+                .check(matches(isDisplayed())));
+    }
+
+    /**
+     * <b>And it says so once the account is linked.</b>
+     *
+     * <p>The row read the same either way, which is wrong twice: somebody who has linked cannot
+     * tell that they have, and somebody who has not is told their tags will "update" when nothing
+     * has ever been read. Being a member is what makes a later read cost one tap and no device
+     * passcode, so it is worth saying out loud.
+     */
+    @Test
+    public void alinkedAccountIsDescribedAsLinked() {
+        this.givenTheAccountIsAlreadyLinked();
+
+        this.openSettings();
+
+        Eventually.check(() -> onView(allOf(
+                withText(R.string.icloud_fetch_from_settings_linked),
+                isDescendantOfA(withId(R.id.settings_fetch_from_account))))
                 .check(matches(isDisplayed())));
     }
 
@@ -81,6 +123,8 @@ public class FetchFromAccountSettingTest {
      */
     @Test
     public void therowSaysWhatItWillDoToTagsAlreadyHere() {
+        this.openSettings();
+
         Eventually.check(() -> onView(allOf(
                 withText(R.string.icloud_fetch_from_settings_subtitle),
                 isDescendantOfA(withId(R.id.settings_fetch_from_account))))
@@ -90,6 +134,8 @@ public class FetchFromAccountSettingTest {
     /** <b>And tapping it gets there.</b> */
     @Test
     public void tappingItReachesTheAccountScreen() {
+        this.openSettings();
+
         Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
                 .check(matches(isDisplayed())));
 

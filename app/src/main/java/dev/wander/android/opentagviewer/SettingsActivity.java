@@ -61,6 +61,7 @@ import dev.wander.android.opentagviewer.databinding.ActivitySettingsBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
@@ -82,6 +83,7 @@ import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import lombok.NonNull;
@@ -115,6 +117,9 @@ public class SettingsActivity extends AppCompatActivity {
     private String initialAnisetteUrl = null;
     private boolean mapProviderChanged = false;
 
+    /** Reading whether the account is linked, so leaving does not land on dead views. */
+    private Disposable membershipLookup;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -147,6 +152,7 @@ public class SettingsActivity extends AppCompatActivity {
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
+        this.sayWhetherTheAccountIsLinked();
 
         this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());
@@ -257,6 +263,50 @@ public class SettingsActivity extends AppCompatActivity {
      * about something this screen would then ignore is a callback that only ever misleads the
      * next person to read it.
      */
+    /**
+     * Say whether this app has already joined the account's keychain.
+     *
+     * <p><b>The row read the same either way</b>, which is the wrong answer twice over: somebody
+     * who has linked cannot tell that they have, and somebody who has not is told their tags will
+     * "update" when nothing has ever been read. Being a member is the thing that makes a later
+     * read cost one tap and no device passcode, so it is worth saying out loud.
+     *
+     * <p>Set to the unlinked wording first and corrected when the store answers, rather than left
+     * blank until then. Reading it is a decryption on a background thread, and a row that appears
+     * with no subtitle and grows one a moment later is worse than one that starts by describing
+     * the more common case.
+     */
+    private void sayWhetherTheAccountIsLinked() {
+        this.binding.setFetchFromAccountSubtitle(
+                this.getString(R.string.icloud_fetch_from_settings_subtitle));
+
+        final KeychainMembershipRepository memberships = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil());
+
+        this.membershipLookup = memberships.get()
+                .firstOrError()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> this.binding.setFetchFromAccountSubtitle(this.getString(
+                                held.isPresent()
+                                        ? R.string.icloud_fetch_from_settings_linked
+                                        : R.string.icloud_fetch_from_settings_subtitle)),
+                        error -> Log.w(TAG, "Could not read whether the account is linked;"
+                                + " leaving the row describing the unlinked case", error));
+    }
+
+    @Override
+    protected void onDestroy() {
+        // The lookup hops back to the main thread to set a subtitle. If the screen has gone by
+        // then that is a binding update on detached views, so it is stopped rather than left to
+        // land wherever it lands.
+        if (this.membershipLookup != null && !this.membershipLookup.isDisposed()) {
+            this.membershipLookup.dispose();
+        }
+        super.onDestroy();
+    }
+
     private void onClickFetchFromAccount() {
         this.startActivity(new Intent(this, FetchFromICloudActivity.class));
     }
