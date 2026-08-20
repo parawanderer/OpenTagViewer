@@ -32,6 +32,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import dev.wander.android.opentagviewer.Eventually;
+import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
@@ -64,6 +65,9 @@ public class ICloudStepsRenderTest {
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
                 new AppCryptographyUtil());
         this.memberships.forget().blockingAwait();
+        // Finishing this flow writes real rows into the real database. Cleared here too,
+        // because a test that crashed left its tags behind for whatever runs next.
+        AccountBeaconsForTests.forgetThemAll();
     }
 
     @After
@@ -73,6 +77,7 @@ public class ICloudStepsRenderTest {
         }
         AppDependencies.reset();
         this.memberships.forget().blockingAwait();
+        AccountBeaconsForTests.forgetThemAll();
     }
 
     private void open(final FakeICloudService fake) {

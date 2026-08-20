@@ -204,4 +204,10 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="icloud_loading_looking_for_devices">Zoeken naar een apparaat dat het kan ontgrendelen…</string>
     <string name="icloud_loading_unlocking">Ontgrendelen, daarna je tags lezen…</string>
     <string name="icloud_loading_importing">Je tags worden opgehaald…</string>
+    <string name="cannot_remove_account_tag_title">Verwijder het in Zoek mijn</string>
+    <string name="cannot_remove_account_tag_message">Deze tag komt uit je Apple-account, dus de app bewaart er alleen een kopie van. Verwijder hem in Zoek mijn op een Apple-apparaat; dan verdwijnt hij hier zodra de app je account opnieuw uitleest.</string>
+    <string name="cannot_remove_account_tags_message">Deze tags komen uit je Apple-account, dus de app bewaart er alleen kopieën van. Verwijder ze in Zoek mijn op een Apple-apparaat; dan verdwijnen ze hier zodra de app je account opnieuw uitleest.</string>
+    <string name="remove_devices_but_keep_account_ones">%1$d hiervan komen uit je Apple-account en blijven staan — verwijder die in Zoek mijn op een Apple-apparaat. De rest wordt uit deze app verwijderd.</string>
+    <string name="source">Bron</string>
+    <string name="source_your_apple_account">Uitgelezen uit je Apple-account</string>
 </resources>

@@ -388,25 +388,73 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 + ".zip";
     }
 
+    /**
+     * Remove, minus the tags this app does not own.
+     *
+     * <p><b>A tag read from the Apple account cannot be removed from here, and saying so is the
+     * whole point of this.</b> Marking one removed appears to work and then undoes itself: the
+     * row is a cache of the account, so the next refresh writes it back with
+     * {@code is_removed = 0} and the tag returns with no explanation. Removing it for real means
+     * removing it in Find My, which is the user's account to change and not this app's.
+     *
+     * <p>So the destructive button is offered only for what is actually the app's to remove, and
+     * a selection that is entirely account tags gets an explanation instead of a dialog whose
+     * confirm button would lie.
+     */
     private void confirmRemoveSelection() {
         final List<BeaconInformation> selected = this.deviceListAdaptor.getSelectedBeacons();
         if (selected.isEmpty()) {
             return;
         }
 
-        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
-                .setTitle(selected.size() == 1 ? R.string.remove_device : R.string.remove_devices)
-                .setIcon(R.drawable.delete_24px)
-                .setMessage(selected.size() == 1
+        final List<BeaconInformation> removable = new ArrayList<>();
+        int fromTheAccount = 0;
+        for (final BeaconInformation device : selected) {
+            if (device.isFromAccount()) {
+                fromTheAccount++;
+            } else {
+                removable.add(device);
+            }
+        }
+
+        if (removable.isEmpty()) {
+            this.explainAccountTagsCannotBeRemoved(selected.size());
+            return;
+        }
+
+        // Mixed: the message names what will survive, so nobody has to notice afterwards that
+        // some of what they picked is still there.
+        final CharSequence message = fromTheAccount == 0
+                ? this.getString(removable.size() == 1
                         ? R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back
                         : R.string.are_you_sure_you_want_to_remove_these_devices)
+                : this.getString(R.string.remove_devices_but_keep_account_ones, fromTheAccount);
+
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(removable.size() == 1 ? R.string.remove_device : R.string.remove_devices)
+                .setIcon(R.drawable.delete_24px)
+                .setMessage(message)
                 .setPositiveButton(R.string.confirm, (dialog, which) -> {
-                    for (BeaconInformation device : selected) {
+                    for (BeaconInformation device : removable) {
                         this.removeDevice(device);
                     }
                     this.endSelection();
                 })
                 .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** No confirm button, because there is nothing here for the app to do. */
+    private void explainAccountTagsCannotBeRemoved(final int howMany) {
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.cannot_remove_account_tag_title)
+                // Not the delete icon. Nothing is being deleted, and the theme-tinted icons are
+                // the only ones legible in both modes - `apple.xml` is hardcoded black.
+                .setIcon(R.drawable.help_center_24px)
+                .setMessage(howMany == 1
+                        ? R.string.cannot_remove_account_tag_message
+                        : R.string.cannot_remove_account_tags_message)
+                .setPositiveButton(R.string.ok, null)
                 .show();
     }
 

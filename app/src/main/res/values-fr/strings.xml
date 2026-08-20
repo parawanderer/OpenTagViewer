@@ -204,4 +204,10 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="icloud_loading_looking_for_devices">Recherche d’un appareil capable de le déverrouiller…</string>
     <string name="icloud_loading_unlocking">Déverrouillage, puis lecture de vos balises…</string>
     <string name="icloud_loading_importing">Importation de vos balises…</string>
+    <string name="cannot_remove_account_tag_title">À supprimer dans Localiser</string>
+    <string name="cannot_remove_account_tag_message">Cette balise provient de votre compte Apple : l’app n’en conserve qu’une copie. Supprimez-la dans Localiser sur un appareil Apple, et elle disparaîtra d’ici à la prochaine lecture de votre compte.</string>
+    <string name="cannot_remove_account_tags_message">Ces balises proviennent de votre compte Apple : l’app n’en conserve que des copies. Supprimez-les dans Localiser sur un appareil Apple, et elles disparaîtront d’ici à la prochaine lecture de votre compte.</string>
+    <string name="remove_devices_but_keep_account_ones">%1$d d’entre elles proviennent de votre compte Apple et seront conservées : supprimez-les dans Localiser sur un appareil Apple. Les autres seront retirées de cette app.</string>
+    <string name="source">Source</string>
+    <string name="source_your_apple_account">Lue depuis votre compte Apple</string>
 </resources>

@@ -218,6 +218,20 @@ public class BeaconInformation {
      */
     private final int customAccessoryKeyCount;
 
+    /**
+     * Whether this tag is a cache of the user's Apple account rather than the app's own copy.
+     *
+     * <p><b>It decides whether the app may remove it.</b> A file-imported tag exists only here,
+     * so removing it is the user's decision and nobody else's. An account tag is a copy of what
+     * Apple holds, and the next refresh rewrites the row from the account - so "remove" would
+     * appear to work and then quietly undo itself. Removing one for real means removing it in
+     * Find My, which this app deliberately does not do on the user's behalf.
+     *
+     * <p>Set at construction from {@code OwnedBeacon.fromAccount}, like {@link #isCustomAccessory()}
+     * and unlike the heuristics on this class - there is nothing in a plist to infer it from.
+     */
+    private final boolean fromAccount;
+
     public boolean isCustomAccessory() {
         return this.customAccessory;
     }

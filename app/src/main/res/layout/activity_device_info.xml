@@ -46,6 +46,10 @@
             type="String" />
 
         <variable
+            name="source"
+            type="String" />
+
+        <variable
             name="deviceType"
             type="String" />
 
@@ -267,6 +271,19 @@
                         app:onClick="@{clickItemHandler}"
                         app:sectionSubtitle="@{importedAt}"
                         app:title="@{@string/imported_at}" />
+
+                    <!--
+                        Shown instead of the three rows above for a tag read from the Apple
+                        account: nothing was exported and nothing was imported, so those rows
+                        have nothing true to say. Exactly one of the two sets is visible.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_source"
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{source}"
+                        app:title="@{@string/source}" />
 
                     <include
                         android:id="@+id/device_settings_device_type"

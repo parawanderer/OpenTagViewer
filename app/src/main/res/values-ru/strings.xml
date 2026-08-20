@@ -204,4 +204,10 @@
     <string name="icloud_loading_looking_for_devices">Поиск устройства, которое может разблокировать…</string>
     <string name="icloud_loading_unlocking">Разблокировка, затем чтение ваших меток…</string>
     <string name="icloud_loading_importing">Загрузка ваших меток…</string>
+    <string name="cannot_remove_account_tag_title">Удалите её в «Локатор»</string>
+    <string name="cannot_remove_account_tag_message">Эта метка получена из вашей учётной записи Apple, поэтому приложение хранит лишь её копию. Удалите метку в «Локаторе» на устройстве Apple — и она исчезнет отсюда при следующем чтении учётной записи.</string>
+    <string name="cannot_remove_account_tags_message">Эти метки получены из вашей учётной записи Apple, поэтому приложение хранит лишь их копии. Удалите их в «Локаторе» на устройстве Apple — и они исчезнут отсюда при следующем чтении учётной записи.</string>
+    <string name="remove_devices_but_keep_account_ones">%1$d из них получены из вашей учётной записи Apple и останутся — удалите их в «Локаторе» на устройстве Apple. Остальные будут удалены из этого приложения.</string>
+    <string name="source">Источник</string>
+    <string name="source_your_apple_account">Получено из вашей учётной записи Apple</string>
 </resources>

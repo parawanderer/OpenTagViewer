@@ -204,4 +204,10 @@
     <string name="icloud_loading_looking_for_devices">正在寻找可以解锁的设备…</string>
     <string name="icloud_loading_unlocking">正在解锁，然后读取你的标签…</string>
     <string name="icloud_loading_importing">正在导入你的标签…</string>
+    <string name="cannot_remove_account_tag_title">请在“查找”中移除</string>
+    <string name="cannot_remove_account_tag_message">此标签来自你的 Apple 账户，应用只保存了一份副本。请在 Apple 设备的“查找”中移除它，下次应用读取账户时它就会从这里消失。</string>
+    <string name="cannot_remove_account_tags_message">这些标签来自你的 Apple 账户，应用只保存了副本。请在 Apple 设备的“查找”中移除它们，下次应用读取账户时它们就会从这里消失。</string>
+    <string name="remove_devices_but_keep_account_ones">其中 %1$d 项来自你的 Apple 账户，将会保留——请在 Apple 设备的“查找”中移除它们。其余项将从本应用中移除。</string>
+    <string name="source">来源</string>
+    <string name="source_your_apple_account">读取自你的 Apple 账户</string>
 </resources>

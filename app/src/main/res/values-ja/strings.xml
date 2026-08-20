@@ -204,4 +204,10 @@
     <string name="icloud_loading_looking_for_devices">ロックを解除できるデバイスを探しています…</string>
     <string name="icloud_loading_unlocking">ロックを解除して、タグを読み取っています…</string>
     <string name="icloud_loading_importing">タグを取り込んでいます…</string>
+    <string name="cannot_remove_account_tag_title">「探す」で削除してください</string>
+    <string name="cannot_remove_account_tag_message">このタグは Apple アカウントから読み取ったもので、アプリはその写しを保持しているだけです。Apple デバイスの「探す」で削除すると、次にアカウントを読み取ったときにここからも消えます。</string>
+    <string name="cannot_remove_account_tags_message">これらのタグは Apple アカウントから読み取ったもので、アプリはその写しを保持しているだけです。Apple デバイスの「探す」で削除すると、次にアカウントを読み取ったときにここからも消えます。</string>
+    <string name="remove_devices_but_keep_account_ones">このうち %1$d 件は Apple アカウントから読み取ったもので、ここには残ります。Apple デバイスの「探す」で削除してください。残りはこのアプリから削除されます。</string>
+    <string name="source">取得元</string>
+    <string name="source_your_apple_account">Apple アカウントから読み取り</string>
 </resources>

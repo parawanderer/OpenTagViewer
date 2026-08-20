@@ -204,4 +204,10 @@
     <string name="icloud_loading_looking_for_devices">잠금을 해제할 수 있는 기기를 찾는 중…</string>
     <string name="icloud_loading_unlocking">잠금을 해제한 뒤 태그를 읽는 중…</string>
     <string name="icloud_loading_importing">태그를 가져오는 중…</string>
+    <string name="cannot_remove_account_tag_title">\'나의 찾기\'에서 제거하세요</string>
+    <string name="cannot_remove_account_tag_message">이 태그는 Apple 계정에서 가져온 것이라 앱에는 사본만 있습니다. Apple 기기의 \'나의 찾기\'에서 제거하면 앱이 계정을 다시 읽을 때 여기에서도 사라집니다.</string>
+    <string name="cannot_remove_account_tags_message">이 태그들은 Apple 계정에서 가져온 것이라 앱에는 사본만 있습니다. Apple 기기의 \'나의 찾기\'에서 제거하면 앱이 계정을 다시 읽을 때 여기에서도 사라집니다.</string>
+    <string name="remove_devices_but_keep_account_ones">이 중 %1$d개는 Apple 계정에서 가져온 것이라 그대로 남습니다. 해당 항목은 Apple 기기의 \'나의 찾기\'에서 제거하세요. 나머지는 이 앱에서 제거됩니다.</string>
+    <string name="source">출처</string>
+    <string name="source_your_apple_account">Apple 계정에서 읽어옴</string>
 </resources>
