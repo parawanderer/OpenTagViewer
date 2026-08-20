@@ -304,8 +304,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
             ((MaterialButton)currentIconButton).setIcon(null);
         } else {
             currentIconButton.setText(null);
-            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(
-                    this, BeaconIcon.forBeacon(this.beaconInformation)));
+            BeaconIcon.applyTo((MaterialButton) currentIconButton, this.beaconInformation);
         }
     }
 

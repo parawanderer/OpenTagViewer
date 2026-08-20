@@ -90,7 +90,7 @@ public class BeaconIconTest {
     /** A Chipolo, a Pebblebee - findable, paired, and not made by Apple. */
     @Test
     public void athirdPartyTagGetsTheFindableIcon() {
-        assertEquals(R.drawable.tag_third_party,
+        assertEquals(R.drawable.findmy_accessory,
                 BeaconIcon.forBeacon(beacon(false, 0x009E)));
     }
 
@@ -120,8 +120,8 @@ public class BeaconIconTest {
     @Test
     public void thethreeIconsAreActuallyDifferent() {
         assertNotEquals(R.drawable.apple, R.drawable.tag_self_generated);
-        assertNotEquals(R.drawable.apple, R.drawable.tag_third_party);
-        assertNotEquals(R.drawable.tag_self_generated, R.drawable.tag_third_party);
+        assertNotEquals(R.drawable.apple, R.drawable.findmy_accessory);
+        assertNotEquals(R.drawable.tag_self_generated, R.drawable.findmy_accessory);
     }
 
     // ---------------------------------------------------------------- does it draw
@@ -142,7 +142,7 @@ public class BeaconIconTest {
             for (final int icon : new int[]{
                     R.drawable.apple,
                     R.drawable.tag_self_generated,
-                    R.drawable.tag_third_party}) {
+                    R.drawable.findmy_accessory}) {
                 final Drawable drawable = AppCompatResources.getDrawable(themed, icon);
 
                 assertNotNull("icon " + icon + " did not load", drawable);
@@ -170,7 +170,7 @@ public class BeaconIconTest {
         final int haystack = paintedPixels(
                 AppCompatResources.getDrawable(themed, R.drawable.tag_self_generated));
         final int findable = paintedPixels(
-                AppCompatResources.getDrawable(themed, R.drawable.tag_third_party));
+                AppCompatResources.getDrawable(themed, R.drawable.findmy_accessory));
 
         assertNotEquals("the haystack draws the same coverage as Apple's logo", apple, haystack);
         assertNotEquals("the findable icon draws the same coverage as Apple's logo",
@@ -197,7 +197,7 @@ public class BeaconIconTest {
             write("selfgenerated-" + variant,
                     AppCompatResources.getDrawable(themed, R.drawable.tag_self_generated));
             write("thirdparty-" + variant,
-                    AppCompatResources.getDrawable(themed, R.drawable.tag_third_party));
+                    AppCompatResources.getDrawable(themed, R.drawable.findmy_accessory));
         }
     }
 

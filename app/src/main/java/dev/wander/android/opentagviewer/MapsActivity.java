@@ -1336,7 +1336,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 iconContainer.setVisibility(GONE);
             } else {
                 // Was always Apple's logo, for a Chipolo and an OpenHaystack tag alike.
-                iconContainer.setImageResource(BeaconIcon.forBeacon(beacon));
+                BeaconIcon.applyTo(iconContainer, beacon);
                 iconContainer.setVisibility(VISIBLE);
                 emojiContainer.setVisibility(GONE);
             }
