@@ -40,15 +40,19 @@ import java.util.stream.IntStream;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class MyDevicesListActivity extends AppCompatActivity {
@@ -77,6 +81,17 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
     /** Survives {@code recreate()}, which is the only reason this is in the instance state. */
     private static final String KEY_DEVICES_CHANGED = "devicesListChanged";
+
+    /**
+     * Whether this app has joined the account's keychain, once the store has said.
+     *
+     * <p>Null while that is still being read - a decryption on a background thread - and null is
+     * treated as "not linked" for the menu, which shows the item. See {@link #showPageMenu()}.
+     */
+    private Boolean accountIsLinked;
+
+    /** The in-flight read of that, so leaving does not land on a menu that has gone. */
+    private Disposable membershipLookup;
 
     /**
      * The tags whose history is being written, captured when the storage picker was opened.
@@ -206,7 +221,16 @@ public class MyDevicesListActivity extends AppCompatActivity {
             }
         });
 
+        this.rememberWhetherTheAccountIsLinked();
         this.fetchDeviceInfoAndRender();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (this.membershipLookup != null && !this.membershipLookup.isDisposed()) {
+            this.membershipLookup.dispose();
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -352,6 +376,14 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this, this.binding.settingsTopToolbar.pageMenuButton);
         menu.getMenuInflater().inflate(R.menu.my_devices_menu, menu.getMenu());
 
+        // **Hidden once the account is linked**, because linking is what this item does. After
+        // it, the app is a member of the keychain and re-reads without asking for anything, so
+        // an item offering to link again describes work already done. Shown while the answer is
+        // still unknown: the screen it leads to resumes as a member anyway, so the harmless
+        // mistake is offering it once too often rather than hiding the only way in.
+        menu.getMenu().findItem(R.id.action_fetch_from_account)
+                .setVisible(!Boolean.TRUE.equals(this.accountIsLinked));
+
         menu.setOnMenuItemClickListener(item -> {
             final int id = item.getItemId();
 
@@ -367,6 +399,19 @@ public class MyDevicesListActivity extends AppCompatActivity {
         });
 
         menu.show();
+    }
+
+    private void rememberWhetherTheAccountIsLinked() {
+        this.membershipLookup = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .get()
+                .firstOrError()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> this.accountIsLinked = held.isPresent(),
+                        error -> Log.w(TAG, "Could not read whether the account is linked;"
+                                + " the menu will go on offering to link it", error));
     }
 
     private void openTheAccountFetch() {

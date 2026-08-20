@@ -215,4 +215,5 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="rename_failed_message">Cette balise est nommée dans votre compte Apple : la renommer doit donc atteindre Apple, ce qui vient d’échouer. Rien n’a été modifié. Vérifiez votre connexion et réessayez.</string>
     <string name="icloud_fetch_from_settings_subtitle">Ajouter les balises de votre compte, ou mettre à jour celles déjà présentes</string>
     <string name="icloud_fetch_from_settings_linked">Associé à votre compte Apple. Touchez pour rechercher des balises nouvelles ou modifiées.</string>
+    <string name="icloud_link_account_action">Associer des balises via le compte Apple</string>
 </resources>

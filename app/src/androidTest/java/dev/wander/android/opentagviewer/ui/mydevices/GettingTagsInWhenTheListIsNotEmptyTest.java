@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ui.mydevices;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
@@ -31,10 +32,14 @@ import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
 import dev.wander.android.opentagviewer.MyDevicesListActivity;
 import dev.wander.android.opentagviewer.R;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
 /**
  * Getting tags in, from a list that already has tags in it.
@@ -115,6 +120,20 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
             this.scenario.close();
         }
         this.forgetIt();
+        new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
+                new AppCryptographyUtil()).forget().blockingAwait();
+    }
+
+    /** As if the app had already joined the account's keychain. */
+    private void givenTheAccountIsLinked() {
+        new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
+                new AppCryptographyUtil())
+                .store(new KeychainMembership(
+                        "{\"peer_id\":\"peer-ours\"}", "ZW50cm9weQ==", "a-passcode",
+                        "a-label", 2))
+                .blockingAwait();
     }
 
     private void forgetIt() {
@@ -145,10 +164,32 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
 
         onView(withId(R.id.page_menu_button)).perform(click());
 
-        Eventually.check(() -> onView(withText(R.string.icloud_fetch_my_tags))
+        Eventually.check(() -> onView(withText(R.string.icloud_link_account_action))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
         onView(withText(R.string.icloud_import_from_file))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed()));
+    }
+
+    /**
+     * <b>And linking disappears once the account is linked.</b>
+     *
+     * <p>The item links an account; after that the app is a member of the keychain and re-reads
+     * without asking for anything, so offering to link again describes work already done.
+     * Importing a file stays, because somebody with a linked account can still be handed a
+     * bundle for a tag that is not theirs.
+     */
+    @Test
+    public void linkingIsNotOfferedOnceTheAccountIsLinked() {
+        this.givenTheAccountIsLinked();
+
+        this.openTheListWithATagInIt();
+        Eventually.check(() -> onView(withId(R.id.page_menu_button))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.page_menu_button)).perform(click());
+
+        Eventually.check(() -> onView(withText(R.string.icloud_import_from_file))
+                .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
+        onView(withText(R.string.icloud_link_account_action)).check(doesNotExist());
     }
 
     /** <b>The one that matters.</b> A second read of the account is one tap away. */
@@ -157,9 +198,10 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
         this.openTheListWithATagInIt();
 
         onView(withId(R.id.page_menu_button)).perform(click());
-        Eventually.check(() -> onView(withText(R.string.icloud_fetch_my_tags))
+        Eventually.check(() -> onView(withText(R.string.icloud_link_account_action))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
-        onView(withText(R.string.icloud_fetch_my_tags)).inRoot(isPlatformPopup()).perform(click());
+        onView(withText(R.string.icloud_link_account_action))
+                .inRoot(isPlatformPopup()).perform(click());
 
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
     }

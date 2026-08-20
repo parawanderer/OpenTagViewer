@@ -215,4 +215,5 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="rename_failed_message">Dieser Tag wird in deinem Apple-Konto benannt, eine Umbenennung muss also Apple erreichen – und das hat gerade nicht geklappt. Es wurde nichts geändert. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="icloud_fetch_from_settings_subtitle">Die Tags aus deinem Konto hinzufügen oder die vorhandenen aktualisieren</string>
     <string name="icloud_fetch_from_settings_linked">Mit deinem Apple-Konto verknüpft. Tippe, um nach neuen oder geänderten Tags zu suchen.</string>
+    <string name="icloud_link_account_action">Tags über Apple-Konto verknüpfen</string>
 </resources>

@@ -22,6 +22,7 @@ import static org.junit.Assert.assertTrue;
 import android.app.Activity;
 import android.app.Instrumentation.ActivityResult;
 import android.content.Context;
+import android.content.Intent;
 import android.os.SystemClock;
 import android.view.View;
 
@@ -287,14 +288,18 @@ public class SignInThenGetTagsJourneyTest {
                 .check(matches(isDisplayed())));
         onView(withId(R.id.icloud_primary_button)).perform(click());
 
-        // Now the list has tags in it, so the way back to the account is the overflow menu -
-        // which is the entry point that only exists because of this.
-        Eventually.check(() -> onView(withId(R.id.page_menu_button)).check(matches(isDisplayed())));
+        // **The screen is opened directly for the second read, deliberately.** Which button
+        // reaches it is being redesigned - linking is offered until the account is linked, and
+        // re-reading is moving to something the app does on its own - and the property under
+        // test is not about buttons. It is that a member reads without asking for anything, and
+        // tying that assertion to whichever affordance exists this week is how a test starts
+        // failing for reasons that have nothing to do with what it protects.
+        this.scenario.close();
         this.icloud = FakeICloudService.withTags();
         AppDependencies.replaceICloud(() -> this.icloud);
 
-        onView(withId(R.id.page_menu_button)).perform(click());
-        onView(withText(R.string.icloud_fetch_my_tags)).inRoot(isPlatformPopup()).perform(click());
+        this.scenario = ActivityScenario.launch(new Intent(
+                getInstrumentation().getTargetContext(), FetchFromICloudActivity.class));
 
         Eventually.check(() -> onView(withId(R.id.icloud_results_container))
                 .check(matches(isDisplayed())));

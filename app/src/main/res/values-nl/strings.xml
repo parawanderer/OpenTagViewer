@@ -215,4 +215,5 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="rename_failed_message">Deze tag krijgt zijn naam uit je Apple-account, dus hernoemen moet Apple bereiken — en dat lukte zojuist niet. Er is niets gewijzigd. Controleer je verbinding en probeer het opnieuw.</string>
     <string name="icloud_fetch_from_settings_subtitle">Voeg de tags uit je account toe, of werk de tags hier bij</string>
     <string name="icloud_fetch_from_settings_linked">Gekoppeld aan je Apple-account. Tik om te zoeken naar nieuwe of gewijzigde tags.</string>
+    <string name="icloud_link_account_action">Tags koppelen via Apple-account</string>
 </resources>
