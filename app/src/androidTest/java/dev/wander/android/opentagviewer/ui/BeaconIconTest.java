@@ -87,6 +87,70 @@ public class BeaconIconTest {
                 BeaconIcon.forBeacon(beacon(false, APPLE_VENDOR_ID)));
     }
 
+    /**
+     * <b>An iPad is drawn as a tablet, not as a generic Find My accessory.</b>
+     *
+     * <p>The decision used to be the vendor id alone, and that does not identify these at all: an
+     * AirTag's record carries 76 and an iPad's carries -1, so every iPhone, iPad and Mac on the
+     * account fell through to the third-party branch. An account read is mostly those, so the
+     * device list came back as a column of identical unknown tags - which is what @parawanderer
+     * saw the first time a real account was imported.
+     *
+     * <p>The model is the direct evidence: an accessory leaves it empty, a device fills it with
+     * an Apple model identifier.
+     */
+    @Test
+    public void anappleDeviceIsDrawnAsWhatItIs() {
+        assertEquals(R.drawable.tablet_24px, BeaconIcon.forBeacon(withModel("iPad13,18")));
+        assertEquals(R.drawable.laptop_24px, BeaconIcon.forBeacon(withModel("MacBookAir10,1")));
+        assertEquals(R.drawable.smartphone_24px, BeaconIcon.forBeacon(withModel("iPhone15,2")));
+    }
+
+    /** And specifically not the accessory mark, which is the behaviour being replaced. */
+    @Test
+    public void anappleDeviceIsNotDrawnAsAThirdPartyAccessory() {
+        for (final String model : new String[] {"iPad13,18", "MacBookAir10,1", "iPhone15,2"}) {
+            assertNotEquals("a " + model + " is one of the owner's own devices, not a tag"
+                            + " somebody else made",
+                    R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel(model)));
+        }
+    }
+
+    /**
+     * Apple hardware this has no drawing of gets Apple's logo rather than a guess.
+     *
+     * <p>A Watch, a Vision Pro, something not shipped yet: "one of your Apple devices" is true,
+     * and drawing it as a third-party tag would not be.
+     */
+    @Test
+    public void appleHardwareWithNoPictureOfItsOwnStillLooksApple() {
+        assertEquals(R.drawable.apple, BeaconIcon.forBeacon(withModel("Watch6,1")));
+    }
+
+    /**
+     * <b>An accessory's empty model must not be mistaken for a device.</b>
+     *
+     * <p>The one that keeps the change honest in the other direction: every AirTag has
+     * {@code model} empty, so a prefix check that treated empty as a match would draw the entire
+     * account as iPads.
+     */
+    @Test
+    public void anaccessoryWithNoModelIsStillAnAccessory() {
+        assertEquals(R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel("")));
+        assertEquals(R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel(null)));
+    }
+
+    private static BeaconInformation withModel(final String model) {
+        return BeaconInformation.builder()
+                .beaconId("a-tag")
+                .originalName("Something")
+                .model(model)
+                // -1 is what a real device's record carries, and is the whole reason the vendor
+                // id cannot be what decides this.
+                .vendorId(-1)
+                .build();
+    }
+
     /** A Chipolo, a Pebblebee - findable, paired, and not made by Apple. */
     @Test
     public void athirdPartyTagGetsTheFindableIcon() {

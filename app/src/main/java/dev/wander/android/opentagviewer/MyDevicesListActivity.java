@@ -19,6 +19,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -63,7 +64,19 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
     private ActivityMyDevicesListBinding binding;
 
+    /**
+     * Whether anything changed here, so the map knows to re-read when this screen closes.
+     *
+     * <p><b>Saved and restored, because this screen recreates itself.</b> Finishing an account
+     * read sets this and then calls {@code recreate()} to rebuild the list - which destroys the
+     * activity and constructs a new one, where a plain field is false again. The tags were on
+     * screen, the flag that says so was gone, and the map went on showing nothing until the app
+     * was restarted. See {@link #KEY_DEVICES_CHANGED}.
+     */
     private boolean devicesListChanged = false;
+
+    /** Survives {@code recreate()}, which is the only reason this is in the instance state. */
+    private static final String KEY_DEVICES_CHANGED = "devicesListChanged";
 
     /**
      * The tags whose history is being written, captured when the storage picker was opened.
@@ -139,6 +152,11 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
+        if (savedInstanceState != null) {
+            this.devicesListChanged =
+                    savedInstanceState.getBoolean(KEY_DEVICES_CHANGED, false);
+        }
+
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
         WindowPaddingUtil.insertUITopPadding(this.binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
@@ -189,6 +207,12 @@ public class MyDevicesListActivity extends AppCompatActivity {
         });
 
         this.fetchDeviceInfoAndRender();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(KEY_DEVICES_CHANGED, this.devicesListChanged);
     }
 
     private void handleEndActivity() {

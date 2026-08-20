@@ -7,6 +7,7 @@
         <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
         <variable name="onClickFetchFromAccount" type="Runnable" />
+        <variable name="fetchFromAccountSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
         <variable name="onClickLanguage" type="Runnable" />
@@ -57,7 +58,7 @@
                 layout="@layout/settings_item_clickable"
                 app:icon="@{@drawable/devices_24px}"
                 app:onClick="@{onClickFetchFromAccount}"
-                app:sectionSubtitle="@{@string/icloud_fetch_from_settings_subtitle}"
+                app:sectionSubtitle="@{fetchFromAccountSubtitle}"
                 app:title="@{@string/icloud_fetch_my_tags}" />
 
         </LinearLayout>
