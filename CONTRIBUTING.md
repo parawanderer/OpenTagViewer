@@ -326,10 +326,28 @@ strongest test rebuilds the committed export fixtures in `app/src/test/resources
 Two things it deliberately does not cover, because they need an Apple account: signing in, and
 everything the account then yields. What happens to the records afterwards is covered in full.
 
-**Two files need Tk and skip without it** — `test_asyncui.py`, for what happens when somebody
-closes the progress window, and `test_wizard_list.py`, for the list of accessories. Both drive
-real Tk widgets, because what they cover *is* the event loop and the widget: a cancelled progress
-window used to leave the wizard hung for ever, and that is not reproducible against a stand-in.
+**Four files need Tk and skip without it.** All of them drive real Tk widgets, because what they
+cover *is* the widget: a cancelled progress window used to leave the wizard hung for ever, and
+that is not reproducible against a stand-in.
+
+| File | What it drives |
+| --- | --- |
+| `test_asyncui.py` | closing the progress window mid-sign-in |
+| `test_wizard_list.py` | the list of accessories |
+| `test_save_logs_button.py` | the Save logs button, and that no identifier survives into the file |
+| `test_terms_dialog.py` | Apple's terms of service, and that refusing them sends nothing |
+
+**The skip has to be `pytest.importorskip`, at the top, before importing `exporter.wizard`.** A
+`pytest.skip` inside a fixture is too late: the module is imported during collection, so a Python
+built without Tk fails the whole run before any fixture can decline.
+
+**Do not test a modal by driving it.** `grab_set` plus `wait_window` hand control to a nested
+event loop and a window manager, and a test that schedules a click into that deadlocks rather than
+failing. Build the window and show it in separate functions, as `_build_terms_window` and
+`_show_terms` do, and drive the built one. For the same reason, keyboard bindings are asserted
+with `widget.bind("<Key>")` rather than `event_generate`: a Toplevel under a withdrawn root holds
+focus from nobody, so a generated keypress is dropped in silence and the test passes without
+having pressed anything.
 
 **CI runs them on one job in four.** The matrix is 3.10 to 3.13 on `macos-14`, and only its 3.13
 has `_tkinter` — the other three skip both files at collection, so a green square there says
