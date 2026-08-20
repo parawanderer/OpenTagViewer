@@ -47,6 +47,20 @@ public class OwnedBeacon {
     public boolean isRemoved;
 
     /**
+     * Whether this beacon was read from the user's Apple account rather than imported from a file.
+     *
+     * <p><b>The two are different kinds of row, and the difference decides what may delete them.</b>
+     * An account beacon is a cache of what Apple holds: the list is re-read, so one that has left
+     * the account goes from here too. A file-imported beacon is the only copy in existence -
+     * nobody else has it and the export it came from may be long gone - so a refresh must never
+     * touch it.
+     *
+     * <p>False for every row that predates this, which is correct: they all came from a file.
+     */
+    @ColumnInfo(name = "from_account")
+    public boolean fromAccount;
+
+    /**
      * Serialized FindMyAccessory state (JSON) for FindMy.py 0.9.x. Includes the
      * rolling-key alignment that updates after every fetch — persisting it back
      * across calls is what fixes the key-drift bug from issue #30.
