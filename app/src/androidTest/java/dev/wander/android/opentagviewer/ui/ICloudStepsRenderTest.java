@@ -170,6 +170,43 @@ public class ICloudStepsRenderTest {
         assertTrue("the indicator is not on screen while the account is being read", shown[0]);
     }
 
+    /**
+     * <b>The wait sits in the middle of the screen, not just under the heading.</b>
+     *
+     * <p>Every other step is content that starts below the title and grows downward. This one is
+     * a spinner and a line of text, and wrapped to its content it sat near the top with the rest
+     * of the screen empty underneath - which reads as a screen that failed to finish drawing
+     * rather than as one that is waiting.
+     *
+     * <p>Asserted as a position rather than looked at, because "near the top" is exactly the kind
+     * of thing a screenshot shows and nothing checks. The bar is deliberately loose: what is
+     * being pinned is that it is not hugging the heading, not a particular pixel.
+     */
+    @Test
+    public void thewaitIsCentredRatherThanTuckedUnderTheHeading() {
+        this.open(FakeICloudService.withTags().takingItsTime(6000));
+
+        Eventually.check(() -> onView(withId(R.id.icloud_loading_container))
+                .check(matches(isDisplayed())));
+
+        final int[] spinnerMiddle = {0};
+        final int[] screenHeight = {0};
+        this.scenario.onActivity(activity -> {
+            final View spinner = activity.findViewById(R.id.icloud_spinner);
+            final int[] where = new int[2];
+            spinner.getLocationOnScreen(where);
+
+            spinnerMiddle[0] = where[1] + spinner.getHeight() / 2;
+            screenHeight[0] = activity.getWindow().getDecorView().getHeight();
+        });
+
+        final double downThePage = (double) spinnerMiddle[0] / screenHeight[0];
+
+        assertTrue("the spinner sits " + Math.round(downThePage * 100) + "% down the screen,"
+                        + " which is back up against the heading",
+                downThePage > 0.3 && downThePage < 0.7);
+    }
+
     /** The screen somebody actually looks at first, and the one that looked wrong. */
     @Test
     public void thewaitingScreen() throws IOException {
