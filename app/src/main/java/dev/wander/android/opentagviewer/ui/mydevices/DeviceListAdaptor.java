@@ -148,7 +148,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             viewHolder.getItemEmoji().setVisibility(VISIBLE);
             viewHolder.getItemImage().setVisibility(GONE);
         } else {
-            viewHolder.getItemImage().setImageResource(BeaconIcon.forBeacon(beacon));
+            BeaconIcon.applyTo(viewHolder.getItemImage(), beacon);
             viewHolder.getItemImage().setVisibility(VISIBLE);
             viewHolder.getItemEmoji().setVisibility(GONE);
         }
