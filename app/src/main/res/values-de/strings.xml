@@ -210,4 +210,5 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="remove_devices_but_keep_account_ones">%1$d davon stammen aus deinem Apple-Konto und bleiben erhalten – entferne sie auf einem Apple-Gerät in „Wo ist?“. Die übrigen werden aus dieser App entfernt.</string>
     <string name="source">Quelle</string>
     <string name="source_your_apple_account">Aus deinem Apple-Konto gelesen</string>
+    <string name="vendor_lookup_hint">%1$s ist eine Firmenkennung der Bluetooth SIG. Tippe darauf, um nachzuschlagen, wer das hergestellt hat.</string>
 </resources>

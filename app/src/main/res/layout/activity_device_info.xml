@@ -293,6 +293,26 @@
                         app:sectionSubtitle="@{deviceType}"
                         app:title="@{@string/type}" />
 
+                    <!--
+                        Shown only when Type could not be resolved to a name and the record still
+                        carries a vendor id worth looking up. Gone the rest of the time, which is
+                        almost always - an AirTag or a Chipolo has nothing to explain.
+                    -->
+                    <TextView
+                        android:id="@+id/device_type_lookup_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingLeft="22dp"
+                        android:paddingTop="4dp"
+                        android:paddingRight="22dp"
+                        android:paddingBottom="12dp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        tools:text="Vendor 0x0ABC is a Bluetooth SIG company identifier. Tap to look up who makes this."
+                        tools:visibility="visible" />
+
                     <LinearLayout
                         android:id="@+id/device_debug_info"
                         android:layout_width="match_parent"

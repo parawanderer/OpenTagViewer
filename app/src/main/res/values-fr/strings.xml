@@ -210,4 +210,5 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="remove_devices_but_keep_account_ones">%1$d d’entre elles proviennent de votre compte Apple et seront conservées : supprimez-les dans Localiser sur un appareil Apple. Les autres seront retirées de cette app.</string>
     <string name="source">Source</string>
     <string name="source_your_apple_account">Lue depuis votre compte Apple</string>
+    <string name="vendor_lookup_hint">%1$s est un identifiant d’entreprise Bluetooth SIG. Touchez pour le rechercher et découvrir qui a fabriqué cet accessoire.</string>
 </resources>
