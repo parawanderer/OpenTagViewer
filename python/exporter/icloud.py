@@ -163,6 +163,24 @@ EXPORTER_IDENTITY = ClientIdentity(serial=EXPORTER_SERIAL, device_name=DEVICE_NA
 """The desktop exporter's, and the default for every entry point here."""
 
 
+LOGIN_TIMEOUT_SECONDS = 30
+"""
+Seconds any one request may take, in place of FindMy.py's default of five.
+
+**Five is a per-request cap, and this makes far more than one request.** Signing in is several
+round trips, and what follows it - escrow recovery, then the CloudKit fetches that carry the
+actual keys - is heavier than the login. A link slow enough to spend five seconds on any one of
+them fails partway through with a bare timeout that names no cause.
+
+Local ADI is the default here and generates its Anisette on this machine, so that part is not
+waiting on anybody. It is Apple's own hosts that this is about - and `--anisette-url`, for anyone
+who does point it at a server.
+
+Thirty rather than a larger number because it is what the Android app settled on for the same
+sign-in, and the two should not disagree about how patient this protocol needs somebody to be.
+"""
+
+
 def make_account(
     anisette_url: str | None = None,
     libs_path: str | None = None,
@@ -200,7 +218,8 @@ def make_account(
         provider = _make_provider(anisette_url, libs_path, stored, identity)
 
     if stored is None:
-        return AsyncAppleAccount(provider, device_name=identity.device_name)
+        return AsyncAppleAccount(
+            provider, device_name=identity.device_name, timeout=LOGIN_TIMEOUT_SECONDS)
 
     # Only the ids are restored. The rest of the shape has to be there because the library reads
     # it, and every field of it is empty on purpose - this is a logged-out account that happens to
@@ -215,7 +234,12 @@ def make_account(
 
     logger.info("Reusing the stored device identity, so this is not a new device to Apple")
 
-    return AsyncAppleAccount(provider, state_info=state, device_name=identity.device_name)
+    return AsyncAppleAccount(
+        provider,
+        state_info=state,
+        device_name=identity.device_name,
+        timeout=LOGIN_TIMEOUT_SECONDS,
+    )
 
 
 def _make_provider(
@@ -226,7 +250,11 @@ def _make_provider(
 ) -> LocalAnisetteProvider | RemoteAnisetteProvider:
     """Build the Anisette provider, restoring its provisioning data if there is any."""
     if anisette_url is not None:
-        return RemoteAnisetteProvider(anisette_url, serial=identity.serial)
+        # Its own session, so raising the account's does nothing for this one: the Anisette fetch
+        # happens inside the login but from the provider's own client. The local provider below
+        # takes no timeout, because there is no HTTP in it to spend one on.
+        return RemoteAnisetteProvider(
+            anisette_url, serial=identity.serial, timeout=LOGIN_TIMEOUT_SECONDS)
 
     saved = (stored or {}).get("anisette")
     state_blob = None
