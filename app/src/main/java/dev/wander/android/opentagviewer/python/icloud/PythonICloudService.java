@@ -49,7 +49,14 @@ public class PythonICloudService implements ICloudService {
             final PyObject made = Python.getInstance().getModule(MODULE)
                     .callAttr("openSession", account.getAccountObj());
 
-            if (made == null || made.toJava(Object.class) == null) {
+            // **Null is the whole check.** Chaquopy hands a Python `None` back as a Java null,
+            // so this is already the answer - and the belt-and-braces version of it,
+            // `made.toJava(Object.class)`, is not redundant but fatal: Chaquopy cannot convert an
+            // arbitrary Python object to java.lang.Object and throws ClassCastException, which
+            // happens on the path where a session was successfully created. That killed the real
+            // iCloud flow on every device while every test went on passing, because the tests
+            // replace this class with a fake and nothing else calls it.
+            if (made == null) {
                 Log.e(TAG, "icloud_bridge.openSession returned nothing; the iCloud flow is"
                         + " unavailable on this account");
                 return null;

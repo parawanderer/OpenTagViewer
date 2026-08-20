@@ -213,4 +213,5 @@
     <string name="vendor_lookup_hint">%1$s — идентификатор компании Bluetooth SIG. Нажмите, чтобы найти его и узнать, кто это сделал.</string>
     <string name="rename_failed_title">Имя не изменено</string>
     <string name="rename_failed_message">Имя этой метки хранится в вашей учётной записи Apple, поэтому переименование должно дойти до Apple — сейчас этого не произошло. Ничего не изменилось. Проверьте подключение и повторите попытку.</string>
+    <string name="icloud_fetch_from_settings_subtitle">Добавить метки из вашей учётной записи или обновить уже добавленные</string>
 </resources>

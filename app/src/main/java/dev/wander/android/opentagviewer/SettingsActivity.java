@@ -146,6 +146,8 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
+        this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
+
         this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());
         this.binding.setOnClickLanguage(this::onClickEditLanguage);
@@ -244,6 +246,19 @@ public class SettingsActivity extends AppCompatActivity {
         return this.currentSettings.getUseDarkTheme()
                 ? this.getString(R.string.dark_theme)
                 : this.getString(R.string.light_theme);
+    }
+
+    /**
+     * Read the Apple account, from the one place people go looking when they cannot find it.
+     *
+     * <p>Started plainly rather than for a result. This screen shows nothing that reading the
+     * account changes - the device list rebuilds itself from the database whenever it is opened,
+     * and the map picks the tags up on its next refresh. Registering a launcher here to be told
+     * about something this screen would then ignore is a callback that only ever misleads the
+     * next person to read it.
+     */
+    private void onClickFetchFromAccount() {
+        this.startActivity(new Intent(this, FetchFromICloudActivity.class));
     }
 
     private void onClickEditTheme() {

@@ -6,6 +6,7 @@
     <data>
         <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
+        <variable name="onClickFetchFromAccount" type="Runnable" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
         <variable name="onClickLanguage" type="Runnable" />
@@ -42,6 +43,22 @@
             <include
                 android:id="@+id/login_info_container"
                 layout="@layout/login_information_settings" />
+
+            <!--
+                The third door to the same screen, and the one people go looking for.
+
+                The empty state's button vanishes once anything is imported, and the device
+                list's overflow menu is only obvious to somebody who already knows it is there -
+                so "how do I get my tags again" is a Settings question, and this is where they
+                come to ask it. Placed under the account card because that is what it acts on.
+            -->
+            <include
+                android:id="@+id/settings_fetch_from_account"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/devices_24px}"
+                app:onClick="@{onClickFetchFromAccount}"
+                app:sectionSubtitle="@{@string/icloud_fetch_from_settings_subtitle}"
+                app:title="@{@string/icloud_fetch_my_tags}" />
 
         </LinearLayout>
 
