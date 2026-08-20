@@ -37,6 +37,21 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // **A cap on any single instrumented test, so one hang cannot eat the suite.**
+        //
+        // A test that blocks forever does not fail - it stops the run where it stands, with no
+        // name attached and nothing in the report, and the emulator keeps holding its log files
+        // open afterwards. That happened here: a test that launched the real map screen sat
+        // waiting out network timeouts for ten minutes of a thirteen-minute run, and the only
+        // way to find out which test it was involved reading logcat file timestamps by hand.
+        //
+        // With this, that test fails, says its own name, and the other 300 still run.
+        //
+        // Two minutes rather than something tight: the slowest honest tests here drive a whole
+        // sign-in, and a demo run adds `slowMotion` pauses on top of every step. This is a
+        // backstop against hanging, not a performance budget.
+        testInstrumentationRunnerArguments["timeout_msec"] = "120000"
+
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
