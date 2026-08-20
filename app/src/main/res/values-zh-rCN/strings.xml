@@ -191,8 +191,13 @@
     <string name="icloud_service_unsure_body">Apple 完全没有返回可用的记录，这通常说明服务出了状况，而不是你的账户有问题。稍后再试为宜。</string>
     <string name="icloud_try_again">重试</string>
     <string name="icloud_found_x_tags">在你的 Apple 账户中找到 %1$d 个标签</string>
-    <string name="icloud_x_were_not_tags">另有 %1$d 项是你自己的设备而非标签，已排除。</string>
+    <string name="icloud_x_were_not_tags">此账户中另有 %1$d 项没有定位密钥，因此无法被找到。</string>
     <string name="settings_icloud_switch">从我的 Apple 账户读取标签</string>
     <string name="settings_icloud_switch_summary">关闭后将停止读取你的标签列表。这不会把 OpenTagViewer 从你的 Apple 设备列表中移除——那需要你在 Apple 的设置中自行操作。</string>
     <string name="icloud_results_title">你的 Apple 账户中的内容</string>
+    <string name="icloud_unlock_action">解锁</string>
+    <string name="icloud_results_done">完成</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">%1$s 添加</string>
+    <string name="icloud_send_your_friend_the_guide">把导出方法发给朋友</string>
 </resources>

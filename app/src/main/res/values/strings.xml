@@ -226,8 +226,13 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="icloud_service_unsure_body">Apple reported nothing usable at all, which usually means the service is having a bad day rather than anything being wrong with your account. Worth trying again later.</string>
     <string name="icloud_try_again">Try again</string>
     <string name="icloud_found_x_tags">Found %1$d tags in your Apple account</string>
-    <string name="icloud_x_were_not_tags">%1$d other items were your own devices rather than tags, so they were left out.</string>
+    <string name="icloud_x_were_not_tags">%1$d other items on this account carry no location key, so nothing can find them.</string>
     <string name="settings_icloud_switch">Read my tags from my Apple account</string>
     <string name="settings_icloud_switch_summary">Turning this off stops reading your tag list. It does not remove OpenTagViewer from your Apple device list — that is yours to do in Apple’s own settings.</string>
     <string name="icloud_results_title">What is on your Apple account</string>
+    <string name="icloud_unlock_action">Unlock</string>
+    <string name="icloud_results_done">Done</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">added %1$s</string>
+    <string name="icloud_send_your_friend_the_guide">Show your friend how to export</string>
 </resources>

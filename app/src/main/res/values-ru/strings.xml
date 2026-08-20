@@ -191,8 +191,13 @@
     <string name="icloud_service_unsure_body">Apple не сообщила ничего пригодного — обычно это сбой сервиса, а не проблема с вашей учётной записью. Попробуйте позже.</string>
     <string name="icloud_try_again">Повторить</string>
     <string name="icloud_found_x_tags">В учётной записи Apple найдено меток: %1$d</string>
-    <string name="icloud_x_were_not_tags">Ещё %1$d записей — это ваши собственные устройства, а не метки, поэтому они пропущены.</string>
+    <string name="icloud_x_were_not_tags">Ещё %1$d записей в этой учётной записи не содержат ключа геолокации, поэтому найти их невозможно.</string>
     <string name="settings_icloud_switch">Читать мои метки из учётной записи Apple</string>
     <string name="settings_icloud_switch_summary">Отключение прекращает чтение списка меток. OpenTagViewer при этом не удаляется из списка устройств Apple — это нужно сделать самому в настройках Apple.</string>
     <string name="icloud_results_title">Что есть в вашей учётной записи Apple</string>
+    <string name="icloud_unlock_action">Разблокировать</string>
+    <string name="icloud_results_done">Готово</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">добавлено %1$s</string>
+    <string name="icloud_send_your_friend_the_guide">Показать другу, как сделать экспорт</string>
 </resources>

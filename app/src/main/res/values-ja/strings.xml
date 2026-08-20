@@ -191,8 +191,13 @@
     <string name="icloud_service_unsure_body">Apple から利用可能なものが何も返りませんでした。多くの場合、アカウントの問題ではなくサービス側の不調です。時間をおいて再度お試しください。</string>
     <string name="icloud_try_again">再試行</string>
     <string name="icloud_found_x_tags">Apple アカウントで %1$d 個のタグが見つかりました</string>
-    <string name="icloud_x_were_not_tags">他の %1$d 件はタグではなくご自身のデバイスだったため、除外されました。</string>
+    <string name="icloud_x_were_not_tags">このアカウントの他の %1$d 件には位置情報の鍵がなく、何も見つけられません。</string>
     <string name="settings_icloud_switch">Apple アカウントからタグを読み取る</string>
     <string name="settings_icloud_switch_summary">オフにするとタグ一覧の読み取りを停止します。Apple のデバイス一覧から OpenTagViewer が削除されるわけではありません。それは Apple の設定でご自身で行ってください。</string>
     <string name="icloud_results_title">Apple アカウントの内容</string>
+    <string name="icloud_unlock_action">ロック解除</string>
+    <string name="icloud_results_done">完了</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">%1$s に追加</string>
+    <string name="icloud_send_your_friend_the_guide">書き出しの手順を友人に見せる</string>
 </resources>

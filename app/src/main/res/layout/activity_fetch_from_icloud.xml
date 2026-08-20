@@ -9,19 +9,34 @@
   Every step is a sibling here and exactly one is visible, the same shape the sign-in screen
   uses.
 -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/icloud_scroll"
+    android:id="@+id/icloud_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:orientation="vertical">
+
+    <!--
+      **The scrolling half.** It takes whatever height is left after the button bar, so a long
+      list of devices scrolls rather than pushing the button off the bottom - which is the one
+      way this screen could become unusable, and only for the people with the most devices.
+    -->
+    <ScrollView
+        android:id="@+id/icloud_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingLeft="24dp"
+        android:paddingTop="24dp"
+        android:paddingRight="24dp"
+        android:paddingBottom="8dp">
 
         <TextView
             android:id="@+id/icloud_step_title"
@@ -66,7 +81,7 @@
             android:id="@+id/icloud_device_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:orientation="vertical"
             android:visibility="gone"
             tools:visibility="visible">
@@ -74,12 +89,14 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
+                android:lineSpacingExtra="3dp"
+                android:paddingBottom="20dp"
                 android:text="@string/icloud_unlock_body" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:fontFamily="@font/nunito_medium"
                 android:paddingBottom="8dp"
                 android:text="@string/icloud_unlock_choose_device"
@@ -89,6 +106,7 @@
                 android:id="@+id/icloud_device_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:orientation="vertical" />
 
         </LinearLayout>
@@ -98,7 +116,7 @@
             android:id="@+id/icloud_passcode_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:orientation="vertical"
             android:visibility="gone"
             tools:visibility="gone">
@@ -106,17 +124,18 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
+                android:lineSpacingExtra="3dp"
+                android:paddingBottom="20dp"
                 android:text="@string/icloud_unlock_body" />
 
-            <TextView
+            <!--
+              The device just chosen, as the same tile it was chosen from. Recognising it is the
+              whole job here - somebody is about to type that device's passcode, and a sentence
+              of comma-separated identifiers is harder to match against the thing in their hand.
+            -->
+            <include
                 android:id="@+id/icloud_passcode_device"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/nunito_medium"
-                android:paddingBottom="8dp"
-                android:textColor="?attr/colorOnSurface"
-                tools:text="A device, serial F2LX9Q" />
+                layout="@layout/icloud_device_tile" />
 
             <FrameLayout
                 android:id="@+id/icloud_passcode_error_container"
@@ -164,17 +183,6 @@
                 android:textSize="13sp"
                 tools:text="Attempt 1 of 3" />
 
-            <Button
-                android:id="@+id/icloud_passcode_submit"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:fontFamily="@font/nunito_medium"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:text="@string/icloud_unlock_title"
-                android:textSize="18sp" />
 
         </LinearLayout>
 
@@ -186,7 +194,7 @@
             android:id="@+id/icloud_no_tags_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:orientation="vertical"
             android:visibility="gone"
             tools:visibility="gone">
@@ -194,30 +202,39 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
+                android:lineSpacingExtra="3dp"
+                android:paddingBottom="4dp"
                 android:text="@string/icloud_no_tags_body" />
 
             <TextView
                 android:id="@+id/icloud_no_tags_shared_note"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/layout_rounded"
                 android:backgroundTint="?attr/colorSurfaceContainerLow"
                 android:padding="12dp"
                 android:text="@string/icloud_no_tags_shared_note"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
-            <Button
-                android:id="@+id/icloud_no_tags_import_button"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="match_parent"
+            <!--
+              The guide, so the friend can be sent something rather than described at. This
+              screen is read by the person who needs a bundle, and the work is somebody else's -
+              a link they can forward is the whole difference between advice and a next step.
+            -->
+            <TextView
+                android:id="@+id/icloud_no_tags_wiki_link"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:fontFamily="@font/nunito_medium"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:text="@string/icloud_import_from_file"
-                android:textSize="18sp" />
+                android:layout_marginTop="16dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="4dp"
+                android:text="@string/icloud_send_your_friend_the_guide"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp" />
+
 
         </LinearLayout>
 
@@ -230,7 +247,7 @@
             android:id="@+id/icloud_retry_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:orientation="vertical"
             android:visibility="gone"
             tools:visibility="gone">
@@ -239,20 +256,10 @@
                 android:id="@+id/icloud_retry_body"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
+                android:lineSpacingExtra="3dp"
+                android:paddingBottom="4dp"
                 android:text="@string/icloud_service_unsure_body" />
 
-            <Button
-                android:id="@+id/icloud_retry_button"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:fontFamily="@font/nunito_medium"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:text="@string/icloud_try_again"
-                android:textSize="18sp" />
 
         </LinearLayout>
 
@@ -261,7 +268,7 @@
             android:id="@+id/icloud_results_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:orientation="vertical"
             android:visibility="gone"
             tools:visibility="gone">
@@ -271,7 +278,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/nunito_medium"
-                android:paddingBottom="4dp"
+                android:paddingBottom="6dp"
+                android:textSize="16sp"
                 android:textColor="?attr/colorOnSurface"
                 tools:text="Found 3 tags in your Apple account" />
 
@@ -279,7 +287,7 @@
                 android:id="@+id/icloud_results_skipped"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
+                android:paddingBottom="4dp"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp"
                 android:visibility="gone"
@@ -289,6 +297,7 @@
                 android:id="@+id/icloud_results_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
                 android:orientation="vertical" />
 
             <!--
@@ -297,20 +306,62 @@
               button offering to import would imply the alternative exists, and would leave
               somebody wondering what happens to whatever they did not tick.
             -->
-            <Button
-                android:id="@+id/icloud_results_done_button"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:fontFamily="@font/nunito_medium"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:text="@string/ok"
-                android:textSize="18sp" />
 
         </LinearLayout>
 
     </LinearLayout>
 
-</ScrollView>
+    </ScrollView>
+
+    <!--
+      **One button, always in the same place.** It was four, one per step, each at the bottom of
+      however much content that step happened to have - so it moved up and down the screen as the
+      flow went on, which reads as the page jumping about. Relabelled per step instead.
+
+      Outside the ScrollView, so a long list of devices scrolls behind it rather than pushing it
+      off the bottom.
+    -->
+    <LinearLayout
+        android:id="@+id/icloud_button_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="24dp"
+        android:paddingTop="8dp"
+        android:paddingRight="24dp"
+        android:paddingBottom="24dp">
+
+        <!--
+          Back, beside the thing it goes back from.
+
+          The system back already does this, and system back alone is not an affordance: nothing
+          on the passcode step said the device list was still there to return to, so choosing the
+          wrong one out of two looked final. Shown only where there is somewhere to go.
+        -->
+        <Button
+            android:id="@+id/icloud_back_button"
+            style="?attr/materialIconButtonFilledTonalStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:visibility="gone"
+            app:icon="@drawable/arrow_back_24px"
+            app:iconTint="?attr/colorOnSecondaryContainer"
+            tools:visibility="visible" />
+
+        <Button
+            android:id="@+id/icloud_primary_button"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/nunito_medium"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:textSize="18sp"
+            tools:text="Unlock" />
+
+    </LinearLayout>
+
+</LinearLayout>

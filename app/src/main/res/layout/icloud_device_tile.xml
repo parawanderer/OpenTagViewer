@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One device whose passcode could unlock the keychain.
+
+  A tile rather than a line of text. Somebody choosing here is picking between physical objects
+  they own, so the parts are separated the way they think about them: what kind of thing it is,
+  what they call it, and then the identifiers that tell two of the same kind apart.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/icloud_device_tile"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    android:background="@drawable/layout_rounded"
+    android:backgroundTint="?attr/colorSurfaceContainerLow"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="@drawable/ripple_rounded_rect"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/icloud_device_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="16dp"
+        android:contentDescription="@null"
+        app:tint="?attr/colorOnSecondaryContainer"
+        tools:src="@drawable/smartphone_24px" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/icloud_device_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nunito_medium"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            tools:text="Shane’s iPhone" />
+
+        <!--
+          The identifiers, small and quiet. They are how two of the same kind are told apart, so
+          they have to be here, and they are not what anybody reads first.
+        -->
+        <TextView
+            android:id="@+id/icloud_device_badges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="?attr/colorOutline"
+            android:textSize="13sp"
+            tools:text="iPhone 15  ·  F2LX9Q  ·  added 12 Mar 2024" />
+
+    </LinearLayout>
+
+</LinearLayout>

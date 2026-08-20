@@ -77,7 +77,13 @@ public class PythonICloudService implements ICloudService {
             for (int i = 0; i < devices.length(); i++) {
                 final JSONObject device = devices.getJSONObject(i);
                 found.add(new RecoverableDevice(
-                        device.getString("serial"), device.getString("description")));
+                        device.getString("serial"),
+                        device.getString("description"),
+                        device.optString("name", ""),
+                        device.optString("model", ""),
+                        device.optString("modelClass", ""),
+                        // Absent rather than zero would be a date in 1970 on the tile.
+                        device.isNull("escrowedAtMs") ? 0L : device.optLong("escrowedAtMs", 0L)));
             }
 
             return found;
@@ -87,6 +93,28 @@ public class PythonICloudService implements ICloudService {
     @Override
     public Completable unlock(final String serial, final String passcode) {
         return Completable.fromAction(() -> answered("unlock", serial, passcode))
+                .subscribeOn(Schedulers.io());
+    }
+
+    @Override
+    public Observable<KeychainMembership> join(final String escrowPasscode) {
+        return Observable.fromCallable(() -> {
+            final JSONObject answer = answered("join", escrowPasscode);
+
+            return new KeychainMembership(
+                    // Stored as the bytes Python produced. This app has no business parsing a
+                    // circle member's keys; it keeps what it was given and hands the same back.
+                    answer.getJSONObject("peer").toString(),
+                    answer.getString("entropy"),
+                    escrowPasscode,
+                    answer.optString("label", ""),
+                    answer.optInt("shares", 0));
+        }).subscribeOn(Schedulers.io());
+    }
+
+    @Override
+    public Completable resume(final String peerJson) {
+        return Completable.fromAction(() -> answered("resume", peerJson))
                 .subscribeOn(Schedulers.io());
     }
 

@@ -63,6 +63,41 @@ public interface ICloudService {
      */
     int MAX_UNLOCK_ATTEMPTS = 3;
 
+    /**
+     * Become a member of the account's keychain in this app's own right. <b>This one writes.</b>
+     *
+     * <p>Everything else here reads. This enrols an escrow record and adds a peer, and it is
+     * worth that for one reason: a non-member reads with view keys it holds a share of, and those
+     * keep working right up until the keys <b>roll</b> - expected whenever the circle's
+     * membership changes. Only a current member is given shares of the new ones, so a non-member
+     * goes quietly stale, still holding keys and decrypting nothing new. Here that is a map that
+     * stopped updating for no reason, which is the failure nobody can diagnose for themselves.
+     *
+     * <p><b>Never call this twice for one intent.</b> A response that will not decode is not a
+     * call that failed, and a timeout does not establish that nothing was sent. Treat any failure
+     * as "it may have happened" and recover by looking at the account, not by trying again.
+     *
+     * <p>Must follow a successful {@link #unlock} in the same session - the peer that unlock
+     * recovered is what sponsors the join.
+     *
+     * @param escrowPasscode the passcode <i>this app's own</i> record will be recoverable under,
+     *                       from {@link EscrowPasscode}. Not the user's, and never shown.
+     * @return the membership to store <b>before anything else can go wrong</b>: its keys are the
+     *         only copy in existence.
+     */
+    Observable<KeychainMembership> join(String escrowPasscode);
+
+    /**
+     * Read the keychain as the member this app already is - no passcode, nothing borrowed.
+     *
+     * <p>What the join bought, and the call that replaces asking on every refresh.
+     *
+     * <p>Fails with {@link ICloudFailure#MEMBERSHIP_UNUSABLE} when the stored keys no longer
+     * work, which is not a retry: the peer may have been removed from the account, and the way
+     * forward is a passcode and a fresh join.
+     */
+    Completable resume(String peerJson);
+
     /** Read and decrypt the account's accessories, described but without their key material. */
     Observable<ICloudFetch> fetch();
 

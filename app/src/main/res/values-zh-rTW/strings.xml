@@ -191,8 +191,13 @@
     <string name="icloud_service_unsure_body">Apple 完全沒有回傳可用的記錄，這通常表示服務出了狀況，而不是你的帳戶有問題。稍後再試為宜。</string>
     <string name="icloud_try_again">重試</string>
     <string name="icloud_found_x_tags">在你的 Apple 帳戶中找到 %1$d 個標籤</string>
-    <string name="icloud_x_were_not_tags">另有 %1$d 項是你自己的裝置而非標籤，已排除。</string>
+    <string name="icloud_x_were_not_tags">此帳戶中另有 %1$d 項沒有定位金鑰，因此無法被找到。</string>
     <string name="settings_icloud_switch">從我的 Apple 帳戶讀取標籤</string>
     <string name="settings_icloud_switch_summary">關閉後將停止讀取你的標籤列表。這不會把 OpenTagViewer 從你的 Apple 裝置列表中移除——那需要你在 Apple 的設定中自行操作。</string>
     <string name="icloud_results_title">你的 Apple 帳戶中的內容</string>
+    <string name="icloud_unlock_action">解鎖</string>
+    <string name="icloud_results_done">完成</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">%1$s 新增</string>
+    <string name="icloud_send_your_friend_the_guide">把匯出方法傳給朋友</string>
 </resources>

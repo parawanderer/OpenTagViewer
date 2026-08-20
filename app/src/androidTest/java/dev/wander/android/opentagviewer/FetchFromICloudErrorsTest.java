@@ -52,6 +52,20 @@ public class FetchFromICloudErrorsTest {
         AppDependencies.reset();
     }
 
+    @org.junit.Before
+    public void forgetAnyStoredMembership() {
+        // **The membership is in the real encrypted datastore, and it outlives a test class.**
+        // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
+        // member and never sees the device list. Cleared before rather than only after, because
+        // a test that crashed leaves it behind.
+        new dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository(
+                dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore.getInstance(
+                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                                .getTargetContext()),
+                new dev.wander.android.opentagviewer.util.android.AppCryptographyUtil())
+                .forget().blockingAwait();
+    }
+
     private void open(final FakeICloudService fake) {
         this.icloud = fake;
         AppDependencies.replaceICloud(() -> fake);
@@ -75,7 +89,7 @@ public class FetchFromICloudErrorsTest {
         final long before = this.icloud.timesCalled("unlock");
         onView(withId(R.id.icloud_passcode_input)).perform(replaceText("123456"));
         Eventually.perform("unlock", () -> this.icloud.timesCalled("unlock") > before,
-                () -> onView(withId(R.id.icloud_passcode_submit)).perform(click()));
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
     }
 
     /** No device on the account can unlock the keychain: final, and import is the answer. */
@@ -85,9 +99,11 @@ public class FetchFromICloudErrorsTest {
 
         Eventually.check(() -> onView(withId(R.id.icloud_no_tags_container))
                 .check(matches(isDisplayed())));
-        Eventually.check(() -> onView(withId(R.id.icloud_no_tags_import_button))
-                .check(matches(isDisplayed())));
-        Eventually.check(() -> onView(withId(R.id.icloud_retry_button))
+        // There is one button now, so what distinguishes the two screens is what it says - and
+        // on this one it must offer the import path rather than a retry that can never work.
+        Eventually.check(() -> onView(withId(R.id.icloud_primary_button))
+                .check(matches(withText(R.string.icloud_import_from_file))));
+        Eventually.check(() -> onView(withId(R.id.icloud_retry_container))
                 .check(matches(not(isDisplayed()))));
 
         TestPace.afterAStep();
@@ -169,7 +185,7 @@ public class FetchFromICloudErrorsTest {
 
         Eventually.check(() -> onView(withId(R.id.icloud_no_tags_container))
                 .check(matches(isDisplayed())));
-        Eventually.check(() -> onView(withId(R.id.icloud_no_tags_import_button))
+        Eventually.check(() -> onView(withId(R.id.icloud_primary_button))
                 .check(matches(isDisplayed())));
 
         TestPace.afterAStep();

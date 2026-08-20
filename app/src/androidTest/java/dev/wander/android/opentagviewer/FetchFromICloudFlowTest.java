@@ -52,6 +52,20 @@ public class FetchFromICloudFlowTest {
         AppDependencies.reset();
     }
 
+    @org.junit.Before
+    public void forgetAnyStoredMembership() {
+        // **The membership is in the real encrypted datastore, and it outlives a test class.**
+        // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
+        // member and never sees the device list. Cleared before rather than only after, because
+        // a test that crashed leaves it behind.
+        new dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository(
+                dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore.getInstance(
+                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                                .getTargetContext()),
+                new dev.wander.android.opentagviewer.util.android.AppCryptographyUtil())
+                .forget().blockingAwait();
+    }
+
     private void open(final FakeICloudService fake) {
         this.icloud = fake;
         AppDependencies.replaceICloud(() -> fake);
@@ -78,7 +92,7 @@ public class FetchFromICloudFlowTest {
         TestPace.afterAStep();
 
         Eventually.perform("unlock", () -> this.icloud.timesCalled("unlock") > before,
-                () -> onView(withId(R.id.icloud_passcode_submit)).perform(click()));
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
         TestPace.afterAStep();
     }
 
@@ -170,7 +184,7 @@ public class FetchFromICloudFlowTest {
         final long before = this.icloud.timesCalled("recoveryOptions");
         Eventually.perform("try again",
                 () -> this.icloud.timesCalled("recoveryOptions") > before,
-                () -> onView(withId(R.id.icloud_retry_button)).perform(click()));
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
     }
 
     /** An account with a Mac on it and no tags lands on the same advice, a step later. */
@@ -239,7 +253,7 @@ public class FetchFromICloudFlowTest {
         this.open(FakeICloudService.withTags());
         this.chooseTheFirstDevice();
 
-        onView(withId(R.id.icloud_passcode_submit)).perform(click());
+        onView(withId(R.id.icloud_primary_button)).perform(click());
 
         assertEquals("an empty box must not cost an attempt", 0, this.icloud.timesCalled("unlock"));
     }
