@@ -15,14 +15,18 @@ is asserted here *and* pinned on the Java side by `IdentityBridgeTest`.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import plistlib
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
 import icloud_bridge
 from exporter import icloud
+from cryptography.hazmat.primitives.asymmetric import ec
+from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
 
 
@@ -34,6 +38,13 @@ class FakeRecord:
 
     def describe(self) -> str:
         return f"A device, serial {self.serial}"
+
+
+class FakeRecoveredPeer:
+    """What a recovery yields: the identity a join is sponsored by."""
+
+    def __init__(self, serial: str) -> None:
+        self.peer_id = f"peer-for-{serial}"
 
 
 class FakeOptions:
@@ -54,6 +65,10 @@ class FakeClient:
         self._options = options or FakeOptions([FakeRecord("F2LX9Q")])
         self._unlockError = unlockError
         self.unlockedWith: list[tuple[str, str]] = []
+        self.resumedAs: list = []
+        self.joinedWith = None
+        self._joinError = None
+        self._resumeError = None
         self.entered = False
         self.exited = False
 
@@ -68,10 +83,35 @@ class FakeClient:
     async def recovery_options(self, *, refresh: bool = False):
         return self._options
 
-    async def unlock(self, record, passcode):
+    # `unlock` recovers explicitly now - `session.recover` then `client.resume` - because the
+    # peer a recovery yields is what sponsors a join, and `client.unlock` keeps it to itself.
+    @property
+    def session(self):
+        return self
+
+    async def recover(self, record, passcode):
         self.unlockedWith.append((record.serial, passcode))
         if self._unlockError is not None:
             raise self._unlockError
+        return FakeRecoveredPeer(record.serial)
+
+    async def resume(self, peer, **_):
+        self.resumedAs.append(getattr(peer, "peer_id", peer))
+        if self._resumeError is not None:
+            raise self._resumeError
+        return []
+
+    async def join(self, peer, *, passcode, device, os_version):
+        self.joinedWith = SimpleNamespace(
+            peer=peer, passcode=passcode, device=device, os_version=os_version)
+        if self._joinError is not None:
+            raise self._joinError
+        return SimpleNamespace(
+            peer=SimpleNamespace(
+                peer_id="peer-ours", to_json=lambda: {"peer_id": "peer-ours"}),
+            bottle=SimpleNamespace(entropy=bytes([7]) * 72),
+            label="a-label",
+            shares=2)
 
 
 class FakeAccount:
@@ -85,8 +125,23 @@ class FakeAccount:
     """
 
     def __init__(self, loop) -> None:
-        self._asyncacc = object()
+        self._asyncacc = FakeAsyncAccount()
         self._evt_loop = loop
+
+
+class FakeAsyncAccount:
+    """
+    The async account, in the two public things a join reads off it.
+
+    Both are what rule 11 is about: the model and build reach the escrow record's metadata, and
+    the serial reaches the peer's stable info, and both are read from the one identity rather
+    than composed - a path that invents its own makes one client look like several.
+    """
+
+    serial = "0PENTAGVIEWR"
+    identity = SimpleNamespace(
+        model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
+        os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0")
 
 
 @pytest.fixture
@@ -545,3 +600,137 @@ class TestClosing:
 
         made.client.__aexit__ = refusing
         made.close()
+
+
+def aStoredMembership() -> dict:
+    """A membership as the app would have stored it, with real keys."""
+    return JoinedPeer(
+        peer_id="peer-ours",
+        signing=ec.generate_private_key(ec.SECP384R1()),
+        encryption=ec.generate_private_key(ec.SECP384R1()),
+    ).to_json()
+
+
+class TestJoiningTheAccount:
+    """
+    The one call here that writes, and the reason it is worth writing.
+
+    A non-member reads with view keys it holds a share of, and those keep working - until the
+    view keys **roll**, which is expected whenever the circle's membership changes. Only a
+    current member is given shares of the new ones, so a non-member goes quietly stale: still
+    holding keys, still looking fine, decrypting nothing new. Here that is a map that stopped
+    updating for no reason.
+    """
+
+    def test_it_cannot_join_before_anything_is_unlocked(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_UNLOCKED
+        assert made.client.joinedWith is None, "nothing may be sent without a sponsor"
+
+    def test_it_refuses_an_empty_passcode(self, session):
+        """Enrolment refuses it anyway, but failing here says which side got it wrong."""
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        assert not json.loads(made.join(""))["ok"]
+        assert made.client.joinedWith is None
+
+    def test_the_peer_that_was_recovered_is_the_one_that_sponsors(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        assert json.loads(made.join("a-passcode"))["ok"]
+        assert made.client.joinedWith.peer.peer_id == "peer-for-F2LX9Q"
+
+    def test_it_describes_itself_with_the_identity_it_already_presents(self, session):
+        """
+        Rule 11. The model and build reach the escrow record's metadata and the serial reaches
+        the peer's stable info - both read from the one identity rather than composed, because
+        a path that invents its own makes one client look like several.
+        """
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+        made.join("a-passcode")
+
+        device = made.client.joinedWith.device
+        assert device.serial == "0PENTAGVIEWR"
+        assert device.model == "iPhone17,1"
+        assert device.build == "22B83"
+        assert made.client.joinedWith.os_version == "18.1"
+
+    def test_the_membership_comes_back_to_be_stored(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert answer["peer"] == {"peer_id": "peer-ours"}
+        assert answer["label"] == "a-label"
+        assert answer["shares"] == 2
+
+    def test_the_entropy_comes_back_too_and_is_not_the_membership(self, session):
+        """
+        Both are kept, and neither substitutes for the other.
+
+        The membership is how a refresh avoids a passcode. The entropy, with the passcode the
+        record was enrolled under, is how the peer is recovered through escrow if the app's
+        encrypted store is ever destroyed.
+        """
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert len(base64.b64decode(answer["entropy"])) == 72
+        assert answer["entropy"] != json.dumps(answer["peer"])
+
+    def test_a_join_that_fails_is_reported_with_words_in_it(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+        made.client._joinError = RuntimeError("cuttlefish said no")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert not answer["ok"]
+        assert "cuttlefish said no" in answer["message"]
+
+
+class TestReadingAsTheMemberItAlreadyIs:
+    def test_it_needs_no_passcode(self, session):
+        made = session(FakeClient())
+
+        # A real `JoinedPeer`, serialised the way the app will store it. A hand-written stub
+        # would skip the deserialisation this call actually does, which is the half that fails
+        # when a stored value comes back damaged.
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert answer["ok"]
+        assert made.client.unlockedWith == [], "resuming must not spend an unlock attempt"
+
+    def test_a_membership_that_no_longer_works_says_which_kind_of_failure_it_is(self, session):
+        """
+        Its own reason, because the answer is different. The peer may have been removed from the
+        account - which is how a user revokes this app - so the way forward is a passcode and a
+        fresh join, not retrying with the same stored keys.
+        """
+        made = session(FakeClient())
+        made.client._resumeError = RuntimeError("no such peer")
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert answer["reason"] == icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
+        assert answer["message"].strip()
+
+    def test_rubbish_in_storage_does_not_crash(self, session):
+        made = session(FakeClient())
+
+        assert not json.loads(made.resume("not json at all"))["ok"]

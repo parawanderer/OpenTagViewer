@@ -53,6 +53,18 @@ public enum ICloudFailure {
     /** A device was chosen that this session never listed. A bug in the screen, not the user. */
     NO_SUCH_RECORD,
 
+    /** A join was asked for before anything unlocked, so no peer could sponsor it. A bug here. */
+    NOT_UNLOCKED,
+
+    /**
+     * The stored membership no longer reads the keychain.
+     *
+     * <p><b>Not a broken app, and not a retry.</b> The peer may simply have been removed from the
+     * account - which is how somebody revokes this app - so the way forward is to ask for a
+     * device passcode and join again, not to try the same stored keys a second time.
+     */
+    MEMBERSHIP_UNUSABLE,
+
     /** An accessory was asked for that this session never fetched. Also a bug in the screen. */
     NO_SUCH_ACCESSORY,
 
@@ -77,6 +89,8 @@ public enum ICloudFailure {
             case "service_unsure": return SERVICE_UNSURE;
             case "passcode_rejected": return PASSCODE_REJECTED;
             case "no_such_record": return NO_SUCH_RECORD;
+            case "not_unlocked": return NOT_UNLOCKED;
+            case "membership_unusable": return MEMBERSHIP_UNUSABLE;
             case "no_such_accessory": return NO_SUCH_ACCESSORY;
             default: return UNKNOWN;
         }
