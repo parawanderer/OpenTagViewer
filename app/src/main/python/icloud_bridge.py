@@ -45,6 +45,7 @@ from exporter import icloud
 from findmy.keychain.enrolment import DeviceDescription
 from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
+from findmy.keychain.session import KeychainSessionError
 
 REASON_NOT_SIGNED_IN = "not_signed_in"
 """The account handed over is not in a state that can talk to iCloud."""
@@ -88,6 +89,17 @@ REASON_NO_SUCH_RECORD = "no_such_record"
 REASON_NO_SUCH_ACCESSORY = "no_such_accessory"
 """An id was asked for that this session never fetched, or has not fetched since reopening."""
 
+
+REASON_NOT_AN_ACCESSORY = "not_an_accessory"
+"""
+The thing being renamed is one of the owner's own devices, not an accessory.
+
+**An iPhone, iPad or Mac takes its name from more places than the naming record**, so writing one
+here would change what Find My shows for it in one place and leave every other copy saying
+something else. The app nicknames those locally instead, and keeps showing the real name
+alongside. Only an accessory - an AirTag, or a Find My-certified tag somebody made - has the
+naming record as its single source of truth.
+"""
 
 REASON_UNKNOWN = "unknown"
 """Anything else, with the exception text carried through so a report can be answered."""
@@ -512,6 +524,61 @@ class ICloudSession:
 
         return json.dumps({"ok": True, "accessories": accessories})
 
+    def rename(self, beaconId: str, plistXml: str, name: str, emoji: str) -> str:
+        """
+        Change an accessory's name and emoji in iCloud.
+
+        **The second call here that writes**, and unlike :meth:`join` it changes something the
+        owner sees in Find My on their own devices. FindMy.py sends back the rest of the record
+        unchanged, so nothing but these two fields moves.
+
+        **Refused for the owner's own devices**, and the refusal is made here rather than trusted
+        to the caller. An iPhone, iPad or Mac carries its name in more places than this record;
+        writing one would leave Find My showing a name that disagrees with the device itself. The
+        test is :func:`opentagviewer_export.hardware.is_own_device`, which is the same one the
+        exporter uses to decide that handing over a Mac's keys is a different act from handing
+        over an AirTag's - two signals, an Apple model identifier or the shared secret only a
+        device carries, and neither is a thing to re-derive in Java.
+
+        **Judged from the stored record rather than by fetching.** Java already holds the
+        `OwnedBeacons` plist this accessory was imported with - it is the same document a bundle
+        carries - so the alternative is reading the whole account to answer a question the
+        record on disk already answers.
+
+        :param beaconId: The accessory's identifier, which is what `associatedBeacon` names.
+        :param plistXml: Its stored `OwnedBeacons` plist, to decide what kind of thing it is.
+        :param name: The new name, or empty to leave it alone.
+        :param emoji: The new emoji, or empty to leave it alone.
+        """
+        if self._client is None:
+            return _failure(REASON_NOT_SIGNED_IN, "The Find My client is not open.")
+
+        # Empty means "leave it alone", not "set it to empty" - sending both fields every time
+        # would blank the emoji of every accessory anybody renamed.
+        changes = {field: value for field, value in (("name", name), ("emoji", emoji)) if value}
+
+        if not changes:
+            return _failure(REASON_UNKNOWN, "Nothing to change: pass a name, an emoji, or both.")
+
+        refusal = _refuseToRenameADevice(plistXml)
+        if refusal is not None:
+            return refusal
+
+        try:
+            self._loop.run_until_complete(
+                self._client.rename(beaconId, **changes))
+        except KeychainSessionError:
+            # Distinguished from the catch-all because the answer is different: this is not a
+            # broken rename, it is a session that never got its keys, and the app can fix it by
+            # resuming or unlocking rather than by telling the user something went wrong.
+            return _failure(
+                REASON_NOT_UNLOCKED,
+                "The keychain is not open, so nothing can be written to the account yet.")
+        except Exception:
+            return _unexpected("renaming the accessory")
+
+        return json.dumps({"ok": True})
+
     def close(self) -> None:
         """Close the client, and say so rather than raising if it will not go quietly."""
         if self._client is None:
@@ -528,6 +595,33 @@ class ICloudSession:
             # is over. A later `records` call then fails with a reason rather than handing back
             # secrets from a conversation that has ended.
             self._candidates = {}
+
+
+def _refuseToRenameADevice(plistXml: str) -> str | None:
+    """
+    Say no if this is one of the owner's own devices, or None to carry on.
+
+    The test is :func:`opentagviewer_export.hardware.is_own_device` - two signals, an Apple model
+    identifier or the shared secret only a device carries - and it is called rather than
+    reproduced. The exporter asks the same question to decide that handing over a Mac's keys is a
+    different act from handing over an AirTag's, and one of those answers going stale while the
+    other did not is exactly the bug this arrangement avoids.
+    """
+    try:
+        record = plistlib.loads(plistXml.encode("utf-8"))
+    except Exception:
+        return _unexpected("reading the accessory's stored record")
+
+    from opentagviewer_export.hardware import is_own_device
+
+    if not is_own_device(record):
+        return None
+
+    return _failure(
+        REASON_NOT_AN_ACCESSORY,
+        "This is one of your own devices rather than an accessory. Its name is not something"
+        " this record decides, so changing it here would not change it anywhere you would"
+        " see it.")
 
 
 def _plist(mapping: Any) -> str | None:

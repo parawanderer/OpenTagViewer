@@ -20,6 +20,7 @@ import json
 import plistlib
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -31,10 +32,30 @@ from findmy.keychain.recovery import RecoveryError
 
 
 class FakeRecord:
-    """An escrow record, as far as this module is concerned: a serial and a description."""
+    """
+    An escrow record, in the fields the bridge reads off one.
 
-    def __init__(self, serial: str) -> None:
+    **Every field, including the empty ones.** The screen builds a tile out of these rather than
+    printing `describe()`, and the interesting case is the phone nobody ever renamed - `name` is
+    empty and the tile has to fall back to the model class. A fake carrying only the fields a
+    passing test happens to touch is how this drifted out of step with the bridge in the first
+    place.
+    """
+
+    def __init__(
+        self,
+        serial: str,
+        *,
+        name: str = "",
+        model: str = "iPhone15,2",
+        modelClass: str = "iPhone",
+        escrowedAt: Any = None,
+    ) -> None:
         self.serial = serial
+        self.device_name = name
+        self.device_model = model
+        self.device_model_class = modelClass
+        self.escrowed_at = escrowedAt
 
     def describe(self) -> str:
         return f"A device, serial {self.serial}"
@@ -69,6 +90,8 @@ class FakeClient:
         self.joinedWith = None
         self._joinError = None
         self._resumeError = None
+        self.renamedWith: list[tuple[str, dict]] = []
+        self.renameError = None
         self.entered = False
         self.exited = False
 
@@ -112,6 +135,12 @@ class FakeClient:
             bottle=SimpleNamespace(entropy=bytes([7]) * 72),
             label="a-label",
             shares=2)
+
+    async def rename(self, accessory, **changes):
+        self.renamedWith.append((accessory, changes))
+        if self.renameError is not None:
+            raise self.renameError
+        return SimpleNamespace(identifier=accessory)
 
 
 class FakeAccount:
@@ -734,3 +763,125 @@ class TestReadingAsTheMemberItAlreadyIs:
         made = session(FakeClient())
 
         assert not json.loads(made.resume("not json at all"))["ok"]
+
+
+def anAccessoryPlist(**extra) -> str:
+    """An AirTag's stored record: empty model, a product id, no device-only shared secret."""
+    record = {
+        "batteryLevel": 1,
+        "model": "",
+        "productId": 21760,
+        "vendorId": 76,
+        "secondarySharedSecret": {"key": {"data": b"x" * 32}},
+    }
+    record.update(extra)
+    return plistlib.dumps(record).decode("utf-8")
+
+
+class TestRenamingAnAccessory:
+    """
+    The one call that changes something the owner sees in Find My on their own devices.
+
+    **The refusal is the interesting half.** An accessory's naming record is the only place its
+    name lives, so writing one is the whole change. An iPhone, iPad or Mac carries its name in
+    several places, and writing this one would leave Find My disagreeing with the device itself -
+    so the app nicknames those locally instead, and this refuses to be talked into the other
+    thing.
+    """
+
+    def test_the_new_name_and_emoji_reach_the_library(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", "🔑"))
+
+        assert answer["ok"]
+        assert made.client.renamedWith == [("beacon-1", {"name": "Keys", "emoji": "🔑"})]
+
+    def test_only_what_is_changing_is_sent(self, session):
+        """
+        Empty means "leave it alone", not "set it to empty". Sending both every time would blank
+        the emoji of every accessory anybody renamed.
+        """
+        made = session(FakeClient())
+
+        json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert made.client.renamedWith == [("beacon-1", {"name": "Keys"})]
+
+    def test_an_emoji_can_be_changed_without_touching_the_name(self, session):
+        made = session(FakeClient())
+
+        json.loads(made.rename("beacon-1", anAccessoryPlist(), "", "🎒"))
+
+        assert made.client.renamedWith == [("beacon-1", {"emoji": "🎒"})]
+
+    def test_changing_nothing_is_refused_rather_than_sent(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "", ""))
+
+        assert not answer["ok"]
+        assert made.client.renamedWith == [], "an empty rename must not reach the account"
+
+    def test_one_of_the_owners_own_devices_is_refused(self, session):
+        """
+        <b>The rule this exists for.</b> An iPad's name is not this record's to change.
+        """
+        made = session(FakeClient())
+        anIpad = anAccessoryPlist(model="iPad13,18")
+
+        answer = json.loads(made.rename("beacon-1", anIpad, "My iPad", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_AN_ACCESSORY
+        assert made.client.renamedWith == [], "a device rename must never reach the account"
+
+    def test_a_device_is_caught_by_its_shared_secret_too(self, session):
+        """
+        The second signal, and the one that catches a device whose `model` is empty. Both are
+        `is_own_device`'s, and neither is re-derived here - see the note on that function.
+        """
+        made = session(FakeClient())
+        aMac = anAccessoryPlist(secureLocationsSharedSecret={"key": {"data": b"y" * 32}})
+
+        answer = json.loads(made.rename("beacon-1", aMac, "Work Mac", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_AN_ACCESSORY
+        assert made.client.renamedWith == []
+
+    def test_a_session_with_no_keys_says_so_rather_than_failing_vaguely(self, session):
+        """
+        Its own reason: the app can fix this by resuming, and "something went wrong" would send
+        the user looking for a fault that is not there.
+        """
+        from findmy.keychain.session import KeychainSessionError
+
+        made = session(FakeClient())
+        made.client.renameError = KeychainSessionError("no keys held")
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_UNLOCKED
+
+    def test_a_failure_from_the_account_is_reported_rather_than_swallowed(self, session):
+        made = session(FakeClient())
+        made.client.renameError = RuntimeError("CloudKit said no")
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert not answer["ok"]
+        assert answer["message"].strip()
+
+    def test_a_damaged_stored_record_does_not_crash(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", "not a plist", "Keys", ""))
+
+        assert not answer["ok"]
+        assert made.client.renamedWith == []
+
+    def test_nothing_can_be_renamed_before_the_client_is_open(self, loop):
+        made = icloud_bridge.openSession(FakeAccount(loop))
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_SIGNED_IN
