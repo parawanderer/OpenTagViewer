@@ -38,6 +38,8 @@ import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.python.icloud.RecoverableDevice;
 import dev.wander.android.opentagviewer.ui.RecoverableDeviceIcon;
+import dev.wander.android.opentagviewer.ui.login.StepTransition;
+import dev.wander.android.opentagviewer.ui.login.StepTransition.Direction;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
@@ -58,6 +60,21 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
  */
 public class FetchFromICloudActivity extends AppCompatActivity {
     private static final String TAG = FetchFromICloudActivity.class.getSimpleName();
+
+    /**
+     * The mutually exclusive steps, listed once.
+     *
+     * <p>So showing one is "show this" rather than every caller remembering to hide the other
+     * five - which is the kind of thing that leaves two stacked on top of each other.
+     */
+    private static final int[] STEPS = {
+            R.id.icloud_loading_container,
+            R.id.icloud_device_container,
+            R.id.icloud_passcode_container,
+            R.id.icloud_no_tags_container,
+            R.id.icloud_retry_container,
+            R.id.icloud_results_container,
+    };
 
     /** Set when the screen should leave and let the caller open the file picker instead. */
     public static final String RESULT_WANTS_FILE_IMPORT = "wantsFileImport";
@@ -155,7 +172,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         if (this.isShowing(R.id.icloud_passcode_container) && this.devices.size() > 1) {
             // Only worth going back to when there was a choice. With one device the list is a
             // single button and returning to it is a dead end that looks like a bug.
-            this.showDevices(this.devices);
+            this.showDevices(this.devices, Direction.BACK);
             return;
         }
 
@@ -177,7 +194,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
     /** Open a session and ask what the keychain can be recovered from. */
     private void start() {
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
         this.setLoadingText(R.string.icloud_fetch_my_tags);
 
         if (this.icloud != null) {
@@ -245,14 +262,16 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     }
 
     private void askForADevice() {
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
 
         var async = this.icloud.recoveryOptions()
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::showDevices, this::showFailure);
+                .subscribe(devices -> this.showDevices(devices, Direction.FORWARD),
+                        this::showFailure);
     }
 
-    private void showDevices(final List<RecoverableDevice> recoverable) {
+    private void showDevices(
+            final List<RecoverableDevice> recoverable, final Direction direction) {
         this.devices = recoverable;
 
         final LinearLayout list = this.findViewById(R.id.icloud_device_list);
@@ -267,7 +286,8 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             list.addView(tile);
         }
 
-        this.showOnly(R.id.icloud_device_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_device_container, R.string.icloud_unlock_title,
+                direction);
     }
 
     private void chooseDevice(final RecoverableDevice device) {
@@ -279,7 +299,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.findViewById(R.id.icloud_passcode_error_container).setVisibility(GONE);
 
         this.updateAttemptCounter();
-        this.showOnly(R.id.icloud_passcode_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_passcode_container, R.string.icloud_unlock_title, Direction.FORWARD);
     }
 
     private void updateAttemptCounter() {
@@ -299,7 +319,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             return;
         }
 
-        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_loading_container, R.string.icloud_unlock_title, Direction.NONE);
         this.setLoadingText(R.string.icloud_unlock_title);
 
         // Unlock, join, store, then read - in that order, and the store is not optional.
@@ -337,7 +357,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
         if (this.attempt > ICloudService.MAX_UNLOCK_ATTEMPTS) {
             Log.w(TAG, "Out of unlock attempts for " + this.chosenDevice.getSerial());
-            this.showOnly(R.id.icloud_retry_container, R.string.icloud_service_unsure_title);
+            this.showOnly(R.id.icloud_retry_container, R.string.icloud_service_unsure_title, Direction.FORWARD);
             ((TextView) this.findViewById(R.id.icloud_retry_body))
                     .setText(R.string.icloud_passcode_rejected);
             return;
@@ -345,7 +365,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
         this.findViewById(R.id.icloud_passcode_error_container).setVisibility(VISIBLE);
         this.updateAttemptCounter();
-        this.showOnly(R.id.icloud_passcode_container, R.string.icloud_unlock_title);
+        this.showOnly(R.id.icloud_passcode_container, R.string.icloud_unlock_title, Direction.NONE);
     }
 
     /**
@@ -382,7 +402,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         if (fetched.isEmpty()) {
             // An account with a Mac on it but no tags. Same advice as having nothing to recover
             // from, reached a step later.
-            this.showOnly(R.id.icloud_no_tags_container, R.string.icloud_no_tags_title);
+            this.showOnly(R.id.icloud_no_tags_container, R.string.icloud_no_tags_title, Direction.FORWARD);
             return;
         }
 
@@ -418,7 +438,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         // **Not `icloud_found_x_tags`**, which is a format string with a `%1$d` in it - used as
         // a heading it renders the placeholder literally, which is what shipped in the first
         // screenshot of this screen.
-        this.showOnly(R.id.icloud_results_container, R.string.icloud_results_title);
+        this.showOnly(R.id.icloud_results_container, R.string.icloud_results_title, Direction.FORWARD);
     }
 
     /** Whatever went wrong, on the screen written for it. */
@@ -434,7 +454,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             case NOTHING_TO_RECOVER_FROM:
                 // Final. This account has nothing that can ever unlock its keychain, so the
                 // import path is the answer rather than a retry.
-                this.showOnly(R.id.icloud_no_tags_container, R.string.icloud_no_tags_title);
+                this.showOnly(R.id.icloud_no_tags_container, R.string.icloud_no_tags_title, Direction.FORWARD);
                 break;
 
             case NOT_SIGNED_IN:
@@ -447,7 +467,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                 // Everything unrecognised lands here on purpose: "try again later" is the safe
                 // thing to say about a failure whose cause is not established, and it is a long
                 // way better than telling somebody they own no tags.
-                this.showOnly(R.id.icloud_retry_container, R.string.icloud_service_unsure_title);
+                this.showOnly(R.id.icloud_retry_container, R.string.icloud_service_unsure_title, Direction.FORWARD);
                 ((TextView) this.findViewById(R.id.icloud_retry_body)).setText(
                         failure == ICloudFailure.SERVICE_UNSURE
                                 ? this.getString(R.string.icloud_service_unsure_body)
@@ -566,19 +586,30 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.primaryButton.setOnClickListener(null);
     }
 
-    private void showOnly(final int stepId, final int titleResId) {
-        for (final int candidate : new int[] {
-                R.id.icloud_loading_container,
-                R.id.icloud_device_container,
-                R.id.icloud_passcode_container,
-                R.id.icloud_no_tags_container,
-                R.id.icloud_retry_container,
-                R.id.icloud_results_container,
-        }) {
-            this.findViewById(candidate).setVisibility(candidate == stepId ? VISIBLE : GONE);
+    private void showOnly(final int stepId, final int titleResId, final Direction direction) {
+        View outgoing = null;
+        for (final int candidate : STEPS) {
+            if (candidate == stepId) {
+                continue;
+            }
+            final View step = this.findViewById(candidate);
+            if (outgoing == null && step.getVisibility() == VISIBLE) {
+                outgoing = step;
+                continue;
+            }
+            // Already off screen, or a second visible step, which should not happen. Hidden
+            // without ceremony either way: only one thing can animate out, and a step left
+            // half-faded by an earlier swap would come back that way.
+            StepTransition.swap(step, null, Direction.NONE);
         }
 
-        ((TextView) this.findViewById(R.id.icloud_step_title)).setText(titleResId);
+        StepTransition.swap(outgoing, this.findViewById(stepId), direction);
+
+        // The heading names the step, so it travels with it. Set first, so nothing has to wait
+        // for the animation to read what it says.
+        final TextView title = this.findViewById(R.id.icloud_step_title);
+        title.setText(titleResId);
+        StepTransition.enter(title, direction);
 
         // Only where there is an earlier step: on the passcode step with a choice of devices.
         // Anywhere else back leaves the screen, and a button that closes the screen is not what
