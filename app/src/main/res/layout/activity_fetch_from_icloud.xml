@@ -49,12 +49,24 @@
             android:textColor="?attr/colorOnSurface"
             android:textSize="24sp" />
 
-        <!-- Working. Its own step so nothing else is on screen while a call is in flight. -->
+        <!--
+            Working. Its own step so nothing else is on screen while a call is in flight.
+
+            **Weighted rather than wrapped, so it centres.** Every other step is content that
+            starts under the heading and grows downward; this one is a spinner and a line of text,
+            and left to wrap it sat just below the title with the rest of the screen empty beneath
+            it - which reads as a screen that failed to finish drawing rather than as one that is
+            waiting. Taking the leftover height puts it in the middle of it.
+
+            The weight only does anything while this step is the visible one: a GONE sibling
+            takes no space, and the ScrollView's fillViewport is what gives the column a height
+            to share out in the first place.
+        -->
         <LinearLayout
             android:id="@+id/icloud_loading_container"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="48dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
             android:visibility="gone"
