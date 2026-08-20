@@ -37,20 +37,14 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // **A cap on any single instrumented test, so one hang cannot eat the suite.**
+        // **Do not add `timeout_msec` here.** It works - a hanging test fails at the cap with
+        // its own name - but AndroidJUnitRunner pays for it per test, not per hang: with it set
+        // to two minutes, FetchFromICloudFlowTest's ten tests took 56.4s against 9.8s without,
+        // and the whole suite went from 2m59s to 9m13s. Measured on this machine, both ways.
         //
-        // A test that blocks forever does not fail - it stops the run where it stands, with no
-        // name attached and nothing in the report, and the emulator keeps holding its log files
-        // open afterwards. That happened here: a test that launched the real map screen sat
-        // waiting out network timeouts for ten minutes of a thirteen-minute run, and the only
-        // way to find out which test it was involved reading logcat file timestamps by hand.
-        //
-        // With this, that test fails, says its own name, and the other 300 still run.
-        //
-        // Two minutes rather than something tight: the slowest honest tests here drive a whole
-        // sign-in, and a demo run adds `slowMotion` pauses on top of every step. This is a
-        // backstop against hanging, not a performance budget.
-        testInstrumentationRunnerArguments["timeout_msec"] = "120000"
+        // A hang costs one bad run and is fixed by fixing the test; this cost three minutes of
+        // every run forever. If a global cap is wanted, it needs to be a JUnit Timeout rule
+        // installed by a custom runner, not this argument.
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")

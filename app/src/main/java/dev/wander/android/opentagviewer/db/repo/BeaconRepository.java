@@ -28,6 +28,7 @@ import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -307,6 +308,67 @@ public class BeaconRepository {
      *                                {@link java.util.HashMap}, because {@code Map.of} and
      *                                {@code Collectors.toMap} both throw on a null value.
      */
+    /**
+     * The same, minus the tags a <b>scheduled</b> fetch should leave alone right now.
+     *
+     * <p><b>A separate entry point on purpose, and the separation is the safety.</b> The backoff
+     * exists so the app stops spending most of its conversation with Apple on tags that never
+     * answer - but a person who opens a tag and presses refresh must get a search every time,
+     * however long it has been quiet, because they may have just found the thing. Filtering
+     * inside {@link #toAccessoryRequests} would have applied it to both, and the user-facing
+     * failure would be a button that silently does nothing.
+     *
+     * <p>So the periodic path calls this and the manual paths call the other one, and which is
+     * which is readable at the call site rather than hidden behind a flag.
+     */
+    /** The newest location held for a tag, for the "last result" line on the tag page. */
+    public Observable<Optional<Long>> newestReportTimeFor(@NonNull final String beaconId) {
+        return Observable.fromCallable(
+                        () -> Optional.ofNullable(db.locationReportDao().newestReportTimeFor(beaconId)))
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Observable<List<AccessoryRequest>> toScheduledAccessoryRequests(
+            final Map<String, String> beaconIdToPlistFallback) {
+
+        return Observable.fromCallable(() -> this.dueForAScheduledScan(beaconIdToPlistFallback))
+                .subscribeOn(Schedulers.io())
+                .flatMap(this::toAccessoryRequests);
+    }
+
+    private Map<String, String> dueForAScheduledScan(final Map<String, String> all) {
+        final long now = System.currentTimeMillis();
+        final var dao = db.ownedBeaconDao();
+
+        final Map<String, String> due = new HashMap<>();
+        int ignored = 0;
+        int waiting = 0;
+
+        for (final var entry : all.entrySet()) {
+            final OwnedBeacon row = dao.getById(entry.getKey());
+
+            if (row != null && row.ignoredAt != null) {
+                ignored++;
+                continue;
+            }
+            if (row != null && !WideScanBackoff.isDue(now, row.fruitlessScans, row.lastScanAt)) {
+                waiting++;
+                continue;
+            }
+
+            // Null values are meaningful here - see toAccessoryRequests - so the key goes in
+            // whatever the fallback is.
+            due.put(entry.getKey(), entry.getValue());
+        }
+
+        if (ignored > 0 || waiting > 0) {
+            Log.d(TAG, "Scheduled fetch is skipping " + ignored + " ignored and " + waiting
+                    + " backing off; asking about " + due.size());
+        }
+
+        return due;
+    }
+
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
         return Observable.fromCallable(() -> {
             if (beaconIdToPlistFallback.isEmpty()) {
@@ -366,9 +428,46 @@ public class BeaconRepository {
                     dao.updateAccessoryJson(entry.getKey(), entry.getValue());
                 }
             }
+
+            this.recordWhatEachScanFound(dao, fetchResult);
+
             return fetchResult.getReports();
         }).subscribeOn(Schedulers.io())
         .flatMap(this::storeToLocationCache);
+    }
+
+    /**
+     * Note, per tag, whether this search found anything - which is what paces the next one.
+     *
+     * <p><b>Three outcomes, not two.</b> Something found resets everything. Nothing found lengthens
+     * the wait a little, because a fortnight of silence is an ordinary tag having an ordinary
+     * week. Nothing found across <i>months</i> of history is different in kind: the tag has
+     * stopped broadcasting, and every further search costs a full-history scan that cannot repay
+     * itself, so it is set aside until somebody asks.
+     *
+     * <p>Driven from what was actually searched rather than from a count of reports, because only
+     * Python knows how wide the key window was - see {@code FetchResult#getExhaustedWideSearch}.
+     */
+    private void recordWhatEachScanFound(
+            final dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao dao,
+            final FetchResult fetchResult) {
+
+        final long now = System.currentTimeMillis();
+
+        for (final var entry : fetchResult.getReports().entrySet()) {
+            final String beaconId = entry.getKey();
+            final boolean foundSomething = entry.getValue() != null && !entry.getValue().isEmpty();
+
+            if (foundSomething) {
+                dao.recordSuccessfulScan(beaconId, now);
+            } else if (fetchResult.getExhaustedWideSearch().contains(beaconId)) {
+                Log.i(TAG, beaconId + " found nothing across months of history; it will be"
+                        + " skipped until somebody asks for it directly");
+                dao.markIgnored(beaconId, now);
+            } else {
+                dao.recordFruitlessScan(beaconId, now);
+            }
+        }
     }
 
     public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {

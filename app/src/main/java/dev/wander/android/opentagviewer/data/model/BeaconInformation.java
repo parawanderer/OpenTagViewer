@@ -232,6 +232,27 @@ public class BeaconInformation {
      */
     private final boolean fromAccount;
 
+    /**
+     * When the app gave up looking for this tag, or null if it has not.
+     *
+     * <p>Set only after a search covering months of history found nothing anywhere - not merely
+     * after an empty search, which for a recently paired tag means very little. Shown on the
+     * device list in place of "no last location known", because those two states look identical
+     * and are not: one is a tag nobody has walked past this week, the other is a tag that has
+     * stopped broadcasting and is no longer being looked for.
+     */
+    private final Long ignoredAt;
+
+    /** Consecutive searches that found nothing, which is what paces the next one. */
+    private final int fruitlessScans;
+
+    /** When it was last searched for, or null if never. */
+    private final Long lastScanAt;
+
+    public boolean isIgnored() {
+        return this.ignoredAt != null;
+    }
+
     public boolean isCustomAccessory() {
         return this.customAccessory;
     }

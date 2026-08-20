@@ -812,6 +812,19 @@ def _filterReportsByTimeRange(reports, startMs, endMs):
 # is enough round trips to be worth avoiding.
 _ALIGNMENT_PROBE_THRESHOLD_INDICES = 2000
 
+# How wide a fruitless key search has to be before the accessory is called dead.
+#
+# **Width, not "we found nothing".** A tag with no key alignment record always searches from its
+# pairing date, so a *young* one searches a small range and finding nothing there means very
+# little - it may simply not have been near an iPhone this week, and it will report eventually.
+# A search this wide means the tag has been silent for months: at an AirTag's ~96 indices a day,
+# 20,000 is around seven months. Nothing that has said nothing for seven months is about to.
+#
+# The point of noticing is not tidiness. Each of these costs a full-history search at ~290 keys
+# per request, every time anything refreshes - the account-flagging risk in rule 6, spent on a
+# tag that will never repay it.
+_DEAD_TAG_WIDTH_INDICES = 20000
+
 # Apple rejects requests carrying much more than ~290 hashed keys, so a ranged fetch is split
 # into chunks below that with a little headroom.
 _MAX_KEYS_PER_REQUEST = 255
@@ -1281,6 +1294,10 @@ def getReports(
             start_dt = datetime.fromtimestamp(unixStartMs / 1000, tz=timezone.utc)
             end_dt = datetime.fromtimestamp(unixEndMs / 1000, tz=timezone.utc)
 
+            # Measured before and after, because "found nothing" on its own says nothing.
+            # See _DEAD_TAG_WIDTH_INDICES.
+            width_before = _isAlignmentWide(airtag, start_dt, end_dt)
+
             try:
                 reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
             except Exception:
@@ -1290,6 +1307,19 @@ def getReports(
                 continue
             print(f"Got {len(reports)} raw reports for {beaconId}")
 
+            # A search that stayed as wide as it started found nothing to align to, which is the
+            # difference between "no reports in the window asked for" and "no reports at all,
+            # anywhere in this tag's life".
+            width_after = _isAlignmentWide(airtag, start_dt, end_dt)
+            exhausted = (
+                not reports
+                and width_before > _DEAD_TAG_WIDTH_INDICES
+                and width_after >= width_before
+            )
+            if exhausted:
+                print(f"{beaconId} has nothing anywhere in {width_before} indices of history;"
+                      f" reporting it as one that appears to have stopped broadcasting.")
+
             filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)
             print(f"  -> {len(filtered)} reports after filtering to requested range")
 
@@ -1298,6 +1328,8 @@ def getReports(
             res[beaconId] = {
                 "reports": _serializeReports(filtered),
                 "updatedAccessoryJson": updated_accessory_json,
+                # Java decides what to do about it; this only reports what was searched.
+                "exhaustedWideSearch": exhausted,
             }
 
         return _resultOrError(res, failures, num_items)

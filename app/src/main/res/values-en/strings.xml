@@ -216,4 +216,15 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="icloud_fetch_from_settings_subtitle">Add the tags on your account, or update the ones already here</string>
     <string name="icloud_fetch_from_settings_linked">Linked to your Apple account. Tap to check for new or changed tags.</string>
     <string name="icloud_link_account_action">Link tags via Apple account</string>
+    <string name="tag_ignored_summary">No updates for months — paused checking</string>
+    <string name="tag_ignored_retry">Check now</string>
+    <string name="debug_last_scan_attempt">Last fetch attempt</string>
+    <string name="debug_last_result_at">Last result</string>
+    <string name="debug_backoff_state">Fetch backoff</string>
+    <string name="debug_backoff_normal">Normal</string>
+    <string name="debug_backoff_waiting">Backing off — %1$d empty searches, next attempt %2$s</string>
+    <string name="debug_backoff_ignored">Ignored since %1$s — nothing found across months of history</string>
+    <string name="debug_never">Never</string>
+    <string name="tag_ignored_explanation">Nothing has been found for this tag anywhere in months of history, so the app stopped searching for it automatically. Searching for one of these is slow, and it is unlikely to be found. Tap below to look again right now.</string>
+    <string name="tag_ignored_retrying">Looking for this tag again. This can take a few minutes.</string>
 </resources>

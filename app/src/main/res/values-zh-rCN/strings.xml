@@ -216,4 +216,15 @@
     <string name="icloud_fetch_from_settings_subtitle">添加你账户中的标签，或更新已导入的标签</string>
     <string name="icloud_fetch_from_settings_linked">已关联你的 Apple 账户。点按可检查是否有新增或变更的标签。</string>
     <string name="icloud_link_account_action">通过 Apple 账户关联标签</string>
+    <string name="tag_ignored_summary">数月无更新 — 已暂停查找</string>
+    <string name="tag_ignored_retry">立即检查</string>
+    <string name="debug_last_scan_attempt">上次获取尝试</string>
+    <string name="debug_last_result_at">上次结果</string>
+    <string name="debug_backoff_state">获取退避</string>
+    <string name="debug_backoff_normal">正常</string>
+    <string name="debug_backoff_waiting">已退避 — %1$d 次空搜索，下次尝试 %2$s</string>
+    <string name="debug_backoff_ignored">自 %1$s 起忽略 — 数月历史中未找到任何记录</string>
+    <string name="debug_never">从未</string>
+    <string name="tag_ignored_explanation">在数月的历史记录中都没有找到这个标签，因此应用已停止自动搜索。这类搜索很慢，而且通常找不到。点按下方可立即重新查找。</string>
+    <string name="tag_ignored_retrying">正在重新查找此标签。可能需要几分钟。</string>
 </resources>
