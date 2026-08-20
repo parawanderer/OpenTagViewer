@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">中国語 簡体字 (简体中文)</string>
     <string name="lang_zh_tw">中国語 繁体字 (繁體中文)</string>
     <string name="no_devices_imported_yet">デバイスがありません</string>
-    <string name="import_a_zip_exported_from_a_mac">Mac でエクスポートした zip ファイルをインポートして始めましょう。</string>
+    <string name="import_a_zip_exported_from_a_mac">Apple アカウントのタグを取得するか、誰かが書き出してくれたファイルを読み込みます。</string>
     <string name="import_devices">デバイスをインポート</string>
     <string name="error_occurred_while_removing_the_device">デバイスの削除中にエラーが発生しました</string>
     <string name="how_do_i_get_the_zip"><u>zip ファイルの入手方法</u></string>
@@ -176,4 +176,23 @@
     <string name="terms_recording_agreement">同意を記録しています…</string>
     <string name="terms_fetching">Apple から利用条件を取得しています…</string>
     <string name="login_failed_terms">サインインはアカウントまで進んで停止しました。利用規約が原因であれば、ここで表示して同意できます。別の原因であれば、同意しても解決しません。</string>
+    <string name="icloud_fetch_my_tags">Apple アカウントからタグを取得</string>
+    <string name="icloud_import_from_file">ファイルからタグを読み込む</string>
+    <string name="icloud_unlock_title">Apple キーチェーンのロックを解除</string>
+    <string name="icloud_unlock_body">お使いの Apple デバイスいずれかの画面ロックパスコードが必要です。Apple ID のパスワードではなく、デバイスの PIN またはログインパスワードです。</string>
+    <string name="icloud_unlock_choose_device">どのデバイスのパスコードがわかりますか？</string>
+    <string name="icloud_passcode_hint">画面ロックパスコード</string>
+    <string name="icloud_passcode_rejected">受け付けられませんでした。同じパスコードをもう一度試す価値があります。この確認は失敗した後に成功することがあります。</string>
+    <string name="icloud_attempt_x_of_y">%2$d 回中 %1$d 回目</string>
+    <string name="icloud_no_tags_title">このアカウントが所有するタグはありません</string>
+    <string name="icloud_no_tags_body">タグは iPhone または iPad で登録され、そのアカウントだけがロックを解除できます。このアカウントには、それができるデバイスがありません。</string>
+    <string name="icloud_no_tags_shared_note"><b>友人が「探す」でタグを共有してくれた場合</b>、その共有にはこのアプリが必要とする鍵は含まれません。バンドルを書き出してもらい、ここで読み込んでください。</string>
+    <string name="icloud_service_unsure_title">現在アカウントを確認できませんでした</string>
+    <string name="icloud_service_unsure_body">Apple から利用可能なものが何も返りませんでした。多くの場合、アカウントの問題ではなくサービス側の不調です。時間をおいて再度お試しください。</string>
+    <string name="icloud_try_again">再試行</string>
+    <string name="icloud_found_x_tags">Apple アカウントで %1$d 個のタグが見つかりました</string>
+    <string name="icloud_x_were_not_tags">他の %1$d 件はタグではなくご自身のデバイスだったため、除外されました。</string>
+    <string name="settings_icloud_switch">Apple アカウントからタグを読み取る</string>
+    <string name="settings_icloud_switch_summary">オフにするとタグ一覧の読み取りを停止します。Apple のデバイス一覧から OpenTagViewer が削除されるわけではありません。それは Apple の設定でご自身で行ってください。</string>
+    <string name="icloud_results_title">Apple アカウントの内容</string>
 </resources>

@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">Chinees, vereenvoudigd (简体中文)</string>
     <string name="lang_zh_tw">Chinees, traditioneel (繁體中文)</string>
     <string name="no_devices_imported_yet">Nog geen apparaten</string>
-    <string name="import_a_zip_exported_from_a_mac">Importeer een zip die op een Mac is geëxporteerd om te beginnen.</string>
+    <string name="import_a_zip_exported_from_a_mac">Haal de tags uit je Apple-account op, of importeer een bestand dat iemand voor je heeft geëxporteerd.</string>
     <string name="import_devices">Apparaten importeren</string>
     <string name="error_occurred_while_removing_the_device">Er is een fout opgetreden bij het verwijderen van het apparaat</string>
     <string name="how_do_i_get_the_zip"><u>Hoe kom ik aan de zip?</u></string>
@@ -176,4 +176,23 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="terms_recording_agreement">Je akkoord wordt vastgelegd…</string>
     <string name="terms_fetching">Voorwaarden ophalen bij Apple…</string>
     <string name="login_failed_terms">Het inloggen kwam tot aan je account en stopte toen. Als dat over servicevoorwaarden gaat, kunnen ze hier getoond en geaccepteerd worden. Gaat het om iets anders, dan lost accepteren het niet op.</string>
+    <string name="icloud_fetch_my_tags">Mijn tags ophalen uit mijn Apple-account</string>
+    <string name="icloud_import_from_file">Tags importeren uit een bestand</string>
+    <string name="icloud_unlock_title">Ontgrendel je Apple-sleutelhanger</string>
+    <string name="icloud_unlock_body">Hiervoor is de toegangscode van een van je Apple-apparaten nodig — de pincode of het inlogwachtwoord, niet het wachtwoord van je Apple ID.</string>
+    <string name="icloud_unlock_choose_device">Van welk apparaat weet je de toegangscode?</string>
+    <string name="icloud_passcode_hint">Toegangscode</string>
+    <string name="icloud_passcode_rejected">Dat is niet geaccepteerd. Het loont om dezelfde code nog eens te proberen — deze controle mislukt soms en werkt daarna wel.</string>
+    <string name="icloud_attempt_x_of_y">Poging %1$d van %2$d</string>
+    <string name="icloud_no_tags_title">Dit account bezit geen tags</string>
+    <string name="icloud_no_tags_body">Tags worden geregistreerd door een iPhone of iPad, en alleen dat account kan ze ontgrendelen. Dit account heeft geen apparaat dat dat kan.</string>
+    <string name="icloud_no_tags_shared_note"><b>Als iemand zijn tags met je heeft gedeeld in Zoek mijn</b>, bevat dat delen niet de sleutels die deze app nodig heeft. Vraag diegene een bundel voor je te exporteren en importeer die hier.</string>
+    <string name="icloud_service_unsure_title">Kon je account nu niet controleren</string>
+    <string name="icloud_service_unsure_body">Apple meldde helemaal niets bruikbaars, wat meestal betekent dat de dienst een slechte dag heeft en niet dat er iets mis is met je account. Probeer het later nog eens.</string>
+    <string name="icloud_try_again">Opnieuw proberen</string>
+    <string name="icloud_found_x_tags">%1$d tags gevonden in je Apple-account</string>
+    <string name="icloud_x_were_not_tags">%1$d andere items waren je eigen apparaten in plaats van tags en zijn weggelaten.</string>
+    <string name="settings_icloud_switch">Mijn tags uit mijn Apple-account lezen</string>
+    <string name="settings_icloud_switch_summary">Dit uitzetten stopt het lezen van je taglijst. Het verwijdert OpenTagViewer niet uit je Apple-apparaatlijst — dat doe je zelf in de instellingen van Apple.</string>
+    <string name="icloud_results_title">Wat er in je Apple-account staat</string>
 </resources>

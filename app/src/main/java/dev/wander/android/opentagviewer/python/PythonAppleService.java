@@ -50,6 +50,17 @@ public class PythonAppleService {
         this.account = account;
     }
 
+    /**
+     * The signed-in account, for the iCloud flow.
+     *
+     * <p><b>This one, not a second one restored from the same stored JSON.</b> One install is
+     * one device to Apple (rule 11), and a parallel account would be a second HTTP session on a
+     * second event loop presenting the same identity.
+     */
+    public PythonAppleAccount getAccount() {
+        return this.account;
+    }
+
     public Observable<FetchResult> getLastReports(final List<AccessoryRequest> requests, final int hoursToGoBack) {
         return Observable.fromCallable(() -> {
             if (requests.isEmpty()) {

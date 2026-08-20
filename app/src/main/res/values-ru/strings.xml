@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">Китайский упрощённый (简体中文)</string>
     <string name="lang_zh_tw">Китайский традиционный (繁體中文)</string>
     <string name="no_devices_imported_yet">Устройств пока нет</string>
-    <string name="import_a_zip_exported_from_a_mac">Импортируйте zip-архив, экспортированный на Mac, чтобы начать.</string>
+    <string name="import_a_zip_exported_from_a_mac">Загрузите метки из своей учётной записи Apple или импортируйте файл, который кто-то экспортировал для вас.</string>
     <string name="import_devices">Импортировать устройства</string>
     <string name="error_occurred_while_removing_the_device">Произошла ошибка при удалении устройства</string>
     <string name="how_do_i_get_the_zip"><u>Как получить zip-архив?</u></string>
@@ -176,4 +176,23 @@
     <string name="terms_recording_agreement">Отправка вашего согласия…</string>
     <string name="terms_fetching">Загрузка условий от Apple…</string>
     <string name="login_failed_terms">Вход дошёл до вашей учётной записи и остановился. Если дело в условиях обслуживания, их можно показать и принять здесь. Если в чём-то другом, принятие условий не поможет.</string>
+    <string name="icloud_fetch_my_tags">Загрузить мои метки из учётной записи Apple</string>
+    <string name="icloud_import_from_file">Импортировать метки из файла</string>
+    <string name="icloud_unlock_title">Разблокировать связку ключей Apple</string>
+    <string name="icloud_unlock_body">Для этого нужен код-пароль одного из ваших устройств Apple — PIN-код или пароль входа, а не пароль Apple ID.</string>
+    <string name="icloud_unlock_choose_device">Код-пароль какого устройства вы знаете?</string>
+    <string name="icloud_passcode_hint">Код-пароль устройства</string>
+    <string name="icloud_passcode_rejected">Код не принят. Стоит попробовать тот же код ещё раз — эта проверка иногда срабатывает лишь со второй попытки.</string>
+    <string name="icloud_attempt_x_of_y">Попытка %1$d из %2$d</string>
+    <string name="icloud_no_tags_title">В этой учётной записи нет собственных меток</string>
+    <string name="icloud_no_tags_body">Метки регистрируются с iPhone или iPad, и разблокировать их может только та учётная запись. В этой учётной записи нет подходящего устройства.</string>
+    <string name="icloud_no_tags_shared_note"><b>Если кто-то поделился с вами метками в «Локатор»</b>, такой доступ не включает ключи, нужные этому приложению. Попросите экспортировать для вас архив и импортируйте его здесь.</string>
+    <string name="icloud_service_unsure_title">Сейчас не удалось проверить учётную запись</string>
+    <string name="icloud_service_unsure_body">Apple не сообщила ничего пригодного — обычно это сбой сервиса, а не проблема с вашей учётной записью. Попробуйте позже.</string>
+    <string name="icloud_try_again">Повторить</string>
+    <string name="icloud_found_x_tags">В учётной записи Apple найдено меток: %1$d</string>
+    <string name="icloud_x_were_not_tags">Ещё %1$d записей — это ваши собственные устройства, а не метки, поэтому они пропущены.</string>
+    <string name="settings_icloud_switch">Читать мои метки из учётной записи Apple</string>
+    <string name="settings_icloud_switch_summary">Отключение прекращает чтение списка меток. OpenTagViewer при этом не удаляется из списка устройств Apple — это нужно сделать самому в настройках Apple.</string>
+    <string name="icloud_results_title">Что есть в вашей учётной записи Apple</string>
 </resources>

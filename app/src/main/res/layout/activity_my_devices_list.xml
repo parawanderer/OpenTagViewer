@@ -96,9 +96,19 @@
                 android:textColor="?attr/colorPrimary"
                 android:textSize="14sp" />
 
+            <!--
+              **Two buttons, not four.** A bundle and a key file are the same button - the app
+              can tell them apart by looking - and somebody with one AirTag and one
+              self-generated tag is both cases at once, so neither is a mode to be in.
+
+              Fetching is first and filled because it is the shorter road for anyone who owns
+              their tags: no desktop, no zip, no transfer. Importing stays for the two cases
+              that still need it - a tag somebody else owns, and an account this app cannot
+              read.
+            -->
             <Button
-                android:id="@+id/my_devices_empty_import_button"
-                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/my_devices_empty_fetch_button"
+                style="@style/Widget.Material3.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
@@ -106,7 +116,21 @@
                 android:paddingTop="9dp"
                 android:paddingRight="20dp"
                 android:paddingBottom="9dp"
-                android:text="@string/import_devices"
+                android:text="@string/icloud_fetch_my_tags"
+                android:textSize="16sp"
+                app:iconSize="22dp" />
+
+            <Button
+                android:id="@+id/my_devices_empty_import_button"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:paddingLeft="20dp"
+                android:paddingTop="9dp"
+                android:paddingRight="20dp"
+                android:paddingBottom="9dp"
+                android:text="@string/icloud_import_from_file"
                 android:textSize="16sp"
                 app:iconSize="22dp" />
 

@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">Chinesisch, vereinfacht (简体中文)</string>
     <string name="lang_zh_tw">Chinesisch, traditionell (繁體中文)</string>
     <string name="no_devices_imported_yet">Noch keine Geräte</string>
-    <string name="import_a_zip_exported_from_a_mac">Importieren Sie ein auf einem Mac exportiertes ZIP-Archiv, um zu beginnen.</string>
+    <string name="import_a_zip_exported_from_a_mac">Lade die Tags aus deinem Apple-Konto oder importiere eine Datei, die jemand für dich exportiert hat.</string>
     <string name="import_devices">Geräte importieren</string>
     <string name="error_occurred_while_removing_the_device">Beim Entfernen des Geräts ist ein Fehler aufgetreten</string>
     <string name="how_do_i_get_the_zip"><u>Wie erhalte ich die ZIP-Datei?</u></string>
@@ -176,4 +176,23 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="terms_recording_agreement">Zustimmung wird übermittelt …</string>
     <string name="terms_fetching">Bedingungen werden von Apple geladen …</string>
     <string name="login_failed_terms">Die Anmeldung kam bis zu deinem Konto und blieb dann stehen. Falls es um Nutzungsbedingungen geht, können sie hier angezeigt und akzeptiert werden. Falls es etwas anderes ist, hilft das Akzeptieren nicht.</string>
+    <string name="icloud_fetch_my_tags">Meine Tags aus meinem Apple-Konto laden</string>
+    <string name="icloud_import_from_file">Tags aus einer Datei importieren</string>
+    <string name="icloud_unlock_title">Apple-Schlüsselbund entsperren</string>
+    <string name="icloud_unlock_body">Dafür wird der Gerätecode eines deiner Apple-Geräte benötigt — die PIN oder das Anmeldepasswort, nicht dein Apple-ID-Passwort.</string>
+    <string name="icloud_unlock_choose_device">Von welchem Gerät kennst du den Code?</string>
+    <string name="icloud_passcode_hint">Gerätecode</string>
+    <string name="icloud_passcode_rejected">Das wurde nicht akzeptiert. Es lohnt sich, denselben Code erneut zu versuchen — diese Prüfung schlägt manchmal fehl und funktioniert dann doch.</string>
+    <string name="icloud_attempt_x_of_y">Versuch %1$d von %2$d</string>
+    <string name="icloud_no_tags_title">Diesem Konto gehören keine Tags</string>
+    <string name="icloud_no_tags_body">Tags werden von einem iPhone oder iPad registriert, und nur dieses Konto kann sie entsperren. Dieses Konto hat kein Gerät, das das kann.</string>
+    <string name="icloud_no_tags_shared_note"><b>Wenn dir jemand seine Tags in „Wo ist?“ freigegeben hat</b>, enthält diese Freigabe nicht die Schlüssel, die diese App braucht. Bitte die Person, ein Bundle für dich zu exportieren, und importiere es hier.</string>
+    <string name="icloud_service_unsure_title">Dein Konto konnte gerade nicht geprüft werden</string>
+    <string name="icloud_service_unsure_body">Apple hat überhaupt nichts Verwendbares gemeldet. Das deutet meist auf eine Störung des Dienstes hin und nicht auf ein Problem mit deinem Konto. Versuche es später noch einmal.</string>
+    <string name="icloud_try_again">Erneut versuchen</string>
+    <string name="icloud_found_x_tags">%1$d Tags in deinem Apple-Konto gefunden</string>
+    <string name="icloud_x_were_not_tags">%1$d weitere Einträge waren eigene Geräte statt Tags und wurden ausgelassen.</string>
+    <string name="settings_icloud_switch">Meine Tags aus meinem Apple-Konto lesen</string>
+    <string name="settings_icloud_switch_summary">Wenn du dies deaktivierst, wird deine Tag-Liste nicht mehr gelesen. OpenTagViewer wird dadurch nicht aus deiner Apple-Geräteliste entfernt — das musst du in den Einstellungen von Apple selbst tun.</string>
+    <string name="icloud_results_title">Was in deinem Apple-Konto ist</string>
 </resources>
