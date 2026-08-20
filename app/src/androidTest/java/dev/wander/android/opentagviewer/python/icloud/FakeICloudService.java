@@ -285,13 +285,66 @@ public final class FakeICloudService implements ICloudService {
                 : Observable.error(this.fetchFailsWith);
     }
 
+
+    /**
+     * A record the real converter can actually convert.
+     *
+     * <p><b>It used to be the string {@code "<plist/>"}</b>, which is not a small shortcut: the
+     * app hands whatever comes back to Python's {@code convertPlistToJson}, and an empty document
+     * fails there with {@code 'NoneType' object is not subscriptable}. The failure is swallowed by
+     * design - a tag whose accessory JSON is missing is backfilled on first fetch - so every test
+     * that "imported" a tag from the account was quietly writing rows with no accessory state at
+     * all, and nothing downstream of that conversion was being exercised by anything.
+     *
+     * <p>The key material is the committed fixture's, so it is real in shape - a 28-byte master
+     * key and two 32-byte shared secrets, which is what {@code FindMyAccessory.from_plist}
+     * reaches for - and secret in no sense whatsoever.
+     */
+    public static final String AN_OWNED_BEACON_PLIST =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                    + "<plist version=\"1.0\"><dict>"
+                    + "<key>batteryLevel</key><integer>1</integer>"
+                    + "<key>identifier</key><string>F612A183-492B-45A8-A5A2-233CA9062A94</string>"
+                    + "<key>model</key><string></string>"
+                    + "<key>pairingDate</key><date>2025-02-27T20:03:32Z</date>"
+                    + "<key>privateKey</key><dict><key>key</key><dict><key>data</key><data>"
+                    + "J1AAk7qStLSbMhZT/XEve6by7hI0H7CslD/Oh7SrOc+mlmLnAO8c"
+                    + "5FGnhi/s3TDlWNiL3SMy19NQuCWg6oTS+YfBZN79RiUmZtssTp9f"
+                    + "UvZjmqMX3g=="
+                    + "</data></dict></dict>"
+                    + "<key>productId</key><integer>21760</integer>"
+                    + "<key>publicKey</key><dict><key>key</key><dict><key>data</key><data>"
+                    + "k6fWaOxFGbClYV6tu/ZK4vXdyWl2joSbJhbzu12Pfmf5p09w5LxKIvnABRfysSFkOAlo/F3Ii9Dq"
+                    + "</data></dict></dict>"
+                    + "<key>secondarySharedSecret</key><dict><key>key</key><dict><key>data</key>"
+                    + "<data>1pWMT+FI3flAWmgbUEW5H6omZy+yZOzp30zZGxEa2A8=</data></dict></dict>"
+                    + "<key>sharedSecret</key><dict><key>key</key><dict><key>data</key>"
+                    + "<data>vM2ZjU/sKW/novHcwzTlY5xwGLOUOZjpgcZa9cNx2Y8=</data></dict></dict>"
+                    + "<key>stableIdentifier</key><array>"
+                    + "<string>2001~#001234a12345aaac~#A02BCDEFG1AB</string></array>"
+                    + "<key>systemVersion</key><string>2.0.73</string>"
+                    + "<key>vendorId</key><integer>76</integer>"
+                    + "</dict></plist>";
+
+    /** Named after whatever the screen already calls it, so a list has readable rows. */
+    private static String namingRecordFor(final String beaconId) {
+        final String name = A_BIKE.getBeaconId().equals(beaconId) ? A_BIKE.getName() : "Keys";
+
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict>"
+                + "<key>identifier</key><string>" + beaconId + "</string>"
+                + "<key>associatedBeacon</key><string>" + beaconId + "</string>"
+                + "<key>name</key><string>" + name + "</string>"
+                + "</dict></plist>";
+    }
+
     @Override
     public Observable<List<AccessoryRecords>> records(final List<String> beaconIds) {
         this.calls.add("records");
 
         final List<AccessoryRecords> taken = new ArrayList<>();
         for (final String beaconId : beaconIds) {
-            taken.add(new AccessoryRecords(beaconId, "<plist/>", "<plist/>", null));
+            taken.add(new AccessoryRecords(
+                    beaconId, AN_OWNED_BEACON_PLIST, namingRecordFor(beaconId), null));
         }
 
         return Observable.just(taken);
