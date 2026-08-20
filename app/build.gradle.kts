@@ -336,6 +336,11 @@ chaquopy {
                 "exporter/icloud.py",
                 "exporter/device.py",
                 "exporter/identity.py",
+                // Renders Apple's terms of service into readable text. Its only import beyond
+                // the standard library is bs4, which FindMy.py already brings. Shared with the
+                // desktop rather than reimplemented because what is displayed is what gets
+                // agreed to, and two renderers would eventually show two different documents.
+                "exporter/terms.py",
             )
             // The package's own test suite is not part of the app. It imports pytest, which is
             // not in the APK, so it is dead weight that would fail if anything ever touched it.

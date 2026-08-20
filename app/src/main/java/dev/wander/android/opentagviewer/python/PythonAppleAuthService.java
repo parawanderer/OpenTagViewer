@@ -1,5 +1,9 @@
 package dev.wander.android.opentagviewer.python;
 
+import com.chaquo.python.PyObject;
+
+import java.util.List;
+
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethod;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
@@ -36,5 +40,15 @@ public final class PythonAppleAuthService implements AppleAuthService {
     @Override
     public Observable<byte[]> retrieveAuthData(final PythonAuthResponse authResponse) {
         return PythonAuthService.retrieveAuthData(authResponse);
+    }
+
+    @Override
+    public Observable<List<TermsDocument>> pendingTerms(final PyObject account) {
+        return PythonAuthService.pendingTerms(account);
+    }
+
+    @Override
+    public Observable<TermsAcceptance> acceptTerms(final PyObject account, final String pageId) {
+        return PythonAuthService.acceptTerms(account, pageId);
     }
 }

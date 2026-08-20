@@ -23,6 +23,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,11 +34,13 @@ import androidx.core.os.LocaleListCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.chaquo.python.PyObject;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -55,6 +58,7 @@ import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
 import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthResponse;
+import dev.wander.android.opentagviewer.python.TermsDocument;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
@@ -98,7 +102,21 @@ public class AppleLoginActivity extends AppCompatActivity {
             R.id.login_maininfo_container,
             R.id.login_2fa_choice,
             R.id.login_2fa_container,
+            R.id.login_terms_container,
     };
+
+    /**
+     * The half-signed-in account waiting on terms, and the documents it is waiting on.
+     *
+     * <p>Held on the activity rather than passed around because a {@code PyObject} cannot go in
+     * an {@code Intent} - which is also why this is a step of this screen and not a screen of
+     * its own. Cleared once signing in completes, so nothing outlives the flow that needed it.
+     */
+    private PyObject termsAccount = null;
+
+    private List<TermsDocument> termsDocuments = List.of();
+
+    private int termsIndex = 0;
 
     /**
      * Set when the user did not choose to be here - their stored session stopped working.
@@ -239,6 +257,38 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.passwordInput = this.findViewById(R.id.password_input_field);
         this.loginButton = this.findViewById(R.id.login_button_main);
         this.twoFactorAuthChoiceBackButton = this.findViewById(R.id.twofactorauthchoice_back_button);
+
+        this.findViewById(R.id.login_terms_agree_button)
+                .setOnClickListener(v -> this.onAgreeToTerms());
+
+        // **The terms box has to win the drag, or the contract cannot be read.**
+        //
+        // This whole screen is inside a vertical ScrollView, and the box holding the document is
+        // another one nested in it. Two vertical scrollers on top of each other means the outer
+        // one takes the gesture: dragging inside the document scrolls the *page*, and the
+        // document itself never moves - so everything past the first boxful is unreachable, on a
+        // screen whose entire purpose is reading to the end.
+        //
+        // Asking the parent not to intercept while a touch is inside the box is the standard fix
+        // and the smallest one. Returning false leaves the ScrollView to do its own scrolling.
+        //
+        // **There were two causes and this is only one of them.** The document TextView also had
+        // `textIsSelectable`, which makes it take the drag for a text-selection gesture, and the
+        // box did not scroll with that set either. Both had to go; removing either one on its own
+        // brings the bug back, which AcceptingTermsFlowTest was used to confirm in both
+        // directions. So selectable text cannot come back here without a scrolling story.
+        this.findViewById(R.id.login_terms_scroll).setOnTouchListener((view, event) -> {
+            view.getParent().requestDisallowInterceptTouchEvent(true);
+            return false;
+        });
+        // Leaving without agreeing. Nothing was sent, and the account is dropped rather than
+        // kept around half-signed-in - the next attempt starts a fresh one.
+        this.findViewById(R.id.login_terms_back_button).setOnClickListener(v -> {
+            this.termsAccount = null;
+            this.termsDocuments = List.of();
+            this.showPage(R.id.login_maininfo_container, Direction.BACK);
+            this.setCurrentStepText(R.string.apple_account, Direction.BACK);
+        });
 
         this.explainWhySignedOutIfSent();
     }
@@ -511,6 +561,18 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this.getUiState().setAuthResponse(null);
                 Log.e(TAG, "Error while trying to log in via python", error);
 
+                // **Not the end of the attempt.** Authentication worked and the exchange after
+                // it did not, which is what an account with unaccepted terms does - and Apple
+                // takes agreement on one of its own devices or on iCloud.com, so this user
+                // generally has nowhere else to do it. Offered here rather than reported as a
+                // dead end. Falls back to the ordinary error if no documents come back, which
+                // is how "it was actually something else" is answered.
+                if (error instanceof PythonAccountLoginException
+                        && ((PythonAccountLoginException) error).hasTermsToAccept()) {
+                    this.handleTermsPending((PythonAccountLoginException) error);
+                    return;
+                }
+
                 // undo loading and allow user to try again, basically. Backwards, because
                 // that is what it is: the step the user just left, handed back to them.
                 this.hideLoading();
@@ -525,6 +587,123 @@ public class AppleLoginActivity extends AppCompatActivity {
                 TextView loginErrorText = this.findViewById(R.id.login_error_message_text);
                 loginErrorText.setText(this.describeLoginFailure(error));
             });
+    }
+
+    /**
+     * Fetch the terms Apple is waiting on and show the first of them.
+     *
+     * <p><b>Read-only.</b> Fetching records nothing; only {@link #onAgreeToTerms} writes, and
+     * only for a document the user has been shown.
+     *
+     * <p>An empty list is not an error and not a bug - it is how "the sign-in stopped for some
+     * other reason" is answered, since which failure means "terms pending" is not established.
+     * That falls through to the ordinary error, whose wording says exactly that.
+     */
+    private void handleTermsPending(final PythonAccountLoginException termsFailure) {
+        this.termsAccount = termsFailure.getAccount();
+        this.showLoading(R.string.terms_fetching);
+
+        var async = this.authService.pendingTerms(this.termsAccount)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(documents -> {
+                    if (documents.isEmpty()) {
+                        Log.w(TAG, "Nothing was waiting on terms, so this was something else");
+                        this.showLoginFailure(termsFailure);
+                        return;
+                    }
+
+                    this.termsDocuments = documents;
+                    this.termsIndex = 0;
+                    this.showTermsStep(Direction.FORWARD);
+                }, error -> {
+                    Log.e(TAG, "Could not fetch the terms of service", error);
+                    this.showLoginFailure(termsFailure);
+                });
+    }
+
+    /** Put the document at {@link #termsIndex} on screen. */
+    private void showTermsStep(final Direction direction) {
+        final TermsDocument document = this.termsDocuments.get(this.termsIndex);
+
+        this.hideLoading();
+        this.setCurrentStepText(R.string.terms_title, direction);
+
+        final TextView counter = this.findViewById(R.id.login_terms_counter);
+        counter.setText(this.getString(R.string.terms_document_x_of_y,
+                this.termsIndex + 1, this.termsDocuments.size()));
+        // Hidden for a single document, where "Document 1 of 1" is noise on a screen that is
+        // already asking somebody to read a contract.
+        counter.setVisibility(this.termsDocuments.size() > 1 ? VISIBLE : GONE);
+
+        final TextView text = this.findViewById(R.id.login_terms_text);
+        text.setText(document.getText());
+        // Back to the top for each document. Otherwise the second one opens scrolled to wherever
+        // the first was left, which looks like part of it is missing.
+        ((ScrollView) this.findViewById(R.id.login_terms_scroll)).scrollTo(0, 0);
+
+        // A document Apple gave no agreement URL for cannot be accepted, and FindMy.py refuses
+        // to send one. Said plainly, with the button disabled rather than left to fail.
+        this.findViewById(R.id.login_terms_cannot_accept)
+                .setVisibility(document.isCanAccept() ? GONE : VISIBLE);
+        this.findViewById(R.id.login_terms_agree_button).setEnabled(document.isCanAccept());
+
+        this.showPage(R.id.login_terms_container, direction);
+    }
+
+    /**
+     * Record agreement to the document currently on screen, and move on.
+     *
+     * <p>Signing in is finished by the last one, and <b>only stored if it reached
+     * {@code LOGGED_IN}</b>. Anything else fails every later fetch inside FindMy.py's own state
+     * check, which is issues #43 and #119 - a map that never updates and a session signing out
+     * does not repair.
+     */
+    private void onAgreeToTerms() {
+        final TermsDocument document = this.termsDocuments.get(this.termsIndex);
+        this.showLoading(R.string.terms_recording_agreement);
+
+        var async = this.authService.acceptTerms(this.termsAccount, document.getPageId())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(accepted -> {
+                    if (accepted.hasMore()) {
+                        this.termsIndex++;
+                        this.showTermsStep(Direction.FORWARD);
+                        return;
+                    }
+
+                    if (!accepted.isSignedIn()) {
+                        Log.e(TAG, "Terms accepted but signing in ended at "
+                                + accepted.getLoginState() + ", so nothing will be stored");
+                        this.showLoginFailure(new PythonAccountLoginException(
+                                this.getString(R.string.login_failed_terms),
+                                PythonAccountLoginException.REASON_TERMS));
+                        return;
+                    }
+
+                    Log.i(TAG, "Terms accepted and signing in completed");
+                    this.getUiState().setAuthResponse(new PythonAuthResponse(
+                            this.termsAccount, PythonAuthService.LOGIN_STATE.LOGGED_IN, null));
+                    this.termsAccount = null;
+                    this.termsDocuments = List.of();
+                    this.handleIsAlreadyLoggedIn();
+                }, error -> {
+                    Log.e(TAG, "Could not record agreement to " + document.getPageId(), error);
+                    this.showLoginFailure(error);
+                });
+    }
+
+    /** Hand the sign-in step back to the user with the failure on it. */
+    private void showLoginFailure(final Throwable error) {
+        this.hideLoading();
+        this.showPage(R.id.login_maininfo_container, Direction.BACK);
+
+        this.findViewById(R.id.email_or_phone_input_field).setEnabled(true);
+        this.findViewById(R.id.password_input_field).setEnabled(true);
+        this.findViewById(R.id.login_button_main).setClickable(true);
+
+        this.findViewById(R.id.login_error_container).setVisibility(VISIBLE);
+        ((TextView) this.findViewById(R.id.login_error_message_text))
+                .setText(this.describeLoginFailure(error));
     }
 
     /**
@@ -547,6 +726,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         if (PythonAccountLoginException.REASON_NETWORK.equals(reason)) {
             return this.getString(R.string.login_failed_network);
+        }
+
+        // Reached when the terms path was tried and produced nothing to accept, so the sentence
+        // says what Apple said and then that accepting terms will not fix something else -
+        // rather than asserting a cause that has not been established.
+        if (PythonAccountLoginException.REASON_TERMS.equals(reason)) {
+            return this.getString(R.string.login_failed_terms);
         }
 
         final String detail = error.getLocalizedMessage();

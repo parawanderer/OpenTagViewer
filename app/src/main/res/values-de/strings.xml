@@ -168,4 +168,12 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="custom_tag_explained">Ein Tag im OpenHaystack-Stil. Seine Schlüssel wurden von seinem Ersteller erzeugt und waren nie in einem Apple-Konto, daher gibt es von Apple weder Namen noch Emoji oder Akkustand – legen Sie unten Ihre eigenen fest.</string>
     <string name="custom_tag_keys_remaining">%1$d vorab erzeugte Schlüssel</string>
     <string name="login_failed_network">Apple konnte nicht erreicht werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="terms_title">Apple benötigt deine Zustimmung</string>
+    <string name="terms_intro">Dein Passwort wurde akzeptiert, aber Apple wartet auf deine Zustimmung zu diesen Bedingungen, bevor das Konto genutzt werden kann. Sie werden unten vollständig angezeigt — das ist es, dem du zustimmen würdest.</string>
+    <string name="terms_document_x_of_y">Dokument %1$d von %2$d</string>
+    <string name="terms_agree">Zustimmen</string>
+    <string name="terms_cannot_be_accepted_here">Apple hat keine Möglichkeit angegeben, die Zustimmung zu diesem Dokument zu erfassen, daher kann es hier nicht akzeptiert werden. Eine Anmeldung auf icloud.com funktioniert möglicherweise.</string>
+    <string name="terms_recording_agreement">Zustimmung wird übermittelt …</string>
+    <string name="terms_fetching">Bedingungen werden von Apple geladen …</string>
+    <string name="login_failed_terms">Die Anmeldung kam bis zu deinem Konto und blieb dann stehen. Falls es um Nutzungsbedingungen geht, können sie hier angezeigt und akzeptiert werden. Falls es etwas anderes ist, hilft das Akzeptieren nicht.</string>
 </resources>
