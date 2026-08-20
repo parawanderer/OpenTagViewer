@@ -106,6 +106,18 @@ entry that neither could be removed from safely.
 """
 
 
+def _toUnixEpochMs(when: Any) -> int | None:
+    """A datetime as milliseconds, or None. Formatting a date is Java's job, not this one's."""
+    if when is None:
+        return None
+
+    try:
+        return int(when.timestamp() * 1000)
+    except (AttributeError, OSError, OverflowError, ValueError):
+        # A record with an unrepresentable date is still a record worth offering.
+        return None
+
+
 def _failure(reason: str, message: str) -> str:
     return json.dumps({"ok": False, "reason": reason, "message": message})
 
@@ -225,7 +237,21 @@ class ICloudSession:
             "devices": [
                 {
                     "serial": record.serial,
+                    # FindMy.py's own sentence, kept as the honest fallback for anything the
+                    # screen cannot lay out itself.
                     "description": record.describe(),
+                    # The parts, so the screen can build a tile rather than print a sentence.
+                    # **`name` is the user's own and is often empty** - somebody who never
+                    # renamed their phone has none - so the screen falls back to the class,
+                    # which is a real word, rather than to "unnamed device".
+                    "name": record.device_name or "",
+                    "model": record.device_model or "",
+                    # "iPhone", "iPad", "Mac" and so on: what picks the icon.
+                    "modelClass": record.device_model_class or "",
+                    # **When the record was created, not when the device was last used.**
+                    # Labelling it "last used" would be a straight lie: a record escrowed three
+                    # months ago says nothing about whether the phone was used this morning.
+                    "escrowedAtMs": _toUnixEpochMs(record.escrowed_at),
                 }
                 for record in self._records
             ],

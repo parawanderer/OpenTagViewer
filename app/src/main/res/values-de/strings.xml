@@ -191,8 +191,13 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="icloud_service_unsure_body">Apple hat überhaupt nichts Verwendbares gemeldet. Das deutet meist auf eine Störung des Dienstes hin und nicht auf ein Problem mit deinem Konto. Versuche es später noch einmal.</string>
     <string name="icloud_try_again">Erneut versuchen</string>
     <string name="icloud_found_x_tags">%1$d Tags in deinem Apple-Konto gefunden</string>
-    <string name="icloud_x_were_not_tags">%1$d weitere Einträge waren eigene Geräte statt Tags und wurden ausgelassen.</string>
+    <string name="icloud_x_were_not_tags">%1$d weitere Einträge in diesem Konto haben keinen Ortungsschlüssel und können daher nicht gefunden werden.</string>
     <string name="settings_icloud_switch">Meine Tags aus meinem Apple-Konto lesen</string>
     <string name="settings_icloud_switch_summary">Wenn du dies deaktivierst, wird deine Tag-Liste nicht mehr gelesen. OpenTagViewer wird dadurch nicht aus deiner Apple-Geräteliste entfernt — das musst du in den Einstellungen von Apple selbst tun.</string>
     <string name="icloud_results_title">Was in deinem Apple-Konto ist</string>
+    <string name="icloud_unlock_action">Entsperren</string>
+    <string name="icloud_results_done">Fertig</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">hinzugefügt %1$s</string>
+    <string name="icloud_send_your_friend_the_guide">Deinem Kontakt zeigen, wie das Exportieren geht</string>
 </resources>

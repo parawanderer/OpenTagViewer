@@ -191,8 +191,13 @@
     <string name="icloud_service_unsure_body">Apple이 사용 가능한 항목을 전혀 반환하지 않았습니다. 보통 계정 문제가 아니라 서비스 장애입니다. 나중에 다시 시도해 보세요.</string>
     <string name="icloud_try_again">다시 시도</string>
     <string name="icloud_found_x_tags">Apple 계정에서 태그 %1$d개를 찾았습니다</string>
-    <string name="icloud_x_were_not_tags">다른 %1$d개 항목은 태그가 아니라 본인의 기기여서 제외했습니다.</string>
+    <string name="icloud_x_were_not_tags">이 계정의 다른 %1$d개 항목에는 위치 키가 없어 아무것도 찾을 수 없습니다.</string>
     <string name="settings_icloud_switch">Apple 계정에서 내 태그 읽기</string>
     <string name="settings_icloud_switch_summary">끄면 태그 목록 읽기를 중단합니다. Apple 기기 목록에서 OpenTagViewer가 제거되지는 않습니다. 그것은 Apple 설정에서 직접 하셔야 합니다.</string>
     <string name="icloud_results_title">Apple 계정에 있는 항목</string>
+    <string name="icloud_unlock_action">잠금 해제</string>
+    <string name="icloud_results_done">완료</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">%1$s에 추가됨</string>
+    <string name="icloud_send_your_friend_the_guide">친구에게 내보내는 방법 보여주기</string>
 </resources>

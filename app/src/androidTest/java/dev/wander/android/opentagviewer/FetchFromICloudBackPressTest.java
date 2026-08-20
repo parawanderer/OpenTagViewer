@@ -49,6 +49,20 @@ public class FetchFromICloudBackPressTest {
         AppDependencies.reset();
     }
 
+    @org.junit.Before
+    public void forgetAnyStoredMembership() {
+        // **The membership is in the real encrypted datastore, and it outlives a test class.**
+        // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
+        // member and never sees the device list. Cleared before rather than only after, because
+        // a test that crashed leaves it behind.
+        new dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository(
+                dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore.getInstance(
+                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                                .getTargetContext()),
+                new dev.wander.android.opentagviewer.util.android.AppCryptographyUtil())
+                .forget().blockingAwait();
+    }
+
     private void open(final FakeICloudService fake) {
         this.icloud = fake;
         AppDependencies.replaceICloud(() -> fake);
@@ -124,7 +138,7 @@ public class FetchFromICloudBackPressTest {
 
         onView(withId(R.id.icloud_passcode_input)).perform(replaceText("123456"));
         Eventually.perform("unlock", () -> this.icloud.timesCalled("unlock") > 0,
-                () -> onView(withId(R.id.icloud_passcode_submit)).perform(click()));
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
 
         assertEquals("the passcode went to the device chosen after going back",
                 FakeICloudService.A_MAC.getSerial(), this.icloud.unlockedWith().get(0));
@@ -181,7 +195,7 @@ public class FetchFromICloudBackPressTest {
 
         onView(withId(R.id.icloud_passcode_input)).perform(replaceText("123456"));
         Eventually.perform("unlock", () -> this.icloud.timesCalled("fetch") > 0,
-                () -> onView(withId(R.id.icloud_passcode_submit)).perform(click()));
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
 
         Eventually.check(() -> onView(withId(R.id.icloud_results_container))
                 .check(matches(isDisplayed())));

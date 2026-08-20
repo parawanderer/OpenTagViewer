@@ -22,10 +22,24 @@ import io.reactivex.rxjava3.core.Observable;
  */
 public final class FakeICloudService implements ICloudService {
 
-    public static final RecoverableDevice AN_IPHONE =
-            new RecoverableDevice("F2LX9Q", "iPhone 15, serial F2LX9Q, last used 2 days ago");
-    public static final RecoverableDevice A_MAC =
-            new RecoverableDevice("C02XK", "MacBook Pro, serial C02XK, last used 3 months ago");
+    /** A named iPhone: the ordinary case, where the user renamed their phone. */
+    public static final RecoverableDevice AN_IPHONE = new RecoverableDevice(
+            "F2LX9Q", "Shane’s iPhone, iPhone 15, serial F2LX9Q, escrowed 2024-03-12",
+            "Shane’s iPhone", "iPhone15,2", "iPhone", 1710201600000L);
+
+    /** A named Mac, so the icon has something to be wrong about. */
+    public static final RecoverableDevice A_MAC = new RecoverableDevice(
+            "C02XK", "Work MacBook, MacBook Pro, serial C02XK, escrowed 2023-11-02",
+            "Work MacBook", "MacBookPro18,3", "Mac", 1698883200000L);
+
+    /**
+     * A device nobody ever renamed, which is the case the tile has to not embarrass itself on.
+     *
+     * <p>FindMy.py falls back to the literal "unnamed device"; the screen should say "iPad".
+     */
+    public static final RecoverableDevice AN_UNNAMED_IPAD = new RecoverableDevice(
+            "DMPX2", "unnamed device, iPad Pro, serial DMPX2, escrowed 2022-06-01",
+            "", "iPad13,4", "iPad", 1654041600000L);
 
     public static final ICloudAccessory A_BIKE = new ICloudAccessory(
             "F1C4A0E2-1111-4222-8333-444455556666", "Bike", "🚲", "🚲 Bike",
@@ -42,6 +56,10 @@ public final class FakeICloudService implements ICloudService {
     private ICloudException optionsFailsWith;
     private ICloudException unlockFailsWith;
     private ICloudException fetchFailsWith;
+    private ICloudException joinFailsWith;
+    private ICloudException resumeFailsWith;
+    private String joinedWithPasscode;
+    private String resumedWith;
 
     /** How many times a passcode is refused before it starts being accepted. */
     private int refusalsBeforeAccepting = 0;
@@ -91,6 +109,25 @@ public final class FakeICloudService implements ICloudService {
     public FakeICloudService refusingThePasscode(final int times) {
         this.refusalsBeforeAccepting = times;
         return this;
+    }
+
+    /**
+     * An account with a great many devices, to push the list past the height of the screen.
+     *
+     * <p>The people most likely to have this are the ones most likely to use the app: somebody
+     * with years of Apple hardware has an escrow record for every one of it, and escrow records
+     * outlive the devices that made them.
+     */
+    public static FakeICloudService withManyDevices(final int count) {
+        final FakeICloudService fake = new FakeICloudService();
+        final List<RecoverableDevice> many = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            many.add(new RecoverableDevice(
+                    "SERIAL" + i, "Device " + i + ", serial SERIAL" + i,
+                    "Device " + i, "iPhone15,2", "iPhone", 1710201600000L));
+        }
+        fake.devices = many;
+        return fake;
     }
 
     /** Only one device can be recovered from, so there is nothing to choose between. */
@@ -146,6 +183,49 @@ public final class FakeICloudService implements ICloudService {
         }
 
         return Completable.complete();
+    }
+
+    @Override
+    public Observable<KeychainMembership> join(final String escrowPasscode) {
+        this.calls.add("join");
+        this.joinedWithPasscode = escrowPasscode;
+
+        if (this.joinFailsWith != null) {
+            return Observable.error(this.joinFailsWith);
+        }
+
+        return Observable.just(new KeychainMembership(
+                "{\"peer_id\":\"peer-ours\"}", "ZW50cm9weQ==", escrowPasscode, "a-label", 2));
+    }
+
+    @Override
+    public Completable resume(final String peerJson) {
+        this.calls.add("resume");
+        this.resumedWith = peerJson;
+
+        return this.resumeFailsWith == null
+                ? Completable.complete() : Completable.error(this.resumeFailsWith);
+    }
+
+    /** The stored membership has stopped working - the peer was removed from the account. */
+    public FakeICloudService whereTheMembershipNoLongerWorks() {
+        this.resumeFailsWith = new ICloudException(
+                ICloudFailure.MEMBERSHIP_UNUSABLE, "no such peer");
+        return this;
+    }
+
+    public FakeICloudService whereJoiningFails(final ICloudException failure) {
+        this.joinFailsWith = failure;
+        return this;
+    }
+
+    /** The passcode the app generated for its own record, so a test can check it was a real one. */
+    public String joinedWithPasscode() {
+        return this.joinedWithPasscode;
+    }
+
+    public String resumedWith() {
+        return this.resumedWith;
     }
 
     @Override

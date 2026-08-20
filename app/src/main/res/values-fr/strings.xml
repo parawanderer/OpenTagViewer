@@ -191,8 +191,13 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="icloud_service_unsure_body">Apple n’a signalé absolument rien d’utilisable, ce qui indique généralement un service en difficulté plutôt qu’un problème avec votre compte. Réessayez plus tard.</string>
     <string name="icloud_try_again">Réessayer</string>
     <string name="icloud_found_x_tags">%1$d balises trouvées dans votre compte Apple</string>
-    <string name="icloud_x_were_not_tags">%1$d autres éléments étaient vos propres appareils et non des balises ; ils ont été écartés.</string>
+    <string name="icloud_x_were_not_tags">%1$d autres éléments de ce compte n’ont pas de clé de localisation ; rien ne peut donc les trouver.</string>
     <string name="settings_icloud_switch">Lire mes balises depuis mon compte Apple</string>
     <string name="settings_icloud_switch_summary">Désactiver cette option arrête la lecture de votre liste de balises. Cela ne retire pas OpenTagViewer de la liste de vos appareils Apple — c’est à vous de le faire dans les réglages d’Apple.</string>
     <string name="icloud_results_title">Ce que contient votre compte Apple</string>
+    <string name="icloud_unlock_action">Déverrouiller</string>
+    <string name="icloud_results_done">Terminé</string>
+    <string name="icloud_device_badges">%1$s  ·  %2$s</string>
+    <string name="icloud_device_added_on">ajouté le %1$s</string>
+    <string name="icloud_send_your_friend_the_guide">Montrer à votre ami comment exporter</string>
 </resources>
