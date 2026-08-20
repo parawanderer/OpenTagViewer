@@ -12,6 +12,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
@@ -228,12 +229,19 @@ public class AcceptingTermsFlowTest {
         Eventually.check(() -> onView(withId(R.id.login_terms_back_button))
                 .check(matches(isDisplayed())));
 
+        // Paced so somebody being shown this can see the terms screen before it leaves.
+        TestPace.afterAStep();
+
         Eventually.perform("the back button",
                 () -> !isShown(R.id.login_terms_container),
                 () -> onView(withId(R.id.login_terms_back_button)).perform(click()));
 
+        TestPace.afterAStep();
+
         Eventually.check(() -> onView(withId(R.id.email_or_phone_input_field))
                 .check(matches(isDisplayed())));
+
+        TestPace.afterAStep();
         assertEquals("nothing may be sent by walking away",
                 0, this.apple.acceptedPageIds().size());
     }
@@ -289,13 +297,36 @@ public class AcceptingTermsFlowTest {
                 contentHeight() > viewportHeight()));
 
         assertEquals("it should start at the top of the document", 0, scrollY());
-
-        onView(withId(R.id.login_terms_scroll))
-                .perform(androidx.test.espresso.action.ViewActions.swipeUp());
-
         Eventually.check(() -> assertTrue(
-                "the box did not scroll, so the end of the contract cannot be reached",
-                scrollY() > 0));
+                "there should be more document below the fold to begin with", canScrollDown()));
+
+        // Swipe until it stops moving, rather than once. **"It scrolled a bit" is not the
+        // property that matters** - a contract you can nudge but not finish is as unreadable as
+        // one that will not move at all, and the first version of this test asserted only that
+        // scrollY had gone above zero.
+        int previous = -1;
+        for (int attempt = 0; attempt < 30 && scrollY() != previous; attempt++) {
+            previous = scrollY();
+            onView(withId(R.id.login_terms_scroll))
+                    .perform(androidx.test.espresso.action.ViewActions.swipeUp());
+            // Paced so this is watchable when somebody is being shown the flow. Off by default,
+            // so a normal run and CI are unaffected.
+            TestPace.afterAStep();
+        }
+
+        assertTrue("the box moved but never reached the end, so the last clauses of the"
+                + " contract cannot be read", scrollY() > 0);
+        Eventually.check(() -> assertFalse(
+                "there is still document below and no way to get to it", canScrollDown()));
+    }
+
+    /** Whether the terms box has anything left below the fold. */
+    private boolean canScrollDown() {
+        final boolean[] value = {false};
+        this.scenario.onActivity(activity ->
+                value[0] = activity.findViewById(R.id.login_terms_scroll)
+                        .canScrollVertically(1));
+        return value[0];
     }
 
     private static String aVeryLongDocument() {
