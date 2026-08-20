@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Reading the tags on the signed-in Apple account.
+
+  **One screen with steps, not several activities.** The steps share a live iCloud session -
+  a keychain session and a CloudKit client, both holding sockets - and that cannot travel in
+  an Intent. It is also a single errand from the user's point of view: unlock, look, import.
+
+  Every step is a sibling here and exactly one is visible, the same shape the sign-in screen
+  uses.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/icloud_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/icloud_step_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:fontFamily="@font/nunito_bold"
+            android:gravity="center"
+            android:text="@string/icloud_unlock_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="24sp" />
+
+        <!-- Working. Its own step so nothing else is on screen while a call is in flight. -->
+        <LinearLayout
+            android:id="@+id/icloud_loading_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/icloud_spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true" />
+
+            <TextView
+                android:id="@+id/icloud_loading_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                tools:text="Fetching…" />
+
+        </LinearLayout>
+
+        <!-- Which device's passcode do you have. Buttons are added per recoverable record. -->
+        <LinearLayout
+            android:id="@+id/icloud_device_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_unlock_body" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingBottom="8dp"
+                android:text="@string/icloud_unlock_choose_device"
+                android:textColor="?attr/colorOnSurface" />
+
+            <LinearLayout
+                android:id="@+id/icloud_device_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+
+        <!-- The passcode itself. One attempt per press; the cap lives beside this. -->
+        <LinearLayout
+            android:id="@+id/icloud_passcode_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_unlock_body" />
+
+            <TextView
+                android:id="@+id/icloud_passcode_device"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingBottom="8dp"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="A device, serial F2LX9Q" />
+
+            <FrameLayout
+                android:id="@+id/icloud_passcode_error_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/layout_rounded_less"
+                android:backgroundTint="?attr/colorErrorContainer"
+                android:visibility="gone"
+                tools:visibility="gone">
+
+                <TextView
+                    android:id="@+id/icloud_passcode_error_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:text="@string/icloud_passcode_rejected"
+                    android:textColor="?attr/colorOnErrorContainer"
+                    android:textSize="14sp" />
+
+            </FrameLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="?attr/textInputOutlinedDenseStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/icloud_passcode_hint"
+                app:endIconMode="password_toggle">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/icloud_passcode_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:singleLine="true" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:id="@+id/icloud_attempts_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                tools:text="Attempt 1 of 3" />
+
+            <Button
+                android:id="@+id/icloud_passcode_submit"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_unlock_title"
+                android:textSize="18sp" />
+
+        </LinearLayout>
+
+        <!--
+          Nothing on this account can be recovered from. **Final**, and the import path is the
+          answer - so the button that leaves here goes there rather than back to a retry.
+        -->
+        <LinearLayout
+            android:id="@+id/icloud_no_tags_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_no_tags_body" />
+
+            <TextView
+                android:id="@+id/icloud_no_tags_shared_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/layout_rounded"
+                android:backgroundTint="?attr/colorSurfaceContainerLow"
+                android:padding="12dp"
+                android:text="@string/icloud_no_tags_shared_note"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <Button
+                android:id="@+id/icloud_no_tags_import_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_import_from_file"
+                android:textSize="18sp" />
+
+        </LinearLayout>
+
+        <!--
+          A service having a bad day. **Deliberately not the screen above**: the advice is the
+          opposite one, and telling somebody with a working account that they permanently own
+          no tags sends them away for good.
+        -->
+        <LinearLayout
+            android:id="@+id/icloud_retry_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <TextView
+                android:id="@+id/icloud_retry_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_service_unsure_body" />
+
+            <Button
+                android:id="@+id/icloud_retry_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:text="@string/icloud_try_again"
+                android:textSize="18sp" />
+
+        </LinearLayout>
+
+        <!-- What was found, and what was set aside for not being a tag. -->
+        <LinearLayout
+            android:id="@+id/icloud_results_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <TextView
+                android:id="@+id/icloud_results_found"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingBottom="4dp"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="Found 3 tags in your Apple account" />
+
+            <TextView
+                android:id="@+id/icloud_results_skipped"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:text="2 other items were your own devices" />
+
+            <LinearLayout
+                android:id="@+id/icloud_results_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!--
+              **No "import" button, because there is nothing to choose.** Everything on the
+              account comes in - this page is an overview of what was found, not a picker. A
+              button offering to import would imply the alternative exists, and would leave
+              somebody wondering what happens to whatever they did not tick.
+            -->
+            <Button
+                android:id="@+id/icloud_results_done_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:text="@string/ok"
+                android:textSize="18sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

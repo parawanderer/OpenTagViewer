@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">중국어 간체 (简体中文)</string>
     <string name="lang_zh_tw">중국어 번체 (繁體中文)</string>
     <string name="no_devices_imported_yet">기기가 없습니다</string>
-    <string name="import_a_zip_exported_from_a_mac">Mac에서 내보낸 zip 파일을 가져와서 시작하세요.</string>
+    <string name="import_a_zip_exported_from_a_mac">Apple 계정의 태그를 가져오거나, 다른 사람이 내보내 준 파일을 가져오세요.</string>
     <string name="import_devices">기기 가져오기</string>
     <string name="error_occurred_while_removing_the_device">기기를 제거하는 중 오류가 발생했습니다</string>
     <string name="how_do_i_get_the_zip"><u>zip 파일은 어떻게 받나요?</u></string>
@@ -176,4 +176,23 @@
     <string name="terms_recording_agreement">동의를 기록하는 중…</string>
     <string name="terms_fetching">Apple에서 약관을 가져오는 중…</string>
     <string name="login_failed_terms">로그인이 계정까지 진행된 뒤 멈췄습니다. 서비스 약관 때문이라면 여기서 보고 동의할 수 있습니다. 다른 이유라면 약관에 동의해도 해결되지 않습니다.</string>
+    <string name="icloud_fetch_my_tags">Apple 계정에서 내 태그 가져오기</string>
+    <string name="icloud_import_from_file">파일에서 태그 가져오기</string>
+    <string name="icloud_unlock_title">Apple 키체인 잠금 해제</string>
+    <string name="icloud_unlock_body">Apple 기기 중 하나의 화면 잠금 암호가 필요합니다. Apple ID 암호가 아니라 기기의 PIN 또는 로그인 암호입니다.</string>
+    <string name="icloud_unlock_choose_device">어느 기기의 암호를 알고 계신가요?</string>
+    <string name="icloud_passcode_hint">화면 잠금 암호</string>
+    <string name="icloud_passcode_rejected">승인되지 않았습니다. 같은 암호를 다시 시도해 볼 만합니다. 이 확인은 실패한 뒤에 성공하는 경우가 있습니다.</string>
+    <string name="icloud_attempt_x_of_y">%2$d회 중 %1$d번째 시도</string>
+    <string name="icloud_no_tags_title">이 계정이 소유한 태그가 없습니다</string>
+    <string name="icloud_no_tags_body">태그는 iPhone 또는 iPad에서 등록되며, 해당 계정만 잠금을 해제할 수 있습니다. 이 계정에는 그럴 수 있는 기기가 없습니다.</string>
+    <string name="icloud_no_tags_shared_note"><b>친구가 \'나의 찾기\'에서 태그를 공유해 준 경우</b>, 그 공유에는 이 앱에 필요한 키가 포함되지 않습니다. 번들을 내보내 달라고 요청한 뒤 여기서 가져오세요.</string>
+    <string name="icloud_service_unsure_title">지금은 계정을 확인할 수 없습니다</string>
+    <string name="icloud_service_unsure_body">Apple이 사용 가능한 항목을 전혀 반환하지 않았습니다. 보통 계정 문제가 아니라 서비스 장애입니다. 나중에 다시 시도해 보세요.</string>
+    <string name="icloud_try_again">다시 시도</string>
+    <string name="icloud_found_x_tags">Apple 계정에서 태그 %1$d개를 찾았습니다</string>
+    <string name="icloud_x_were_not_tags">다른 %1$d개 항목은 태그가 아니라 본인의 기기여서 제외했습니다.</string>
+    <string name="settings_icloud_switch">Apple 계정에서 내 태그 읽기</string>
+    <string name="settings_icloud_switch_summary">끄면 태그 목록 읽기를 중단합니다. Apple 기기 목록에서 OpenTagViewer가 제거되지는 않습니다. 그것은 Apple 설정에서 직접 하셔야 합니다.</string>
+    <string name="icloud_results_title">Apple 계정에 있는 항목</string>
 </resources>

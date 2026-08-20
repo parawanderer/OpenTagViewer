@@ -104,7 +104,7 @@
     <string name="amap_key_cleared">已移除高德地图 API Key。</string>
     <string name="amap_how_to_get_a_key">如何获取 Key</string>
     <string name="no_devices_imported_yet">暂无设备</string>
-    <string name="import_a_zip_exported_from_a_mac">导入从 Mac 导出的 zip 文件即可开始。</string>
+    <string name="import_a_zip_exported_from_a_mac">获取你 Apple 账户中的标签，或导入别人为你导出的文件。</string>
     <string name="import_devices">导入设备</string>
     <string name="error_occurred_while_removing_the_device">移除设备时出错</string>
     <string name="how_do_i_get_the_zip"><u>如何获取 zip 文件？</u></string>
@@ -176,4 +176,23 @@
     <string name="terms_recording_agreement">正在记录你的同意…</string>
     <string name="terms_fetching">正在从 Apple 获取条款…</string>
     <string name="login_failed_terms">登录已到达你的账户后停止。如果这与服务条款有关，可以在此查看并同意。如果是别的原因，同意条款并不能解决。</string>
+    <string name="icloud_fetch_my_tags">从我的 Apple 账户获取标签</string>
+    <string name="icloud_import_from_file">从文件导入标签</string>
+    <string name="icloud_unlock_title">解锁你的 Apple 钥匙串</string>
+    <string name="icloud_unlock_body">这需要你某台 Apple 设备的锁屏密码——设备的 PIN 或登录密码，而不是 Apple ID 密码。</string>
+    <string name="icloud_unlock_choose_device">你知道哪台设备的密码？</string>
+    <string name="icloud_passcode_hint">锁屏密码</string>
+    <string name="icloud_passcode_rejected">未被接受。值得用同一个密码再试一次——这项校验有时会先失败、再成功。</string>
+    <string name="icloud_attempt_x_of_y">第 %1$d 次尝试，共 %2$d 次</string>
+    <string name="icloud_no_tags_title">此账户没有自己的标签</string>
+    <string name="icloud_no_tags_body">标签由 iPhone 或 iPad 注册，只有该账户能解锁它们。此账户没有可以做到这一点的设备。</string>
+    <string name="icloud_no_tags_shared_note"><b>如果朋友在“查找”中与你共享了标签</b>，那种共享并不包含此应用所需的密钥。请他们为你导出一个包，然后在这里导入。</string>
+    <string name="icloud_service_unsure_title">暂时无法检查你的账户</string>
+    <string name="icloud_service_unsure_body">Apple 完全没有返回可用的记录，这通常说明服务出了状况，而不是你的账户有问题。稍后再试为宜。</string>
+    <string name="icloud_try_again">重试</string>
+    <string name="icloud_found_x_tags">在你的 Apple 账户中找到 %1$d 个标签</string>
+    <string name="icloud_x_were_not_tags">另有 %1$d 项是你自己的设备而非标签，已排除。</string>
+    <string name="settings_icloud_switch">从我的 Apple 账户读取标签</string>
+    <string name="settings_icloud_switch_summary">关闭后将停止读取你的标签列表。这不会把 OpenTagViewer 从你的 Apple 设备列表中移除——那需要你在 Apple 的设置中自行操作。</string>
+    <string name="icloud_results_title">你的 Apple 账户中的内容</string>
 </resources>

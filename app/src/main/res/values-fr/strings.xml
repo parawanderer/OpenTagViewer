@@ -101,7 +101,7 @@
     <string name="lang_zh_cn">Chinois simplifié (简体中文)</string>
     <string name="lang_zh_tw">Chinois traditionnel (繁體中文)</string>
     <string name="no_devices_imported_yet">Aucun appareil</string>
-    <string name="import_a_zip_exported_from_a_mac">Importez une archive zip exportée depuis un Mac pour commencer.</string>
+    <string name="import_a_zip_exported_from_a_mac">Récupérez les balises de votre compte Apple, ou importez un fichier que quelqu’un a exporté pour vous.</string>
     <string name="import_devices">Importer des appareils</string>
     <string name="error_occurred_while_removing_the_device">Une erreur s’est produite lors de la suppression de l’appareil</string>
     <string name="how_do_i_get_the_zip"><u>Comment obtenir l’archive zip ?</u></string>
@@ -176,4 +176,23 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="terms_recording_agreement">Enregistrement de votre accord…</string>
     <string name="terms_fetching">Récupération des conditions auprès d’Apple…</string>
     <string name="login_failed_terms">La connexion est arrivée jusqu’à votre compte puis s’est arrêtée. Si cela concerne les conditions d’utilisation, elles peuvent être affichées et acceptées ici. S’il s’agit d’autre chose, les accepter n’y changera rien.</string>
+    <string name="icloud_fetch_my_tags">Récupérer mes balises depuis mon compte Apple</string>
+    <string name="icloud_import_from_file">Importer des balises depuis un fichier</string>
+    <string name="icloud_unlock_title">Déverrouiller votre trousseau Apple</string>
+    <string name="icloud_unlock_body">Cela nécessite le code de verrouillage de l’un de vos appareils Apple — son code ou mot de passe de session, et non le mot de passe de votre identifiant Apple.</string>
+    <string name="icloud_unlock_choose_device">De quel appareil connaissez-vous le code ?</string>
+    <string name="icloud_passcode_hint">Code de verrouillage</string>
+    <string name="icloud_passcode_rejected">Ce code n’a pas été accepté. Cela vaut la peine de réessayer le même — cette vérification échoue parfois puis fonctionne.</string>
+    <string name="icloud_attempt_x_of_y">Tentative %1$d sur %2$d</string>
+    <string name="icloud_no_tags_title">Aucune balise n’appartient à ce compte</string>
+    <string name="icloud_no_tags_body">Les balises sont enregistrées par un iPhone ou un iPad, et seul ce compte peut les déverrouiller. Ce compte n’a aucun appareil capable de le faire.</string>
+    <string name="icloud_no_tags_shared_note"><b>Si un proche a partagé ses balises avec vous dans Localiser</b>, ce partage n’inclut pas les clés dont cette app a besoin. Demandez-lui d’exporter une archive pour vous, puis importez-la ici.</string>
+    <string name="icloud_service_unsure_title">Impossible de vérifier votre compte pour le moment</string>
+    <string name="icloud_service_unsure_body">Apple n’a signalé absolument rien d’utilisable, ce qui indique généralement un service en difficulté plutôt qu’un problème avec votre compte. Réessayez plus tard.</string>
+    <string name="icloud_try_again">Réessayer</string>
+    <string name="icloud_found_x_tags">%1$d balises trouvées dans votre compte Apple</string>
+    <string name="icloud_x_were_not_tags">%1$d autres éléments étaient vos propres appareils et non des balises ; ils ont été écartés.</string>
+    <string name="settings_icloud_switch">Lire mes balises depuis mon compte Apple</string>
+    <string name="settings_icloud_switch_summary">Désactiver cette option arrête la lecture de votre liste de balises. Cela ne retire pas OpenTagViewer de la liste de vos appareils Apple — c’est à vous de le faire dans les réglages d’Apple.</string>
+    <string name="icloud_results_title">Ce que contient votre compte Apple</string>
 </resources>

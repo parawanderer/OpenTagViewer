@@ -86,6 +86,25 @@ public class MyDevicesListActivity extends AppCompatActivity {
             }
     );
 
+    /**
+     * Reading the account, which can end by asking for the file picker instead.
+     *
+     * <p>An account with nothing to recover from, or with no tags on it, has one useful answer -
+     * import a bundle from somebody who owns them - so that screen hands the user straight back
+     * here with a flag rather than making them find the other button themselves.
+     */
+    private final ActivityResultLauncher<Intent> fetchFromICloudLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                final Intent data = result.getData();
+                if (data != null
+                        && data.getBooleanExtra(
+                                FetchFromICloudActivity.RESULT_WANTS_FILE_IMPORT, false)) {
+                    this.handleStartImport();
+                }
+            }
+    );
+
     private final ActivityResultLauncher<Intent> deviceInfoActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             (ActivityResult result) -> {
@@ -135,6 +154,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
         findViewById(R.id.my_devices_empty_import_button)
                 .setOnClickListener(v -> this.handleStartImport());
+
+        findViewById(R.id.my_devices_empty_fetch_button)
+                .setOnClickListener(v -> this.fetchFromICloudLauncher.launch(
+                        new Intent(this, FetchFromICloudActivity.class)));
 
         findViewById(R.id.my_devices_empty_wiki_link)
                 .setOnClickListener(v -> this.openExportGuide());

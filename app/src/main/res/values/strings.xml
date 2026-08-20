@@ -142,7 +142,7 @@
     <string name="maps_api_key_missing_title">Google Maps API key missing</string>
     <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
     <string name="no_devices_imported_yet">No devices yet</string>
-    <string name="import_a_zip_exported_from_a_mac">Import a zip exported from a Mac to get started.</string>
+    <string name="import_a_zip_exported_from_a_mac">Fetch the tags on your Apple account, or import a file somebody exported for you.</string>
     <string name="import_devices">Import Devices</string>
     <string name="error_occurred_while_removing_the_device">An error occurred while removing the device</string>
     <string name="how_do_i_get_the_zip"><u>How do I get the zip?</u></string>
@@ -211,4 +211,23 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="terms_recording_agreement">Recording your agreement…</string>
     <string name="terms_fetching">Fetching the terms from Apple…</string>
     <string name="login_failed_terms">Signing in got as far as your account and then stopped. If that is about terms of service, they can be shown and accepted here. If it is about something else, accepting terms will not fix it.</string>
+    <string name="icloud_fetch_my_tags">Fetch my tags from my Apple account</string>
+    <string name="icloud_import_from_file">Import tags from a file</string>
+    <string name="icloud_unlock_title">Unlock your Apple keychain</string>
+    <string name="icloud_unlock_body">This needs the screen-lock passcode of one of your Apple devices — its PIN or login password, not your Apple ID password.</string>
+    <string name="icloud_unlock_choose_device">Which device’s passcode do you have?</string>
+    <string name="icloud_passcode_hint">Screen-lock passcode</string>
+    <string name="icloud_passcode_rejected">That was not accepted. It is worth trying the same passcode again — this check sometimes fails and then works.</string>
+    <string name="icloud_attempt_x_of_y">Attempt %1$d of %2$d</string>
+    <string name="icloud_no_tags_title">No tags owned by this account</string>
+    <string name="icloud_no_tags_body">Tags are registered by an iPhone or iPad, and only that account can unlock them. This account has no device that can.</string>
+    <string name="icloud_no_tags_shared_note"><b>If a friend shared their tags with you in Find My</b>, that sharing does not include the keys this app needs. Ask them to export a bundle for you, and import it here.</string>
+    <string name="icloud_service_unsure_title">Could not check your account just now</string>
+    <string name="icloud_service_unsure_body">Apple reported nothing usable at all, which usually means the service is having a bad day rather than anything being wrong with your account. Worth trying again later.</string>
+    <string name="icloud_try_again">Try again</string>
+    <string name="icloud_found_x_tags">Found %1$d tags in your Apple account</string>
+    <string name="icloud_x_were_not_tags">%1$d other items were your own devices rather than tags, so they were left out.</string>
+    <string name="settings_icloud_switch">Read my tags from my Apple account</string>
+    <string name="settings_icloud_switch_summary">Turning this off stops reading your tag list. It does not remove OpenTagViewer from your Apple device list — that is yours to do in Apple’s own settings.</string>
+    <string name="icloud_results_title">What is on your Apple account</string>
 </resources>
