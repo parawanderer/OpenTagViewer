@@ -16,6 +16,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
@@ -37,9 +38,13 @@ import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
+import java.util.List;
+
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
+import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
@@ -166,6 +171,46 @@ public class SignInThenGetTagsJourneyTest {
 
         Eventually.check(() -> assertTrue("nothing was written for the account",
                 this.icloud.timesCalled("records") > 0));
+    }
+
+    /**
+     * <b>And what was written is usable, not just present.</b>
+     *
+     * <p>The rows carry {@code accessory_json} - FindMy.py's serialised accessory state, which is
+     * what actually locates the tag afterwards - and it is produced by handing the account's
+     * plist to Python. That conversion failing is not fatal by design, because a missing one is
+     * backfilled on the first fetch, so a tag that imported and can never be located looks
+     * exactly like a tag that imported.
+     *
+     * <p>Which is how this went unnoticed: the fake used to return {@code "<plist/>"}, the real
+     * converter threw on it, the failure was swallowed, and every "imported" tag in every test
+     * had no accessory state at all.
+     */
+    @Test
+    public void whatarrivesCanActuallyBeLocated() {
+        this.icloud = FakeICloudService.withTags();
+        AppDependencies.replaceICloud(() -> this.icloud);
+
+        this.signInAllTheWayThrough();
+        this.openTheDeviceList();
+        onView(withId(R.id.my_devices_empty_fetch_button)).perform(click());
+        this.unlockWithADevicePasscode();
+
+        Eventually.check(() -> onView(withId(R.id.icloud_results_container))
+                .check(matches(isDisplayed())));
+
+        final OpenTagViewerDatabase db = OpenTagViewerDatabase.getInstance(
+                getInstrumentation().getTargetContext());
+
+        Eventually.check(() -> {
+            final List<OwnedBeacon> held = db.ownedBeaconDao().getAll();
+            assertTrue("nothing was written for the account", !held.isEmpty());
+
+            for (final OwnedBeacon beacon : held) {
+                assertNotNull("beacon " + beacon.id + " imported with no accessory state, so it"
+                        + " looks imported and can never be located", beacon.accessoryJson);
+            }
+        });
     }
 
     /**
