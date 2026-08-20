@@ -722,11 +722,24 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
              * relative to each other does not matter.
              */
             .flatMapCompletable(storedBeacons -> RxFlows.allThen(
-                    // Once, after every accessory has landed, rather than per accessory.
+                    // A last pass once everything has landed, for anything the per-accessory
+                    // passes below could not resolve.
                     this.updateBeaconGeocodings(),
                     this.fetchLastReports(
                             BeaconRepository.plistFallbacks(storedBeacons.getOwnedBeacons()), HOURS_TO_GO_BACK_24H)
-                            .doOnNext(this::addBeaconLocationsToCurrent),
+                            // **Geocoded as each accessory lands, not only at the end.** This
+                            // used to be a bare doOnNext with the geocoding left to the `then`
+                            // above, which runs after the whole batch - and a batch is one
+                            // sequential fetch per tag, where a tag with no key alignment record
+                            // takes minutes. So every card sat showing raw coordinates for the
+                            // length of the run, despite geocoding being a Google call that had
+                            // nothing to wait for. Cheap to repeat: a beacon whose location has
+                            // not moved since its last geocoding is skipped.
+                            .concatMap(reports -> {
+                                this.addBeaconLocationsToCurrent(reports);
+                                return this.updateBeaconGeocodings()
+                                        .andThen(Observable.just(reports));
+                            }),
                     BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
                             .doOnNext(this::addBeaconToCurrent)
             ))
