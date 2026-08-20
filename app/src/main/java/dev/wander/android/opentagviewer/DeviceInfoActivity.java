@@ -27,6 +27,7 @@ import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.DataBindingUtil;
@@ -81,7 +82,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
     private BeaconRepository beaconRepo;
     private BeaconData beaconData;
     private BeaconInformation beaconInformation;
-    private @NonNull Import importData;
+    /** Null for a tag read from the Apple account - nothing was ever exported or imported. */
+    private @Nullable Import importData;
     private UserSettings userSettings;
     private EmojiPickerView emojiPickerView;
     private Button currentIconButton;
@@ -122,7 +124,15 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
-        this.importData = this.beaconRepo.getImportById(this.beaconData.getOwnedBeaconInfo().importId).blockingFirst().orElseThrow();
+
+        // **Null for a tag read from the Apple account**, which was never exported and never
+        // imported - there is no bundle behind it and so no `Import` row. Fetching one anyway
+        // unboxes a null `importId` and crashes this screen in onCreate, which is what tapping
+        // an account tag used to do.
+        final Long importId = this.beaconData.getOwnedBeaconInfo().importId;
+        this.importData = importId == null
+                ? null
+                : this.beaconRepo.getImportById(importId).blockingFirst().orElse(null);
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
@@ -136,9 +146,27 @@ public class DeviceInfoActivity extends AppCompatActivity {
         binding.setOnClickDeviceName(this::handleEditDeviceName);
         binding.setOnClickDeviceEmoji(this::handleEditDeviceEmoji);
 
-        binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
-        binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
-        binding.setExportedBy(this.importData.sourceUser);
+        // **Two independent questions, deliberately not one.** "Exported by", "Exported at" and
+        // "Imported at" all read from an `Import` row, so they are shown when there is one. The
+        // source row says the tag was read from the account, so it is shown when it was. Folding
+        // them into one branch reads fine and is wrong: a file-imported row whose import record
+        // has gone would then be labelled as coming from the Apple account, which is a claim
+        // about where somebody's data came from, made on the strength of a missing join.
+        if (this.importData == null) {
+            findViewById(R.id.device_settings_exported_by).setVisibility(View.GONE);
+            findViewById(R.id.device_settings_exported_at).setVisibility(View.GONE);
+            findViewById(R.id.device_settings_imported_at).setVisibility(View.GONE);
+        } else {
+            binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
+            binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
+            binding.setExportedBy(this.importData.sourceUser);
+        }
+
+        if (this.beaconInformation.isFromAccount()) {
+            binding.setSource(this.getString(R.string.source_your_apple_account));
+        } else {
+            findViewById(R.id.device_settings_source).setVisibility(View.GONE);
+        }
 
         // What is known without asking anything, drawn immediately. The shared heuristic can
         // improve on it, but it costs a Python interpreter, so this screen must be readable
@@ -496,6 +524,21 @@ public class DeviceInfoActivity extends AppCompatActivity {
     }
 
     private void onClickDeviceDelete() {
+        // A tag read from the Apple account is a cache of what Apple holds, so marking it
+        // removed here would undo itself at the next refresh - the row is written back with
+        // `is_removed = 0` and the tag reappears with no explanation. Removing it for real is
+        // done in Find My. See MyDevicesListActivity#confirmRemoveSelection, which says the
+        // same thing for a selection.
+        if (this.beaconInformation.isFromAccount()) {
+            new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                    .setTitle(R.string.cannot_remove_account_tag_title)
+                    .setIcon(R.drawable.help_center_24px)
+                    .setMessage(R.string.cannot_remove_account_tag_message)
+                    .setPositiveButton(R.string.ok, null)
+                    .show();
+            return;
+        }
+
         var dialog = new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
                 .setTitle(R.string.remove_device)
                 .setIcon(R.drawable.delete_24px)

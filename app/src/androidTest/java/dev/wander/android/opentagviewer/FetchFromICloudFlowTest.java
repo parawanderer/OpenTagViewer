@@ -22,6 +22,7 @@ import org.junit.runner.RunWith;
 
 import java.util.List;
 
+import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
@@ -50,10 +51,15 @@ public class FetchFromICloudFlowTest {
             this.scenario.close();
         }
         AppDependencies.reset();
+        AccountBeaconsForTests.forgetThemAll();
     }
 
     @org.junit.Before
     public void forgetAnyStoredMembership() {
+        // Finishing this flow writes real rows into the real database. Cleared here too,
+        // because a test that crashed left its tags behind for whatever runs next.
+        AccountBeaconsForTests.forgetThemAll();
+
         // **The membership is in the real encrypted datastore, and it outlives a test class.**
         // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
         // member and never sees the device list. Cleared before rather than only after, because

@@ -239,4 +239,10 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="icloud_loading_looking_for_devices">Looking for a device that can unlock it…</string>
     <string name="icloud_loading_unlocking">Unlocking, then reading your tags…</string>
     <string name="icloud_loading_importing">Bringing your tags in…</string>
+    <string name="cannot_remove_account_tag_title">Remove it in Find My</string>
+    <string name="cannot_remove_account_tag_message">This tag comes from your Apple account, so the app only holds a copy of it. Remove it in Find My on an Apple device, and it will go from here the next time the app reads your account.</string>
+    <string name="cannot_remove_account_tags_message">These tags come from your Apple account, so the app only holds copies of them. Remove them in Find My on an Apple device, and they will go from here the next time the app reads your account.</string>
+    <string name="remove_devices_but_keep_account_ones">%1$d of these came from your Apple account and will stay — remove those in Find My on an Apple device. The rest will be removed from this app.</string>
+    <string name="source">Source</string>
+    <string name="source_your_apple_account">Read from your Apple account</string>
 </resources>

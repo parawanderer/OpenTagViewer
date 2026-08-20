@@ -22,6 +22,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.AppDependencies;
@@ -57,6 +58,9 @@ public class FetchFromICloudMembershipTest {
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
                 new AppCryptographyUtil());
         this.memberships.forget().blockingAwait();
+        // Finishing this flow writes real rows into the real database. Cleared here too,
+        // because a test that crashed left its tags behind for whatever runs next.
+        AccountBeaconsForTests.forgetThemAll();
     }
 
     @After
@@ -66,6 +70,7 @@ public class FetchFromICloudMembershipTest {
         }
         AppDependencies.reset();
         this.memberships.forget().blockingAwait();
+        AccountBeaconsForTests.forgetThemAll();
     }
 
     private void open(final FakeICloudService fake) {
