@@ -211,4 +211,6 @@
     <string name="source">Источник</string>
     <string name="source_your_apple_account">Получено из вашей учётной записи Apple</string>
     <string name="vendor_lookup_hint">%1$s — идентификатор компании Bluetooth SIG. Нажмите, чтобы найти его и узнать, кто это сделал.</string>
+    <string name="rename_failed_title">Имя не изменено</string>
+    <string name="rename_failed_message">Имя этой метки хранится в вашей учётной записи Apple, поэтому переименование должно дойти до Apple — сейчас этого не произошло. Ничего не изменилось. Проверьте подключение и повторите попытку.</string>
 </resources>

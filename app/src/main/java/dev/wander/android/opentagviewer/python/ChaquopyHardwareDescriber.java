@@ -29,6 +29,14 @@ public class ChaquopyHardwareDescriber implements HardwareDescriber {
         return call("whereToLookUpHardware", plistXml);
     }
 
+    @Override
+    public Boolean isOwnDevice(final String plistXml) {
+        // Parsed from the same string channel the other two use rather than crossing a boolean,
+        // so a failure arrives as null - "not established" - instead of as a confident false.
+        final String answered = call("isOwnDeviceHardware", plistXml);
+        return answered == null ? null : Boolean.valueOf("True".equals(answered));
+    }
+
     /**
      * <p>A null or empty plist short-circuits rather than crossing the bridge. A self-generated
      * tag has no plist at all, and the Python side would only decode the empty string and return

@@ -223,6 +223,39 @@ public final class FakeICloudService implements ICloudService {
                 ? Completable.complete() : Completable.error(this.resumeFailsWith);
     }
 
+    @Override
+    public Completable rename(final String beaconId, final String plistXml,
+                              final String name, final String emoji) {
+        this.calls.add("rename");
+        this.renamedWith = new String[] {beaconId, name, emoji};
+        this.renamedPlist = plistXml;
+
+        return this.renameFailsWith == null
+                ? Completable.complete() : Completable.error(this.renameFailsWith);
+    }
+
+    /** What the last rename was asked to change: beacon id, name, emoji. Null if never called. */
+    public String[] renamedWith() {
+        return this.renamedWith;
+    }
+
+    /**
+     * The record the rename was judged from.
+     *
+     * <p>Worth asserting on rather than ignoring: Python decides accessory-or-device from this
+     * plist, so a screen that sends the wrong one - or an empty one - would have Python answering
+     * about a different tag entirely, and the rename would still look like it worked.
+     */
+    public String renamedPlist() {
+        return this.renamedPlist;
+    }
+
+    /** The account refuses the write - the network is down, or the session lost its keys. */
+    public FakeICloudService whereRenamingFails(final ICloudFailure failure) {
+        this.renameFailsWith = new ICloudException(failure, "the fake was told to refuse");
+        return this;
+    }
+
     /** The stored membership has stopped working - the peer was removed from the account. */
     public FakeICloudService whereTheMembershipNoLongerWorks() {
         this.resumeFailsWith = new ICloudException(
@@ -273,6 +306,12 @@ public final class FakeICloudService implements ICloudService {
     public List<String> calls() {
         return this.calls;
     }
+
+    private String[] renamedWith;
+
+    private String renamedPlist;
+
+    private ICloudException renameFailsWith;
 
     public long timesCalled(final String call) {
         return this.calls.stream().filter(call::equals).count();

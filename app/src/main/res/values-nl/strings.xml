@@ -211,4 +211,6 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="source">Bron</string>
     <string name="source_your_apple_account">Uitgelezen uit je Apple-account</string>
     <string name="vendor_lookup_hint">%1$s is een bedrijfs-id van de Bluetooth SIG. Tik erop om op te zoeken wie dit heeft gemaakt.</string>
+    <string name="rename_failed_title">De naam is niet gewijzigd</string>
+    <string name="rename_failed_message">Deze tag krijgt zijn naam uit je Apple-account, dus hernoemen moet Apple bereiken — en dat lukte zojuist niet. Er is niets gewijzigd. Controleer je verbinding en probeer het opnieuw.</string>
 </resources>
