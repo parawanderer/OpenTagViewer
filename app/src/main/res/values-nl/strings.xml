@@ -168,4 +168,12 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="custom_tag_explained">Een tag in OpenHaystack-stijl. De sleutels zijn gemaakt door wie de tag bouwde en hebben nooit in een Apple-account gestaan, dus er is geen naam, emoji of batterijniveau van Apple — stel hieronder je eigen in.</string>
     <string name="custom_tag_keys_remaining">%1$d vooraf gegenereerde sleutels</string>
     <string name="login_failed_network">Kan Apple niet bereiken. Controleer je verbinding en probeer het opnieuw.</string>
+    <string name="terms_title">Apple heeft je akkoord nodig</string>
+    <string name="terms_intro">Je wachtwoord is geaccepteerd, maar Apple wacht op je akkoord met deze voorwaarden voordat het account gebruikt kan worden. Ze staan hieronder volledig — dit is waarmee je akkoord zou gaan.</string>
+    <string name="terms_document_x_of_y">Document %1$d van %2$d</string>
+    <string name="terms_agree">Akkoord</string>
+    <string name="terms_cannot_be_accepted_here">Apple gaf geen manier om akkoord met dit document vast te leggen, dus het kan hier niet geaccepteerd worden. Inloggen op icloud.com werkt mogelijk wel.</string>
+    <string name="terms_recording_agreement">Je akkoord wordt vastgelegd…</string>
+    <string name="terms_fetching">Voorwaarden ophalen bij Apple…</string>
+    <string name="login_failed_terms">Het inloggen kwam tot aan je account en stopte toen. Als dat over servicevoorwaarden gaat, kunnen ze hier getoond en geaccepteerd worden. Gaat het om iets anders, dan lost accepteren het niet op.</string>
 </resources>

@@ -168,4 +168,12 @@
     <string name="custom_tag_explained">OpenHaystack 类型的标签。它的密钥由制作者生成，从未存在于 Apple 账户中，因此没有来自 Apple 的名称、表情或电量信息 — 请在下方自行设置。</string>
     <string name="custom_tag_keys_remaining">%1$d 个预生成密钥</string>
     <string name="login_failed_network">无法连接 Apple。请检查网络连接后重试。</string>
+    <string name="terms_title">Apple 需要你的同意</string>
+    <string name="terms_intro">你的密码已被接受，但 Apple 需要你先同意这些条款才能使用该账户。下方为全文——这就是你将要同意的内容。</string>
+    <string name="terms_document_x_of_y">第 %1$d 份文件，共 %2$d 份</string>
+    <string name="terms_agree">同意</string>
+    <string name="terms_cannot_be_accepted_here">Apple 没有提供记录同意此文件的方式，因此无法在此同意。改为在 icloud.com 登录也许可行。</string>
+    <string name="terms_recording_agreement">正在记录你的同意…</string>
+    <string name="terms_fetching">正在从 Apple 获取条款…</string>
+    <string name="login_failed_terms">登录已到达你的账户后停止。如果这与服务条款有关，可以在此查看并同意。如果是别的原因，同意条款并不能解决。</string>
 </resources>

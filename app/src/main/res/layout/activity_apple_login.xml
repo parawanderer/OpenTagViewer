@@ -220,6 +220,13 @@
 
             </LinearLayout>
 
+            <!--
+              Apple's terms of service. Its own file so it can be inflated without this
+              one, which pulls in the settings panel and cannot inflate outside an
+              activity - see TermsStepLayoutTest.
+            -->
+            <include layout="@layout/login_terms_step" />
+
             <LinearLayout
                 android:id="@+id/login_2fa_choice"
                 android:layout_width="match_parent"
