@@ -7,6 +7,7 @@
         <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
         <variable name="onClickFetchFromAccount" type="Runnable" />
+        <variable name="onClickUnlinkAccount" type="Runnable" />
         <variable name="fetchFromAccountSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
@@ -60,6 +61,23 @@
                 app:onClick="@{onClickFetchFromAccount}"
                 app:sectionSubtitle="@{fetchFromAccountSubtitle}"
                 app:title="@{@string/icloud_fetch_my_tags}" />
+
+            <!--
+                Only shown once there is something to unlink.
+
+                Gone by default rather than shown-and-disabled: this row does not apply at all
+                until the account has been linked, and a permanently greyed row in Settings
+                reads as a broken feature. Its visibility is set from SettingsActivity when the
+                membership lookup answers - see sayWhetherTheAccountIsLinked.
+            -->
+            <include
+                android:id="@+id/settings_unlink_account"
+                layout="@layout/settings_item_clickable"
+                android:visibility="gone"
+                app:icon="@{@drawable/link_off_24px}"
+                app:onClick="@{onClickUnlinkAccount}"
+                app:sectionSubtitle="@{@string/icloud_unlink_subtitle}"
+                app:title="@{@string/icloud_unlink_title}" />
 
         </LinearLayout>
 

@@ -234,4 +234,15 @@
     <string name="battery_level_low">Низкий (~20%) — с этого уровня iOS предупреждает</string>
     <string name="battery_level_very_low">Критически низкий (~5-10%) — почти разряжен</string>
     <string name="battery_level_icloud_only">Это значение обновляется только у меток, прочитанных из iCloud. Метка, импортированная из файла, сохраняет значение на момент экспорта.</string>
+    <string name="icloud_unlink_title">Отвязать мою учётную запись Apple</string>
+    <string name="icloud_unlink_subtitle">Приложение перестанет читать метки из вашей учётной записи</string>
+    <string name="icloud_unlink_confirm_title">Отвязать учётную запись Apple?</string>
+    <string name="icloud_unlink_confirm_message">Приложение перестанет читать ваши метки из Apple. Уже импортированные метки останутся на этом устройстве вместе с историей местоположений, но больше не будут обновляться из вашей учётной записи.
+
+Это не удаляет приложение из вашей учётной записи Apple. Чтобы удалить его, откройте «Локатор» на устройстве Apple и удалите его там.
+
+Вы сможете связать учётную запись снова позже. Для этого понадобится код-пароль вашего устройства Apple.</string>
+    <string name="icloud_unlink_confirm_button">Отвязать</string>
+    <string name="icloud_unlink_done">Учётная запись Apple больше не связана</string>
+    <string name="icloud_unlink_failed">Не удалось отвязать учётную запись Apple. Повторите попытку.</string>
 </resources>

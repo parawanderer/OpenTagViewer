@@ -234,4 +234,15 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="battery_level_low">Faible (~20%) – iOS commence à alerter</string>
     <string name="battery_level_very_low">Critique (~5-10%) – presque épuisée</string>
     <string name="battery_level_icloud_only">Seules les balises lues depuis iCloud mettent cette valeur à jour. Une balise importée depuis un fichier conserve la valeur qu’elle avait lors de l’export.</string>
+    <string name="icloud_unlink_title">Dissocier mon compte Apple</string>
+    <string name="icloud_unlink_subtitle">Empêcher cette application de lire les balises de votre compte</string>
+    <string name="icloud_unlink_confirm_title">Dissocier votre compte Apple ?</string>
+    <string name="icloud_unlink_confirm_message">Cette application cessera de lire vos balises depuis Apple. Les balises déjà importées restent sur cet appareil, avec leur historique de localisation — mais elles ne seront plus mises à jour depuis votre compte.
+
+Cela ne supprime pas cette application de votre compte Apple. Pour cela, ouvrez Localiser sur un appareil Apple et supprimez-la depuis cet appareil.
+
+Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple sera alors nécessaire.</string>
+    <string name="icloud_unlink_confirm_button">Dissocier</string>
+    <string name="icloud_unlink_done">Votre compte Apple n’est plus associé</string>
+    <string name="icloud_unlink_failed">Impossible de dissocier votre compte Apple. Veuillez réessayer.</string>
 </resources>
