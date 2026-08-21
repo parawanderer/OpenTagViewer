@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Theme overlays that exist only so tests can drive a themed case.
+
+    **Debug source set, so none of this reaches a release build.** Nothing in the app applies
+    these; they are applied by an instrumented test onto a themed context.
+
+    The one below stands in for what DynamicColors does at runtime. Turning system colours on is
+    not something a test can do reliably - it depends on the device's wallpaper and on Android 12
+    or later - but the property that matters is much simpler than "wallpaper colours": it is that
+    android:colorBackground can be something other than @color/md_theme_background, and that
+    anything drawing the app's background has to follow the attribute rather than the resource.
+    An overlay says exactly that, on every API level, with no device state involved.
+
+    See MarkerFollowsTheThemeTest and MarkerPalette.
+-->
+<resources>
+
+    <style name="TestOnly_RecolouredBackground">
+        <!--
+            Deliberately nothing like either md_theme_background - #F5FAFB by day, #0E1415 at
+            night - so a test asserting "this is not the static resource" cannot pass by accident
+            in one mode and fail in the other.
+        -->
+        <item name="android:colorBackground">#FF7043</item>
+    </style>
+
+</resources>
