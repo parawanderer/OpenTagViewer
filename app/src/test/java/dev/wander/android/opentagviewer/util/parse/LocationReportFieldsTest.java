@@ -75,30 +75,75 @@ public class LocationReportFieldsTest {
     }
 
     /**
-     * <b>No status bit is ever given a name.</b>
+     * <b>The value this app actually sees is never given a battery reading.</b>
      *
-     * <p>The test that matters. Every circulating bitmask for this byte contradicts another one,
-     * and {@code 0x90} would be "battery low" and "battery full" simultaneously under the most
-     * commonly repeated one. Anybody adding a label here needs a source, and this failing is how
-     * they find out.
+     * <p>The test that matters. Apple's Table 5-5 does define this byte, but an AirTag does not
+     * follow it - {@code 0x90} has the marker bit clear and a reserved bit set. Decoded anyway it
+     * comes out as "battery low", for a tag whose own record says full. A confident wrong answer
+     * is worse than no answer, and this is what stops one being reintroduced.
      */
     @Test
-    public void nobitIsGivenAMeaning() {
-        final String[] claimsNobodyHasEstablished = {
-                "full", "medium", "low", "critical", "battery",
-                "paired", "registered", "nominal", "motion", "sound", "maintained", "separated"};
+    public void anairTagsStatusIsNotDecodedAsABatteryLevel() {
+        final String described = LocationReportFields.status(0x90).toLowerCase(Locale.ROOT);
 
-        for (long value = 0; value <= 0xFF; value++) {
-            final String described = LocationReportFields.status(value).toLowerCase(Locale.ROOT);
+        for (final String label : new String[] {
+                "full", "medium", "low", "critical", "battery", "maintained"}) {
 
-            for (final String claim : claimsNobodyHasEstablished) {
-                assertFalse(
-                        "status " + value + " was labelled '" + claim + "'. The bit meanings of "
-                                + "this byte are not publicly documented - see the class javadoc "
-                                + "before adding one.",
-                        described.contains(claim));
-            }
+            assertFalse("0x90 does not conform to Table 5-5 - marker bit clear, reserved bit 4 "
+                            + "set - so it must not be labelled '" + label + "': " + described,
+                    described.contains(label));
         }
+    }
+
+    /**
+     * Only a byte that conforms to Table 5-5 gets a reading at all.
+     *
+     * <p>Swept across the whole range rather than spot-checked, because the interesting failure is
+     * a decode leaking onto some value nobody thought about.
+     */
+    @Test
+    public void onlyaconformingByteIsGivenAReading() {
+        for (long value = 0; value <= 0xFF; value++) {
+            final boolean conforms = (value & 0b0010_0000) != 0 && (value & 0b0001_1011) == 0;
+            final boolean read = LocationReportFields.status(value).contains("claims");
+
+            assertEquals("status 0x" + Long.toHexString(value) + " conformance vs reading",
+                    conforms, read);
+        }
+    }
+
+    /**
+     * A conforming byte is read out per Apple's Table 5-5.
+     *
+     * <p>Bits 6-7 are the battery state (0 full, 1 medium, 2 low, 3 critically low), bit 2 is
+     * "maintained" - the owner device connected within the current 15-minute key rotation period.
+     */
+    @Test
+    public void aconformingByteIsReadPerTheSpecification() {
+        assertTrue(LocationReportFields.status(0x20), // 0b00100000
+                LocationReportFields.status(0x20).endsWith("(claims battery full, not maintained)"));
+        assertTrue(LocationReportFields.status(0x24), // 0b00100100
+                LocationReportFields.status(0x24).endsWith("(claims battery full, maintained)"));
+        assertTrue(LocationReportFields.status(0x60), // 0b01100000
+                LocationReportFields.status(0x60).endsWith("(claims battery medium, not maintained)"));
+        assertTrue(LocationReportFields.status(0xA0), // 0b10100000
+                LocationReportFields.status(0xA0).endsWith("(claims battery low, not maintained)"));
+        assertTrue(LocationReportFields.status(0xE4), // 0b11100100
+                LocationReportFields.status(0xE4).endsWith("(claims battery critically low, maintained)"));
+    }
+
+    /**
+     * <b>It says "claims", because the beacon chooses this byte.</b>
+     *
+     * <p>Caesar Creek's write-up: the user "can actually set it to whatever they want", and a
+     * device type set in these bits suppresses unwanted-tracking alerts - so a beacon has an active
+     * reason to lie here. The wording is the only thing standing between a reader and treating this
+     * as a measurement.
+     */
+    @Test
+    public void areadingIsWordedAsAClaimNotAMeasurement() {
+        assertTrue(LocationReportFields.status(0x24),
+                LocationReportFields.status(0x24).contains("claims"));
     }
 
     /** Accuracy carries its unit, because a bare number reads as a distance to the tag. */

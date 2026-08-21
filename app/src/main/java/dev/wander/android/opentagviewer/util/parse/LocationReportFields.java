@@ -69,40 +69,77 @@ import lombok.NoArgsConstructor;
  *
  * <p>Being one byte, it also saturates: 255 means "255 or worse".
  *
- * <h2>Status: shown, not decoded</h2>
+ * <h2>Status: decoded only when the byte says it can be</h2>
  *
- * <p>The accessory's own status byte - byte 12 of its BLE advertisement (Table 2), copied through
- * by the finder. The paper labels it {@code Status (e.g., battery level)} and stops there, citing
- * Apple's accessory specification § 5.1 for the detail. That document is MFi-gated, so <b>the bit
- * layout is not publicly established and this class does not pretend otherwise.</b>
+ * <p>The accessory's own status byte - byte 12 of its BLE advertisement (paper, Table 2), copied
+ * through by the finder. The paper labels it {@code Status (e.g., battery level)} and defers to
+ * Apple's <i>Find My Network Accessory Specification</i>. That document does define it, in
+ * Table 5-5, "Payload for separated state", byte 2:
  *
- * <p>The temptation is real, because confident-sounding tables of it circulate. They disagree:
+ * <pre>
+ *   Bits 0-1: Reserved.
+ *   Bit 2:    Maintained
+ *   Bits 3-4: Reserved
+ *   Bits 5:   0b1
+ *   Bits 6-7: Battery state.
  *
- * <ul>
- *   <li>{@code go-haystack} reads the whole byte as a battery level - {@code 0x10} full,
- *       {@code 0x40} medium, {@code 0x80} low, {@code 0xC0} critical - and calls anything else
- *       unknown, which includes every value this app has actually seen.</li>
- *   <li>Adam Catley's AirTag teardown, that library's own cited source, records a real AirTag
- *       advertising {@code 0x10} and does not decode the bits at all.</li>
- *   <li>Chatbots will readily produce a full bitmask - paired, sound playing, motion detected -
- *       and attribute it to the paper above. It is not in the paper. That is how this class came
- *       to exist.</li>
- * </ul>
+ *   Maintained: Set if owner connected within current key rotation period (15 minutes)
+ *   Battery state definition: 0 = Full, 1 = Medium, 2 = Low, 3 = Critically low
+ * </pre>
  *
- * <p>Those cannot all hold. {@code 0x90} - ordinary, and the value this app sees - would be
- * {@code 0x80 | 0x10}: "low" and "full" at once. The reading that resolves it is that bits 6-7 are
- * a two-bit battery enum ({@code 00} full, {@code 01} medium, {@code 10} low, {@code 11} critical)
- * and {@code 0x10} is a different bit that happens to always be set, which would also line up with
- * the accessory record's enum in {@link BatteryLevelDescription} shifted by one for "unknown".
- * <b>That is an inference drawn here from two conflicting third-party sources and nothing else.</b>
- * It is written down because it is the obvious thing to test next, not because it is known.
+ * <p>Which settles it for accessories that follow the specification, and disposes of the bitmasks
+ * in circulation. {@code go-haystack} is half right - its {@code 0x40}/{@code 0x80}/{@code 0xC0}
+ * are exactly medium/low/critical shifted into bits 6-7, and its {@code 0x10} for "full" should
+ * have been {@code 0x20}. The tables a chatbot will produce - {@code 0x80} paired, {@code 0x02}
+ * sound playing, {@code 0x04} motion detected - are invention. That is why this class exists.
  *
- * <p>Hence the rendering: decimal, hex and binary of one number. All three are certainly right,
- * and the binary is what somebody correlating this against their own tags actually needs. Whoever
- * does that work should replace this section with what they found.
+ * <p><b>But an AirTag does not follow that table, and this app mostly sees AirTags.</b> The value
+ * it observes is {@code 0x90}: bit 5 clear where the specification requires it set, and reserved
+ * bit 4 set. Adam Catley's teardown records a real AirTag advertising {@code 0x10}, which breaks
+ * the same two rules. The specification governs third-party MFi accessories; AirTag is Apple's own
+ * hardware and predates it. Decoding {@code 0x90} against Table 5-5 anyway yields "battery Low"
+ * for a tag whose own record reads Full - a confident, wrong answer, which is worse than none.
+ *
+ * <p><b>And the byte is not trustworthy even when it is well-formed.</b> Caesar Creek Software's
+ * write-up of this network puts it plainly: "it's supposed to indicate the battery level and
+ * device type, but the user can actually set it to whatever they want". They also record that
+ * marking a beacon as an Apple Device or Find My Device <i>through this byte</i> suppresses
+ * unwanted-tracking alerts - so those "Reserved" bits carry a device type in practice, and a
+ * beacon has an active reason to lie about them.
+ *
+ * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
+ * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is
+ * annotated as what the beacon <i>claimed</i>, never as a measurement. Every value carries decimal,
+ * hex and binary regardless, because those three are certainly right and the binary is what
+ * somebody correlating this against their own tags actually needs.
  *
  * <p>Not translated, matching the rest of the debug output - a translated bit pattern helps
  * nobody.
+ *
+ * <h2>Sources</h2>
+ *
+ * <p>Linked because every one of them was hard to find, and because the next person to doubt a
+ * sentence above should be able to check it rather than re-derive it:
+ *
+ * <ul>
+ *   <li>Heinrich, Stute, Kornhuber and Hollick, <i>Who Can Find My Devices?</i>, PoPETs 2021(3) -
+ *       <a href="https://arxiv.org/abs/2103.02282">arXiv:2103.02282</a>,
+ *       <a href="https://petsymposium.org/popets/2021/popets-2021-0045.pdf">PDF</a>. Fig. 2 for
+ *       the report layout, Table 2 for the advertisement, § 6.3 fn. 3 for the accuracy unit,
+ *       Table 6 for its measured error.</li>
+ *   <li>Apple, <i>Find My Network Accessory Specification</i>, release R2, 2022-05-17 -
+ *       <a href="https://www.scribd.com/document/809845350/Find-My-Network-Accessory-Specification-r-2">
+ *       mirror</a>. Table 5-5 for the status byte. The primary source, and MFi-gated, so the
+ *       mirror is the only way most people will read it.</li>
+ *   <li>Caesar Creek Software, <i>Find My and Find Hub Network Research</i> -
+ *       <a href="https://cc-sw.com/find-my-and-find-hub-network-research/">cc-sw.com</a>. That the
+ *       byte is beacon-controlled, and that a device type in it suppresses stalking alerts.</li>
+ *   <li>Adam Catley, <i>AirTag Reverse Engineering</i> -
+ *       <a href="https://adamcatley.com/AirTag.html#advertising-data">adamcatley.com</a>. A real
+ *       AirTag observed advertising {@code 0x10}.</li>
+ *   <li><a href="https://pkg.go.dev/github.com/HattoriHanzo031/go-haystack/lib/findmy">go-haystack</a>
+ *       - the half-right battery constants, kept here as the example of what this class is for.</li>
+ * </ul>
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class LocationReportFields {
@@ -144,13 +181,36 @@ public final class LocationReportFields {
         return "conf " + value;
     }
 
+    /** Table 5-5 requires this set. An AirTag leaves it clear, which is how they are told apart. */
+    private static final long SPEC_MARKER_BIT = 0b0010_0000;
+
+    /** Bits 0-1 and 3-4. Publicly "Reserved"; a device type rides in them in practice. */
+    private static final long SPEC_RESERVED_BITS = 0b0001_1011;
+
+    /** Bit 2: the owner device connected within the current 15-minute key rotation period. */
+    private static final long SPEC_MAINTAINED_BIT = 0b0000_0100;
+
+    /** Bits 6-7, as an index into {@link #SPEC_BATTERY_STATES}. */
+    private static final int SPEC_BATTERY_SHIFT = 6;
+
+    /** Apple's words, in Apple's order (Table 5-5). */
+    private static final String[] SPEC_BATTERY_STATES = {"full", "medium", "low", "critically low"};
+
     /**
-     * {@code "status 144 = 0x90 = 0b10010000"}.
+     * {@code "status 144 = 0x90 = 0b10010000"}, plus a reading when the byte earns one.
      *
-     * <p><b>No bit is named.</b> Three renderings of one number, every one of them certainly true,
-     * and the binary is the useful one. A value too wide for a byte is shown at its natural width
-     * rather than truncated to eight bits: a status that does not fit in a byte means an
-     * assumption somewhere is wrong, and hiding the evidence would be the worst response to that.
+     * <p>Decimal, hex and binary always: three renderings of one number, every one certainly true,
+     * and the binary is what somebody correlating bits against their own tags needs.
+     *
+     * <p><b>The Table 5-5 reading is appended only to a byte that conforms to Table 5-5</b> - the
+     * marker bit set and every reserved bit clear. An AirTag satisfies neither, so the value this
+     * app usually sees stays a bare number rather than being told it has a low battery when it
+     * does not. And a conforming byte is phrased as a claim, because a beacon sets this field
+     * itself and can put anything in it.
+     *
+     * <p>A value too wide for a byte is shown at its natural width rather than truncated to eight
+     * bits: it would mean an assumption is wrong somewhere upstream, and hiding the evidence would
+     * be the worst response to that.
      */
     @NonNull
     public static String status(final long value) {
@@ -163,6 +223,25 @@ public final class LocationReportFields {
                 ? "00000000".substring(bits.length()) + bits
                 : bits;
 
-        return String.format(Locale.ROOT, "status %d = 0x%02X = 0b%s", value, value, padded);
+        return String.format(Locale.ROOT, "status %d = 0x%02X = 0b%s%s",
+                value, value, padded, specReading(value));
+    }
+
+    /** {@code " (claims battery full, maintained)"}, or empty when the byte does not conform. */
+    @NonNull
+    private static String specReading(final long value) {
+        final boolean conforms = value <= 0xFF
+                && (value & SPEC_MARKER_BIT) != 0
+                && (value & SPEC_RESERVED_BITS) == 0;
+
+        if (!conforms) {
+            return "";
+        }
+
+        final String battery = SPEC_BATTERY_STATES[(int) (value >> SPEC_BATTERY_SHIFT) & 0b11];
+        final String maintained = (value & SPEC_MAINTAINED_BIT) != 0
+                ? "maintained" : "not maintained";
+
+        return " (claims battery " + battery + ", " + maintained + ")";
     }
 }
