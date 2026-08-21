@@ -7,6 +7,10 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.content.Intent;
 
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
+
 import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -18,6 +22,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.Eventually;
@@ -43,18 +49,23 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
  * proves the fake works and nothing about the screen. This is the other half: the activity is
  * launched for real, against a database with tags in it, and asked what it drew.
  *
- * <p><b>What is not covered, and why.</b> The obvious thing to assert is "a tag with a stored
- * location gets a marker". It is not here, because the drawing is not reachable without a
- * restorable Apple session: {@code handleAuthAndShowDevices} zips the cached-beacon stream with
+ * <p><b>Drawing anything needs a session that restores, which is why {@code apple_test_double}
+ * exists.</b> {@code handleAuthAndShowDevices} <i>zips</i> the cached-beacon stream with
  * {@code PythonAuthService.restoreAccount}, so a session that will not restore disposes the
- * drawing side before it emits. A test can supply a session blob, but not one FindMy.py will
- * deserialise into an account - that needs a double on the Python side of the bridge, the same
- * shape as {@code icloud_test_double}, which does not exist for the auth path yet.
+ * drawing side before it emits - and no session a test can write by hand will deserialise into a
+ * FindMy.py account. Confirmed rather than assumed: taking the double out again turns all three
+ * marker tests red.
  *
- * <p>Written down rather than faked around, because the pragmatic alternative - making the
- * drawing method visible so a test can call it - buys the assertion by making the thing under
- * test slightly worse, and would pin the drawing while leaving the path that actually reaches it
- * uncovered.
+ * <p>Restoring needs no network - {@code getAccount} is {@code AppleAccount.from_json} and
+ * nothing else - so the double replaces only that and the fetch. Everything between them is the
+ * shipping code.
+ *
+ * <p><b>Still not covered:</b> that a redraw replaces a tag's marker rather than stacking a
+ * second on top. {@code showBeaconOnMap} removes the old one first and that is worth pinning,
+ * but driving it needs either the periodic refresh to come round or
+ * {@code showLastDeviceLocations} made visible - and widening a production method's access so a
+ * test can call it buys coverage by making the thing under test slightly worse. Left undone and
+ * written down rather than quietly skipped.
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
@@ -85,6 +96,7 @@ public class TheMapDrawsWhatIsStoredTest {
     private DeviceStateGuard guard;
     private FakeMapProvider fake;
     private ActivityScenario<MapsActivity> scenario;
+    private PyObject appleDouble;
 
     @Before
     public void seedTwoTagsAndSubstituteTheMap() {
@@ -128,10 +140,27 @@ public class TheMapDrawsWhatIsStoredTest {
         MapProviderFactory.replaceWith(() -> this.fake);
     }
 
+    /**
+     * Make the stored session restore, so the drawing side of the zip actually runs.
+     *
+     * <p>Not every test wants this: {@link #anunrestorableSessionSendsYouBackToSignIn} needs the
+     * opposite. So it is opt-in rather than setup, and torn down either way.
+     */
+    private void givenTheSessionRestores() {
+        if (!Python.isStarted()) {
+            Python.start(new AndroidPlatform(getInstrumentation().getTargetContext()));
+        }
+        this.appleDouble = Python.getInstance().getModule("apple_test_double");
+        this.appleDouble.callAttr("installWithNothingToReport");
+    }
+
     @After
     public void putEverythingBack() {
         if (this.scenario != null) {
             this.scenario.close();
+        }
+        if (this.appleDouble != null) {
+            this.appleDouble.callAttr("uninstall");
         }
         MapProviderFactory.reset();
         this.forgetThem();
@@ -181,6 +210,69 @@ public class TheMapDrawsWhatIsStoredTest {
 
         Eventually.check(() -> assertTrue("the map provider was never initialised",
                 this.fake.isReady()));
+    }
+
+    /**
+     * <b>A tag with a stored location gets a marker.</b>
+     *
+     * <p>The assertion this screen most needed and could not have until the session restored.
+     * The double returns nothing from the fetch, so what is drawn here is what the database
+     * already held - which is the behaviour worth pinning: somebody opening the app sees where
+     * their things were before Apple is asked anything.
+     */
+    @Test
+    public void astoredLocationIsDrawn() {
+        this.givenTheSessionRestores();
+        this.openTheMap();
+
+        Eventually.check(() -> assertEquals("the stored tag was not drawn",
+                1, this.markersFor(FOUND_TAG).size()));
+    }
+
+    /** And where the report says, not merely somewhere. */
+    @Test
+    public void themarkerIsAtTheStoredCoordinates() {
+        this.givenTheSessionRestores();
+        this.openTheMap();
+
+        Eventually.check(() -> assertEquals(1, this.markersFor(FOUND_TAG).size()));
+
+        final MapMarker drawn = this.markersFor(FOUND_TAG).get(0).marker;
+
+        assertEquals(LATITUDE, drawn.getLatitude(), 0.000001);
+        assertEquals(LONGITUDE, drawn.getLongitude(), 0.000001);
+    }
+
+    /**
+     * <b>A tag nobody has ever walked past gets no marker.</b>
+     *
+     * <p>Intended, and it looks like a fault from the outside - the warning-level log about a tag
+     * that cannot be drawn reads like one. Pinned so nobody later fixes the non-problem by
+     * putting a marker at 0,0, which is in the Atlantic.
+     */
+    @Test
+    public void atagWithNoLocationIsNotDrawnAtAll() {
+        this.givenTheSessionRestores();
+        this.openTheMap();
+
+        Eventually.check(() -> assertEquals(1, this.markersFor(FOUND_TAG).size()));
+
+        assertTrue("a tag with no location was given a marker anyway",
+                this.markersFor(NEVER_SEEN_TAG).isEmpty());
+    }
+
+    /**
+     * Every marker the fake was asked to place for one beacon.
+     *
+     * <p><b>Matched on the marker's id, which is the beacon id.</b> Not on the title: the screen
+     * does not set one - a pin carries the tag's emoji or icon as its bitmap and nothing else -
+     * so a title-based filter matches nothing and reads as "the map drew nothing", which is a
+     * long way from the truth and cost a debugging round here.
+     */
+    private List<FakeMapProvider.PlacedMarker> markersFor(final String beaconId) {
+        return this.fake.markers().stream()
+                .filter(placed -> beaconId.equals(placed.marker.getId()))
+                .collect(Collectors.toList());
     }
 
     /**
