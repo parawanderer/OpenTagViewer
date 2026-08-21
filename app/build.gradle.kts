@@ -24,6 +24,50 @@ secrets {
     defaultPropertiesFileName = "local.defaults.properties"
 }
 
+/** The ABIs every build carries unless asked otherwise. An emulator is the first, a phone the second. */
+val supportedAbis = listOf("arm64-v8a", "x86_64")
+
+/**
+ * `-PotvAbi=x86_64` to build one ABI instead of both. Null when nobody asked.
+ *
+ * Validated here rather than passed through: a typo would otherwise produce an APK with no
+ * native libraries at all, which installs perfectly happily and then dies at the first Chaquopy
+ * call - a far worse afternoon than a failed build.
+ */
+val requestedAbis: List<String>? = providers.gradleProperty("otvAbi").orNull
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.onEach { abi ->
+        require(abi in supportedAbis) { "-PotvAbi=$abi is not one of $supportedAbis" }
+    }
+
+// **A release must never be built with otvAbi set.**
+//
+// `providers.gradleProperty` reads gradle.properties as well as -P, including the one in
+// ~/.gradle. So somebody who tires of typing -PotvAbi=x86_64 and puts it there gets what they
+// wanted for every local run, and also a release APK that installs on no phone anybody owns -
+// with nothing to see in the build log, because it succeeded.
+//
+// Refused rather than silently ignored, so the flag never means two different things depending
+// on which task is run.
+//
+// **Checked against the task graph, not in `beforeVariants`.** That hook runs for every variant
+// whatever was asked for, so the release check there failed `assembleDebug` as well - which is
+// the one command this property exists to serve. The graph knows what is actually going to be
+// built, which is the question being asked.
+if (requestedAbis != null) {
+    gradle.taskGraph.whenReady {
+        val releaseTask = this.allTasks.firstOrNull { it.name.contains("Release") }
+        check(releaseTask == null) {
+            "otvAbi is set to ${requestedAbis.joinToString(",")}, but this build runs " +
+                "${releaseTask?.path} and a release must carry every ABI in $supportedAbis. " +
+                "It is for local debug installs only - pass it with -P rather than putting it " +
+                "in gradle.properties."
+        }
+    }
+}
+
 android {
     namespace = "dev.wander.android.opentagviewer"
     compileSdk = 35
@@ -37,8 +81,30 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // **Do not add `timeout_msec` here.** It works - a hanging test fails at the cap with
+        // its own name - but AndroidJUnitRunner pays for it per test, not per hang: with it set
+        // to two minutes, FetchFromICloudFlowTest's ten tests took 56.4s against 9.8s without,
+        // and the whole suite went from 2m59s to 9m13s. Measured on this machine, both ways.
+        //
+        // A hang costs one bad run and is fixed by fixing the test; this cost three minutes of
+        // every run forever. If a global cap is wanted, it needs to be a JUnit Timeout rule
+        // installed by a custom runner, not this argument.
+
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // **65 MB of a 105 MB debug APK is native libraries, and half of it is for an ABI
+            // the target cannot run.** Chaquopy's CPython, cryptography's OpenSSL and Apple's
+            // ADI libraries are all here, twice over. An emulator is x86_64 and a phone is
+            // arm64, so a local install always carries about 32 MB it will never load.
+            //
+            // That is only a papercut until a device runs out of room, and then it is an
+            // INSTALL_FAILED_INSUFFICIENT_STORAGE with nothing in it about ABIs. An upgrade
+            // needs space for the new APK while the old one is still installed, so the real
+            // cost is roughly double.
+            //
+            // `-PotvAbi=x86_64` builds just the one. Opt-in, so CI, releases and anybody who
+            // does not know about it get both, unchanged - a default that silently shipped one
+            // ABI would produce a release that installs on nothing.
+            abiFilters += requestedAbis ?: supportedAbis
         }
         externalNativeBuild {
             cmake {
@@ -287,7 +353,7 @@ chaquopy {
             // wheel for desktop platforms and a pure-Python `py3-none-any` one as well.
             // There is no Android wheel, so pip falls back to the pure-Python build - which
             // is correct but markedly slower. The messages here are small enough not to care.
-            install("git+https://github.com/parawanderer/FindMy.py@23a9b8d7109b405f8362ea1e69ebe51f9ca82fca")
+            install("git+https://github.com/parawanderer/FindMy.py@337381dedf4662d730752e727d896f964feae1f8")
 
             install("NSKeyedUnArchiver==1.5")
 

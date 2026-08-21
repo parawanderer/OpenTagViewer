@@ -40,6 +40,17 @@ public final class BeaconNamingRecordInnerParser {
             final String rawBase64String = (String) xPathExpression.evaluate(beaconNamingRecordPlist, XPathConstants.STRING);
             final String cleanBase64 = cleanXMLBase64Content(rawBase64String);
 
+            // **Empty is a real answer, not a failure.** A record read from the Apple account
+            // carries `cloudKitMetadata` as empty bytes: FindMy.py writes the field as a
+            // placeholder because CloudKit's own metadata cannot be reconstructed from a
+            // decrypted record, and the app has no use for it. Handing that to Python is a
+            // started interpreter, a plistlib.InvalidFileException and a logged stack trace -
+            // once per tag, every time a list is drawn - describing a state that is entirely
+            // normal and about which nothing can be done.
+            if (cleanBase64 == null || cleanBase64.isBlank()) {
+                return Optional.empty();
+            }
+
             // offload this task to python because python has a working implementation.
             return Optional.ofNullable(PythonUtils.decodeBeaconNamingRecordCloudKitMetadata(cleanBase64));
         } catch (Exception e) {

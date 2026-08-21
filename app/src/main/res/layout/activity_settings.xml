@@ -6,6 +6,9 @@
     <data>
         <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
+        <variable name="onClickFetchFromAccount" type="Runnable" />
+        <variable name="onClickUnlinkAccount" type="Runnable" />
+        <variable name="fetchFromAccountSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
         <variable name="onClickLanguage" type="Runnable" />
@@ -42,6 +45,39 @@
             <include
                 android:id="@+id/login_info_container"
                 layout="@layout/login_information_settings" />
+
+            <!--
+                The third door to the same screen, and the one people go looking for.
+
+                The empty state's button vanishes once anything is imported, and the device
+                list's overflow menu is only obvious to somebody who already knows it is there -
+                so "how do I get my tags again" is a Settings question, and this is where they
+                come to ask it. Placed under the account card because that is what it acts on.
+            -->
+            <include
+                android:id="@+id/settings_fetch_from_account"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/devices_24px}"
+                app:onClick="@{onClickFetchFromAccount}"
+                app:sectionSubtitle="@{fetchFromAccountSubtitle}"
+                app:title="@{@string/icloud_fetch_my_tags}" />
+
+            <!--
+                Only shown once there is something to unlink.
+
+                Gone by default rather than shown-and-disabled: this row does not apply at all
+                until the account has been linked, and a permanently greyed row in Settings
+                reads as a broken feature. Its visibility is set from SettingsActivity when the
+                membership lookup answers - see sayWhetherTheAccountIsLinked.
+            -->
+            <include
+                android:id="@+id/settings_unlink_account"
+                layout="@layout/settings_item_clickable"
+                android:visibility="gone"
+                app:icon="@{@drawable/link_off_24px}"
+                app:onClick="@{onClickUnlinkAccount}"
+                app:sectionSubtitle="@{@string/icloud_unlink_subtitle}"
+                app:title="@{@string/icloud_unlink_title}" />
 
         </LinearLayout>
 

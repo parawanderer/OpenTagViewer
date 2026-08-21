@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One accessory found on the account.
+
+  Two lines because one is not always enough: an accessory nobody ever named has only its
+  details to identify it - what kind of thing it is, its serial, and when it was paired, which
+  is often the one a person recognises because they remember buying it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/layout_rounded"
+    android:backgroundTint="?attr/colorSurfaceContainerLow"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/icloud_found_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/nunito_medium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="16sp"
+        tools:text="🚲 Bike" />
+
+    <TextView
+        android:id="@+id/icloud_found_details"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="?attr/colorOutline"
+        android:textSize="13sp"
+        tools:text="AirTag, serial HXXXXXXXXXXX, paired 2024-03-01" />
+
+</LinearLayout>

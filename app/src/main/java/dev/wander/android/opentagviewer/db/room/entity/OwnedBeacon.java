@@ -47,6 +47,50 @@ public class OwnedBeacon {
     public boolean isRemoved;
 
     /**
+     * Whether this beacon was read from the user's Apple account rather than imported from a file.
+     *
+     * <p><b>The two are different kinds of row, and the difference decides what may delete them.</b>
+     * An account beacon is a cache of what Apple holds: the list is re-read, so one that has left
+     * the account goes from here too. A file-imported beacon is the only copy in existence -
+     * nobody else has it and the export it came from may be long gone - so a refresh must never
+     * touch it.
+     *
+     * <p>False for every row that predates this, which is correct: they all came from a file.
+     */
+    @ColumnInfo(name = "from_account")
+    public boolean fromAccount;
+
+    /**
+     * How many times in a row a full-history search for this tag has come back with nothing.
+     *
+     * <p><b>What stops the app scanning a silent tag every single refresh.</b> A tag with no key
+     * alignment record searches from its pairing date, and that search costs a request per ~290
+     * keys - so a tag nobody has walked past is not merely uninformative, it is the most
+     * expensive thing in the batch, repeated on every tick. The count drives a backoff: the
+     * longer it has said nothing, the less often it is asked. See {@code WideScanBackoff}.
+     *
+     * <p>Reset to zero the moment anything is found, because a tag that reports again is a
+     * normal tag again - the silence may have been a fortnight in a drawer.
+     */
+    @ColumnInfo(name = "fruitless_scans", defaultValue = "0")
+    public int fruitlessScans;
+
+    /** When this tag was last searched for, so the backoff knows whether it is due. */
+    @ColumnInfo(name = "last_scan_at")
+    public Long lastScanAt;
+
+    /**
+     * When the app gave up on this tag, or null if it has not.
+     *
+     * <p>Set only when a search that covered <b>months</b> of history found nothing anywhere -
+     * not merely when a search found nothing, which for a young tag means almost nothing. Such a
+     * tag is skipped entirely rather than backed off, and says so on screen with a button to try
+     * again; anything found clears this.
+     */
+    @ColumnInfo(name = "ignored_at")
+    public Long ignoredAt;
+
+    /**
      * Serialized FindMyAccessory state (JSON) for FindMy.py 0.9.x. Includes the
      * rolling-key alignment that updates after every fetch — persisting it back
      * across calls is what fixes the key-drift bug from issue #30.

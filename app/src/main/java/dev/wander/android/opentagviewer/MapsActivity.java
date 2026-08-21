@@ -56,6 +56,7 @@ import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
+import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -81,6 +82,7 @@ import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityMapsBinding;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
@@ -102,6 +104,7 @@ import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
+import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PermissionUtil;
 import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
@@ -111,6 +114,7 @@ import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
 import dev.wander.android.opentagviewer.util.rx.BeaconLocationHistory;
 import dev.wander.android.opentagviewer.util.rx.LongFetchBannerState;
 import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
+import dev.wander.android.opentagviewer.util.rx.AccountReadPolicy;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -130,6 +134,28 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
     private static final int HOURS_TO_GO_BACK_24H = 24;
+
+    /**
+     * How far back to look for a tag nothing has ever searched for.
+     *
+     * <p><b>A day is the wrong window for a tag's first fetch.</b> Everything else here asks
+     * about the time since the last fetch, which is right for a tag the app has been watching -
+     * but a tag that has just arrived from a zip or from the account has no history at all, and
+     * one last seen on Tuesday comes back empty from a window that starts this morning. It then
+     * sits in My Devices saying "No last location known" while its locations are sitting on
+     * Apple's servers, findable by opening the history screen and paging back - which is exactly
+     * how @parawanderer found this.
+     *
+     * <p>Seven days because that is all Apple keeps, so it is the whole of what can be had, and
+     * one request rather than a widening loop. It costs little: ~672 key indices for an aligned
+     * tag against the 2000 that makes a search count as expensive, so it does not look like a
+     * wide search and cannot push a healthy tag towards the backoff.
+     *
+     * <p>Applied per beacon and only while {@code last_scan_at} is null, so it happens once and
+     * then stops - a tag that has been searched drops back to the ordinary window whether or not
+     * that first search found anything.
+     */
+    private static final int HOURS_TO_GO_BACK_FIRST_TIME = 24 * 7;
 
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
@@ -185,6 +211,29 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     /** When a refresh is allowed, and how much history it should ask for. See RefreshPolicyTest. */
     // Shared across activity instances on purpose - see RefreshPolicy.shared. Rebuilding this
     // screen must not look like an app that has never spoken to Apple.
+    /**
+     * How often the app re-reads the Apple account on its own.
+     *
+     * <p><b>Six hours, against the location refresh's one minute.</b> These answer different
+     * questions: locations change constantly and are the point of the map, while what tags exist
+     * changes when somebody adds one in Find My or renames it - rare, and never urgent. A read
+     * also decrypts every record on the account and queues behind the location fetches, so doing
+     * it eagerly costs the user's own work rather than just bandwidth.
+     */
+    private static final long WAIT_BEFORE_REREADING_ACCOUNT = 6L * 60 * 60 * 1000;
+
+    private final AccountReadPolicy accountReadPolicy =
+            new AccountReadPolicy(WAIT_BEFORE_REREADING_ACCOUNT);
+
+    /**
+     * Whether an Apple account is linked, as of the last time this screen resumed.
+     *
+     * <p>Cached rather than asked on every tick: the answer lives in the encrypted datastore, and
+     * the tick runs every minute. It can only become true while this screen is away - linking
+     * happens on another one - so resuming is exactly when it is worth asking again.
+     */
+    private volatile boolean accountIsLinked = false;
+
     private final RefreshPolicy refreshPolicy =
             RefreshPolicy.shared(WAIT_BEFORE_REFETCH, HOURS_TO_GO_BACK_24H);
 
@@ -264,6 +313,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             data.getStringExtra("deviceWasRemoved") != null
                             || data.getStringExtra("deviceWasChanged") != null)) {
                         this.handleDeviceListChanged();
+                    }
+
+                    // The tag page has no way to fetch - the picker, the Python service and the
+                    // card that shows the answer all live here - so it asks. See
+                    // DeviceInfoActivity#lookForItAgainNow.
+                    final String retry = data == null
+                            ? null : data.getStringExtra(DeviceInfoActivity.RETRY_IGNORED_BEACON);
+                    if (retry != null) {
+                        this.lookForAnIgnoredTagAgain(retry);
                     }
                 }
             }
@@ -427,6 +485,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
          // TODO: when a user changes their anisette URL in settings and returns here, this should be able to deal with querying the new URL
 
+        this.rememberWhetherAnAccountIsLinked();
         this.refreshIfAllowed();
         this.reSchedulePeriodicTagLocationRefresher();
         
@@ -454,6 +513,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.nextLocationRefreshTask = () -> {
             refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
             this.refreshIfAllowed();
+            this.rereadTheAccountIfAllowed();
         };
         refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
     }
@@ -476,6 +536,93 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Performing automatic scheduled refresh of data for all tags...");
         this.fetchAndUpdateCurrentBeacons();
         Log.d(TAG, "Automatic scheduled refresh complete! Next automatic refresh will be in " + WAIT_BEFORE_REFETCH + " ms");
+    }
+
+    /**
+     * Ask the account what it holds now, if it is time and nothing else is running.
+     *
+     * <p><b>Silent by design.</b> Nobody asked for this, so there is nothing to show and nothing
+     * to report: it succeeds by the device list quietly being right, and by the map picking up a
+     * tag that was added in Find My without anybody going to look for a button.
+     *
+     * <p>The device list is only rebuilt when something actually changed, because rebuilding it
+     * moves rows under whoever is reading them.
+     */
+    private void rereadTheAccountIfAllowed() {
+        final long now = System.currentTimeMillis();
+
+        final AccountReadPolicy.Decision decision = this.accountReadPolicy.decide(
+                now, this.accountIsLinked, PythonAppleService.isBusy());
+
+        if (!decision.shouldRead()) {
+            return;
+        }
+
+        // Marked before it runs, not after. A read that takes twenty minutes queued behind a
+        // location fetch must not earn another one the moment it finishes.
+        this.accountReadPolicy.markRead(now);
+        Log.d(TAG, "Re-reading the Apple account in the background");
+
+        var async = new AccountRefresher(
+                new KeychainMembershipRepository(
+                        UserAuthDataStore.getInstance(this.getApplicationContext()),
+                        new AppCryptographyUtil()),
+                this.beaconRepo)
+                .refresh()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> Log.i(TAG, "Background account read holds " + held.size() + " tags"),
+                        error -> Log.w(TAG, "Background account read failed", error));
+    }
+
+    private void rememberWhetherAnAccountIsLinked() {
+        var async = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .get()
+                .firstOrError()
+                .subscribeOn(Schedulers.io())
+                .subscribe(
+                        held -> this.accountIsLinked = held.isPresent(),
+                        error -> Log.w(TAG, "Could not tell whether an account is linked", error));
+    }
+
+    /**
+     * Search for one tag the app had given up on, because somebody asked.
+     *
+     * <p><b>Through the manual fetch path, which the backoff does not touch.</b> That is the
+     * whole point of the button: the tag is skipped by the scheduled fetches precisely because
+     * it has answered nothing for months, and a person pressing "check now" is overriding that
+     * judgement, which they are entitled to do.
+     *
+     * <p>Nothing here clears the ignored flag. A successful search does that on its own, in the
+     * same place every other successful search does - see
+     * {@code OwnedBeaconDao#recordSuccessfulScan}. A second path that cleared it separately
+     * could disagree with the first, and would be the version that quietly un-ignores a tag that
+     * still found nothing.
+     */
+    private void lookForAnIgnoredTagAgain(final String beaconId) {
+        final BeaconData beacon = this.beacons.get(beaconId);
+        if (beacon == null) {
+            Log.w(TAG, "Asked to look for " + beaconId + " again, but it is not on this screen");
+            return;
+        }
+
+        Log.i(TAG, "Looking again for " + beaconId + ", which had been set aside");
+        Toast.makeText(this.getApplicationContext(), R.string.tag_ignored_retrying, LENGTH_LONG)
+                .show();
+
+        // **The whole week, not a day.** This tag was set aside precisely because it has not
+        // reported in a very long time, so asking about the last twenty-four hours is close to
+        // guaranteed to find nothing - and the person tapping "look again" would be told the
+        // same thing they were told before, having done the one thing the screen offered them.
+        var async = this.fetchLastReportsFor(
+                        beaconId, beacon.getInfo().getOwnedBeaconPlistRaw(),
+                        HOURS_TO_GO_BACK_FIRST_TIME)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        reports -> this.handleDeviceListChanged(),
+                        error -> Log.e(TAG, "Looking again for " + beaconId + " failed", error));
     }
 
     public void onClickMoreSettings(View view)
@@ -645,11 +792,28 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
              * relative to each other does not matter.
              */
             .flatMapCompletable(storedBeacons -> RxFlows.allThen(
-                    // Once, after every accessory has landed, rather than per accessory.
+                    // A last pass once everything has landed, for anything the per-accessory
+                    // passes below could not resolve.
                     this.updateBeaconGeocodings(),
                     this.fetchLastReports(
                             BeaconRepository.plistFallbacks(storedBeacons.getOwnedBeacons()), HOURS_TO_GO_BACK_24H)
-                            .doOnNext(this::addBeaconLocationsToCurrent),
+                            // **Geocoded as each accessory lands, not only at the end.** This
+                            // used to be a bare doOnNext with the geocoding left to the `then`
+                            // above, which runs after the whole batch - and a batch is one
+                            // sequential fetch per tag, where a tag with no key alignment record
+                            // takes minutes. So every card sat showing raw coordinates for the
+                            // length of the run, despite geocoding being a Google call that had
+                            // nothing to wait for. Cheap to repeat: a beacon whose location has
+                            // not moved since its last geocoding is skipped.
+                            .concatMap(reports -> {
+                                this.addBeaconLocationsToCurrent(reports);
+                                // Same reason as the periodic refresh: the model is not the
+                                // screen, and waiting for the slowest tag to redraw the fast
+                                // ones is the whole complaint.
+                                this.runOnUiThread(this::showLastDeviceLocations);
+                                return this.updateBeaconGeocodings()
+                                        .andThen(Observable.just(reports));
+                            }),
                     BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
                             .doOnNext(this::addBeaconToCurrent)
             ))
@@ -1180,17 +1344,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // 创建自定义标记图标
         android.graphics.Bitmap iconBitmap;
+        // **Resolved from the theme, not read from the colour resource.** The two agree in every
+        // built-in theme, including at night - and stop agreeing the moment system colours are
+        // on, because DynamicColors rewrites the theme attribute and cannot rewrite a fixed
+        // value in colors.xml. The cards took the wallpaper's tint and the pins did not. See
+        // MarkerPalette.
         if (beacon.isEmojiFilled()) {
             iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
-                    getColor(R.color.md_theme_background));
+                    MarkerPalette.fill(this));
         } else {
             iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     R.drawable.apple,
-                    getColor(R.color.md_theme_background),
-                    getColor(R.color.greyish)
+                    MarkerPalette.fill(this),
+                    MarkerPalette.icon(this)
             );
         }
 
@@ -1336,7 +1505,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 iconContainer.setVisibility(GONE);
             } else {
                 // Was always Apple's logo, for a Chipolo and an OpenHaystack tag alike.
-                iconContainer.setImageResource(BeaconIcon.forBeacon(beacon));
+                BeaconIcon.applyTo(iconContainer, beacon);
                 iconContainer.setVisibility(VISIBLE);
                 emojiContainer.setVisibility(GONE);
             }
@@ -1415,7 +1584,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
 
         var async = this.fetchLastReports(beacons)
-                .doOnNext(this::addBeaconLocationsToCurrent)
+                // **Drawn as each tag lands, not once at the end.**
+                //
+                // The fetch is one accessory at a time, and a tag with no key alignment record
+                // can take minutes on its own - so a batch of six is quarter of an hour during
+                // which nothing on screen moved, even though most of those answers arrived in
+                // the first few seconds. addBeaconLocationsToCurrent only updates the model;
+                // showLastDeviceLocations is what redraws, and it used to run in the terminal
+                // subscribe below, once, after the slowest tag.
+                //
+                // It is also what makes the fetch order worth anything: putting the tags that
+                // answer first is pointless if nothing is drawn until the silent ones have been
+                // ground through too. See ScanOrder.
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext(reports -> {
+                    this.addBeaconLocationsToCurrent(reports);
+                    this.showLastDeviceLocations();
+                })
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
@@ -1451,7 +1636,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         final int hoursToGoBack = this.refreshPolicy.hoursToGoBack(now);
 
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
-        return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
+        // **The scheduled variant, and the only caller of it.** This overload is the periodic
+        // tick - it is the one that reads refreshPolicy for its window - so it is where tags
+        // that have gone quiet are allowed to be skipped. Every other fetch here is somebody
+        // asking, and asks about whatever it was given.
+        return this.beaconRepo.toScheduledAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
@@ -1488,14 +1677,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
             final List<AccessoryRequest> requests, final int hoursToGoBack) {
 
-        return RxFlows.oneAtATime(
+        // **A tag nobody has searched for yet gets the whole week.** Read once for the batch,
+        // then applied per accessory - see HOURS_TO_GO_BACK_FIRST_TIME. Everything else keeps
+        // the window it asked for.
+        return this.beaconRepo.neverScanned().flatMap(neverScanned -> RxFlows.oneAtATime(
                 requests,
-                request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
+                request -> this.appleService.getLastReports(
+                                List.of(request),
+                                neverScanned.contains(request.getBeaconId())
+                                        ? HOURS_TO_GO_BACK_FIRST_TIME
+                                        : hoursToGoBack)
                         .flatMap(this.beaconRepo::storeFetchResult),
                 this::setLongFetchProgress,
                 (request, error) -> Log.e(TAG,
                         "Failed to fetch reports for beaconId=" + request.getBeaconId()
-                                + "; continuing with the remaining accessories", error));
+                                + "; continuing with the remaining accessories", error)));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {

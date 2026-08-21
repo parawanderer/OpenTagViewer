@@ -148,7 +148,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             viewHolder.getItemEmoji().setVisibility(VISIBLE);
             viewHolder.getItemImage().setVisibility(GONE);
         } else {
-            viewHolder.getItemImage().setImageResource(BeaconIcon.forBeacon(beacon));
+            BeaconIcon.applyTo(viewHolder.getItemImage(), beacon);
             viewHolder.getItemImage().setVisibility(VISIBLE);
             viewHolder.getItemEmoji().setVisibility(GONE);
         }
@@ -165,6 +165,15 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             ).toString();
 
             viewHolder.getLastUpdated().setText(this.resources.getString(R.string.last_updated_x, timeAgo));
+
+        } else if (beacon.isIgnored()) {
+            // **Not the same as "no last location known", though it looks identical.** That
+            // line describes a tag nobody has walked past this week; this one has been searched
+            // across months of history and answered nothing, so the app has stopped asking. A
+            // user staring at the generic line has no way to tell those apart, and the second
+            // one is the one they can act on - the tag page offers to look again.
+            viewHolder.getLastUpdated().setText(R.string.tag_ignored_summary);
+            viewHolder.getWarningIcon().setVisibility(VISIBLE);
 
         } else {
             viewHolder.getLastUpdated().setText(R.string.no_last_location_known);

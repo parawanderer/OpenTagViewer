@@ -87,10 +87,74 @@ public class BeaconIconTest {
                 BeaconIcon.forBeacon(beacon(false, APPLE_VENDOR_ID)));
     }
 
+    /**
+     * <b>An iPad is drawn as a tablet, not as a generic Find My accessory.</b>
+     *
+     * <p>The decision used to be the vendor id alone, and that does not identify these at all: an
+     * AirTag's record carries 76 and an iPad's carries -1, so every iPhone, iPad and Mac on the
+     * account fell through to the third-party branch. An account read is mostly those, so the
+     * device list came back as a column of identical unknown tags - which is what @parawanderer
+     * saw the first time a real account was imported.
+     *
+     * <p>The model is the direct evidence: an accessory leaves it empty, a device fills it with
+     * an Apple model identifier.
+     */
+    @Test
+    public void anappleDeviceIsDrawnAsWhatItIs() {
+        assertEquals(R.drawable.tablet_24px, BeaconIcon.forBeacon(withModel("iPad13,18")));
+        assertEquals(R.drawable.laptop_24px, BeaconIcon.forBeacon(withModel("MacBookAir10,1")));
+        assertEquals(R.drawable.smartphone_24px, BeaconIcon.forBeacon(withModel("iPhone15,2")));
+    }
+
+    /** And specifically not the accessory mark, which is the behaviour being replaced. */
+    @Test
+    public void anappleDeviceIsNotDrawnAsAThirdPartyAccessory() {
+        for (final String model : new String[] {"iPad13,18", "MacBookAir10,1", "iPhone15,2"}) {
+            assertNotEquals("a " + model + " is one of the owner's own devices, not a tag"
+                            + " somebody else made",
+                    R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel(model)));
+        }
+    }
+
+    /**
+     * Apple hardware this has no drawing of gets Apple's logo rather than a guess.
+     *
+     * <p>A Watch, a Vision Pro, something not shipped yet: "one of your Apple devices" is true,
+     * and drawing it as a third-party tag would not be.
+     */
+    @Test
+    public void appleHardwareWithNoPictureOfItsOwnStillLooksApple() {
+        assertEquals(R.drawable.apple, BeaconIcon.forBeacon(withModel("Watch6,1")));
+    }
+
+    /**
+     * <b>An accessory's empty model must not be mistaken for a device.</b>
+     *
+     * <p>The one that keeps the change honest in the other direction: every AirTag has
+     * {@code model} empty, so a prefix check that treated empty as a match would draw the entire
+     * account as iPads.
+     */
+    @Test
+    public void anaccessoryWithNoModelIsStillAnAccessory() {
+        assertEquals(R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel("")));
+        assertEquals(R.drawable.findmy_accessory, BeaconIcon.forBeacon(withModel(null)));
+    }
+
+    private static BeaconInformation withModel(final String model) {
+        return BeaconInformation.builder()
+                .beaconId("a-tag")
+                .originalName("Something")
+                .model(model)
+                // -1 is what a real device's record carries, and is the whole reason the vendor
+                // id cannot be what decides this.
+                .vendorId(-1)
+                .build();
+    }
+
     /** A Chipolo, a Pebblebee - findable, paired, and not made by Apple. */
     @Test
     public void athirdPartyTagGetsTheFindableIcon() {
-        assertEquals(R.drawable.tag_third_party,
+        assertEquals(R.drawable.findmy_accessory,
                 BeaconIcon.forBeacon(beacon(false, 0x009E)));
     }
 
@@ -120,8 +184,8 @@ public class BeaconIconTest {
     @Test
     public void thethreeIconsAreActuallyDifferent() {
         assertNotEquals(R.drawable.apple, R.drawable.tag_self_generated);
-        assertNotEquals(R.drawable.apple, R.drawable.tag_third_party);
-        assertNotEquals(R.drawable.tag_self_generated, R.drawable.tag_third_party);
+        assertNotEquals(R.drawable.apple, R.drawable.findmy_accessory);
+        assertNotEquals(R.drawable.tag_self_generated, R.drawable.findmy_accessory);
     }
 
     // ---------------------------------------------------------------- does it draw
@@ -142,7 +206,7 @@ public class BeaconIconTest {
             for (final int icon : new int[]{
                     R.drawable.apple,
                     R.drawable.tag_self_generated,
-                    R.drawable.tag_third_party}) {
+                    R.drawable.findmy_accessory}) {
                 final Drawable drawable = AppCompatResources.getDrawable(themed, icon);
 
                 assertNotNull("icon " + icon + " did not load", drawable);
@@ -170,7 +234,7 @@ public class BeaconIconTest {
         final int haystack = paintedPixels(
                 AppCompatResources.getDrawable(themed, R.drawable.tag_self_generated));
         final int findable = paintedPixels(
-                AppCompatResources.getDrawable(themed, R.drawable.tag_third_party));
+                AppCompatResources.getDrawable(themed, R.drawable.findmy_accessory));
 
         assertNotEquals("the haystack draws the same coverage as Apple's logo", apple, haystack);
         assertNotEquals("the findable icon draws the same coverage as Apple's logo",
@@ -197,7 +261,7 @@ public class BeaconIconTest {
             write("selfgenerated-" + variant,
                     AppCompatResources.getDrawable(themed, R.drawable.tag_self_generated));
             write("thirdparty-" + variant,
-                    AppCompatResources.getDrawable(themed, R.drawable.tag_third_party));
+                    AppCompatResources.getDrawable(themed, R.drawable.findmy_accessory));
         }
     }
 

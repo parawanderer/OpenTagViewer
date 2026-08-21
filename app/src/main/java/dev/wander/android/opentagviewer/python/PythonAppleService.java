@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import io.reactivex.rxjava3.core.Observable;
@@ -37,37 +36,29 @@ public class PythonAppleService {
     }
 
     /**
-     * Serialises all calls into Python.
-     * <br>
-     * FindMy.py's synchronous AppleAccount wraps an async one and drives it with a single
-     * asyncio event loop. RxJava schedules our fetches on a thread pool, and the periodic
-     * refresh in MapsActivity fires every 60 seconds regardless of whether the previous
-     * fetch has finished. Two fetches overlapping means two threads calling
-     * run_until_complete on the same loop, which fails with
-     * "RuntimeError: This event loop is already running" and then keeps failing.
-     * <br>
-     * A fetch that takes longer than the refresh interval is entirely normal for an
-     * accessory with no alignment yet, so this is not a rare race.
-     * <br>
-     * Serialising alone is not enough: the periodic refresh would still queue up behind a
-     * slow fetch, one entry per minute, and then fire the whole stale backlog at once when
-     * it finally drained. Callers on the periodic path should check {@link #isBusy()} and
-     * skip their turn instead - a refresh that is minutes late has no value.
-     */
-    private static final ReentrantLock PYTHON_LOCK = new ReentrantLock();
-
-    /**
      * Whether a call into Python is currently in progress.
-     * <br>
-     * Advisory only. A caller that acts on this can still be beaten to the lock, which is
-     * harmless: it just waits, exactly as it did before.
+     *
+     * <p>Delegates to {@link PythonLock}, which is where the lock moved when the iCloud flow
+     * started driving the same event loop. Kept here because the periodic refresh asks this
+     * service, and where the lock lives is not its business.
      */
     public static boolean isBusy() {
-        return PYTHON_LOCK.isLocked();
+        return PythonLock.isBusy();
     }
 
     private PythonAppleService(PythonAppleAccount account) {
         this.account = account;
+    }
+
+    /**
+     * The signed-in account, for the iCloud flow.
+     *
+     * <p><b>This one, not a second one restored from the same stored JSON.</b> One install is
+     * one device to Apple (rule 11), and a parallel account would be a second HTTP session on a
+     * second event loop presenting the same identity.
+     */
+    public PythonAppleAccount getAccount() {
+        return this.account;
     }
 
     public Observable<FetchResult> getLastReports(final List<AccessoryRequest> requests, final int hoursToGoBack) {
@@ -76,8 +67,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            PYTHON_LOCK.lock();
-            try {
+            return PythonLock.holding(() -> {
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
@@ -94,9 +84,7 @@ public class PythonAppleService {
                 }
 
                 return mapResults(returned);
-            } finally {
-                PYTHON_LOCK.unlock();
-            }
+            });
         }).subscribeOn(Schedulers.io());
     }
 
@@ -106,8 +94,7 @@ public class PythonAppleService {
                 return emptyResult();
             }
 
-            PYTHON_LOCK.lock();
-            try {
+            return PythonLock.holding(() -> {
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
@@ -125,14 +112,13 @@ public class PythonAppleService {
                 }
 
                 return mapResults(returned);
-            } finally {
-                PYTHON_LOCK.unlock();
-            }
+            });
         }).subscribeOn(Schedulers.io());
     }
 
     private static FetchResult emptyResult() {
-        return new FetchResult(Collections.emptyMap(), Collections.emptyMap());
+        return new FetchResult(Collections.emptyMap(), Collections.emptyMap(),
+                java.util.Set.of(), java.util.Set.of());
     }
 
     /**
@@ -145,6 +131,8 @@ public class PythonAppleService {
     private static FetchResult mapResults(final PyObject locationReportsResult) {
         Map<String, List<BeaconLocationReport>> results = new HashMap<>();
         Map<String, String> updatedAccessoryJson = new HashMap<>();
+        java.util.Set<String> exhaustedWideSearch = new java.util.HashSet<>();
+        java.util.Set<String> wideSearch = new java.util.HashSet<>();
 
         var mapBeaconIdToResult = locationReportsResult.asMap();
         for (var key : mapBeaconIdToResult.keySet()) {
@@ -152,6 +140,21 @@ public class PythonAppleService {
 
             var locationReportList = perBeacon.get("reports").asList();
             var updatedAccessory = perBeacon.get("updatedAccessoryJson");
+
+            // Absent on any answer from an older bridge, which reads as "not exhausted" - the
+            // cautious way round, since the consequence of a wrong true is the app quietly
+            // giving up on somebody's tag.
+            final var exhausted = perBeacon.get("exhaustedWideSearch");
+            if (exhausted != null && exhausted.toBoolean()) {
+                exhaustedWideSearch.add(key.toString());
+            }
+
+            // Absent on an older bridge, which reads as "not expensive" - so nothing is counted
+            // against a tag on the strength of a field that was not there.
+            final var wide = perBeacon.get("wideSearch");
+            if (wide != null && wide.toBoolean()) {
+                wideSearch.add(key.toString());
+            }
 
             List<BeaconLocationReport> reports = new LinkedList<>();
             final int numReports = locationReportList.size();
@@ -189,6 +192,6 @@ public class PythonAppleService {
             }
         }
 
-        return new FetchResult(results, updatedAccessoryJson);
+        return new FetchResult(results, updatedAccessoryJson, exhaustedWideSearch, wideSearch);
     }
 }

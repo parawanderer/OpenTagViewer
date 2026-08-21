@@ -19,6 +19,15 @@ public final class UserAuthDataStore {
 
     public static final Preferences.Key<byte[]> APPLE_ACCOUNT = PreferencesKeys.byteArrayKey("apple_account");
 
+    /**
+     * This app's membership of the user's keychain, encrypted under its own alias.
+     *
+     * <p>Beside the account rather than in the database: it is a secret, and this file is where
+     * secrets live. Deliberately not cleared by signing out - see the alias.
+     */
+    public static final Preferences.Key<byte[]> KEYCHAIN_MEMBERSHIP =
+            PreferencesKeys.byteArrayKey("keychain_membership");
+
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (AUTH_DATA_STORE == null) {
             AUTH_DATA_STORE = new RxPreferenceDataStoreBuilder(context, AUTH_FILE_FLENAME)

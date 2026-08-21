@@ -15,25 +15,57 @@ is asserted here *and* pinned on the Java side by `IdentityBridgeTest`.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import plistlib
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 import icloud_bridge
 from exporter import icloud
+from cryptography.hazmat.primitives.asymmetric import ec
+from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
 
 
 class FakeRecord:
-    """An escrow record, as far as this module is concerned: a serial and a description."""
+    """
+    An escrow record, in the fields the bridge reads off one.
 
-    def __init__(self, serial: str) -> None:
+    **Every field, including the empty ones.** The screen builds a tile out of these rather than
+    printing `describe()`, and the interesting case is the phone nobody ever renamed - `name` is
+    empty and the tile has to fall back to the model class. A fake carrying only the fields a
+    passing test happens to touch is how this drifted out of step with the bridge in the first
+    place.
+    """
+
+    def __init__(
+        self,
+        serial: str,
+        *,
+        name: str = "",
+        model: str = "iPhone15,2",
+        modelClass: str = "iPhone",
+        escrowedAt: Any = None,
+    ) -> None:
         self.serial = serial
+        self.device_name = name
+        self.device_model = model
+        self.device_model_class = modelClass
+        self.escrowed_at = escrowedAt
 
     def describe(self) -> str:
         return f"A device, serial {self.serial}"
+
+
+class FakeRecoveredPeer:
+    """What a recovery yields: the identity a join is sponsored by."""
+
+    def __init__(self, serial: str) -> None:
+        self.peer_id = f"peer-for-{serial}"
 
 
 class FakeOptions:
@@ -54,6 +86,12 @@ class FakeClient:
         self._options = options or FakeOptions([FakeRecord("F2LX9Q")])
         self._unlockError = unlockError
         self.unlockedWith: list[tuple[str, str]] = []
+        self.resumedAs: list = []
+        self.joinedWith = None
+        self._joinError = None
+        self._resumeError = None
+        self.renamedWith: list[tuple[str, dict]] = []
+        self.renameError = None
         self.entered = False
         self.exited = False
 
@@ -68,10 +106,41 @@ class FakeClient:
     async def recovery_options(self, *, refresh: bool = False):
         return self._options
 
-    async def unlock(self, record, passcode):
+    # `unlock` recovers explicitly now - `session.recover` then `client.resume` - because the
+    # peer a recovery yields is what sponsors a join, and `client.unlock` keeps it to itself.
+    @property
+    def session(self):
+        return self
+
+    async def recover(self, record, passcode):
         self.unlockedWith.append((record.serial, passcode))
         if self._unlockError is not None:
             raise self._unlockError
+        return FakeRecoveredPeer(record.serial)
+
+    async def resume(self, peer, **_):
+        self.resumedAs.append(getattr(peer, "peer_id", peer))
+        if self._resumeError is not None:
+            raise self._resumeError
+        return []
+
+    async def join(self, peer, *, passcode, device, os_version):
+        self.joinedWith = SimpleNamespace(
+            peer=peer, passcode=passcode, device=device, os_version=os_version)
+        if self._joinError is not None:
+            raise self._joinError
+        return SimpleNamespace(
+            peer=SimpleNamespace(
+                peer_id="peer-ours", to_json=lambda: {"peer_id": "peer-ours"}),
+            bottle=SimpleNamespace(entropy=bytes([7]) * 72),
+            label="a-label",
+            shares=2)
+
+    async def rename(self, accessory, **changes):
+        self.renamedWith.append((accessory, changes))
+        if self.renameError is not None:
+            raise self.renameError
+        return SimpleNamespace(identifier=accessory)
 
 
 class FakeAccount:
@@ -85,8 +154,23 @@ class FakeAccount:
     """
 
     def __init__(self, loop) -> None:
-        self._asyncacc = object()
+        self._asyncacc = FakeAsyncAccount()
         self._evt_loop = loop
+
+
+class FakeAsyncAccount:
+    """
+    The async account, in the two public things a join reads off it.
+
+    Both are what rule 11 is about: the model and build reach the escrow record's metadata, and
+    the serial reaches the peer's stable info, and both are read from the one identity rather
+    than composed - a path that invents its own makes one client look like several.
+    """
+
+    serial = "0PENTAGVIEWR"
+    identity = SimpleNamespace(
+        model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
+        os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0")
 
 
 @pytest.fixture
@@ -545,3 +629,259 @@ class TestClosing:
 
         made.client.__aexit__ = refusing
         made.close()
+
+
+def aStoredMembership() -> dict:
+    """A membership as the app would have stored it, with real keys."""
+    return JoinedPeer(
+        peer_id="peer-ours",
+        signing=ec.generate_private_key(ec.SECP384R1()),
+        encryption=ec.generate_private_key(ec.SECP384R1()),
+    ).to_json()
+
+
+class TestJoiningTheAccount:
+    """
+    The one call here that writes, and the reason it is worth writing.
+
+    A non-member reads with view keys it holds a share of, and those keep working - until the
+    view keys **roll**, which is expected whenever the circle's membership changes. Only a
+    current member is given shares of the new ones, so a non-member goes quietly stale: still
+    holding keys, still looking fine, decrypting nothing new. Here that is a map that stopped
+    updating for no reason.
+    """
+
+    def test_it_cannot_join_before_anything_is_unlocked(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_UNLOCKED
+        assert made.client.joinedWith is None, "nothing may be sent without a sponsor"
+
+    def test_it_refuses_an_empty_passcode(self, session):
+        """Enrolment refuses it anyway, but failing here says which side got it wrong."""
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        assert not json.loads(made.join(""))["ok"]
+        assert made.client.joinedWith is None
+
+    def test_the_peer_that_was_recovered_is_the_one_that_sponsors(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        assert json.loads(made.join("a-passcode"))["ok"]
+        assert made.client.joinedWith.peer.peer_id == "peer-for-F2LX9Q"
+
+    def test_it_describes_itself_with_the_identity_it_already_presents(self, session):
+        """
+        Rule 11. The model and build reach the escrow record's metadata and the serial reaches
+        the peer's stable info - both read from the one identity rather than composed, because
+        a path that invents its own makes one client look like several.
+        """
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+        made.join("a-passcode")
+
+        device = made.client.joinedWith.device
+        assert device.serial == "0PENTAGVIEWR"
+        assert device.model == "iPhone17,1"
+        assert device.build == "22B83"
+        assert made.client.joinedWith.os_version == "18.1"
+
+    def test_the_membership_comes_back_to_be_stored(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert answer["peer"] == {"peer_id": "peer-ours"}
+        assert answer["label"] == "a-label"
+        assert answer["shares"] == 2
+
+    def test_the_entropy_comes_back_too_and_is_not_the_membership(self, session):
+        """
+        Both are kept, and neither substitutes for the other.
+
+        The membership is how a refresh avoids a passcode. The entropy, with the passcode the
+        record was enrolled under, is how the peer is recovered through escrow if the app's
+        encrypted store is ever destroyed.
+        """
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert len(base64.b64decode(answer["entropy"])) == 72
+        assert answer["entropy"] != json.dumps(answer["peer"])
+
+    def test_a_join_that_fails_is_reported_with_words_in_it(self, session):
+        made = session(FakeClient())
+        made.recoveryOptions()
+        made.unlock("F2LX9Q", "1234")
+        made.client._joinError = RuntimeError("cuttlefish said no")
+
+        answer = json.loads(made.join("a-passcode"))
+
+        assert not answer["ok"]
+        assert "cuttlefish said no" in answer["message"]
+
+
+class TestReadingAsTheMemberItAlreadyIs:
+    def test_it_needs_no_passcode(self, session):
+        made = session(FakeClient())
+
+        # A real `JoinedPeer`, serialised the way the app will store it. A hand-written stub
+        # would skip the deserialisation this call actually does, which is the half that fails
+        # when a stored value comes back damaged.
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert answer["ok"]
+        assert made.client.unlockedWith == [], "resuming must not spend an unlock attempt"
+
+    def test_a_membership_that_no_longer_works_says_which_kind_of_failure_it_is(self, session):
+        """
+        Its own reason, because the answer is different. The peer may have been removed from the
+        account - which is how a user revokes this app - so the way forward is a passcode and a
+        fresh join, not retrying with the same stored keys.
+        """
+        made = session(FakeClient())
+        made.client._resumeError = RuntimeError("no such peer")
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert answer["reason"] == icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
+        assert answer["message"].strip()
+
+    def test_rubbish_in_storage_does_not_crash(self, session):
+        made = session(FakeClient())
+
+        assert not json.loads(made.resume("not json at all"))["ok"]
+
+
+def anAccessoryPlist(**extra) -> str:
+    """An AirTag's stored record: empty model, a product id, no device-only shared secret."""
+    record = {
+        "batteryLevel": 1,
+        "model": "",
+        "productId": 21760,
+        "vendorId": 76,
+        "secondarySharedSecret": {"key": {"data": b"x" * 32}},
+    }
+    record.update(extra)
+    return plistlib.dumps(record).decode("utf-8")
+
+
+class TestRenamingAnAccessory:
+    """
+    The one call that changes something the owner sees in Find My on their own devices.
+
+    **The refusal is the interesting half.** An accessory's naming record is the only place its
+    name lives, so writing one is the whole change. An iPhone, iPad or Mac carries its name in
+    several places, and writing this one would leave Find My disagreeing with the device itself -
+    so the app nicknames those locally instead, and this refuses to be talked into the other
+    thing.
+    """
+
+    def test_the_new_name_and_emoji_reach_the_library(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", "🔑"))
+
+        assert answer["ok"]
+        assert made.client.renamedWith == [("beacon-1", {"name": "Keys", "emoji": "🔑"})]
+
+    def test_only_what_is_changing_is_sent(self, session):
+        """
+        Empty means "leave it alone", not "set it to empty". Sending both every time would blank
+        the emoji of every accessory anybody renamed.
+        """
+        made = session(FakeClient())
+
+        json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert made.client.renamedWith == [("beacon-1", {"name": "Keys"})]
+
+    def test_an_emoji_can_be_changed_without_touching_the_name(self, session):
+        made = session(FakeClient())
+
+        json.loads(made.rename("beacon-1", anAccessoryPlist(), "", "🎒"))
+
+        assert made.client.renamedWith == [("beacon-1", {"emoji": "🎒"})]
+
+    def test_changing_nothing_is_refused_rather_than_sent(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "", ""))
+
+        assert not answer["ok"]
+        assert made.client.renamedWith == [], "an empty rename must not reach the account"
+
+    def test_one_of_the_owners_own_devices_is_refused(self, session):
+        """
+        <b>The rule this exists for.</b> An iPad's name is not this record's to change.
+        """
+        made = session(FakeClient())
+        anIpad = anAccessoryPlist(model="iPad13,18")
+
+        answer = json.loads(made.rename("beacon-1", anIpad, "My iPad", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_AN_ACCESSORY
+        assert made.client.renamedWith == [], "a device rename must never reach the account"
+
+    def test_a_device_is_caught_by_its_shared_secret_too(self, session):
+        """
+        The second signal, and the one that catches a device whose `model` is empty. Both are
+        `is_own_device`'s, and neither is re-derived here - see the note on that function.
+        """
+        made = session(FakeClient())
+        aMac = anAccessoryPlist(secureLocationsSharedSecret={"key": {"data": b"y" * 32}})
+
+        answer = json.loads(made.rename("beacon-1", aMac, "Work Mac", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_AN_ACCESSORY
+        assert made.client.renamedWith == []
+
+    def test_a_session_with_no_keys_says_so_rather_than_failing_vaguely(self, session):
+        """
+        Its own reason: the app can fix this by resuming, and "something went wrong" would send
+        the user looking for a fault that is not there.
+        """
+        from findmy.keychain.session import KeychainSessionError
+
+        made = session(FakeClient())
+        made.client.renameError = KeychainSessionError("no keys held")
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_UNLOCKED
+
+    def test_a_failure_from_the_account_is_reported_rather_than_swallowed(self, session):
+        made = session(FakeClient())
+        made.client.renameError = RuntimeError("CloudKit said no")
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert not answer["ok"]
+        assert answer["message"].strip()
+
+    def test_a_damaged_stored_record_does_not_crash(self, session):
+        made = session(FakeClient())
+
+        answer = json.loads(made.rename("beacon-1", "not a plist", "Keys", ""))
+
+        assert not answer["ok"]
+        assert made.client.renamedWith == []
+
+    def test_nothing_can_be_renamed_before_the_client_is_open(self, loop):
+        made = icloud_bridge.openSession(FakeAccount(loop))
+
+        answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
+
+        assert answer["reason"] == icloud_bridge.REASON_NOT_SIGNED_IN

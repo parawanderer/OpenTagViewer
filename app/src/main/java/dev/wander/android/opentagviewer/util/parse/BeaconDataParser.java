@@ -164,6 +164,10 @@ public final class BeaconDataParser {
                         .stableIdentifier(List.of(stableIdentifier))
                         .systemVersion(systemVersion)
                         .vendorId(vendorId)
+                        .fromAccount(beaconData.getOwnedBeaconInfo().fromAccount)
+                        .ignoredAt(beaconData.getOwnedBeaconInfo().ignoredAt)
+                        .fruitlessScans(beaconData.getOwnedBeaconInfo().fruitlessScans)
+                        .lastScanAt(beaconData.getOwnedBeaconInfo().lastScanAt)
                         .ownedBeaconPlistRaw(ownedBeaconPList);
 
                 if (userOverrides != null) {
