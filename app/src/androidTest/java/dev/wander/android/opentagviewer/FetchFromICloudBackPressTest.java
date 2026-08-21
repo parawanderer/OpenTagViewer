@@ -231,4 +231,84 @@ public class FetchFromICloudBackPressTest {
 
         Eventually.check(() -> assertTrue("the session was left open", this.icloud.wasClosed()));
     }
+
+    /**
+     * <b>Back gets you out while the screen is still loading.</b>
+     *
+     * <p><b>The screen used to swallow every back press whenever the loading step was up</b> -
+     * the in-app arrow and the device's own back button alike - on the reasoning that there is
+     * nothing to go back to mid-call. That reasoning holds for an unlock and for nothing else.
+     *
+     * <p>What it produced in practice: every call into Python is serialised through
+     * {@code PythonLock}, because the iCloud flow and the location fetch drive the same asyncio
+     * loop, and a first import holds that lock for <b>minutes</b> walking key indices for tags
+     * with no alignment record. Opening this screen during that wait left the user on a spinner
+     * they could not leave by any means, reading "Looking for a device that can unlock it" -
+     * which was not what was happening and, for an account already linked, never would be.
+     *
+     * <p>The delay here stands in for that wait. What is asserted is only that the screen can be
+     * left, which is the part that was impossible.
+     */
+    @Test
+    public void backLeavesWhileTheScreenIsStillLoading() {
+        this.open(FakeICloudService.withTags().takingItsTime(20_000));
+
+        Eventually.check(() -> assertTrue("the loading step should be up",
+                isShown(R.id.icloud_loading_container)));
+
+        // **Unconditionally, because succeeding is what throws.** A plain pressBack() raises
+        // NoActivityResumedException when the press finishes the last activity - which is
+        // precisely the outcome under test here, so the ordinary call reports the fix working
+        // as a failure.
+        pressBackUnconditionally();
+
+        Eventually.check(() -> assertTrue(
+                "back did nothing while the screen was loading, so there is no way out of a"
+                        + " wait that can last minutes", hasLeft()));
+    }
+
+    /**
+     * <b>And an unlock attempt is still not something you can walk out of.</b>
+     *
+     * <p>The exception the rule above is written around, and it is a real one: by then a
+     * passcode is being tried against Apple, attempts are probably limited on their end, and
+     * abandoning one half way risks spending it for nothing.
+     *
+     * <p>Pinned so that fixing the lock-in did not quietly remove the one case it was right
+     * about.
+     */
+    @Test
+    public void backIsStillIgnoredWhileAPasscodeIsBeingTried() {
+        // **The unlock is what is held open, and only the unlock.** The general delay applies
+        // to recoveryOptions alone, so setting it here would slow a call that has already
+        // happened and leave the unlock instant - the flow would finish before the back press
+        // and the screen would be gone for an ordinary reason.
+        this.open(FakeICloudService.withTags().withOneDevice());
+
+        Eventually.check(() -> onView(withId(R.id.icloud_device_container))
+                .check(matches(isDisplayed())));
+        Eventually.perform("the only device", () -> isShown(R.id.icloud_passcode_container),
+                () -> onView(withText(containsString(FakeICloudService.AN_IPHONE.getSerial())))
+                        .perform(click()));
+
+        this.icloud.takingItsTimeToUnlock(20_000);
+        onView(withId(R.id.icloud_passcode_input)).perform(replaceText("123456"));
+        Eventually.perform("unlock", () -> this.icloud.timesCalled("unlock") > 0,
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
+
+        // **Waited for, because unlock itself answers instantly.** The fake's delay lands on
+        // the fetch later in the chain, so `timesCalled("unlock") > 0` is true a moment before
+        // the screen has actually moved to the loading step - and a back press in that gap is
+        // handled by the passcode step, which with a single device correctly leaves.
+        Eventually.check(() -> assertTrue("the unlock step never came up",
+                isShown(R.id.icloud_loading_container)));
+
+        pressBack();
+
+        // Asked after giving it a moment to act on the press, so this is "it stayed" rather
+        // than "it has not left yet".
+        Eventually.check(() -> assertTrue("the unlock step should still be waiting",
+                isShown(R.id.icloud_loading_container)));
+        assertTrue("back abandoned an unlock that was already talking to Apple", !hasLeft());
+    }
 }

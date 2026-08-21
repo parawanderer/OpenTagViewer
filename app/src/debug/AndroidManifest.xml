@@ -23,6 +23,36 @@
             android:exported="false"
             android:theme="@style/Theme.OpenTagViewer" />
 
+        <!--
+            Something for a "navigate to this tag" intent to resolve to, in debug builds only.
+
+            **Without it that path cannot be tested at all on the managed device.** aosp-atd
+            carries no maps application of any kind, so `resolveActivity` for a geo: link
+            correctly finds nothing and the app shows its "no app can open a map" message
+            instead of sending the intent. The test then sees no intent and cannot tell "the
+            button is broken" from "this device has no maps app".
+
+            It also exercises the fix it belongs to. MapsActivity used to name
+            com.google.android.apps.maps explicitly, and from Android 11 an app cannot see a
+            package it has not declared in <queries> - so resolveActivity returned null on
+            every current device, with or without Google Maps, and the button silently did
+            nothing. This activity is only visible to the app because of the geo: <queries>
+            entry in the main manifest; delete that entry and the test goes red.
+
+            Debug source set, not androidTest, for the same reason as TestHostActivity above:
+            an activity declared in the instrumentation manifest belongs to the test package.
+        -->
+        <activity
+            android:name="dev.wander.android.opentagviewer.ui.maps.SomewhereToNavigateTo"
+            android:exported="true"
+            android:theme="@style/Theme.OpenTagViewer">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="geo" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>
