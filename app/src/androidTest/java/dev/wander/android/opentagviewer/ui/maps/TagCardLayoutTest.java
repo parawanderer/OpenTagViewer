@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,6 +57,21 @@ public class TagCardLayoutTest {
     private static final String SHORT_ADDRESS = "Amsterdam, Netherlands";
     private static final String LONG_ADDRESS =
             "Nieuwezijds Voorburgwal 147, 1012 RJ Amsterdam, Noord-Holland, Netherlands";
+
+    /**
+     * A real place, and about as long as a geocoded address gets.
+     *
+     * <p>Llanfairpwllgwyngyll's full name is the usual example and it is not a joke input: the
+     * address on a card comes from a geocoder, so its length is decided by where the tag is
+     * rather than by anything this app or its user chose. Somebody's card looks like this.
+     */
+    private static final String A_RIDICULOUS_ADDRESS =
+            "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch, "
+                    + "Ynys Môn, Wales, LL61 5UJ, United Kingdom";
+
+    /** And a name the user typed themselves, with no length limit on the field. */
+    private static final String A_RIDICULOUS_NAME =
+            "My absolutely enormous and unreasonably descriptive spare bicycle key tag";
 
     private Context context;
 
@@ -210,5 +226,321 @@ public class TagCardLayoutTest {
         assertFalse("tags_scroll_container must not clip to padding", rowClipsToPadding.get());
         assertFalse("tags_scrollable_area must not clip its children", areaClipsChildren.get());
         assertFalse("tags_scrollable_area must not clip to padding", areaClipsToPadding.get());
+    }
+
+    /**
+     * <b>The card is elevated, so something has to make room for its shadow.</b>
+     *
+     * <p>Only half the story is checkable here, and it is worth being explicit about which half.
+     * The elevation is in the layout; the room below it is <b>not</b> - {@code MapsActivity}
+     * calls {@code WindowPaddingUtil.insertUIBottomPadding} at runtime and the space comes from
+     * the navigation-bar inset. A freshly inflated layout therefore has zero bottom padding and
+     * always will, so asserting on it here fails for a reason that has nothing to do with the
+     * app. This test says the elevation exists and leaves the measurement to a test that has an
+     * activity to measure.
+     */
+    @Test
+    public void theCardIsElevatedSoItsShadowNeedsRoomBelow() {
+        final int[] elevation = {0};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            elevation[0] = Math.round(card.findViewById(R.id.tag_item_container).getElevation());
+        });
+
+        assertTrue("the card is no longer elevated, so the row's bottom inset and its"
+                + " clipToPadding settings are now protecting nothing", elevation[0] > 0);
+    }
+
+    // --- the width of a card, and the one behind it ----------------------------------------
+
+    /** The width {@code MapsActivity.updateBeaconCards} gives every card, in pixels. */
+    private static int cardWidthFor(final int screenWidth) {
+        return screenWidth - 80;
+    }
+
+    /**
+     * Lay out a row of cards the size the app makes them, and return each card's left edge.
+     *
+     * <p>Sized by the app's own rule rather than by a number chosen here, so this measures
+     * {@code updateBeaconCards} and not the test's opinion of it.
+     */
+    private List<Integer> measureLeftEdges(final CardSpec... specs) {
+        final List<Integer> edges = new ArrayList<>();
+
+        getInstrumentation().runOnMainSync(() -> {
+            final View activityMaps = LayoutInflater.from(this.context)
+                    .inflate(R.layout.activity_maps, null);
+            final ViewGroup row = activityMaps.findViewById(R.id.tags_scroll_container);
+
+            for (final CardSpec spec : specs) {
+                final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                        .inflate(R.layout.maps_tag_card, null);
+                row.addView(card);
+
+                final ViewGroup.LayoutParams params = card.getLayoutParams();
+                params.width = cardWidthFor(SCREEN_WIDTH_PX);
+                params.height = spec.height;
+                card.setLayoutParams(params);
+
+                ((TextView) card.findViewById(R.id.device_name)).setText(spec.name);
+                ((TextView) card.findViewById(R.id.device_location)).setText(spec.address);
+                ((TextView) card.findViewById(R.id.device_last_update))
+                        .setText("Last Updated: 2 minutes ago");
+            }
+
+            activityMaps.measure(
+                    View.MeasureSpec.makeMeasureSpec(SCREEN_WIDTH_PX, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(2400, View.MeasureSpec.EXACTLY));
+            activityMaps.layout(0, 0, SCREEN_WIDTH_PX, 2400);
+
+            // **Asked of the view, not reconstructed from offsets.** Adding the row's own
+            // padding to a child's getLeft() double-counts it - layout has already applied it -
+            // which put the second card 42px further right than it is and turned a passing
+            // layout into a failing assertion about the app.
+            final int[] atScreen = new int[2];
+            for (int i = 0; i < row.getChildCount(); i++) {
+                row.getChildAt(i).getLocationInWindow(atScreen);
+                edges.add(atScreen[0]);
+            }
+        });
+
+        return edges;
+    }
+
+    /**
+     * <b>The next card peeks, which is the only sign the row scrolls at all.</b>
+     *
+     * <p>There is no scrollbar and no arrow - {@code scrollbars="none"} - so a sliver of the
+     * card behind is the entire affordance. A card sized to the full width hides it, and a user
+     * with four tags sees one and no reason to think there are more.
+     */
+    @Test
+    public void thenextCardPeeksSoTheRowLooksScrollable() {
+        final List<Integer> edges = this.measureLeftEdges(
+                new CardSpec("Keys", SHORT_ADDRESS),
+                new CardSpec("Bike", SHORT_ADDRESS));
+
+        final int secondCardStartsAt = edges.get(1);
+        final int visible = SCREEN_WIDTH_PX - secondCardStartsAt;
+
+        assertTrue("the second card starts at " + secondCardStartsAt + " on a "
+                        + SCREEN_WIDTH_PX + "px screen, so nothing of it is visible and the row"
+                        + " gives no sign that it scrolls",
+                visible > 0);
+    }
+
+    /**
+     * <b>And it takes most of the width, so it is a card and not a column.</b>
+     *
+     * <p>Bounds either side. Too narrow and the address wraps to four lines; too wide and the
+     * peek above disappears. The numbers are loose on purpose - this is a guard against a
+     * change of an order of magnitude, not a pin on the current value.
+     */
+    @Test
+    public void thecardTakesMostOfTheScreenButNotAllOfIt() {
+        final int width = cardWidthFor(SCREEN_WIDTH_PX);
+
+        assertTrue("a card " + width + "px wide on a " + SCREEN_WIDTH_PX + "px screen is too"
+                + " narrow to read an address on", width > SCREEN_WIDTH_PX * 0.6);
+        assertTrue("a card " + width + "px wide leaves nothing of the next one showing",
+                width < SCREEN_WIDTH_PX);
+    }
+
+    /**
+     * <b>A very long street name does not change the card's shape.</b>
+     *
+     * <p>The case that keeps breaking: the address is the one field with no bound on its length,
+     * and it is filled in by a geocoder rather than by anything this app controls. If it can
+     * push the card wider, the peek goes and the row stops looking scrollable - and it happens
+     * only to whoever lives on a long street.
+     */
+    @Test
+    public void averyLongStreetNameDoesNotChangeTheCardsShape() {
+        final List<Integer> edges = this.measureLeftEdges(
+                new CardSpec("Keys", A_RIDICULOUS_ADDRESS),
+                new CardSpec("Bike", SHORT_ADDRESS));
+
+        final List<Integer> heights = this.measureHeights(
+                new CardSpec("Keys", A_RIDICULOUS_ADDRESS),
+                new CardSpec("Bike", SHORT_ADDRESS));
+
+        assertEquals("a long address made its card a different height", heights.get(0), heights.get(1));
+        assertTrue("a long address pushed the next card off the screen",
+                SCREEN_WIDTH_PX - edges.get(1) > 0);
+    }
+
+    /** The same for a name nobody sensible would use, which is to say the one somebody used. */
+    @Test
+    public void averyLongTagNameDoesNotChangeTheCardsShape() {
+        final List<Integer> edges = this.measureLeftEdges(
+                new CardSpec(A_RIDICULOUS_NAME, SHORT_ADDRESS),
+                new CardSpec("Bike", SHORT_ADDRESS));
+
+        assertTrue("a long tag name pushed the next card off the screen",
+                SCREEN_WIDTH_PX - edges.get(1) > 0);
+    }
+
+    // --- the two kinds of tag icon ---------------------------------------------------------
+
+    /**
+     * <b>An emoji tag and an icon tag are the same shape.</b>
+     *
+     * <p>Two different views in the same slot - a {@code TextView} at 36sp and an
+     * {@code ImageView} - swapped by visibility, and only one of them is ever on screen at a
+     * time. So a difference between them is invisible until somebody sets an emoji on one tag
+     * and not another, at which point the row goes ragged for that person only.
+     *
+     * <p><b>The emoji one is also the one that follows the font scale.</b> 36sp grows with the
+     * system text size and 53dp does not, so this is measured at the largest accessibility
+     * setting rather than the default - which is where they come apart, if they do.
+     */
+    @Test
+    public void anemojiTagAndAnIconTagAreTheSameShape() {
+        final List<Integer> heights = this.measureIconVariantHeights(1.0f);
+
+        assertEquals("an emoji tag and an icon tag should be the same height",
+                heights.get(0), heights.get(1));
+    }
+
+    /** And they stay the same shape when the system text is turned all the way up. */
+    @Test
+    public void theystayTheSameShapeAtTheLargestTextSize() {
+        final List<Integer> heights = this.measureIconVariantHeights(2.0f);
+
+        assertEquals("at 2x text scale the emoji tag and the icon tag came apart",
+                heights.get(0), heights.get(1));
+    }
+
+    /**
+     * Card heights for [emoji tag, icon tag], at a given system font scale.
+     *
+     * <p>Each card is measured on its own rather than side by side: in a row they are forced to
+     * a uniform height, which is exactly the mechanism that would hide a difference between
+     * them.
+     */
+    private List<Integer> measureIconVariantHeights(final float fontScale) {
+        final List<Integer> heights = new ArrayList<>();
+
+        getInstrumentation().runOnMainSync(() -> {
+            final Configuration scaled = new Configuration(
+                    this.context.getResources().getConfiguration());
+            scaled.fontScale = fontScale;
+
+            final Context scaledContext = new ContextThemeWrapper(
+                    this.context.createConfigurationContext(scaled), R.style.Theme_OpenTagViewer);
+
+            for (final boolean emoji : new boolean[] {true, false}) {
+                final FrameLayout card = (FrameLayout) LayoutInflater.from(scaledContext)
+                        .inflate(R.layout.maps_tag_card, null);
+
+                card.findViewById(R.id.device_icon_emoji)
+                        .setVisibility(emoji ? View.VISIBLE : View.GONE);
+                card.findViewById(R.id.device_icon_img)
+                        .setVisibility(emoji ? View.GONE : View.VISIBLE);
+
+                if (emoji) {
+                    ((TextView) card.findViewById(R.id.device_icon_emoji)).setText("🚲");
+                }
+
+                ((TextView) card.findViewById(R.id.device_name)).setText("Bike");
+                ((TextView) card.findViewById(R.id.device_location)).setText(SHORT_ADDRESS);
+                ((TextView) card.findViewById(R.id.device_last_update))
+                        .setText("Last Updated: 2 minutes ago");
+
+                card.measure(
+                        View.MeasureSpec.makeMeasureSpec(
+                                cardWidthFor(SCREEN_WIDTH_PX), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+
+                heights.add(card.getMeasuredHeight());
+            }
+        });
+
+        return heights;
+    }
+
+    // --- the buttons along the bottom -------------------------------------------------------
+
+    /**
+     * <b>Every action that ships still has room, whatever the card is holding.</b>
+     *
+     * <p>History, Refresh and More share the bottom row, each carrying a label under an icon.
+     * They are what a longer address squeezes, because it sits directly above them and the
+     * card's height is fixed by its shortest neighbour - so the failure is a row of icons with
+     * the words clipped away, on one card out of four.
+     *
+     * <p><b>Ring is not among them, and that is deliberate.</b> Its container is
+     * {@code visibility="gone"} in the layout because the feature does not exist - FindMy.py has
+     * no ring implementation - so it measures nothing. Pinned separately below rather than
+     * quietly skipped here.
+     */
+    @Test
+    public void everyActionOnTheCardStillHasRoomWithTheWorstContent() {
+        final int[][] sizes = new int[3][2];
+        final int[] buttonIds = {
+                R.id.device_history_button_container,
+                R.id.device_refresh_button_container,
+                R.id.device_more_button_container,
+        };
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            ((TextView) card.findViewById(R.id.device_name)).setText(A_RIDICULOUS_NAME);
+            ((TextView) card.findViewById(R.id.device_location)).setText(A_RIDICULOUS_ADDRESS);
+            ((TextView) card.findViewById(R.id.device_last_update))
+                    .setText("Last Updated: 2 minutes ago");
+
+            final int width = cardWidthFor(SCREEN_WIDTH_PX);
+            card.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            card.layout(0, 0, width, card.getMeasuredHeight());
+
+            for (int i = 0; i < buttonIds.length; i++) {
+                final View button = card.findViewById(buttonIds[i]);
+                sizes[i][0] = button.getMeasuredWidth();
+                sizes[i][1] = button.getMeasuredHeight();
+            }
+        });
+
+        for (int i = 0; i < buttonIds.length; i++) {
+            assertTrue("button " + i + " measured " + sizes[i][0] + "x" + sizes[i][1]
+                    + ", so it is not on the card", sizes[i][0] > 0 && sizes[i][1] > 0);
+        }
+
+        // They share the row, so a card that has run out of width shows up as one of them being
+        // visibly smaller than the rest rather than as anything failing.
+        final int widest = Math.max(Math.max(sizes[0][0], sizes[1][0]), sizes[2][0]);
+        for (int i = 0; i < buttonIds.length; i++) {
+            assertTrue("button " + i + " is " + sizes[i][0] + "px against a widest of " + widest
+                            + ", so the row is no longer sharing the width evenly",
+                    sizes[i][0] > widest / 2);
+        }
+    }
+
+    /**
+     * <b>Ring is hidden, because there is nothing behind it.</b>
+     *
+     * <p>{@code onClickRing} logs and returns: FindMy.py cannot ring an accessory, so the
+     * control exists in the layout and is switched off. This is here so that stops being true
+     * on purpose rather than by accident - a stray edit making it visible ships a button that
+     * does nothing at all, which is worse than not offering it.
+     */
+    @Test
+    public void theRingButtonStaysHiddenWhileThereIsNothingBehindIt() {
+        final int[] visibility = {View.VISIBLE};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            visibility[0] = card.findViewById(R.id.device_ring_button_container).getVisibility();
+        });
+
+        assertEquals("Ring is showing, but nothing implements it - see MapsActivity#onClickRing",
+                View.GONE, visibility[0]);
     }
 }
