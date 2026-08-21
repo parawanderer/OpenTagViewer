@@ -529,9 +529,34 @@ public class BeaconRepository {
             if (foundSomething) {
                 dao.recordSuccessfulScan(beaconId, now);
             } else if (fetchResult.getExhaustedWideSearch().contains(beaconId)) {
-                Log.i(TAG, beaconId + " found nothing across months of history; it will be"
-                        + " skipped until somebody asks for it directly");
-                dao.markIgnored(beaconId, now);
+                // **Not on the first one.** Retiring a tag is close to permanent - it is skipped
+                // by every automatic fetch afterwards and only comes back when somebody opens it
+                // and asks - so one bad search is a thin basis for it. A fetch can come back
+                // empty for reasons that have nothing to do with the tag: a request that failed,
+                // an account that was briefly unhappy, a moment when Apple returned nothing.
+                //
+                // So it takes a second, and the two are a refresh cycle apart rather than
+                // back-to-back, which is a real further chance for somebody to walk past it.
+                //
+                // Phrased as "the previous search also failed" rather than "was also
+                // exhaustive", because there is no column recording that and adding one means a
+                // Room migration - rule 1 - for a refinement of a heuristic. In practice the
+                // difference is nothing: exhaustion needs a key window wider than
+                // _DEAD_TAG_WIDTH_INDICES, and a window that wide does not narrow on its own, so
+                // for the tags this is aimed at every consecutive failure is an exhaustive one.
+                final OwnedBeacon held = dao.getById(beaconId);
+                final int failuresBefore = held == null ? 0 : held.fruitlessScans;
+
+                if (failuresBefore >= 1) {
+                    Log.i(TAG, beaconId + " found nothing across months of history for the"
+                            + " second time running; it will be skipped until somebody asks for"
+                            + " it directly");
+                    dao.markIgnored(beaconId, now);
+                } else {
+                    Log.i(TAG, beaconId + " found nothing across months of history; giving it"
+                            + " one more search before setting it aside");
+                    dao.recordFruitlessScan(beaconId, now);
+                }
             } else if (fetchResult.getWideSearch().contains(beaconId)) {
                 dao.recordFruitlessScan(beaconId, now);
             } else {

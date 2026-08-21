@@ -160,25 +160,78 @@ public class GivingUpOnASilentTagTest {
         assertNotNull("the attempt should still be recorded", this.stored().lastScanAt);
     }
 
+    /** Two of them, a refresh cycle apart, which is what it now takes to be set aside. */
+    private void givenItHasBeenSetAside() {
+        this.aWideSearchAcrossMonthsThatFoundNothing();
+        this.aWideSearchAcrossMonthsThatFoundNothing();
+    }
+
     /**
-     * <b>Only a search covering months of history gives up.</b>
+     * <b>Only a search covering months of history counts towards giving up.</b>
      *
      * <p>The distinction @parawanderer insisted on: a young tag searching a short history and
      * finding nothing means very little, and treating that as death would set aside tags that
      * were about to report.
      */
     @Test
-    public void asearchAcrossMonthsOfHistoryWithNothingInItGivesUp() {
+    public void asearchAcrossMonthsOfHistoryWithNothingInItCountsAgainstAtag() {
         this.aWideSearchAcrossMonthsThatFoundNothing();
 
-        assertNotNull("a tag silent across its whole history should be set aside",
+        assertEquals("a search across months that found nothing was not counted",
+                1, this.stored().fruitlessScans);
+    }
+
+    /**
+     * <b>But one of them is not enough to retire it.</b>
+     *
+     * <p>Being set aside is close to permanent - every automatic fetch skips it afterwards, and
+     * it only comes back if somebody opens the tag and asks - so one bad search is a thin basis.
+     * A fetch can come back empty for reasons that are nothing to do with the tag: a request that
+     * failed, an account briefly unhappy, a moment when Apple returned nothing.
+     *
+     * <p>Three of @parawanderer's own devices were retired on a single first pass, which is what
+     * prompted this.
+     */
+    @Test
+    public void onesearchAcrossMonthsIsNotEnoughToGiveUp() {
+        this.aWideSearchAcrossMonthsThatFoundNothing();
+
+        assertNull("a tag was set aside on the strength of a single search",
                 this.stored().ignoredAt);
+    }
+
+    /** The second one does, and the two are a refresh cycle apart rather than back to back. */
+    @Test
+    public void asecondSearchAcrossMonthsGivesUp() {
+        this.givenItHasBeenSetAside();
+
+        assertNotNull("a tag silent across its whole history twice running should be set aside",
+                this.stored().ignoredAt);
+    }
+
+    /**
+     * <b>And anything found in between calls it off.</b>
+     *
+     * <p>The point of asking twice. A tag that answers on the second attempt has to end up
+     * indistinguishable from one that never missed, rather than carrying a strike towards a
+     * retirement it no longer deserves.
+     */
+    @Test
+    public void areportBetweenTheTwoSearchesCancelsIt() {
+        this.aWideSearchAcrossMonthsThatFoundNothing();
+        this.aSearchThatFoundSomething();
+        this.aWideSearchAcrossMonthsThatFoundNothing();
+
+        assertNull("a tag that reported in between was still retired on the next miss",
+                this.stored().ignoredAt);
+        assertEquals("the earlier miss should have been forgotten", 1,
+                this.stored().fruitlessScans);
     }
 
     /** And being given up on is undone by anything at all being found later. */
     @Test
     public void agivenUpTagComesBackTheMomentItIsFound() {
-        this.aWideSearchAcrossMonthsThatFoundNothing();
+        this.givenItHasBeenSetAside();
         assertNotNull(this.stored().ignoredAt);
 
         this.aSearchThatFoundSomething();
@@ -208,7 +261,7 @@ public class GivingUpOnASilentTagTest {
     /** A tag given up on is skipped entirely - it is the expensive one. */
     @Test
     public void agivenUpTagIsSkippedByTheScheduledFetch() {
-        this.aWideSearchAcrossMonthsThatFoundNothing();
+        this.givenItHasBeenSetAside();
 
         assertTrue("an ignored tag must not be searched for automatically",
                 this.scheduledRequests().isEmpty());
@@ -236,7 +289,7 @@ public class GivingUpOnASilentTagTest {
      */
     @Test
     public void amanualRefreshIsNeverThrottledOrSkipped() {
-        this.aWideSearchAcrossMonthsThatFoundNothing();
+        this.givenItHasBeenSetAside();
         assertTrue("premise: the scheduler has given up on it",
                 this.scheduledRequests().isEmpty());
 
