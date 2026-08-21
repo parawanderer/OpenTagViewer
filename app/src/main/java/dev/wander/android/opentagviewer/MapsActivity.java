@@ -56,6 +56,7 @@ import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
+import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -1343,17 +1344,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // 创建自定义标记图标
         android.graphics.Bitmap iconBitmap;
+        // **Resolved from the theme, not read from the colour resource.** The two agree in every
+        // built-in theme, including at night - and stop agreeing the moment system colours are
+        // on, because DynamicColors rewrites the theme attribute and cannot rewrite a fixed
+        // value in colors.xml. The cards took the wallpaper's tint and the pins did not. See
+        // MarkerPalette.
         if (beacon.isEmojiFilled()) {
             iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     beacon.getEmoji(),
-                    getColor(R.color.md_theme_background));
+                    MarkerPalette.fill(this));
         } else {
             iconBitmap = VectorImageGeneratorUtil.makeMarker(
                     getResources(),
                     R.drawable.apple,
-                    getColor(R.color.md_theme_background),
-                    getColor(R.color.greyish)
+                    MarkerPalette.fill(this),
+                    MarkerPalette.icon(this)
             );
         }
 
