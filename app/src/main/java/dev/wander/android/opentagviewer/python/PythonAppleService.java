@@ -117,7 +117,8 @@ public class PythonAppleService {
     }
 
     private static FetchResult emptyResult() {
-        return new FetchResult(Collections.emptyMap(), Collections.emptyMap(), java.util.Set.of());
+        return new FetchResult(Collections.emptyMap(), Collections.emptyMap(),
+                java.util.Set.of(), java.util.Set.of());
     }
 
     /**
@@ -131,6 +132,7 @@ public class PythonAppleService {
         Map<String, List<BeaconLocationReport>> results = new HashMap<>();
         Map<String, String> updatedAccessoryJson = new HashMap<>();
         java.util.Set<String> exhaustedWideSearch = new java.util.HashSet<>();
+        java.util.Set<String> wideSearch = new java.util.HashSet<>();
 
         var mapBeaconIdToResult = locationReportsResult.asMap();
         for (var key : mapBeaconIdToResult.keySet()) {
@@ -145,6 +147,13 @@ public class PythonAppleService {
             final var exhausted = perBeacon.get("exhaustedWideSearch");
             if (exhausted != null && exhausted.toBoolean()) {
                 exhaustedWideSearch.add(key.toString());
+            }
+
+            // Absent on an older bridge, which reads as "not expensive" - so nothing is counted
+            // against a tag on the strength of a field that was not there.
+            final var wide = perBeacon.get("wideSearch");
+            if (wide != null && wide.toBoolean()) {
+                wideSearch.add(key.toString());
             }
 
             List<BeaconLocationReport> reports = new LinkedList<>();
@@ -183,6 +192,6 @@ public class PythonAppleService {
             }
         }
 
-        return new FetchResult(results, updatedAccessoryJson, exhaustedWideSearch);
+        return new FetchResult(results, updatedAccessoryJson, exhaustedWideSearch, wideSearch);
     }
 }

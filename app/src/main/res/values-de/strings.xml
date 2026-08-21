@@ -227,4 +227,11 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="debug_never">Nie</string>
     <string name="tag_ignored_explanation">Für diesen Tag wurde über Monate hinweg nichts gefunden, deshalb sucht die App nicht mehr automatisch danach. Eine solche Suche dauert lange und findet selten etwas. Tippe unten, um sofort erneut zu suchen.</string>
     <string name="tag_ignored_retrying">Es wird erneut nach diesem Tag gesucht. Das kann einige Minuten dauern.</string>
+    <string name="battery_level_described">%1$d – %2$s</string>
+    <string name="battery_level_unknown">Noch nicht gemeldet</string>
+    <string name="battery_level_full">Voll (100%)</string>
+    <string name="battery_level_medium">Mittel (~50-70%)</string>
+    <string name="battery_level_low">Niedrig (~20%) – ab hier warnt iOS</string>
+    <string name="battery_level_very_low">Kritisch niedrig (~5-10%) – fast leer</string>
+    <string name="battery_level_icloud_only">Nur aus iCloud gelesene Tags aktualisieren diesen Wert. Ein aus einer Datei importierter Tag behält den Wert, den er beim Export hatte.</string>
 </resources>

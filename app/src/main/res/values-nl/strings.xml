@@ -227,4 +227,11 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="debug_never">Nooit</string>
     <string name="tag_ignored_explanation">Er is voor deze tag in maanden geschiedenis niets gevonden, dus de app zoekt er niet meer automatisch naar. Zo’n zoekopdracht is traag en levert zelden iets op. Tik hieronder om nu opnieuw te zoeken.</string>
     <string name="tag_ignored_retrying">Er wordt opnieuw naar deze tag gezocht. Dit kan enkele minuten duren.</string>
+    <string name="battery_level_described">%1$d — %2$s</string>
+    <string name="battery_level_unknown">Nog niet gemeld</string>
+    <string name="battery_level_full">Vol (100%)</string>
+    <string name="battery_level_medium">Gemiddeld (~50-70%)</string>
+    <string name="battery_level_low">Laag (~20%) — vanaf hier waarschuwt iOS</string>
+    <string name="battery_level_very_low">Kritiek laag (~5-10%) — bijna leeg</string>
+    <string name="battery_level_icloud_only">Alleen tags die uit iCloud worden gelezen werken dit bij. Een tag die uit een bestand is geïmporteerd houdt de waarde van het moment van exporteren.</string>
 </resources>

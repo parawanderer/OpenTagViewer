@@ -5,6 +5,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +29,7 @@ import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.rx.ScanOrder;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -38,6 +40,15 @@ public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
     private final OpenTagViewerDatabase db;
     private final PlistToAccessoryJsonConverter accessoryJsonConverter;
+
+    /**
+     * The source of the scheduled fetch's shuffle.
+     *
+     * <p>Held rather than made per call so a test can seed it, and so the sequence continues
+     * across refreshes instead of restarting - a fresh Random each time is a fresh chance to
+     * draw the same order.
+     */
+    private final java.util.Random shuffle = new java.util.Random();
 
     public BeaconRepository(OpenTagViewerDatabase db) {
         this(db, new ChaquopyPlistToAccessoryJsonConverter());
@@ -340,7 +351,7 @@ public class BeaconRepository {
         final long now = System.currentTimeMillis();
         final var dao = db.ownedBeaconDao();
 
-        final Map<String, String> due = new HashMap<>();
+        final List<ScanOrder.Candidate> candidates = new ArrayList<>();
         int ignored = 0;
         int waiting = 0;
 
@@ -356,14 +367,26 @@ public class BeaconRepository {
                 continue;
             }
 
-            // Null values are meaningful here - see toAccessoryRequests - so the key goes in
-            // whatever the fallback is.
-            due.put(entry.getKey(), entry.getValue());
+            candidates.add(new ScanOrder.Candidate(
+                    entry.getKey(),
+                    row != null && row.lastScanAt != null,
+                    row != null && row.lastScanAt != null && row.fruitlessScans == 0));
         }
 
         if (ignored > 0 || waiting > 0) {
             Log.d(TAG, "Scheduled fetch is skipping " + ignored + " ignored and " + waiting
-                    + " backing off; asking about " + due.size());
+                    + " backing off; asking about " + candidates.size());
+        }
+
+        // **A LinkedHashMap, because the order is the point.** toAccessoryRequests walks the map
+        // it is handed, so a HashMap here would throw the ordering away silently - the requests
+        // would come out in hash order and nothing would fail.
+        //
+        // Null values are meaningful - see toAccessoryRequests - so every key goes in with
+        // whatever fallback it had.
+        final Map<String, String> due = new LinkedHashMap<>();
+        for (final String beaconId : ScanOrder.forScheduledFetch(candidates, this.shuffle)) {
+            due.put(beaconId, all.get(beaconId));
         }
 
         return due;
@@ -464,8 +487,16 @@ public class BeaconRepository {
                 Log.i(TAG, beaconId + " found nothing across months of history; it will be"
                         + " skipped until somebody asks for it directly");
                 dao.markIgnored(beaconId, now);
-            } else {
+            } else if (fetchResult.getWideSearch().contains(beaconId)) {
                 dao.recordFruitlessScan(beaconId, now);
+            } else {
+                // **An empty answer from a cheap search is not a failure.** An aligned tag costs
+                // a request or two, and finding nothing new in the window asked for is the
+                // ordinary state of a tag that reported an hour ago and has not moved since.
+                // Counting it made tags that update every day slowly accrue strikes and start
+                // being asked less often - the opposite of what the backoff is for, which is to
+                // stop full-history searches nobody is going to benefit from.
+                dao.recordSuccessfulScan(beaconId, now);
             }
         }
     }

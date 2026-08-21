@@ -227,4 +227,11 @@
     <string name="debug_never">なし</string>
     <string name="tag_ignored_explanation">このタグは数か月分の履歴のどこにも見つからなかったため、自動の検索を停止しました。この種の検索は時間がかかり、見つかることもまれです。下をタップすると今すぐ再検索します。</string>
     <string name="tag_ignored_retrying">このタグをもう一度探しています。数分かかることがあります。</string>
+    <string name="battery_level_described">%1$d — %2$s</string>
+    <string name="battery_level_unknown">未報告</string>
+    <string name="battery_level_full">満充電（100%）</string>
+    <string name="battery_level_medium">中（約50〜70%）</string>
+    <string name="battery_level_low">低（約20%）— iOS が警告を出し始めます</string>
+    <string name="battery_level_very_low">非常に低い（約5〜10%）— ほぼ空です</string>
+    <string name="battery_level_icloud_only">この値を更新するのは iCloud から読み取ったタグだけです。ファイルから読み込んだタグは、書き出し時の値のままになります。</string>
 </resources>

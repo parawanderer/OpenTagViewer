@@ -75,9 +75,36 @@ public class GivingUpOnASilentTagTest {
         return this.db.ownedBeaconDao().getById(A_TAG);
     }
 
-    private void storeAFetchThatFound(final boolean anything, final boolean searchedWide) {
+    /**
+     * The four kinds of scan outcome, named rather than passed as booleans.
+     *
+     * <p>They were one helper taking {@code (found, wide)} until that turned out not to express
+     * the middle case at all: "expensive and empty" and "empty across months of history" are
+     * different answers with different consequences, and a single flag quietly made every
+     * expensive empty search a death sentence.
+     */
+    private void aSearchThatFoundSomething() {
+        this.store(true, false, false);
+    }
+
+    /** Aligned tag, narrow window: an empty answer means "has not moved", not "is gone". */
+    private void aCheapSearchThatFoundNothing() {
+        this.store(false, false, false);
+    }
+
+    /** Expensive, and empty - worth waiting longer before trying again. */
+    private void aWideSearchThatFoundNothing() {
+        this.store(false, true, false);
+    }
+
+    /** Expensive, empty, and covering months: the tag has stopped broadcasting. */
+    private void aWideSearchAcrossMonthsThatFoundNothing() {
+        this.store(false, true, true);
+    }
+
+    private void store(final boolean found, final boolean wide, final boolean exhausted) {
         final Map<String, List<BeaconLocationReport>> reports = Map.of(
-                A_TAG, anything
+                A_TAG, found
                         ? List.of(BeaconLocationReport.builder()
                                 .timestamp(1L).publishedAt(1L).description("somewhere")
                                 .latitude(1).longitude(1).build())
@@ -86,17 +113,18 @@ public class GivingUpOnASilentTagTest {
         this.repo.storeFetchResult(new FetchResult(
                 reports,
                 Collections.emptyMap(),
-                searchedWide ? Set.of(A_TAG) : Set.of())).blockingFirst();
+                exhausted ? Set.of(A_TAG) : Set.of(),
+                wide ? Set.of(A_TAG) : Set.of())).blockingFirst();
     }
 
     /** A search that found something clears everything held against the tag. */
     @Test
     public void atagThatReportsIsAnOrdinaryTagAgain() {
-        this.storeAFetchThatFound(false, false);
-        this.storeAFetchThatFound(false, false);
+        this.aWideSearchThatFoundNothing();
+        this.aWideSearchThatFoundNothing();
         assertEquals(2, this.stored().fruitlessScans);
 
-        this.storeAFetchThatFound(true, false);
+        this.aSearchThatFoundSomething();
 
         assertEquals("a tag that answered must go back to being asked normally",
                 0, this.stored().fruitlessScans);
@@ -104,13 +132,32 @@ public class GivingUpOnASilentTagTest {
         assertNotNull("the attempt should still be recorded", this.stored().lastScanAt);
     }
 
-    /** An ordinary empty search lengthens the wait, and nothing more. */
+    /** An ordinary empty wide search lengthens the wait, and nothing more. */
     @Test
     public void anemptySearchBacksOffRatherThanGivingUp() {
-        this.storeAFetchThatFound(false, false);
+        this.aWideSearchThatFoundNothing();
 
         assertEquals(1, this.stored().fruitlessScans);
         assertNull("one quiet week is not evidence of anything", this.stored().ignoredAt);
+    }
+
+    /**
+     * <b>A cheap search finding nothing new is not held against the tag at all.</b>
+     *
+     * <p>The bug @parawanderer spotted in the database: tags updating happily every day were
+     * carrying fruitless_scans of 1. An aligned tag costs a request or two, and an empty answer
+     * from one means "nothing new in the window asked for" - which is simply what a tag that
+     * reported an hour ago and has not moved looks like. Counting it made healthy tags accrue
+     * strikes and drift towards being asked less often, for doing nothing wrong.
+     */
+    @Test
+    public void anemptyCheapSearchIsNotCountedAgainstAhealthyTag() {
+        this.aCheapSearchThatFoundNothing();
+
+        assertEquals("a tag with a narrow key window must not be penalised for not moving",
+                0, this.stored().fruitlessScans);
+        assertNull(this.stored().ignoredAt);
+        assertNotNull("the attempt should still be recorded", this.stored().lastScanAt);
     }
 
     /**
@@ -122,7 +169,7 @@ public class GivingUpOnASilentTagTest {
      */
     @Test
     public void asearchAcrossMonthsOfHistoryWithNothingInItGivesUp() {
-        this.storeAFetchThatFound(false, true);
+        this.aWideSearchAcrossMonthsThatFoundNothing();
 
         assertNotNull("a tag silent across its whole history should be set aside",
                 this.stored().ignoredAt);
@@ -131,10 +178,10 @@ public class GivingUpOnASilentTagTest {
     /** And being given up on is undone by anything at all being found later. */
     @Test
     public void agivenUpTagComesBackTheMomentItIsFound() {
-        this.storeAFetchThatFound(false, true);
+        this.aWideSearchAcrossMonthsThatFoundNothing();
         assertNotNull(this.stored().ignoredAt);
 
-        this.storeAFetchThatFound(true, false);
+        this.aSearchThatFoundSomething();
 
         assertNull("a tag that reported must stop being ignored", this.stored().ignoredAt);
         assertEquals(0, this.stored().fruitlessScans);
@@ -161,7 +208,7 @@ public class GivingUpOnASilentTagTest {
     /** A tag given up on is skipped entirely - it is the expensive one. */
     @Test
     public void agivenUpTagIsSkippedByTheScheduledFetch() {
-        this.storeAFetchThatFound(false, true);
+        this.aWideSearchAcrossMonthsThatFoundNothing();
 
         assertTrue("an ignored tag must not be searched for automatically",
                 this.scheduledRequests().isEmpty());
@@ -171,7 +218,7 @@ public class GivingUpOnASilentTagTest {
     @Test
     public void atagInsideItsBackoffIsSkippedByTheScheduledFetch() {
         for (int i = 0; i < 4; i++) {
-            this.storeAFetchThatFound(false, false);
+            this.aWideSearchThatFoundNothing();
         }
         assertTrue("this test needs a backoff long enough to still be waiting",
                 WideScanBackoff.waitMillisAfter(this.stored().fruitlessScans) > 0);
@@ -189,7 +236,7 @@ public class GivingUpOnASilentTagTest {
      */
     @Test
     public void amanualRefreshIsNeverThrottledOrSkipped() {
-        this.storeAFetchThatFound(false, true);
+        this.aWideSearchAcrossMonthsThatFoundNothing();
         assertTrue("premise: the scheduler has given up on it",
                 this.scheduledRequests().isEmpty());
 

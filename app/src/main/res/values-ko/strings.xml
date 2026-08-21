@@ -227,4 +227,11 @@
     <string name="debug_never">없음</string>
     <string name="tag_ignored_explanation">이 태그는 몇 달치 기록 어디에서도 발견되지 않아 자동 검색을 멈췄습니다. 이런 검색은 오래 걸리고 성공하는 경우도 드뭅니다. 아래를 탭하면 지금 다시 찾아봅니다.</string>
     <string name="tag_ignored_retrying">이 태그를 다시 찾는 중입니다. 몇 분 걸릴 수 있습니다.</string>
+    <string name="battery_level_described">%1$d — %2$s</string>
+    <string name="battery_level_unknown">아직 보고되지 않음</string>
+    <string name="battery_level_full">충분함 (100%)</string>
+    <string name="battery_level_medium">보통 (약 50-70%)</string>
+    <string name="battery_level_low">낮음 (약 20%) — 이 지점부터 iOS가 경고합니다</string>
+    <string name="battery_level_very_low">매우 낮음 (약 5-10%) — 거의 소진됨</string>
+    <string name="battery_level_icloud_only">이 값은 iCloud에서 읽어온 태그만 갱신합니다. 파일에서 가져온 태그는 내보낼 당시의 값을 그대로 유지합니다.</string>
 </resources>

@@ -65,6 +65,7 @@ import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import dev.wander.android.opentagviewer.python.AppDependencies;
@@ -190,6 +191,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
         }
 
         this.describeHowItIsBeingLookedFor(timestampFormat);
+        this.showTheOriginalNameOnlyWhereItMeansSomething();
 
         // What is known without asking anything, drawn immediately. The shared heuristic can
         // improve on it, but it costs a Python interpreter, so this screen must be readable
@@ -215,7 +217,22 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 Optional.ofNullable(this.beaconInformation.getNamingRecordModifiedByDevice())
                         .orElse("?"));
 
-        binding.setBatteryLevel(this.beaconInformation.getBatteryLevel() + "");
+        // The number with its meaning beside it. The number stays first because that is what a
+        // bug report should quote and what every other source discusses - see
+        // BatteryLevelDescription for how much the labels are worth, and why nothing outside
+        // this debug panel reads any of it.
+        // **With the caveat attached, not left to the reader.** Apple's own devices are what
+        // update this field as they pass the accessory, so a tag imported from a zip carries
+        // whatever was true when the export was made and never changes it - possibly years ago.
+        // A number with no note beside it reads as current, and "Full" on a tag that has been
+        // flat since last spring is worse than showing nothing.
+        //
+        // Said for every tag rather than only for imported ones: somebody reading an account
+        // tag's row learns the rule at the moment it is relevant, which is what makes the
+        // imported case legible when they meet it.
+        binding.setBatteryLevel(BatteryLevelDescription.describe(
+                        this, this.beaconInformation.getBatteryLevel())
+                + "\n" + this.getString(R.string.battery_level_icloud_only));
         binding.setDeviceModel(this.beaconInformation.getModel());
         binding.setPairingDate(this.beaconInformation.getPairingDate());
         binding.setProductId(this.beaconInformation.getProductId() + "");
@@ -604,6 +621,10 @@ public class DeviceInfoActivity extends AppCompatActivity {
                             // Left null when the heuristic could not say, which keeps renaming
                             // local. See the field.
                             this.isOwnDevice = answers.second.second.orElse(null);
+
+                            // Re-run now the answer is in: whether "original" means anything
+                            // depends on it, and it arrives after the screen is drawn.
+                            this.showTheOriginalNameOnlyWhereItMeansSomething();
                         },
                         error -> Log.w(TAG, "Could not describe this accessory; "
                                 + "keeping the label already shown", error));
@@ -778,6 +799,30 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
     /** Asks whoever launched this screen to search for the named tag right now. */
     public static final String RETRY_IGNORED_BEACON = "retryIgnoredBeacon";
+
+    /**
+     * Hide "original name" and "original emoji" for a tag whose name is not a nickname.
+     *
+     * <p><b>"Original" is only a coherent idea where something is layered over it.</b> A tag
+     * imported from a file, or one of the owner's own devices, keeps the name Apple gave it and
+     * shows a local nickname on top - so the two are different things and both are worth seeing.
+     * An accessory read from iCloud has no such split: renaming it writes to the account, so the
+     * name on screen <i>is</i> the name, and a row labelled "original" showing the same string
+     * invites the reader to hunt for a difference that cannot exist.
+     *
+     * <p>Deliberately the same predicate that decides where a rename goes. The two questions are
+     * one question - "is this a name we can actually change" - and answering it twice is how they
+     * end up disagreeing.
+     *
+     * <p>Called again once the heuristic answers, because it decides this and arrives after the
+     * screen is drawn.
+     */
+    private void showTheOriginalNameOnlyWhereItMeansSomething() {
+        final int visibility = this.renamingWritesToTheAccount() ? GONE : VISIBLE;
+
+        this.findViewById(R.id.settings_debug_device_name_original).setVisibility(visibility);
+        this.findViewById(R.id.settings_debug_device_emoji_original).setVisibility(visibility);
+    }
 
     private void onClickDeviceDelete() {
         // A tag read from the Apple account is a cache of what Apple holds, so marking it

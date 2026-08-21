@@ -779,6 +779,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             // not moved since its last geocoding is skipped.
                             .concatMap(reports -> {
                                 this.addBeaconLocationsToCurrent(reports);
+                                // Same reason as the periodic refresh: the model is not the
+                                // screen, and waiting for the slowest tag to redraw the fast
+                                // ones is the whole complaint.
+                                this.runOnUiThread(this::showLastDeviceLocations);
                                 return this.updateBeaconGeocodings()
                                         .andThen(Observable.just(reports));
                             }),
@@ -1547,7 +1551,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
 
         var async = this.fetchLastReports(beacons)
-                .doOnNext(this::addBeaconLocationsToCurrent)
+                // **Drawn as each tag lands, not once at the end.**
+                //
+                // The fetch is one accessory at a time, and a tag with no key alignment record
+                // can take minutes on its own - so a batch of six is quarter of an hour during
+                // which nothing on screen moved, even though most of those answers arrived in
+                // the first few seconds. addBeaconLocationsToCurrent only updates the model;
+                // showLastDeviceLocations is what redraws, and it used to run in the terminal
+                // subscribe below, once, after the slowest tag.
+                //
+                // It is also what makes the fetch order worth anything: putting the tags that
+                // answer first is pointless if nothing is drawn until the silent ones have been
+                // ground through too. See ScanOrder.
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext(reports -> {
+                    this.addBeaconLocationsToCurrent(reports);
+                    this.showLastDeviceLocations();
+                })
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
