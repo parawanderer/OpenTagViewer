@@ -159,6 +159,34 @@ afterwards it is reused. If your Python is not discovered automatically:
 > build skips those deliberately. If any Python-invoking tooling hangs mysteriously on
 > Windows, that alias is a good first suspect.
 
+### Building a smaller APK for a local install
+
+The debug APK is about **105 MB**, and 65 MB of that is native libraries: Chaquopy's CPython,
+`cryptography`'s OpenSSL and Apple's ADI libraries, built for both `arm64-v8a` and `x86_64`.
+Whatever you install to only uses one of them.
+
+```bash
+./gradlew :app:assembleDebug -PotvAbi=x86_64    # an emulator
+./gradlew :app:assembleDebug -PotvAbi=arm64-v8a # a phone
+```
+
+That takes it to **68.6 MB**, and the saving is roughly double that in practice — an upgrade
+needs room for the new APK while the old one is still installed.
+
+Worth knowing when you hit `INSTALL_FAILED_INSUFFICIENT_STORAGE`, whose message says nothing
+about ABIs. The other half of that fix is the emulator itself: a Pixel AVD defaults to a 6 GB
+data partition, and Device Manager → Edit → Advanced → Internal Storage raises it. Changing it
+wipes the device, so export anything you care about first — an account-linked install can be
+re-read, but zip-imported tags and any location history older than about seven days cannot.
+
+**It is for local debug installs only.** A release must carry both ABIs, so `assembleRelease`
+refuses to run while `otvAbi` is set rather than quietly ignoring it. That matters because the
+property is also read from `gradle.properties`, including `~/.gradle/gradle.properties` — so
+setting it there to save typing would otherwise produce a release that installs on no phone
+anybody owns, with a green build log. An unrecognised ABI fails the build too, rather than
+producing an APK with no native libraries that installs fine and dies at the first Chaquopy
+call.
+
 ### Android instrumented tests
 
 Gradle provisions the emulator, runs the tests and tears it down — nothing needs to be
