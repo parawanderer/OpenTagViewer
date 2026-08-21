@@ -107,6 +107,13 @@ import lombok.NoArgsConstructor;
  * unwanted-tracking alerts - so those "Reserved" bits carry a device type in practice, and a
  * beacon has an active reason to lie about them.
  *
+ * <p><b>The likely real answer is that there is no single layout.</b> An AirTag, an older Apple
+ * device and a third-party gadget can each use these bits differently and all be working
+ * correctly, in which case reading them properly means a routing table keyed by accessory type
+ * rather than one decoder. Nobody has built that, and doing it honestly would mean sitting down
+ * with several kinds of tag at several battery levels and writing down what each one emits. The
+ * gate below exists so that the app stays useful and silent in the meantime, instead of guessing.
+ *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is
  * annotated as what the beacon <i>claimed</i>, never as a measurement. Every value carries decimal,
