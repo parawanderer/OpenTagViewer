@@ -234,4 +234,15 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="battery_level_low">Low (~20%) — iOS starts warning here</string>
     <string name="battery_level_very_low">Critically low (~5-10%) — near death</string>
     <string name="battery_level_icloud_only">Only tags read from iCloud ever update this. A tag imported from a file keeps whatever value it had when the export was made.</string>
+    <string name="icloud_unlink_title">Unlink my Apple account</string>
+    <string name="icloud_unlink_subtitle">Stop this app reading tags from your account</string>
+    <string name="icloud_unlink_confirm_title">Unlink your Apple account?</string>
+    <string name="icloud_unlink_confirm_message">This app will stop reading your tags from Apple. Tags you have already imported stay on this device, along with their location history — but they will no longer be updated from your account.
+
+This does not remove this app from your Apple account. To do that, open Find My on an Apple device and remove it there.
+
+You can link again later. That needs your Apple device passcode.</string>
+    <string name="icloud_unlink_confirm_button">Unlink</string>
+    <string name="icloud_unlink_done">Your Apple account is no longer linked</string>
+    <string name="icloud_unlink_failed">Could not unlink your Apple account. Please try again.</string>
 </resources>

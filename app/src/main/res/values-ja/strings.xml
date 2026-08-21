@@ -234,4 +234,15 @@
     <string name="battery_level_low">低（約20%）— iOS が警告を出し始めます</string>
     <string name="battery_level_very_low">非常に低い（約5〜10%）— ほぼ空です</string>
     <string name="battery_level_icloud_only">この値を更新するのは iCloud から読み取ったタグだけです。ファイルから読み込んだタグは、書き出し時の値のままになります。</string>
+    <string name="icloud_unlink_title">Apple アカウントの連携を解除</string>
+    <string name="icloud_unlink_subtitle">このアプリがアカウントからタグを読み取るのをやめます</string>
+    <string name="icloud_unlink_confirm_title">Apple アカウントの連携を解除しますか？</string>
+    <string name="icloud_unlink_confirm_message">このアプリは Apple からタグを読み取らなくなります。すでにインポートしたタグと位置情報履歴はこの端末に残りますが、アカウントからは更新されなくなります。
+
+この操作では、このアプリは Apple アカウントから削除されません。削除するには、Apple 製デバイスで「探す」を開いて削除してください。
+
+後で再び連携できます。その際は Apple デバイスのパスコードが必要です。</string>
+    <string name="icloud_unlink_confirm_button">連携を解除</string>
+    <string name="icloud_unlink_done">Apple アカウントの連携を解除しました</string>
+    <string name="icloud_unlink_failed">Apple アカウントの連携を解除できませんでした。もう一度お試しください。</string>
 </resources>

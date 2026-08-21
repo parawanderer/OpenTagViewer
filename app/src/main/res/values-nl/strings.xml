@@ -234,4 +234,15 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="battery_level_low">Laag (~20%) — vanaf hier waarschuwt iOS</string>
     <string name="battery_level_very_low">Kritiek laag (~5-10%) — bijna leeg</string>
     <string name="battery_level_icloud_only">Alleen tags die uit iCloud worden gelezen werken dit bij. Een tag die uit een bestand is geïmporteerd houdt de waarde van het moment van exporteren.</string>
+    <string name="icloud_unlink_title">Koppeling met mijn Apple-account opheffen</string>
+    <string name="icloud_unlink_subtitle">Deze app leest dan geen tags meer uit je account</string>
+    <string name="icloud_unlink_confirm_title">Koppeling met je Apple-account opheffen?</string>
+    <string name="icloud_unlink_confirm_message">Deze app leest je tags dan niet meer bij Apple. Tags die je al hebt geïmporteerd blijven op dit apparaat staan, samen met hun locatiegeschiedenis — maar ze worden niet meer bijgewerkt vanuit je account.
+
+Hiermee wordt deze app niet uit je Apple-account verwijderd. Open daarvoor Zoek mijn op een Apple-apparaat en verwijder de app daar.
+
+Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-apparaat nodig.</string>
+    <string name="icloud_unlink_confirm_button">Ontkoppelen</string>
+    <string name="icloud_unlink_done">Je Apple-account is niet meer gekoppeld</string>
+    <string name="icloud_unlink_failed">Kan de koppeling met je Apple-account niet opheffen. Probeer het opnieuw.</string>
 </resources>

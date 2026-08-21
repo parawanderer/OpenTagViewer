@@ -234,4 +234,15 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="battery_level_low">Niedrig (~20%) – ab hier warnt iOS</string>
     <string name="battery_level_very_low">Kritisch niedrig (~5-10%) – fast leer</string>
     <string name="battery_level_icloud_only">Nur aus iCloud gelesene Tags aktualisieren diesen Wert. Ein aus einer Datei importierter Tag behält den Wert, den er beim Export hatte.</string>
+    <string name="icloud_unlink_title">Verknüpfung mit meinem Apple-Konto aufheben</string>
+    <string name="icloud_unlink_subtitle">Diese App liest dann keine Tags mehr aus deinem Konto</string>
+    <string name="icloud_unlink_confirm_title">Verknüpfung mit dem Apple-Konto aufheben?</string>
+    <string name="icloud_unlink_confirm_message">Diese App liest deine Tags dann nicht mehr von Apple. Bereits importierte Tags bleiben mit ihrem Standortverlauf auf diesem Gerät — sie werden aber nicht mehr aus deinem Konto aktualisiert.
+
+Dadurch wird diese App nicht aus deinem Apple-Konto entfernt. Öffne dafür „Wo ist?“ auf einem Apple-Gerät und entferne sie dort.
+
+Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode deines Apple-Geräts.</string>
+    <string name="icloud_unlink_confirm_button">Verknüpfung aufheben</string>
+    <string name="icloud_unlink_done">Dein Apple-Konto ist nicht mehr verknüpft</string>
+    <string name="icloud_unlink_failed">Die Verknüpfung mit deinem Apple-Konto konnte nicht aufgehoben werden. Bitte versuche es erneut.</string>
 </resources>

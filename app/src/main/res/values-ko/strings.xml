@@ -234,4 +234,15 @@
     <string name="battery_level_low">낮음 (약 20%) — 이 지점부터 iOS가 경고합니다</string>
     <string name="battery_level_very_low">매우 낮음 (약 5-10%) — 거의 소진됨</string>
     <string name="battery_level_icloud_only">이 값은 iCloud에서 읽어온 태그만 갱신합니다. 파일에서 가져온 태그는 내보낼 당시의 값을 그대로 유지합니다.</string>
+    <string name="icloud_unlink_title">Apple 계정 연결 해제</string>
+    <string name="icloud_unlink_subtitle">이 앱이 계정에서 태그를 읽지 않도록 합니다</string>
+    <string name="icloud_unlink_confirm_title">Apple 계정 연결을 해제할까요?</string>
+    <string name="icloud_unlink_confirm_message">이 앱은 Apple에서 태그를 읽지 않게 됩니다. 이미 가져온 태그와 위치 기록은 이 기기에 그대로 남지만, 계정에서 더 이상 업데이트되지 않습니다.
+
+이 작업으로 이 앱이 Apple 계정에서 삭제되지는 않습니다. 삭제하려면 Apple 기기에서 나의 찾기를 열고 거기서 제거하세요.
+
+나중에 다시 연결할 수 있습니다. 그때는 Apple 기기의 암호가 필요합니다.</string>
+    <string name="icloud_unlink_confirm_button">연결 해제</string>
+    <string name="icloud_unlink_done">Apple 계정 연결이 해제되었습니다</string>
+    <string name="icloud_unlink_failed">Apple 계정 연결을 해제하지 못했습니다. 다시 시도해 주세요.</string>
 </resources>

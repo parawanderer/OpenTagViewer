@@ -318,6 +318,15 @@ Eventually.perform("the sign in button", () -> apple.timesCalled("login") > 0,
 
 Two more rules that came out of the same failures:
 
+- **`perform`'s predicate runs *before* the first attempt, so it must be cheap when the answer
+  is "not yet".** It is asked once up front, then twice per retry. A predicate phrased as "is
+  the dialog up?" runs `inRoot(isDialog())` against a screen with no dialog, and Espresso's
+  root picker retries internally for seconds before admitting there isn't one — so the cheap
+  case is the slow one, fifty times over. Seven tests in `UnlinkTheAccountSettingTest` took
+  **6m 33s**; asking a repository instead took **19s**. Prefer a fake's call count or a stored
+  value. And do not reach for `perform` at all unless the action might tear the screen down —
+  a click that opens a dialog cannot, so `Eventually.check` then a plain `perform(click())` is
+  both correct and instant.
 - **One `ViewAction` per `perform` when the action might finish the flow.**
   `perform(replaceText(code), closeSoftKeyboard())` fails on the *second* action, because the
   first one completed the sign-in and there is no activity left to close a keyboard on.

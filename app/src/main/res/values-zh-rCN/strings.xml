@@ -234,4 +234,15 @@
     <string name="battery_level_low">偏低（约 20%）— iOS 从此开始提示</string>
     <string name="battery_level_very_low">极低（约 5-10%）— 几乎耗尽</string>
     <string name="battery_level_icloud_only">只有从 iCloud 读取的标签才会更新此值。从文件导入的标签会保留导出时的数值。</string>
+    <string name="icloud_unlink_title">取消关联我的 Apple 账户</string>
+    <string name="icloud_unlink_subtitle">让此应用不再从你的账户读取标签</string>
+    <string name="icloud_unlink_confirm_title">要取消关联你的 Apple 账户吗？</string>
+    <string name="icloud_unlink_confirm_message">此应用将不再从 Apple 读取你的标签。已导入的标签及其位置历史会保留在本设备上，但不会再从你的账户更新。
+
+此操作不会把此应用从你的 Apple 账户中移除。若要移除，请在 Apple 设备上打开“查找”并在那里移除。
+
+你可以稍后重新关联，届时需要你的 Apple 设备密码。</string>
+    <string name="icloud_unlink_confirm_button">取消关联</string>
+    <string name="icloud_unlink_done">你的 Apple 账户已取消关联</string>
+    <string name="icloud_unlink_failed">无法取消关联你的 Apple 账户，请重试。</string>
 </resources>
