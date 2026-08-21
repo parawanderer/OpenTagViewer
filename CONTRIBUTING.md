@@ -119,7 +119,7 @@ them back means redoing the macOS export.
 
 ## Testing
 
-Tests live in five places, because the code runs in three environments: the JVM, an Android
+Tests live in a lot of places, because the code runs in three environments: the JVM, an Android
 runtime, and CPython (both inside the app via Chaquopy, and on the desktop for the export
 wizard).
 
@@ -133,6 +133,57 @@ wizard).
 | Desktop exporter tests | `python/test/` | pytest | no |
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
+| Test doubles for the bridge | `app/src/debug/python/` | installed from an instrumented test | provisioned for you |
+
+### Faking Apple, on the Python side of the bridge
+
+**Everything this app does against Apple happens behind Python, so a fake on the Java side of
+the bridge skips the bridge.** That is not a hypothetical: two bugs shipped through exactly that
+gap while the whole suite stayed green.
+
+- `PythonICloudService.openFor` checked its result with `made.toJava(Object.class)`, which
+  throws for any Python object. The entire iCloud flow was dead on every device, and the screen
+  blamed a missing account — a cause it had invented.
+- `getLastReports` never emitted `wideSearch` or `exhaustedWideSearch`. Java reads both, a
+  missing key reads as `false`, and the silent-tag backoff quietly did nothing at all.
+
+Both were found by using the app. Every test of those paths replaced the Java service with a
+Java fake, which is right for testing screens and means the bridge code itself — the JSON it
+builds, the objects it converts, the reason strings it maps — had never run.
+
+So there are two doubles, and they sit **below** the code under test rather than in front of it:
+
+| Module | Replaces | So a test can |
+| --- | --- | --- |
+| `icloud_test_double` | the two functions in `exporter.icloud` that talk to Apple | drive sign-in, unlock, join, fetch, rename and close for real |
+| `apple_test_double` | `main.getAccount` and `main.accessoryFromJson` | have a stored session restore, so screens that wait on one will draw |
+
+They live in the **debug source set**. Chaquopy compiles `src/<variant>/python` alongside
+`src/main/python`, so they are in the debug APK the instrumented tests run against and in no
+release build. Nothing in `main` imports them; a test installs them at runtime:
+
+```java
+final PyObject double_ = Python.getInstance().getModule("apple_test_double");
+double_.callAttr("install");        // or installWithNothingToReport()
+// ... drive the app ...
+double_.callAttr("uninstall");      // in @After, always
+```
+
+Both are idempotent on install and safe to uninstall without a matching install, but **an
+uninstall that never runs leaves the fake in place for every test after it** — so it belongs in
+`@After`, not at the end of the test body.
+
+Two things worth knowing before reaching for these:
+
+- **Restoring a session needs no network.** `getAccount` is `AppleAccount.from_json` and nothing
+  else; the sockets only appear at fetch time. That is why `apple_test_double` is small.
+- **Neither of these tests Apple.** They prove this app's code is correct about a protocol it
+  cannot check, so they say nothing about whether Apple still accepts what is being sent.
+  Nothing in this repository has run against a real account in CI, and nothing can — which is
+  why rule 2 in [AGENTS.md](./AGENTS.md) asks you to say what you actually verified.
+
+`TheWholeICloudFlowAcrossTheBridgeTest` and `TheMapDrawsWhatIsStoredTest` are the worked
+examples.
 
 ### Run everything
 
