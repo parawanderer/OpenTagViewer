@@ -11,8 +11,10 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.format.DateFormat;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -20,6 +22,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.util.Pair;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +30,7 @@ import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.DataBindingUtil;
@@ -51,6 +55,8 @@ import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -58,10 +64,15 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
+import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.HardwareDescriber;
+import dev.wander.android.opentagviewer.python.icloud.AccessoryRenamer;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -81,7 +92,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
     private BeaconRepository beaconRepo;
     private BeaconData beaconData;
     private BeaconInformation beaconInformation;
-    private @NonNull Import importData;
+    /** Null for a tag read from the Apple account - nothing was ever exported or imported. */
+    private @Nullable Import importData;
     private UserSettings userSettings;
     private EmojiPickerView emojiPickerView;
     private Button currentIconButton;
@@ -95,6 +107,18 @@ public class DeviceInfoActivity extends AppCompatActivity {
      * stop it rather than letting it land wherever it lands.
      */
     private Disposable hardwareLookup;
+
+    /**
+     * Whether this is one of the owner's own devices, once the shared heuristic has said.
+     *
+     * <p><b>Null until it answers, and null is not false.</b> Renaming writes to the account only
+     * when this is definitely false, so an unanswered question leaves the screen on the cautious
+     * road - a local nickname, which changes nothing anybody else can see.
+     */
+    private Boolean isOwnDevice;
+
+    /** The in-flight write to the account, so leaving the screen does not land on dead views. */
+    private Disposable accountRename;
 
     private boolean hasNameChanges = false;
 
@@ -122,7 +146,15 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
-        this.importData = this.beaconRepo.getImportById(this.beaconData.getOwnedBeaconInfo().importId).blockingFirst().orElseThrow();
+
+        // **Null for a tag read from the Apple account**, which was never exported and never
+        // imported - there is no bundle behind it and so no `Import` row. Fetching one anyway
+        // unboxes a null `importId` and crashes this screen in onCreate, which is what tapping
+        // an account tag used to do.
+        final Long importId = this.beaconData.getOwnedBeaconInfo().importId;
+        this.importData = importId == null
+                ? null
+                : this.beaconRepo.getImportById(importId).blockingFirst().orElse(null);
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
@@ -136,9 +168,30 @@ public class DeviceInfoActivity extends AppCompatActivity {
         binding.setOnClickDeviceName(this::handleEditDeviceName);
         binding.setOnClickDeviceEmoji(this::handleEditDeviceEmoji);
 
-        binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
-        binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
-        binding.setExportedBy(this.importData.sourceUser);
+        // **Two independent questions, deliberately not one.** "Exported by", "Exported at" and
+        // "Imported at" all read from an `Import` row, so they are shown when there is one. The
+        // source row says the tag was read from the account, so it is shown when it was. Folding
+        // them into one branch reads fine and is wrong: a file-imported row whose import record
+        // has gone would then be labelled as coming from the Apple account, which is a claim
+        // about where somebody's data came from, made on the strength of a missing join.
+        if (this.importData == null) {
+            findViewById(R.id.device_settings_exported_by).setVisibility(View.GONE);
+            findViewById(R.id.device_settings_exported_at).setVisibility(View.GONE);
+            findViewById(R.id.device_settings_imported_at).setVisibility(View.GONE);
+        } else {
+            binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
+            binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
+            binding.setExportedBy(this.importData.sourceUser);
+        }
+
+        if (this.beaconInformation.isFromAccount()) {
+            binding.setSource(this.getString(R.string.source_your_apple_account));
+        } else {
+            findViewById(R.id.device_settings_source).setVisibility(View.GONE);
+        }
+
+        this.describeHowItIsBeingLookedFor(timestampFormat);
+        this.showTheOriginalNameOnlyWhereItMeansSomething();
 
         // What is known without asking anything, drawn immediately. The shared heuristic can
         // improve on it, but it costs a Python interpreter, so this screen must be readable
@@ -164,7 +217,22 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 Optional.ofNullable(this.beaconInformation.getNamingRecordModifiedByDevice())
                         .orElse("?"));
 
-        binding.setBatteryLevel(this.beaconInformation.getBatteryLevel() + "");
+        // The number with its meaning beside it. The number stays first because that is what a
+        // bug report should quote and what every other source discusses - see
+        // BatteryLevelDescription for how much the labels are worth, and why nothing outside
+        // this debug panel reads any of it.
+        // **With the caveat attached, not left to the reader.** Apple's own devices are what
+        // update this field as they pass the accessory, so a tag imported from a zip carries
+        // whatever was true when the export was made and never changes it - possibly years ago.
+        // A number with no note beside it reads as current, and "Full" on a tag that has been
+        // flat since last spring is worse than showing nothing.
+        //
+        // Said for every tag rather than only for imported ones: somebody reading an account
+        // tag's row learns the rule at the moment it is relevant, which is what makes the
+        // imported case legible when they meet it.
+        binding.setBatteryLevel(BatteryLevelDescription.describe(
+                        this, this.beaconInformation.getBatteryLevel())
+                + "\n" + this.getString(R.string.battery_level_icloud_only));
         binding.setDeviceModel(this.beaconInformation.getModel());
         binding.setPairingDate(this.beaconInformation.getPairingDate());
         binding.setProductId(this.beaconInformation.getProductId() + "");
@@ -257,8 +325,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
             ((MaterialButton)currentIconButton).setIcon(null);
         } else {
             currentIconButton.setText(null);
-            ((MaterialButton)currentIconButton).setIcon(AppCompatResources.getDrawable(
-                    this, BeaconIcon.forBeacon(this.beaconInformation)));
+            BeaconIcon.applyTo((MaterialButton) currentIconButton, this.beaconInformation);
         }
     }
 
@@ -287,10 +354,36 @@ public class DeviceInfoActivity extends AppCompatActivity {
         }));
     }
 
+    /**
+     * Whether renaming this tag changes the account or only this app.
+     *
+     * <p><b>An accessory read from iCloud keeps its name in one place</b> - the naming record -
+     * so renaming it there is the whole rename, and it shows up in Find My on the owner's own
+     * devices. Everything else gets a nickname: one of the owner's own devices takes its name
+     * from several places and writing this record would leave Find My disagreeing with the
+     * device, and a tag imported from a file was never on this account to begin with.
+     *
+     * <p><b>Both halves have to be true, and neither is guessed.</b> {@code isOwnDevice} is
+     * answered by the shared heuristic across the bridge, and is null until it does answer -
+     * which is treated as "not an accessory", because the cautious mistake is a local nickname
+     * and the other one writes to somebody's account.
+     */
+    private boolean renamingWritesToTheAccount() {
+        return this.beaconInformation.isFromAccount() && Boolean.FALSE.equals(this.isOwnDevice);
+    }
+
     private void saveUpdatedDeviceName(final String newDeviceName) {
         final String oldDeviceName = this.beaconInformation.getName();
 
         if (oldDeviceName.equals(newDeviceName)) return; // nothing to do, no change
+
+        if (this.renamingWritesToTheAccount()) {
+            this.writeToTheAccount(newDeviceName, "", () -> {
+                this.binding.setDeviceName(this.beaconInformation.getName());
+                this.binding.setPageTitle(this.getDeviceNameForTitle());
+            });
+            return;
+        }
 
         this.beaconInformation.setUserOverrideName(newDeviceName);
         // save changes...
@@ -307,6 +400,69 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 binding.setPageTitle(this.getDeviceNameForTitle());
             },
             error -> Log.e(TAG, "Error occurred while trying to update user-facing device name for beaconId=" + this.beaconId, error));
+    }
+
+    /**
+     * Write the change to iCloud, then to the stored record, then redraw.
+     *
+     * <p><b>In that order, and nothing local happens first.</b> A rename that failed on the
+     * network and still changed the screen would be the app telling the user something about
+     * their account that is not true - so a failure says so and leaves everything exactly as it
+     * was, rather than quietly demoting itself to a nickname.
+     *
+     * <p>The stored naming record is edited rather than covered with a nickname, because a
+     * nickname wins at display time forever: the next rename made on the owner's iPhone would
+     * arrive and be hidden behind it.
+     *
+     * @param name    the new name, or empty when only the emoji is changing.
+     * @param emoji   the new emoji, or empty when only the name is changing.
+     * @param redraw  what to run on the main thread once the change is real.
+     */
+    private void writeToTheAccount(final String name, final String emoji, final Runnable redraw) {
+        this.showRenameInProgress(true);
+
+        final AccessoryRenamer renamer = new AccessoryRenamer(new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil()));
+
+        this.accountRename = renamer
+                .rename(this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw(),
+                        name, emoji)
+                .andThen(this.beaconRepo.renameStoredAccessory(
+                        this.beaconId,
+                        name.isEmpty() ? null : name,
+                        emoji.isEmpty() ? null : emoji))
+                .andThen(this.beaconRepo.getById(this.beaconId).firstOrError())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        reread -> {
+                            this.beaconData = reread;
+                            // Rebuilt from the record that was just written, so what is on screen
+                            // is what the account holds - not a value this screen remembered
+                            // sending.
+                            this.beaconInformation = BeaconDataParser.parse(List.of(reread)).get(0);
+                            this.hasNameChanges = true;
+                            this.showRenameInProgress(false);
+                            redraw.run();
+                        },
+                        error -> {
+                            Log.e(TAG, "Could not rename " + this.beaconId + " in iCloud", error);
+                            this.showRenameInProgress(false);
+                            this.sayTheRenameDidNotHappen();
+                        });
+    }
+
+    private void showRenameInProgress(final boolean busy) {
+        this.findViewById(R.id.device_rename_progress).setVisibility(busy ? VISIBLE : GONE);
+    }
+
+    private void sayTheRenameDidNotHappen() {
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.rename_failed_title)
+                .setIcon(R.drawable.warning_24px)
+                .setMessage(R.string.rename_failed_message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
     }
 
     private void handleEditDeviceEmoji() {
@@ -338,6 +494,14 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         final String oldEmoji = this.beaconInformation.getEmoji();
         if (oldEmoji != null && oldEmoji.equals(newEmoji)) return; // nothing to do, no change
+
+        if (this.renamingWritesToTheAccount()) {
+            this.writeToTheAccount("", newEmoji, () -> {
+                this.visualiseDeviceEmoji();
+                this.binding.setPageTitle(this.getDeviceNameForTitle());
+            });
+            return;
+        }
 
         this.beaconInformation.setUserOverrideEmoji(newEmoji);
 
@@ -382,6 +546,12 @@ public class DeviceInfoActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (this.hardwareLookup != null && !this.hardwareLookup.isDisposed()) {
             this.hardwareLookup.dispose();
+        }
+        // **Disposed, but the write is not cancelled** - it is already on its way to Apple, and
+        // there is no undoing that from here. What this stops is the result landing on views
+        // that have gone.
+        if (this.accountRename != null && !this.accountRename.isDisposed()) {
+            this.accountRename.dispose();
         }
         super.onDestroy();
     }
@@ -432,14 +602,74 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         final HardwareDescriber describer = AppDependencies.hardwareDescriber();
 
+        // Both answers in one crossing. Each call starts a Python interpreter and parses the
+        // same plist, and the second question is only ever asked about the first one's failure.
         this.hardwareLookup = Observable
-                .fromCallable(() -> Optional.ofNullable(describer.describe(plist)))
+                .fromCallable(() -> Pair.create(
+                        Optional.ofNullable(describer.describe(plist)),
+                        Pair.create(
+                                Optional.ofNullable(describer.whereToLookUp(plist)),
+                                Optional.ofNullable(describer.isOwnDevice(plist)))))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        described -> described.ifPresent(this.binding::setDeviceType),
+                        answers -> {
+                            answers.first.ifPresent(this.binding::setDeviceType);
+                            if (answers.second.first.isPresent()) {
+                                this.offerToLookTheVendorUp();
+                            }
+                            // Left null when the heuristic could not say, which keeps renaming
+                            // local. See the field.
+                            this.isOwnDevice = answers.second.second.orElse(null);
+
+                            // Re-run now the answer is in: whether "original" means anything
+                            // depends on it, and it arrives after the screen is drawn.
+                            this.showTheOriginalNameOnlyWhereItMeansSomething();
+                        },
                         error -> Log.w(TAG, "Could not describe this accessory; "
                                 + "keeping the label already shown", error));
+    }
+
+    /**
+     * Say what the hex on the Type row is, and offer to settle it.
+     *
+     * <p>Shown only when nothing recognised the accessory, which is when Type reads something
+     * like {@code vendor 0x0ABC product 0x1234}. That is a real registry value rather than a
+     * failure, and somebody holding the thing can settle what it is in under a minute - but only
+     * if they are told the number means something.
+     *
+     * <p><b>Python decides whether there is anything to look up; this writes the sentence.</b>
+     * {@code where_to_look_up} returns one already, and it is deliberately not used: it is
+     * English, composed in a module the desktop exporter shares, and this app ships in ten
+     * languages. Splitting it this way keeps the judgement in the one place that has the vendor
+     * table and the wording in the one place that gets translated.
+     */
+    private void offerToLookTheVendorUp() {
+        final TextView hint = this.findViewById(R.id.device_type_lookup_hint);
+
+        hint.setText(this.getString(R.string.vendor_lookup_hint,
+                String.format(Locale.ROOT, "0x%04X", this.beaconInformation.getVendorId())));
+        hint.setVisibility(VISIBLE);
+        hint.setOnClickListener(view -> this.openBluetoothRegistry());
+    }
+
+    private void openBluetoothRegistry() {
+        final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+        if (properties == null) {
+            Log.w(TAG, "Could not read app.properties; no registry link to open");
+            return;
+        }
+
+        final String url = properties.getProperty("bluetoothSigAssignedNumbers");
+        if (url == null || url.isBlank()) {
+            Log.w(TAG, "No bluetoothSigAssignedNumbers configured in app.properties");
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        if (intent.resolveActivity(this.getPackageManager()) != null) {
+            this.startActivity(intent);
+        }
     }
 
     private String getDeviceNameForTitle() {
@@ -495,7 +725,121 @@ public class DeviceInfoActivity extends AppCompatActivity {
             });
     }
 
+    /**
+     * Say when this tag was last looked for, and how hard the app is still trying.
+     *
+     * <p><b>Otherwise "no last location known" is the whole story</b>, and it covers three
+     * different situations that need different reactions: a tag nobody has walked past today, a
+     * tag being asked about less and less because it keeps answering nothing, and a tag the app
+     * has given up on. Only the last of those is worth a person's attention, and only it has
+     * anything they can do about it.
+     *
+     * <p>The notice is for everybody; the three rows below it are behind the debug switch,
+     * because "3 fruitless searches, next attempt in 4h" is a sentence for whoever is diagnosing
+     * a bug report rather than for the person who just wants their keys.
+     */
+    private void describeHowItIsBeingLookedFor(final SimpleDateFormat timestamps) {
+        final boolean ignored = this.beaconInformation.isIgnored();
+
+        this.findViewById(R.id.device_ignored_notice).setVisibility(ignored ? VISIBLE : GONE);
+        if (ignored) {
+            this.findViewById(R.id.device_ignored_retry)
+                    .setOnClickListener(view -> this.lookForItAgainNow());
+        }
+
+        final Long lastScan = this.beaconInformation.getLastScanAt();
+        this.binding.setLastScanAttempt(lastScan == null
+                ? this.getString(R.string.debug_never)
+                : timestamps.format(new Date(lastScan)));
+
+        final Long newest = this.beaconRepo.newestReportTimeFor(this.beaconId).blockingFirst()
+                .orElse(null);
+        this.binding.setLastResultAt(newest == null
+                ? this.getString(R.string.debug_never)
+                : timestamps.format(new Date(newest)));
+
+        this.binding.setBackoffState(this.describeBackoff(timestamps));
+    }
+
+    private String describeBackoff(final SimpleDateFormat timestamps) {
+        final Long ignoredAt = this.beaconInformation.getIgnoredAt();
+        if (ignoredAt != null) {
+            return this.getString(
+                    R.string.debug_backoff_ignored, timestamps.format(new Date(ignoredAt)));
+        }
+
+        final int scans = this.beaconInformation.getFruitlessScans();
+        if (scans <= 0) {
+            return this.getString(R.string.debug_backoff_normal);
+        }
+
+        final Long lastScan = this.beaconInformation.getLastScanAt();
+        final long dueAt = (lastScan == null ? System.currentTimeMillis() : lastScan)
+                + WideScanBackoff.waitMillisAfter(scans);
+
+        return this.getString(R.string.debug_backoff_waiting, scans,
+                DateUtils.getRelativeTimeSpanString(
+                        dueAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS));
+    }
+
+    /**
+     * Hand the request back to the map, which owns fetching.
+     *
+     * <p><b>Deliberately the manual path.</b> That one is not subject to the backoff at all, so a
+     * tag the app had stopped asking about is asked about immediately - which is the entire point
+     * of the button. Anything found clears the flag as an ordinary consequence of a successful
+     * search, rather than through a second code path that could disagree with the first.
+     */
+    private void lookForItAgainNow() {
+        final Intent data = new Intent();
+        data.putExtra(RETRY_IGNORED_BEACON, this.beaconId);
+        this.setResult(RESULT_OK, data);
+        this.finish();
+    }
+
+    /** Asks whoever launched this screen to search for the named tag right now. */
+    public static final String RETRY_IGNORED_BEACON = "retryIgnoredBeacon";
+
+    /**
+     * Hide "original name" and "original emoji" for a tag whose name is not a nickname.
+     *
+     * <p><b>"Original" is only a coherent idea where something is layered over it.</b> A tag
+     * imported from a file, or one of the owner's own devices, keeps the name Apple gave it and
+     * shows a local nickname on top - so the two are different things and both are worth seeing.
+     * An accessory read from iCloud has no such split: renaming it writes to the account, so the
+     * name on screen <i>is</i> the name, and a row labelled "original" showing the same string
+     * invites the reader to hunt for a difference that cannot exist.
+     *
+     * <p>Deliberately the same predicate that decides where a rename goes. The two questions are
+     * one question - "is this a name we can actually change" - and answering it twice is how they
+     * end up disagreeing.
+     *
+     * <p>Called again once the heuristic answers, because it decides this and arrives after the
+     * screen is drawn.
+     */
+    private void showTheOriginalNameOnlyWhereItMeansSomething() {
+        final int visibility = this.renamingWritesToTheAccount() ? GONE : VISIBLE;
+
+        this.findViewById(R.id.settings_debug_device_name_original).setVisibility(visibility);
+        this.findViewById(R.id.settings_debug_device_emoji_original).setVisibility(visibility);
+    }
+
     private void onClickDeviceDelete() {
+        // A tag read from the Apple account is a cache of what Apple holds, so marking it
+        // removed here would undo itself at the next refresh - the row is written back with
+        // `is_removed = 0` and the tag reappears with no explanation. Removing it for real is
+        // done in Find My. See MyDevicesListActivity#confirmRemoveSelection, which says the
+        // same thing for a selection.
+        if (this.beaconInformation.isFromAccount()) {
+            new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                    .setTitle(R.string.cannot_remove_account_tag_title)
+                    .setIcon(R.drawable.help_center_24px)
+                    .setMessage(R.string.cannot_remove_account_tag_message)
+                    .setPositiveButton(R.string.ok, null)
+                    .show();
+            return;
+        }
+
         var dialog = new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
                 .setTitle(R.string.remove_device)
                 .setIcon(R.drawable.delete_24px)

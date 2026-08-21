@@ -218,6 +218,41 @@ public class BeaconInformation {
      */
     private final int customAccessoryKeyCount;
 
+    /**
+     * Whether this tag is a cache of the user's Apple account rather than the app's own copy.
+     *
+     * <p><b>It decides whether the app may remove it.</b> A file-imported tag exists only here,
+     * so removing it is the user's decision and nobody else's. An account tag is a copy of what
+     * Apple holds, and the next refresh rewrites the row from the account - so "remove" would
+     * appear to work and then quietly undo itself. Removing one for real means removing it in
+     * Find My, which this app deliberately does not do on the user's behalf.
+     *
+     * <p>Set at construction from {@code OwnedBeacon.fromAccount}, like {@link #isCustomAccessory()}
+     * and unlike the heuristics on this class - there is nothing in a plist to infer it from.
+     */
+    private final boolean fromAccount;
+
+    /**
+     * When the app gave up looking for this tag, or null if it has not.
+     *
+     * <p>Set only after a search covering months of history found nothing anywhere - not merely
+     * after an empty search, which for a recently paired tag means very little. Shown on the
+     * device list in place of "no last location known", because those two states look identical
+     * and are not: one is a tag nobody has walked past this week, the other is a tag that has
+     * stopped broadcasting and is no longer being looked for.
+     */
+    private final Long ignoredAt;
+
+    /** Consecutive searches that found nothing, which is what paces the next one. */
+    private final int fruitlessScans;
+
+    /** When it was last searched for, or null if never. */
+    private final Long lastScanAt;
+
+    public boolean isIgnored() {
+        return this.ignoredAt != null;
+    }
+
     public boolean isCustomAccessory() {
         return this.customAccessory;
     }

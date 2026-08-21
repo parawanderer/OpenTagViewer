@@ -65,6 +65,10 @@
             android:exported="false"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
+            android:name=".FetchFromICloudActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
+        <activity
             android:name=".AppleLoginActivity"
             android:exported="true"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity">

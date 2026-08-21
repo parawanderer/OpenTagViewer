@@ -19,6 +19,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -39,15 +40,19 @@ import java.util.stream.IntStream;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class MyDevicesListActivity extends AppCompatActivity {
@@ -63,7 +68,30 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
     private ActivityMyDevicesListBinding binding;
 
+    /**
+     * Whether anything changed here, so the map knows to re-read when this screen closes.
+     *
+     * <p><b>Saved and restored, because this screen recreates itself.</b> Finishing an account
+     * read sets this and then calls {@code recreate()} to rebuild the list - which destroys the
+     * activity and constructs a new one, where a plain field is false again. The tags were on
+     * screen, the flag that says so was gone, and the map went on showing nothing until the app
+     * was restarted. See {@link #KEY_DEVICES_CHANGED}.
+     */
     private boolean devicesListChanged = false;
+
+    /** Survives {@code recreate()}, which is the only reason this is in the instance state. */
+    private static final String KEY_DEVICES_CHANGED = "devicesListChanged";
+
+    /**
+     * Whether this app has joined the account's keychain, once the store has said.
+     *
+     * <p>Null while that is still being read - a decryption on a background thread - and null is
+     * treated as "not linked" for the menu, which shows the item. See {@link #showPageMenu()}.
+     */
+    private Boolean accountIsLinked;
+
+    /** The in-flight read of that, so leaving does not land on a menu that has gone. */
+    private Disposable membershipLookup;
 
     /**
      * The tags whose history is being written, captured when the storage picker was opened.
@@ -83,6 +111,37 @@ public class MyDevicesListActivity extends AppCompatActivity {
                     return;
                 }
                 this.writeHistoryZip(uri, this.pendingExport);
+            }
+    );
+
+    /**
+     * Reading the account, which can end by asking for the file picker instead.
+     *
+     * <p>An account with nothing to recover from, or with no tags on it, has one useful answer -
+     * import a bundle from somebody who owns them - so that screen hands the user straight back
+     * here with a flag rather than making them find the other button themselves.
+     */
+    private final ActivityResultLauncher<Intent> fetchFromICloudLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                final Intent data = result.getData();
+                if (data == null) {
+                    return;
+                }
+
+                if (data.getBooleanExtra(
+                        FetchFromICloudActivity.RESULT_WANTS_FILE_IMPORT, false)) {
+                    this.handleStartImport();
+                    return;
+                }
+
+                if (data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false)) {
+                    // Rebuilt rather than appended to. This screen accumulates into `beaconInfo`
+                    // on load, so fetching again would list everything twice - and the tags that
+                    // just arrived have to appear without the user backing out and returning.
+                    this.devicesListChanged = true;
+                    this.recreate();
+                }
             }
     );
 
@@ -108,6 +167,11 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
 
+        if (savedInstanceState != null) {
+            this.devicesListChanged =
+                    savedInstanceState.getBoolean(KEY_DEVICES_CHANGED, false);
+        }
+
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
         WindowPaddingUtil.insertUITopPadding(this.binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
@@ -127,6 +191,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
         this.binding.setHandleClickCloseSelection(this::endSelection);
         this.binding.setHandleClickSelectionMenu(this::showSelectionMenu);
+        this.binding.setHandleClickPageMenu(this::showPageMenu);
         this.showSelectionBar(false);
 
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
@@ -135,6 +200,9 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
         findViewById(R.id.my_devices_empty_import_button)
                 .setOnClickListener(v -> this.handleStartImport());
+
+        findViewById(R.id.my_devices_empty_fetch_button)
+                .setOnClickListener(v -> this.openTheAccountFetch());
 
         findViewById(R.id.my_devices_empty_wiki_link)
                 .setOnClickListener(v -> this.openExportGuide());
@@ -153,7 +221,22 @@ public class MyDevicesListActivity extends AppCompatActivity {
             }
         });
 
+        this.rememberWhetherTheAccountIsLinked();
         this.fetchDeviceInfoAndRender();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (this.membershipLookup != null && !this.membershipLookup.isDisposed()) {
+            this.membershipLookup.dispose();
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(KEY_DEVICES_CHANGED, this.devicesListChanged);
     }
 
     private void handleEndActivity() {
@@ -197,6 +280,46 @@ public class MyDevicesListActivity extends AppCompatActivity {
                         deviceListAdaptor.notifyItemChanged(index);
                     }, error -> Log.e(TAG, "Error occurred while querying for updated data for beaconId=" + beaconId, error));
         }
+    }
+
+    /**
+     * Re-read the last known locations whenever this screen comes back to the front.
+     *
+     * <p><b>The list was only ever loaded in {@code onCreate}.</b> Coming back from the device
+     * page refreshed it only when that page said a device had been removed or changed, and
+     * fetching history is neither - so a tag whose locations had just been found through the
+     * history screen went on saying "No last location known" until something else recreated the
+     * activity. @parawanderer found it by going device → history → back and seeing no change,
+     * then reaching the same list through the map and seeing "3 days ago". The data had been
+     * there the whole time; this screen had not looked again.
+     *
+     * <p>Locations only. Rebuilding the beacons as well would re-sort and re-bind every row
+     * under somebody who is reading them, and their names and icons cannot change without the
+     * device page saying so - which it already does.
+     *
+     * <p>Skipped while the first load is still in flight, since {@code onResume} runs
+     * immediately after {@code onCreate} and there is nothing yet to refresh.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (this.beaconInfo.isEmpty()) {
+            return;
+        }
+
+        var async = this.beaconRepo.getLastLocationsForAll()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(latest -> {
+                    if (latest.equals(this.locations)) {
+                        return;
+                    }
+
+                    this.locations.clear();
+                    this.locations.putAll(latest);
+                    this.deviceListAdaptor.notifyItemRangeChanged(0, this.beaconInfo.size());
+                }, error -> Log.e(TAG, "Could not refresh the last known locations", error));
     }
 
     private void fetchDeviceInfoAndRender() {
@@ -280,6 +403,61 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * a menu that grows an item between versions is harder to learn than one where the item is
      * visibly not ready. The XML disables it; this is where to stop doing that.
      */
+    /**
+     * The two ways to get tags in, from a screen that already has some.
+     *
+     * <p><b>Both of these used to be reachable only from the empty state</b>, which is hidden the
+     * moment anything is imported - so after a first import there was no way back to either. It
+     * matters most for the account route: the app joins the keychain precisely so that a later
+     * read costs one tap and no device passcode, and there was nothing to tap.
+     */
+    private void showPageMenu() {
+        final PopupMenu menu = new PopupMenu(
+                this, this.binding.settingsTopToolbar.pageMenuButton);
+        menu.getMenuInflater().inflate(R.menu.my_devices_menu, menu.getMenu());
+
+        // **Hidden once the account is linked**, because linking is what this item does. After
+        // it, the app is a member of the keychain and re-reads without asking for anything, so
+        // an item offering to link again describes work already done. Shown while the answer is
+        // still unknown: the screen it leads to resumes as a member anyway, so the harmless
+        // mistake is offering it once too often rather than hiding the only way in.
+        menu.getMenu().findItem(R.id.action_fetch_from_account)
+                .setVisible(!Boolean.TRUE.equals(this.accountIsLinked));
+
+        menu.setOnMenuItemClickListener(item -> {
+            final int id = item.getItemId();
+
+            if (id == R.id.action_fetch_from_account) {
+                this.openTheAccountFetch();
+                return true;
+            }
+            if (id == R.id.action_import_from_file) {
+                this.handleStartImport();
+                return true;
+            }
+            return false;
+        });
+
+        menu.show();
+    }
+
+    private void rememberWhetherTheAccountIsLinked() {
+        this.membershipLookup = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .get()
+                .firstOrError()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> this.accountIsLinked = held.isPresent(),
+                        error -> Log.w(TAG, "Could not read whether the account is linked;"
+                                + " the menu will go on offering to link it", error));
+    }
+
+    private void openTheAccountFetch() {
+        this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
+    }
+
     private void showSelectionMenu() {
         PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
         menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
@@ -353,25 +531,73 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 + ".zip";
     }
 
+    /**
+     * Remove, minus the tags this app does not own.
+     *
+     * <p><b>A tag read from the Apple account cannot be removed from here, and saying so is the
+     * whole point of this.</b> Marking one removed appears to work and then undoes itself: the
+     * row is a cache of the account, so the next refresh writes it back with
+     * {@code is_removed = 0} and the tag returns with no explanation. Removing it for real means
+     * removing it in Find My, which is the user's account to change and not this app's.
+     *
+     * <p>So the destructive button is offered only for what is actually the app's to remove, and
+     * a selection that is entirely account tags gets an explanation instead of a dialog whose
+     * confirm button would lie.
+     */
     private void confirmRemoveSelection() {
         final List<BeaconInformation> selected = this.deviceListAdaptor.getSelectedBeacons();
         if (selected.isEmpty()) {
             return;
         }
 
-        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
-                .setTitle(selected.size() == 1 ? R.string.remove_device : R.string.remove_devices)
-                .setIcon(R.drawable.delete_24px)
-                .setMessage(selected.size() == 1
+        final List<BeaconInformation> removable = new ArrayList<>();
+        int fromTheAccount = 0;
+        for (final BeaconInformation device : selected) {
+            if (device.isFromAccount()) {
+                fromTheAccount++;
+            } else {
+                removable.add(device);
+            }
+        }
+
+        if (removable.isEmpty()) {
+            this.explainAccountTagsCannotBeRemoved(selected.size());
+            return;
+        }
+
+        // Mixed: the message names what will survive, so nobody has to notice afterwards that
+        // some of what they picked is still there.
+        final CharSequence message = fromTheAccount == 0
+                ? this.getString(removable.size() == 1
                         ? R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back
                         : R.string.are_you_sure_you_want_to_remove_these_devices)
+                : this.getString(R.string.remove_devices_but_keep_account_ones, fromTheAccount);
+
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(removable.size() == 1 ? R.string.remove_device : R.string.remove_devices)
+                .setIcon(R.drawable.delete_24px)
+                .setMessage(message)
                 .setPositiveButton(R.string.confirm, (dialog, which) -> {
-                    for (BeaconInformation device : selected) {
+                    for (BeaconInformation device : removable) {
                         this.removeDevice(device);
                     }
                     this.endSelection();
                 })
                 .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** No confirm button, because there is nothing here for the app to do. */
+    private void explainAccountTagsCannotBeRemoved(final int howMany) {
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.cannot_remove_account_tag_title)
+                // Not the delete icon. Nothing is being deleted, and the theme-tinted icons are
+                // the only ones legible in both modes - `apple.xml` is hardcoded black.
+                .setIcon(R.drawable.help_center_24px)
+                .setMessage(howMany == 1
+                        ? R.string.cannot_remove_account_tag_message
+                        : R.string.cannot_remove_account_tags_message)
+                .setPositiveButton(R.string.ok, null)
                 .show();
     }
 

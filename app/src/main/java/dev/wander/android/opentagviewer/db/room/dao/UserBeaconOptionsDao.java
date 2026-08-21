@@ -19,4 +19,14 @@ public interface UserBeaconOptionsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(UserBeaconOptions... options);
+
+    /**
+     * Drop one tag's overrides.
+     *
+     * <p><b>What makes a real rename real.</b> An accessory renamed in iCloud has its actual name
+     * changed, so any nickname sitting over the top of it has to go - a leftover would win at
+     * display time and hide the value that was just written.
+     */
+    @Query("DELETE FROM UserBeaconOptions WHERE beacon_id = :beaconId")
+    void deleteById(String beaconId);
 }

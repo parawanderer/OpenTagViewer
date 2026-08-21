@@ -5,6 +5,9 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,8 +27,12 @@ import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
+import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
+import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.rx.ScanOrder;
+import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -35,6 +42,15 @@ public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
     private final OpenTagViewerDatabase db;
     private final PlistToAccessoryJsonConverter accessoryJsonConverter;
+
+    /**
+     * The source of the scheduled fetch's shuffle.
+     *
+     * <p>Held rather than made per call so a test can seed it, and so the sequence continues
+     * across refreshes instead of restarting - a fresh Random each time is a fresh chance to
+     * draw the same order.
+     */
+    private final java.util.Random shuffle = new java.util.Random();
 
     public BeaconRepository(OpenTagViewerDatabase db) {
         this(db, new ChaquopyPlistToAccessoryJsonConverter());
@@ -61,7 +77,23 @@ public class BeaconRepository {
 
                 var ownedBeacons = importData.getOwnedBeacons();
                 ownedBeacons.forEach(b -> b.importId = insertionId);
-                db.ownedBeaconDao().insertAll(ownedBeacons.toArray(new OwnedBeacon[0]));
+
+                // **Insert what is new, update what is held.** Re-importing is ordinary - a newer
+                // export carries a key alignment record an older one lacked - and a re-insert
+                // would delete the existing row, cascading into the user's custom names, the
+                // tag's location history and the record of which days have been fetched. See
+                // OwnedBeaconDao#insertAll.
+                db.ownedBeaconDao().insertIfNew(ownedBeacons.toArray(new OwnedBeacon[0]));
+
+                for (final OwnedBeacon beacon : ownedBeacons) {
+                    db.ownedBeaconDao().refreshFromImport(
+                            beacon.id,
+                            beacon.content,
+                            beacon.alignmentPlist,
+                            beacon.accessoryJson,
+                            beacon.version,
+                            insertionId);
+                }
 
                 var beaconNamingRecords = importData.getBeaconNamingRecords();
                 beaconNamingRecords.forEach(b -> b.importId = insertionId);
@@ -74,6 +106,139 @@ public class BeaconRepository {
             }
         }).subscribeOn(Schedulers.io());
     }
+
+    /**
+     * Bring the beacons held for the Apple account into line with what it actually holds.
+     *
+     * <p><b>A refresh, not an import.</b> These rows are a cache of somebody's account: what is
+     * on it is written, and what has left it is retired. That is the whole reason
+     * {@code from_account} exists - a file-imported beacon is the only copy anyone has, so this
+     * must never touch one, and the DAO scopes every write accordingly.
+     *
+     * <p>Retired rather than deleted, so a tag that leaves the account does not take its location
+     * history with it on the way out.
+     *
+     * <p>Rows are written with {@code is_removed = 0}, which matters for a tag that left the
+     * account and later came back: without it the row would be restored still marked as gone.
+     *
+     * @return the ids now held for the account.
+     */
+    public Observable<List<String>> refreshAccountBeacons(
+            @NonNull final List<AccessoryRecords> fromAccount) {
+        return Observable.fromCallable(() -> {
+            try {
+                final List<String> ids = new ArrayList<>();
+                final List<OwnedBeacon> beacons = new ArrayList<>();
+                final List<BeaconNamingRecord> namingRecords = new ArrayList<>();
+
+                for (final AccessoryRecords record : fromAccount) {
+                    ids.add(record.getBeaconId());
+
+                    beacons.add(OwnedBeacon.builder()
+                            .id(record.getBeaconId())
+                            .importId(null)
+                            .version(ACCOUNT_SOURCED_VERSION)
+                            .content(record.getOwnedBeaconPlist())
+                            .alignmentPlist(record.getKeyAlignmentPlist())
+                            // Converted eagerly, exactly as a zip import does. Null on failure is
+                            // not fatal: the lazy backfill on first fetch handles it.
+                            .accessoryJson(this.accessoryJsonConverter.convert(
+                                    record.getOwnedBeaconPlist(), record.getKeyAlignmentPlist()))
+                            .fromAccount(true)
+                            .isRemoved(false)
+                            .build());
+
+                    if (record.getNamingRecordPlist() != null) {
+                        namingRecords.add(BeaconNamingRecord.builder()
+                                .id(record.getBeaconId())
+                                .importId(null)
+                                .version(ACCOUNT_SOURCED_VERSION)
+                                .content(record.getNamingRecordPlist())
+                                .build());
+                    }
+                }
+
+                // **Insert the new ones, update the rest. Never re-insert.** A re-insert is
+                // `INSERT OR REPLACE`, which deletes the row it is replacing and cascades that
+                // delete into UserBeaconOptions and LocationReport - so an ordinary background
+                // read would silently take the user's custom names and the tag's whole location
+                // history with it. See OwnedBeaconDao#insertAll.
+                if (!beacons.isEmpty()) {
+                    db.ownedBeaconDao().insertIfNew(beacons.toArray(new OwnedBeacon[0]));
+
+                    for (final OwnedBeacon beacon : beacons) {
+                        db.ownedBeaconDao().refreshFromAccount(
+                                beacon.id,
+                                beacon.content,
+                                beacon.alignmentPlist,
+                                beacon.accessoryJson,
+                                beacon.version);
+                    }
+                }
+                if (!namingRecords.isEmpty()) {
+                    db.beaconNamingRecordDao()
+                            .insertAll(namingRecords.toArray(new BeaconNamingRecord[0]));
+                }
+
+                // `NOT IN ()` is not valid SQL, so an account that now holds nothing needs the
+                // other query rather than a list nobody can match against.
+                final int retired = ids.isEmpty()
+                        ? db.ownedBeaconDao().retireEveryAccountBeacon()
+                        : db.ownedBeaconDao().retireAccountBeaconsMissingFrom(ids);
+
+                Log.i(TAG, "Refreshed from the Apple account: " + ids.size()
+                        + " held, " + retired + " retired");
+
+                return ids;
+            } catch (Exception e) {
+                Log.e(TAG, "Error occurred while refreshing the beacons held for the account", e);
+                throw new RepoQueryException(e);
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Write a name and emoji that iCloud has already accepted into the stored naming record.
+     *
+     * <p><b>Only after the account has taken the change</b>, never before and never instead. This
+     * is what makes the tag's real name change rather than acquiring a nickname over the top of
+     * it - see {@link dev.wander.android.opentagviewer.util.parse.NamingRecordEditor} for why the
+     * difference is not cosmetic.
+     *
+     * <p>Silently does nothing for a tag with no naming record. CloudKit holds none for an
+     * accessory nobody ever named, and a rename of one of those is a change the next account read
+     * will bring back properly - there is nothing here to edit in the meantime, and inventing a
+     * record would put a document in the database that Apple never sent.
+     */
+    public Completable renameStoredAccessory(
+            @NonNull final String beaconId, final String name, final String emoji) {
+        return Completable.fromAction(() -> {
+            // **Any nickname over this tag has to go.** The name being written is now the tag's
+            // real one, and an override wins at display time - leaving one would hide the value
+            // that was just sent to Apple behind the value it replaced.
+            db.userBeaconOptionsDao().deleteById(beaconId);
+
+            final BeaconNamingRecord stored = db.beaconNamingRecordDao().getByBeaconId(beaconId);
+
+            if (stored == null) {
+                Log.i(TAG, "No stored naming record for " + beaconId
+                        + "; the next account read will bring the new name back");
+                return;
+            }
+
+            stored.content = NamingRecordEditor.with(stored.content, name, emoji);
+            db.beaconNamingRecordDao().insertAll(stored);
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The {@code version} recorded for a row that came from the account rather than a bundle.
+     *
+     * <p>A bundle's version is its export format, which is what tells a reader how to interpret
+     * the files in it. Nothing was exported here, so borrowing a format number would be a claim
+     * about a file that does not exist.
+     */
+    private static final String ACCOUNT_SOURCED_VERSION = "account";
 
     public Observable<Optional<Import>> getImportById(final long importId) {
         return Observable.fromCallable(() -> {
@@ -186,6 +351,92 @@ public class BeaconRepository {
      *                                {@link java.util.HashMap}, because {@code Map.of} and
      *                                {@code Collectors.toMap} both throw on a null value.
      */
+    /**
+     * The same, minus the tags a <b>scheduled</b> fetch should leave alone right now.
+     *
+     * <p><b>A separate entry point on purpose, and the separation is the safety.</b> The backoff
+     * exists so the app stops spending most of its conversation with Apple on tags that never
+     * answer - but a person who opens a tag and presses refresh must get a search every time,
+     * however long it has been quiet, because they may have just found the thing. Filtering
+     * inside {@link #toAccessoryRequests} would have applied it to both, and the user-facing
+     * failure would be a button that silently does nothing.
+     *
+     * <p>So the periodic path calls this and the manual paths call the other one, and which is
+     * which is readable at the call site rather than hidden behind a flag.
+     */
+    /** The newest location held for a tag, for the "last result" line on the tag page. */
+    public Observable<Optional<Long>> newestReportTimeFor(@NonNull final String beaconId) {
+        return Observable.fromCallable(
+                        () -> Optional.ofNullable(db.locationReportDao().newestReportTimeFor(beaconId)))
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Observable<List<AccessoryRequest>> toScheduledAccessoryRequests(
+            final Map<String, String> beaconIdToPlistFallback) {
+
+        return Observable.fromCallable(() -> this.dueForAScheduledScan(beaconIdToPlistFallback))
+                .subscribeOn(Schedulers.io())
+                .flatMap(this::toAccessoryRequests);
+    }
+
+    private Map<String, String> dueForAScheduledScan(final Map<String, String> all) {
+        final long now = System.currentTimeMillis();
+        final var dao = db.ownedBeaconDao();
+
+        final List<ScanOrder.Candidate> candidates = new ArrayList<>();
+        int ignored = 0;
+        int waiting = 0;
+
+        for (final var entry : all.entrySet()) {
+            final OwnedBeacon row = dao.getById(entry.getKey());
+
+            if (row != null && row.ignoredAt != null) {
+                ignored++;
+                continue;
+            }
+            if (row != null && !WideScanBackoff.isDue(now, row.fruitlessScans, row.lastScanAt)) {
+                waiting++;
+                continue;
+            }
+
+            candidates.add(new ScanOrder.Candidate(
+                    entry.getKey(),
+                    row != null && row.lastScanAt != null,
+                    row != null && row.lastScanAt != null && row.fruitlessScans == 0));
+        }
+
+        if (ignored > 0 || waiting > 0) {
+            Log.d(TAG, "Scheduled fetch is skipping " + ignored + " ignored and " + waiting
+                    + " backing off; asking about " + candidates.size());
+        }
+
+        // **A LinkedHashMap, because the order is the point.** toAccessoryRequests walks the map
+        // it is handed, so a HashMap here would throw the ordering away silently - the requests
+        // would come out in hash order and nothing would fail.
+        //
+        // Null values are meaningful - see toAccessoryRequests - so every key goes in with
+        // whatever fallback it had.
+        final Map<String, String> due = new LinkedHashMap<>();
+        for (final String beaconId : ScanOrder.forScheduledFetch(candidates, this.shuffle)) {
+            due.put(beaconId, all.get(beaconId));
+        }
+
+        return due;
+    }
+
+    /**
+     * The beacons nobody has ever searched for, which get a wider first window.
+     *
+     * <p>Read once per batch rather than per accessory: it is one small query and the answer
+     * cannot change underneath a batch in a way that matters - a tag that becomes scanned
+     * halfway through simply gets the ordinary window next time, which is the intent.
+     */
+    public Observable<Set<String>> neverScanned() {
+        return Observable.fromCallable(
+                        () -> (Set<String>) new HashSet<>(db.ownedBeaconDao().neverScannedIds()))
+                .subscribeOn(Schedulers.io());
+    }
+
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
         return Observable.fromCallable(() -> {
             if (beaconIdToPlistFallback.isEmpty()) {
@@ -245,9 +496,79 @@ public class BeaconRepository {
                     dao.updateAccessoryJson(entry.getKey(), entry.getValue());
                 }
             }
+
+            this.recordWhatEachScanFound(dao, fetchResult);
+
             return fetchResult.getReports();
         }).subscribeOn(Schedulers.io())
         .flatMap(this::storeToLocationCache);
+    }
+
+    /**
+     * Note, per tag, whether this search found anything - which is what paces the next one.
+     *
+     * <p><b>Three outcomes, not two.</b> Something found resets everything. Nothing found lengthens
+     * the wait a little, because a fortnight of silence is an ordinary tag having an ordinary
+     * week. Nothing found across <i>months</i> of history is different in kind: the tag has
+     * stopped broadcasting, and every further search costs a full-history scan that cannot repay
+     * itself, so it is set aside until somebody asks.
+     *
+     * <p>Driven from what was actually searched rather than from a count of reports, because only
+     * Python knows how wide the key window was - see {@code FetchResult#getExhaustedWideSearch}.
+     */
+    private void recordWhatEachScanFound(
+            final dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao dao,
+            final FetchResult fetchResult) {
+
+        final long now = System.currentTimeMillis();
+
+        for (final var entry : fetchResult.getReports().entrySet()) {
+            final String beaconId = entry.getKey();
+            final boolean foundSomething = entry.getValue() != null && !entry.getValue().isEmpty();
+
+            if (foundSomething) {
+                dao.recordSuccessfulScan(beaconId, now);
+            } else if (fetchResult.getExhaustedWideSearch().contains(beaconId)) {
+                // **Not on the first one.** Retiring a tag is close to permanent - it is skipped
+                // by every automatic fetch afterwards and only comes back when somebody opens it
+                // and asks - so one bad search is a thin basis for it. A fetch can come back
+                // empty for reasons that have nothing to do with the tag: a request that failed,
+                // an account that was briefly unhappy, a moment when Apple returned nothing.
+                //
+                // So it takes a second, and the two are a refresh cycle apart rather than
+                // back-to-back, which is a real further chance for somebody to walk past it.
+                //
+                // Phrased as "the previous search also failed" rather than "was also
+                // exhaustive", because there is no column recording that and adding one means a
+                // Room migration - rule 1 - for a refinement of a heuristic. In practice the
+                // difference is nothing: exhaustion needs a key window wider than
+                // _DEAD_TAG_WIDTH_INDICES, and a window that wide does not narrow on its own, so
+                // for the tags this is aimed at every consecutive failure is an exhaustive one.
+                final OwnedBeacon held = dao.getById(beaconId);
+                final int failuresBefore = held == null ? 0 : held.fruitlessScans;
+
+                if (failuresBefore >= 1) {
+                    Log.i(TAG, beaconId + " found nothing across months of history for the"
+                            + " second time running; it will be skipped until somebody asks for"
+                            + " it directly");
+                    dao.markIgnored(beaconId, now);
+                } else {
+                    Log.i(TAG, beaconId + " found nothing across months of history; giving it"
+                            + " one more search before setting it aside");
+                    dao.recordFruitlessScan(beaconId, now);
+                }
+            } else if (fetchResult.getWideSearch().contains(beaconId)) {
+                dao.recordFruitlessScan(beaconId, now);
+            } else {
+                // **An empty answer from a cheap search is not a failure.** An aligned tag costs
+                // a request or two, and finding nothing new in the window asked for is the
+                // ordinary state of a tag that reported an hour ago and has not moved since.
+                // Counting it made tags that update every day slowly accrue strikes and start
+                // being asked less often - the opposite of what the backoff is for, which is to
+                // stop full-history searches nobody is going to benefit from.
+                dao.recordSuccessfulScan(beaconId, now);
+            }
+        }
     }
 
     public Observable<Map<String, List<BeaconLocationReport>>> storeToLocationCache(Map<String, List<BeaconLocationReport>> reportsForBeaconId) {

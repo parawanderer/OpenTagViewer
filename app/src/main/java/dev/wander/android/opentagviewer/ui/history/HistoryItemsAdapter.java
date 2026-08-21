@@ -33,6 +33,7 @@ import java.util.function.Consumer;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.util.parse.LocationReportFields;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -108,16 +109,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
 
         if (this.userSettings.getEnableDebugData() == Boolean.TRUE) {
             viewHolder.getLocationDetail().setVisibility(VISIBLE);
-            viewHolder.getLocationDetail().setText(String.format(
-                    Locale.ROOT,
-                    "coords:%.6f,%.6f, desc:%s, status:%d, conf:%d, acc:%d",
-                    item.getLatitude(),
-                    item.getLongitude(),
-                    item.getDescription(),
-                    item.getStatus(),
-                    item.getConfidence(),
-                    item.getHorizontalAccuracy()
-            ));
+            viewHolder.getLocationDetail().setText(LocationReportFields.debugText(item));
         } else {
             viewHolder.getLocationDetail().setVisibility(GONE);
         }

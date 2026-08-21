@@ -61,6 +61,7 @@ import dev.wander.android.opentagviewer.databinding.ActivitySettingsBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
@@ -82,6 +83,7 @@ import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import lombok.NonNull;
@@ -115,6 +117,12 @@ public class SettingsActivity extends AppCompatActivity {
     private String initialAnisetteUrl = null;
     private boolean mapProviderChanged = false;
 
+    /** Reading whether the account is linked, so leaving does not land on dead views. */
+    private Disposable membershipLookup;
+
+    /** Forgetting the membership. Held for the same reason - it reports back on the main thread. */
+    private Disposable unlinking;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +154,10 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
+        this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
+        this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);
+        this.sayWhetherTheAccountIsLinked();
+
         this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());
         this.binding.setOnClickLanguage(this::onClickEditLanguage);
@@ -244,6 +256,122 @@ public class SettingsActivity extends AppCompatActivity {
         return this.currentSettings.getUseDarkTheme()
                 ? this.getString(R.string.dark_theme)
                 : this.getString(R.string.light_theme);
+    }
+
+    /**
+     * Say whether this app has already joined the account's keychain, and offer to undo it.
+     *
+     * <p><b>The row read the same either way</b>, which is the wrong answer twice over: somebody
+     * who has linked cannot tell that they have, and somebody who has not is told their tags will
+     * "update" when nothing has ever been read. Being a member is the thing that makes a later
+     * read cost one tap and no device passcode, so it is worth saying out loud.
+     *
+     * <p>Set to the unlinked wording first and corrected when the store answers, rather than left
+     * blank until then. Reading it is a decryption on a background thread, and a row that appears
+     * with no subtitle and grows one a moment later is worse than one that starts by describing
+     * the more common case.
+     *
+     * <p>The unlink row follows the same answer. Hidden rather than disabled while unlinked -
+     * there is nothing to undo yet, and a permanently greyed row in Settings reads as something
+     * broken rather than something not applicable.
+     */
+    private void sayWhetherTheAccountIsLinked() {
+        this.binding.setFetchFromAccountSubtitle(
+                this.getString(R.string.icloud_fetch_from_settings_subtitle));
+        this.showTheUnlinkRow(false);
+
+        this.membershipLookup = this.memberships().get()
+                .firstOrError()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> {
+                            this.binding.setFetchFromAccountSubtitle(this.getString(
+                                    held.isPresent()
+                                            ? R.string.icloud_fetch_from_settings_linked
+                                            : R.string.icloud_fetch_from_settings_subtitle));
+                            this.showTheUnlinkRow(held.isPresent());
+                        },
+                        error -> Log.w(TAG, "Could not read whether the account is linked;"
+                                + " leaving the row describing the unlinked case", error));
+    }
+
+    private KeychainMembershipRepository memberships() {
+        return new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil());
+    }
+
+    private void showTheUnlinkRow(final boolean visible) {
+        this.binding.settingsUnlinkAccount.getRoot()
+                .setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * Unlink, once the user has been told what that does and - more importantly - what it does
+     * not.
+     *
+     * <p><b>Nothing here can leave the account's trust circle</b>, so the peer this app joined as
+     * goes on existing. All this does is forget the keys for it, which is what stops the
+     * background read. The entry the user can see in their Apple device list stays until they
+     * remove it there, and the dialog says so: somebody who unlinks expecting the device list to
+     * tidy itself up will otherwise go looking for a bug.
+     *
+     * <p>Confirmed rather than immediate because linking again is not free - it needs the Apple
+     * device passcode, which is not something people have to hand.
+     */
+    private void onClickUnlinkAccount() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.icloud_unlink_confirm_title)
+                .setMessage(R.string.icloud_unlink_confirm_message)
+                .setNegativeButton(R.string.cancel, (dialog, which) -> dialog.dismiss())
+                .setPositiveButton(R.string.icloud_unlink_confirm_button,
+                        (dialog, which) -> this.unlinkTheAccount())
+                .show();
+    }
+
+    private void unlinkTheAccount() {
+        this.unlinking = this.memberships().forget()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        () -> {
+                            Log.i(TAG, "The keychain membership has been forgotten");
+                            this.binding.setFetchFromAccountSubtitle(this.getString(
+                                    R.string.icloud_fetch_from_settings_subtitle));
+                            this.showTheUnlinkRow(false);
+                            Toast.makeText(this, R.string.icloud_unlink_done,
+                                    Toast.LENGTH_LONG).show();
+                        },
+                        error -> {
+                            // **Left linked, and said so.** The row is not hidden on failure:
+                            // reporting an unlink that did not happen would leave the background
+                            // read still running against an account the user believes it has let
+                            // go of.
+                            Log.e(TAG, "Could not forget the keychain membership", error);
+                            Toast.makeText(this, R.string.icloud_unlink_failed,
+                                    Toast.LENGTH_LONG).show();
+                        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        // The lookup hops back to the main thread to set a subtitle. If the screen has gone by
+        // then that is a binding update on detached views, so it is stopped rather than left to
+        // land wherever it lands.
+        if (this.membershipLookup != null && !this.membershipLookup.isDisposed()) {
+            this.membershipLookup.dispose();
+        }
+        // **Disposed, but the write is not cancelled by it.** forget() is a DataStore update that
+        // has already been handed off; dropping the subscription only stops the toast and the
+        // binding update arriving at a screen that has gone. The membership is forgotten either
+        // way, which is the behaviour somebody who taps Unlink and immediately leaves expects.
+        if (this.unlinking != null && !this.unlinking.isDisposed()) {
+            this.unlinking.dispose();
+        }
+        super.onDestroy();
+    }
+
+    private void onClickFetchFromAccount() {
+        this.startActivity(new Intent(this, FetchFromICloudActivity.class));
     }
 
     private void onClickEditTheme() {

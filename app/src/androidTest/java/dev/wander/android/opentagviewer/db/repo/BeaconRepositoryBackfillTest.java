@@ -335,7 +335,10 @@ public class BeaconRepositoryBackfillTest {
         final String updated = "{\"type\":\"accessory\",\"alignment_index\":4242}";
         var fetchResult = new dev.wander.android.opentagviewer.python.FetchResult(
                 Collections.emptyMap(),
-                Map.of("beacon-a", updated)
+                Map.of("beacon-a", updated),
+                // Nothing was searched wide and found empty here; this test is about the
+                // accessory JSON being written back, not about tags that have gone quiet.
+                java.util.Set.of(), java.util.Set.of()
         );
 
         repo.storeFetchResult(fetchResult).blockingFirst();
@@ -353,7 +356,7 @@ public class BeaconRepositoryBackfillTest {
         var updates = new java.util.HashMap<String, String>();
         updates.put("beacon-a", null);
         var fetchResult = new dev.wander.android.opentagviewer.python.FetchResult(
-                Collections.emptyMap(), updates);
+                Collections.emptyMap(), updates, java.util.Set.of(), java.util.Set.of());
 
         repo.storeFetchResult(fetchResult).blockingFirst();
 

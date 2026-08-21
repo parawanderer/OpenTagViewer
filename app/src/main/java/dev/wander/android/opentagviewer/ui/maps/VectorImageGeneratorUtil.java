@@ -3,6 +3,7 @@ package dev.wander.android.opentagviewer.ui.maps;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.graphics.Color;
 import android.graphics.HardwareRenderer;
 import android.graphics.Paint;
@@ -14,6 +15,7 @@ import android.graphics.drawable.Drawable;
 import android.hardware.HardwareBuffer;
 import android.media.ImageReader;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.DrawableRes;
@@ -84,13 +86,26 @@ public final class VectorImageGeneratorUtil {
 
         drawMarker(canvas, markerDrawable, markerColor);
 
-        // draw emoji on marker (e.g. an emoji like 😁 would be placed in the middle of the marker)
+        // **Centred on the pin's head, not on the pin.** A location pin is a circle with a point
+        // hanging off the bottom, so the middle of its bounding box is below the middle of the
+        // head - and the emoji used to be placed by halving the drawable's height and nudging it
+        // with two magic divisors, which put it low and slightly left. It was only visible next
+        // to a non-emoji pin, where the icon is positioned by setBounds and lands correctly.
+        //
+        // So both now use the same box, and Paint measures the glyph instead of a constant
+        // guessing at its width: ALIGN.CENTER handles x, and the font metrics put the glyph's
+        // visual middle on the box's middle rather than its baseline.
+        final Rect head = innerIconBounds(canvas, markerDrawable);
+
         Paint paint = new Paint();
         paint.setColor(Color.BLACK);
         paint.setTextSize(EMOJI_TEXT_SIZE);
-        final float emojiX = (markerDrawable.getIntrinsicWidth()/2.f) - (EMOJI_TEXT_SIZE/1.75f);
-        final float emojiY = (markerDrawable.getIntrinsicHeight()/2.f) + (EMOJI_TEXT_SIZE/8f);
-        canvas.drawText(emoji, emojiX, emojiY, paint);
+        paint.setTextAlign(Paint.Align.CENTER);
+
+        final Paint.FontMetrics metrics = paint.getFontMetrics();
+        final float baseline = head.centerY() - (metrics.ascent + metrics.descent) / 2f;
+
+        canvas.drawText(emoji, head.centerX(), baseline, paint);
 
         BITMAP_CACHE.put(key, bitmap);
         return bitmap;
@@ -118,12 +133,35 @@ public final class VectorImageGeneratorUtil {
         // draw secondary icon on marker (e.g. apple icon)
         Drawable iconOnMarkerDrawable = Objects.requireNonNull(// TINTED_AFTERWARDS: setTint below replaces every fill, so no theme is needed here.
         ResourcesCompat.getDrawable(resources, innerIcon, null));
-        iconOnMarkerDrawable.setBounds(unit, half + INNER_ICON_OFFSET_TOP, canvas.getWidth() - unit, canvas.getHeight() - (unit + half) + INNER_ICON_OFFSET_TOP);
+        iconOnMarkerDrawable.setBounds(innerIconBounds(canvas, markerDrawable));
         DrawableCompat.setTint(iconOnMarkerDrawable, iconColor);
         iconOnMarkerDrawable.draw(canvas);
 
         BITMAP_CACHE.put(key, bitmap);
         return bitmap;
+    }
+
+    /**
+     * The square inside the pin's head, which is where anything drawn on a pin belongs.
+     *
+     * <p><b>One definition, used by both kinds of pin.</b> The emoji and the icon are drawn by
+     * completely different means - {@code drawText} against {@code setBounds} - and while each
+     * had its own idea of where the middle was, they disagreed: the icon sat in the head and the
+     * emoji sat low and left of it. Sharing the box is what makes them land in the same place,
+     * and makes "is it centred" a question with one answer rather than two.
+     *
+     * <p>The numbers are the ones the icon has always used, since that was the one that looked
+     * right. {@code INNER_ICON_OFFSET_TOP} nudges it up off the point of the pin.
+     */
+    private static Rect innerIconBounds(Canvas canvas, Drawable markerDrawable) {
+        final int unit = (int) ((float) markerDrawable.getIntrinsicWidth() / 3.5f);
+        final int half = unit / 2;
+
+        return new Rect(
+                unit,
+                half + INNER_ICON_OFFSET_TOP,
+                canvas.getWidth() - unit,
+                canvas.getHeight() - (unit + half) + INNER_ICON_OFFSET_TOP);
     }
 
     private static void drawMarker(Canvas canvas, Drawable markerDrawable, @ColorInt int markerColor) {
@@ -140,7 +178,27 @@ public final class VectorImageGeneratorUtil {
         // https://developer.android.com/guide/topics/renderscript/compute
         // however this was explicitly deprecated for Android 12 and up
         // so meh. No blur shadow, just an outline for older versions)
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? drawShadow(markerDrawable) : fromOutline(markerDrawable);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                return drawShadow(markerDrawable);
+            } catch (final RuntimeException cannotBlur) {
+                // **A missing shadow is not worth a missing pin.** The blur goes through
+                // HardwareRenderer and an ImageReader, which needs a working GPU render path -
+                // and where there is not one, acquireNextImage returns null and this used to
+                // throw all the way out of showBeaconOnMap. The tag then simply did not appear
+                // on the map, with an exception in the log about an image, which is a long way
+                // from "this device cannot blur".
+                //
+                // Found on the headless emulator the instrumented tests run on, which has no
+                // GPU. That is not a real user's phone - but "the device cannot do the fancy
+                // version" is exactly the case the older-Android branch below already handles,
+                // and losing the drop shadow is a far better outcome than losing the marker.
+                Log.w(TAG, "Could not render the marker's blurred shadow on this device;"
+                        + " drawing a plain outline instead", cannotBlur);
+            }
+        }
+
+        return fromOutline(markerDrawable);
     }
 
     /**

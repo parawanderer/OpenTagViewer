@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    How to get tags in, from a screen that already has some.
+
+    Both of these were only ever reachable from the empty state, which is hidden the moment
+    anything is imported - so after a first import there was no way back to either. That matters
+    most for the account route: the app joins the keychain precisely so a later read costs one
+    tap and no passcode, and there was nothing to tap.
+
+    Same wording as the empty-state buttons, deliberately. They are the same two actions, and a
+    menu that renames them makes the second one look like a third option.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        No icons. A PopupMenu does not draw them anyway, and the only on-brand candidate here is
+        apple.xml, whose paths are hardcoded black - it would be invisible in dark mode the day
+        somebody rendered this menu somewhere that does show them.
+    -->
+    <!--
+        **Linking, not fetching, and it goes away once done.** This is how somebody who has only
+        ever imported zips connects their account; after that the app is a member of the keychain
+        and reads it without asking anything, so offering "link" again describes work that has
+        already happened. Re-reading on demand lives in Settings, where the row says the account
+        is linked.
+    -->
+    <item
+        android:id="@+id/action_fetch_from_account"
+        android:title="@string/icloud_link_account_action" />
+
+    <item
+        android:id="@+id/action_import_from_file"
+        android:title="@string/icloud_import_from_file" />
+
+</menu>

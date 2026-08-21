@@ -7,9 +7,12 @@ import org.chromium.net.CronetEngine;
 import androidx.annotation.VisibleForTesting;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
+import dev.wander.android.opentagviewer.python.icloud.ICloudService;
+import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 
@@ -67,6 +70,44 @@ public final class AppDependencies {
      */
     private static HardwareDescriber hardwareDescriber = new ChaquopyHardwareDescriber();
 
+    /**
+     * Opens a conversation with iCloud on the signed-in account.
+     *
+     * <p>A supplier rather than an instance because a session is not reusable: it holds a
+     * keychain session and a CloudKit client, both with sockets, and it is closed when the
+     * screen that opened it goes away.
+     *
+     * <p>Here for the usual reason, more sharply than most. Every failure this flow has to
+     * handle - an account with nothing to recover from, a service having a bad day, a rejected
+     * passcode - needs an Apple account in a state nobody can arrange on demand, and the ones
+     * that matter most are the ones a real account will never be in.
+     */
+    private static Supplier<ICloudService> icloudFactory = AppDependencies::openRealICloud;
+
+    private static ICloudService openRealICloud() {
+        final PythonAppleService signedIn = PythonAppleService.getInstance();
+        if (signedIn == null || signedIn.getAccount() == null) {
+            return null;
+        }
+
+        return PythonICloudService.openFor(signedIn.getAccount());
+    }
+
+    /**
+     * A new iCloud session, or null when there is no usable signed-in account.
+     *
+     * <p>Null is not a crash: the caller reports it as needing a sign-in, which is the same
+     * recovery as a session that has expired.
+     */
+    public static ICloudService icloud() {
+        return icloudFactory.get();
+    }
+
+    @VisibleForTesting
+    public static void replaceICloud(final Supplier<ICloudService> replacement) {
+        icloudFactory = replacement;
+    }
+
     public static AppleAuthService authService() {
         return authService;
     }
@@ -111,5 +152,6 @@ public final class AppDependencies {
         anisetteFactory = LocalAnisette::new;
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
+        icloudFactory = AppDependencies::openRealICloud;
     }
 }

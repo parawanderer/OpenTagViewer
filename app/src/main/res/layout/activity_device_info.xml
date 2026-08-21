@@ -46,6 +46,22 @@
             type="String" />
 
         <variable
+            name="source"
+            type="String" />
+
+        <variable
+            name="lastScanAttempt"
+            type="String" />
+
+        <variable
+            name="lastResultAt"
+            type="String" />
+
+        <variable
+            name="backoffState"
+            type="String" />
+
+        <variable
             name="deviceType"
             type="String" />
 
@@ -147,6 +163,52 @@
                             android:paddingTop="8dp"
                             android:text="@string/device_settings"
                             android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
+
+                    <!--
+                        Shown only for a tag the app has stopped looking for. It explains the
+                        state and offers the one action that can change it - anything found
+                        clears the flag - because "no last location known" with no way forward
+                        is the reading a user cannot act on.
+                    -->
+                    <LinearLayout
+                        android:id="@+id/device_ignored_notice"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="22dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginRight="22dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/layout_rounded"
+                        android:backgroundTint="?attr/colorSurfaceContainerLow"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_bold"
+                            android:text="@string/tag_ignored_summary"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/tag_ignored_explanation"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/device_ignored_retry"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/tag_ignored_retry" />
 
                     </LinearLayout>
 
@@ -268,6 +330,32 @@
                         app:sectionSubtitle="@{importedAt}"
                         app:title="@{@string/imported_at}" />
 
+                    <!--
+                        Shown while a rename is on its way to iCloud. Renaming an accessory is a
+                        network round trip rather than a local edit, and without this the screen
+                        looks like it ignored the change for as long as that takes.
+                    -->
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/device_rename_progress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <!--
+                        Shown instead of the three rows above for a tag read from the Apple
+                        account: nothing was exported and nothing was imported, so those rows
+                        have nothing true to say. Exactly one of the two sets is visible.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_source"
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{source}"
+                        app:title="@{@string/source}" />
+
                     <include
                         android:id="@+id/device_settings_device_type"
                         layout="@layout/settings_item_noicon_clickable"
@@ -275,6 +363,26 @@
                         app:onClick="@{clickItemHandler}"
                         app:sectionSubtitle="@{deviceType}"
                         app:title="@{@string/type}" />
+
+                    <!--
+                        Shown only when Type could not be resolved to a name and the record still
+                        carries a vendor id worth looking up. Gone the rest of the time, which is
+                        almost always - an AirTag or a Chipolo has nothing to explain.
+                    -->
+                    <TextView
+                        android:id="@+id/device_type_lookup_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingLeft="22dp"
+                        android:paddingTop="4dp"
+                        android:paddingRight="22dp"
+                        android:paddingBottom="12dp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        tools:text="Vendor 0x0ABC is a Bluetooth SIG company identifier. Tap to look up who makes this."
+                        tools:visibility="visible" />
 
                     <LinearLayout
                         android:id="@+id/device_debug_info"
@@ -307,6 +415,30 @@
                                 android:textColor="?attr/colorOnSurfaceVariant" />
 
                         </LinearLayout>
+
+                        <include
+                            android:id="@+id/settings_debug_last_scan"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{lastScanAttempt}"
+                            app:title="@{@string/debug_last_scan_attempt}" />
+
+                        <include
+                            android:id="@+id/settings_debug_last_result"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{lastResultAt}"
+                            app:title="@{@string/debug_last_result_at}" />
+
+                        <include
+                            android:id="@+id/settings_debug_backoff"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{backoffState}"
+                            app:title="@{@string/debug_backoff_state}" />
 
                         <include
                             android:id="@+id/settings_debug_device_name_original"

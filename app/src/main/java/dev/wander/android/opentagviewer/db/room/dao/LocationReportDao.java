@@ -20,6 +20,16 @@ public interface LocationReportDao {
     @Query("SELECT MAX(timestamp) AS latest_report_timestamp, * FROM LocationReport GROUP BY beacon_id")
     List<LocationReport> getLastForAllBeacons();
 
+    /**
+     * The newest report held for one tag, or null if there are none.
+     *
+     * <p>Read for the tag page's debug line: "last result" answers a different question from
+     * "last attempt", and the gap between them is the whole diagnosis when somebody asks why a
+     * tag has stopped moving.
+     */
+    @Query("SELECT MAX(timestamp) FROM LocationReport WHERE beacon_id = :beaconId")
+    Long newestReportTimeFor(String beaconId);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(LocationReport... locationReports);
 }
