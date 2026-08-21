@@ -26,11 +26,20 @@ import lombok.NoArgsConstructor;
  *   <tr><td>4</td><td>Critically low, roughly 5-10%. The tag is near the end of its battery</td></tr>
  * </table>
  *
- * <p><b>Apple documents none of it, and neither of the people who wrote this checked a primary
- * source.</b> The ordering is easy to confirm - a fresh tag reads 1 - but the percentages and the
- * claim about iOS warning at 3 are repeated knowledge, not something verified here against a
- * device or a reference implementation. Said plainly because a comment like this is trusted years
- * later by somebody with no way to tell how much work went into it.
+ * <p><b>The four state names and their order are Apple's.</b> Its <i>Find My Network Accessory
+ * Specification</i> (R2, Table 5-5) defines the battery state an accessory advertises as
+ * {@code 0 = Full, 1 = Medium, 2 = Low, 3 = Critically low} - the same four states in the same
+ * order, offset by one because this field reserves 0 for "not reported yet". A fresh tag reading 1
+ * confirms the offset from the other end.
+ *
+ * <p><b>The percentages are not.</b> Neither is the claim that iOS warns at 3. Apple's enum is
+ * four words with no numbers attached, and nobody here has checked those figures against a device
+ * or a reference implementation - they are repeated knowledge. Said plainly because a comment like
+ * this is trusted years later by somebody with no way to tell how much work went into it.
+ *
+ * <p>Note also that the specification's field is the byte a beacon <i>broadcasts</i>, which is not
+ * this one - see {@link LocationReportFields} for that byte, why an AirTag's copy of it does not
+ * follow the table, and why it is not decoded on sight.
  *
  * <p>That is also why the raw number always appears alongside the label. If a reading is wrong,
  * the value beside it still is not, and a bug report quoting "3" stays useful to whoever
