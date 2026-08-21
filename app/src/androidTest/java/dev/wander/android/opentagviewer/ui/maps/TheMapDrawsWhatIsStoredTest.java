@@ -36,6 +36,7 @@ import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 
 /**
  * The map screen, driven for the first time.
@@ -60,12 +61,10 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
  * nothing else - so the double replaces only that and the fetch. Everything between them is the
  * shipping code.
  *
- * <p><b>Still not covered:</b> that a redraw replaces a tag's marker rather than stacking a
- * second on top. {@code showBeaconOnMap} removes the old one first and that is worth pinning,
- * but driving it needs either the periodic refresh to come round or
- * {@code showLastDeviceLocations} made visible - and widening a production method's access so a
- * test can call it buys coverage by making the thing under test slightly worse. Left undone and
- * written down rather than quietly skipped.
+ * <p>With the fetch reachable too, the chain runs end to end: the session restores, the fetch
+ * crosses the bridge, Python serialises what the account returned, the repository stores it, and
+ * the screen redraws the tag where it now is. Which also makes redrawing testable - the cached
+ * pin is drawn and then replaced - so "one marker, not two" is asserted rather than deferred.
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
@@ -78,6 +77,10 @@ public class TheMapDrawsWhatIsStoredTest {
 
     private static final double LATITUDE = 52.370216;
     private static final double LONGITUDE = 4.895168;
+
+    /** Somewhere a fetch could not be confused with the cached report. */
+    private static final double FETCHED_LATITUDE = 48.858370;
+    private static final double FETCHED_LONGITUDE = 2.294481;
 
     private static final String A_PLIST = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             + "<plist version=\"1.0\"><dict>"
@@ -136,6 +139,12 @@ public class TheMapDrawsWhatIsStoredTest {
                 .lastUpdate(1_700_000_000_000L)
                 .build());
 
+        // **Otherwise the startup fetch is skipped.** RefreshPolicy is a process-wide singleton
+        // that survives an activity being rebuilt - deliberately, so a theme change does not cost
+        // a full walk of every tag's key history - which also means one test's fetch suppresses
+        // the next test's.
+        RefreshPolicy.resetShared();
+
         this.fake = new FakeMapProvider();
         MapProviderFactory.replaceWith(() -> this.fake);
     }
@@ -152,6 +161,20 @@ public class TheMapDrawsWhatIsStoredTest {
         }
         this.appleDouble = Python.getInstance().getModule("apple_test_double");
         this.appleDouble.callAttr("installWithNothingToReport");
+    }
+
+    /**
+     * The same, but every fetch comes back with a location - so the fetch path runs too.
+     *
+     * <p>Two hours ago, which is inside every window the app asks for, so nothing here depends
+     * on which window a given path chose.
+     */
+    private void givenTheAccountReports(final double latitude, final double longitude) {
+        if (!Python.isStarted()) {
+            Python.start(new AndroidPlatform(getInstrumentation().getTargetContext()));
+        }
+        this.appleDouble = Python.getInstance().getModule("apple_test_double");
+        this.appleDouble.callAttr("install", latitude, longitude, 2.0);
     }
 
     @After
@@ -171,6 +194,14 @@ public class TheMapDrawsWhatIsStoredTest {
         this.db.ownedBeaconDao().insertAll(OwnedBeacon.builder()
                 .id(id).importId(importId).content(A_PLIST).version("0.0.2")
                 .fromAccount(false).isRemoved(false)
+                // **Stored, so nothing tries to derive it from the plist above.** That plist is
+                // shaped like a real one and is not one - its private key is eighteen bytes
+                // where a real key is twenty-eight - so FindMy.py refuses it, the request list
+                // comes back empty, and the fetch never happens. Silently: a conversion failure
+                // is logged per accessory and the batch carries on with what is left, which is
+                // nothing. What is in here does not matter, because apple_test_double replaces
+                // the function that reads it.
+                .accessoryJson("{\"type\": \"accessory\", \"id\": \"" + id + "\"}")
                 .build());
 
         this.db.beaconNamingRecordDao().insertAll(BeaconNamingRecord.builder()
@@ -273,6 +304,62 @@ public class TheMapDrawsWhatIsStoredTest {
         return this.fake.markers().stream()
                 .filter(placed -> beaconId.equals(placed.marker.getId()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * <b>A fetched location replaces the stored one, and the pin moves.</b>
+     *
+     * <p>The whole chain in one assertion: the session restores, the fetch runs through the real
+     * bridge, Python serialises what the account returned, the repository stores it, and the
+     * screen redraws the tag where it now is. Every step between the two doubles is shipping
+     * code.
+     *
+     * <p>The two coordinates are a continent apart on purpose. A fetch that silently returned
+     * the cached report would pass an "is there a marker" test perfectly.
+     */
+    @Test
+    public void afetchedLocationMovesThePin() {
+        this.givenTheAccountReports(FETCHED_LATITUDE, FETCHED_LONGITUDE);
+        this.openTheMap();
+
+        // **Asked first, and kept.** When this failed, "the pin is in the wrong place" was true
+        // and useless - the fetch had never reached Python at all, because the request list came
+        // back empty and nothing says so out loud. One question separates "the fetch is wrong"
+        // from "there was no fetch", and it is worth a line.
+        Eventually.check(() -> assertTrue("python was never asked to fetch anything",
+                this.appleDouble.callAttr("howManyFetches").toInt() > 0));
+
+        Eventually.check(() -> {
+            assertEquals(1, this.markersFor(FOUND_TAG).size());
+
+            final MapMarker drawn = this.markersFor(FOUND_TAG).get(0).marker;
+            assertEquals("the pin is still on the cached location, so the fetch never landed",
+                    FETCHED_LATITUDE, drawn.getLatitude(), 0.000001);
+            assertEquals(FETCHED_LONGITUDE, drawn.getLongitude(), 0.000001);
+        });
+    }
+
+    /**
+     * <b>And redrawing replaces the pin rather than stacking another on it.</b>
+     *
+     * <p>Reachable now only because the fetch is: the screen draws the cached location, then
+     * draws the fetched one over it, so a run of this test redraws the same tag for real. There
+     * must be one marker at the end, not two.
+     *
+     * <p>Worth an assertion of its own because the failure is invisible on a real map - two pins
+     * at nearly the same place look like one - and permanent, since nothing ever removes the
+     * stale one.
+     */
+    @Test
+    public void redrawingReplacesThePinRatherThanStackingOne() {
+        this.givenTheAccountReports(FETCHED_LATITUDE, FETCHED_LONGITUDE);
+        this.openTheMap();
+
+        Eventually.check(() -> assertEquals(FETCHED_LATITUDE,
+                this.markersFor(FOUND_TAG).get(0).marker.getLatitude(), 0.000001));
+
+        assertEquals("the tag was drawn twice and the older pin was never removed",
+                1, this.markersFor(FOUND_TAG).size());
     }
 
     /**

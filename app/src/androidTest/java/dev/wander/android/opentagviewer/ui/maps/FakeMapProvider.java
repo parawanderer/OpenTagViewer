@@ -100,9 +100,25 @@ public class FakeMapProvider implements IMapProvider {
         this.style = mapStyle;
     }
 
+    /**
+     * <b>Hands back the id it was given, as both real providers do.</b>
+     *
+     * <p>This used to invent {@code "marker-0"}, {@code "marker-1"} and so on, which reads like a
+     * reasonable thing for a fake to do and is wrong: {@code GoogleMapProvider} and
+     * {@code AMapProvider} both {@code return marker.getId()} and key their own maps by it, and
+     * {@code MapsActivity} relies on that - it calls {@code removeMarker(beaconId)} to replace a
+     * tag's pin.
+     *
+     * <p>So against the fake that removal matched nothing and markers quietly accumulated. Any
+     * test of redrawing would have measured the fake's divergence rather than the app, which is
+     * the specific way a fake stops being useful.
+     */
     @Override
     public String addMarker(final MapMarker marker) {
-        final String id = "marker-" + (this.nextId++);
+        final String id = marker.getId() != null
+                ? marker.getId()
+                : "unidentified-" + (this.nextId++);
+
         this.markers.put(id, new PlacedMarker(id, marker));
         return id;
     }
