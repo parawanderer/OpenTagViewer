@@ -227,4 +227,11 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="debug_never">Never</string>
     <string name="tag_ignored_explanation">Nothing has been found for this tag anywhere in months of history, so the app stopped searching for it automatically. Searching for one of these is slow, and it is unlikely to be found. Tap below to look again right now.</string>
     <string name="tag_ignored_retrying">Looking for this tag again. This can take a few minutes.</string>
+    <string name="battery_level_described">%1$d — %2$s</string>
+    <string name="battery_level_unknown">Not reported yet</string>
+    <string name="battery_level_full">Full (100%)</string>
+    <string name="battery_level_medium">Medium (~50-70%)</string>
+    <string name="battery_level_low">Low (~20%) — iOS starts warning here</string>
+    <string name="battery_level_very_low">Critically low (~5-10%) — near death</string>
+    <string name="battery_level_icloud_only">Only tags read from iCloud ever update this. A tag imported from a file keeps whatever value it had when the export was made.</string>
 </resources>

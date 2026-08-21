@@ -1330,6 +1330,14 @@ def getReports(
                 "updatedAccessoryJson": updated_accessory_json,
                 # Java decides what to do about it; this only reports what was searched.
                 "exhaustedWideSearch": exhausted,
+                # **Whether this search was an expensive one at all.**
+                #
+                # An accessory with a narrow key window costs a request or two, and an empty
+                # answer from one means only "nothing new in the window asked for" - which is
+                # the ordinary state of a tag that reported an hour ago and has not moved. Java
+                # must not count that against it, or a tag updating happily every day slowly
+                # accrues strikes and starts being asked less often for no reason.
+                "wideSearch": width_before > _ALIGNMENT_PROBE_THRESHOLD_INDICES,
             }
 
         return _resultOrError(res, failures, num_items)

@@ -17,6 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.content.Intent;
+import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -221,6 +222,82 @@ public class RenamingWritesToTheAccountTest {
 
     private String storedNameFor(final String beaconId) {
         return this.db.beaconNamingRecordDao().getByBeaconId(beaconId).content;
+    }
+
+    /**
+     * <b>An accessory read from iCloud has no "original" name to show.</b>
+     *
+     * <p>Renaming it writes to the account, so the name on screen <i>is</i> the name. A debug row
+     * labelled "original" showing the identical string invites the reader to hunt for a
+     * difference that cannot exist - which is worse than showing nothing, because it looks like
+     * information.
+     *
+     * <p>Asked of the view's visibility rather than through Espresso, because these rows live
+     * inside the debug block and that is hidden unless debug data is switched on. What is being
+     * checked is the decision, not whether the debug section happens to be open.
+     */
+    @Test
+    public void anaccessoryHasNoOriginalNameRowsBecauseItsNameIsNotANickname() {
+        this.open(AN_ACCESSORY, false);
+
+        Eventually.check(() -> assertEquals("an accessory's name is not a nickname, so there is"
+                        + " no original to show alongside it",
+                View.GONE, this.visibilityOf(R.id.settings_debug_device_name_original)));
+        assertEquals(View.GONE, this.visibilityOf(R.id.settings_debug_device_emoji_original));
+    }
+
+    /** One of the owner's own devices keeps them - there, the name really is layered. */
+    @Test
+    public void anownDeviceStillShowsWhatAppleCallsIt() {
+        this.open(A_DEVICE, true);
+
+        Eventually.check(() -> assertEquals("a nicknamed device must still show its real name",
+                View.VISIBLE, this.visibilityOf(R.id.settings_debug_device_name_original)));
+    }
+
+    /** And so does anything imported from a file, for the same reason. */
+    @Test
+    public void afileImportedTagStillShowsItsOriginalName() {
+        this.open(FROM_A_FILE, false);
+
+        Eventually.check(() -> assertEquals(
+                View.VISIBLE, this.visibilityOf(R.id.settings_debug_device_name_original)));
+    }
+
+    /**
+     * <b>The battery row carries its caveat, on every tag.</b>
+     *
+     * <p>Apple's own devices are what update that field as they pass an accessory, so a tag
+     * imported from a zip keeps whatever value was true when the export was made and never
+     * changes it. A bare number reads as current, and "Full" on a tag flat since last spring is
+     * worse than showing nothing at all.
+     *
+     * <p>Checked on an account tag deliberately - the one where the value <i>is</i> live. Showing
+     * the rule only where it bites would mean nobody learns it until they are already misreading
+     * an imported tag.
+     */
+    @Test
+    public void thebatteryRowSaysWhoEverUpdatesIt() {
+        this.open(AN_ACCESSORY, false);
+
+        final String[] shown = {null};
+        Eventually.check(() -> {
+            this.scenario.onActivity(activity -> shown[0] =
+                    ((android.widget.TextView) activity
+                            .findViewById(R.id.settings_debug_naming_record_battery_level)
+                            .findViewById(R.id.settings_clickable_item_content)).getText().toString());
+            assertNotNull(shown[0]);
+        });
+
+        assertTrue("the battery row must say that only iCloud updates it, but read: " + shown[0],
+                shown[0].contains(getInstrumentation().getTargetContext()
+                        .getString(R.string.battery_level_icloud_only)));
+    }
+
+    private int visibilityOf(final int id) {
+        final int[] visibility = {-1};
+        this.scenario.onActivity(activity -> visibility[0] = activity.findViewById(id).getVisibility());
+        return visibility[0];
     }
 
     /**

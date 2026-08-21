@@ -227,4 +227,11 @@
     <string name="debug_never">从未</string>
     <string name="tag_ignored_explanation">在数月的历史记录中都没有找到这个标签，因此应用已停止自动搜索。这类搜索很慢，而且通常找不到。点按下方可立即重新查找。</string>
     <string name="tag_ignored_retrying">正在重新查找此标签。可能需要几分钟。</string>
+    <string name="battery_level_described">%1$d — %2$s</string>
+    <string name="battery_level_unknown">尚未上报</string>
+    <string name="battery_level_full">电量充足（100%）</string>
+    <string name="battery_level_medium">中等（约 50-70%）</string>
+    <string name="battery_level_low">偏低（约 20%）— iOS 从此开始提示</string>
+    <string name="battery_level_very_low">极低（约 5-10%）— 几乎耗尽</string>
+    <string name="battery_level_icloud_only">只有从 iCloud 读取的标签才会更新此值。从文件导入的标签会保留导出时的数值。</string>
 </resources>

@@ -29,4 +29,15 @@ public class FetchResult {
      * wide says the tag has been silent for months, and Python is where the width is known.
      */
     private final java.util.Set<String> exhaustedWideSearch;
+
+    /**
+     * The accessories whose search was an expensive one - a wide key window.
+     *
+     * <p><b>What separates "nothing new" from "nothing at all".</b> An aligned tag costs a
+     * request or two and an empty answer means only that it has not moved since the window
+     * began, which is the ordinary state of a tag that reported an hour ago. Counting that as a
+     * failure made healthy tags accrue strikes and start being asked less often, which is the
+     * opposite of what the backoff is for.
+     */
+    private final java.util.Set<String> wideSearch;
 }
