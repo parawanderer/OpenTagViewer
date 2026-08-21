@@ -75,7 +75,23 @@ public class BeaconRepository {
 
                 var ownedBeacons = importData.getOwnedBeacons();
                 ownedBeacons.forEach(b -> b.importId = insertionId);
-                db.ownedBeaconDao().insertAll(ownedBeacons.toArray(new OwnedBeacon[0]));
+
+                // **Insert what is new, update what is held.** Re-importing is ordinary - a newer
+                // export carries a key alignment record an older one lacked - and a re-insert
+                // would delete the existing row, cascading into the user's custom names, the
+                // tag's location history and the record of which days have been fetched. See
+                // OwnedBeaconDao#insertAll.
+                db.ownedBeaconDao().insertIfNew(ownedBeacons.toArray(new OwnedBeacon[0]));
+
+                for (final OwnedBeacon beacon : ownedBeacons) {
+                    db.ownedBeaconDao().refreshFromImport(
+                            beacon.id,
+                            beacon.content,
+                            beacon.alignmentPlist,
+                            beacon.accessoryJson,
+                            beacon.version,
+                            insertionId);
+                }
 
                 var beaconNamingRecords = importData.getBeaconNamingRecords();
                 beaconNamingRecords.forEach(b -> b.importId = insertionId);
@@ -140,8 +156,22 @@ public class BeaconRepository {
                     }
                 }
 
+                // **Insert the new ones, update the rest. Never re-insert.** A re-insert is
+                // `INSERT OR REPLACE`, which deletes the row it is replacing and cascades that
+                // delete into UserBeaconOptions and LocationReport - so an ordinary background
+                // read would silently take the user's custom names and the tag's whole location
+                // history with it. See OwnedBeaconDao#insertAll.
                 if (!beacons.isEmpty()) {
-                    db.ownedBeaconDao().insertAll(beacons.toArray(new OwnedBeacon[0]));
+                    db.ownedBeaconDao().insertIfNew(beacons.toArray(new OwnedBeacon[0]));
+
+                    for (final OwnedBeacon beacon : beacons) {
+                        db.ownedBeaconDao().refreshFromAccount(
+                                beacon.id,
+                                beacon.content,
+                                beacon.alignmentPlist,
+                                beacon.accessoryJson,
+                                beacon.version);
+                    }
                 }
                 if (!namingRecords.isEmpty()) {
                     db.beaconNamingRecordDao()
