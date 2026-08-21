@@ -192,20 +192,30 @@ public class ThemedFindMyIconTest {
     /**
      * <b>The silhouette carries against the row it sits on</b>, in both modes.
      *
-     * <p>3:1 is the WCAG floor for something that is not text. The outer disc is
-     * {@code colorOutline}, and the row behind it is {@code colorSurface}.
+     * <p>3:1 is the WCAG floor for something that is not text.
+     *
+     * <p><b>Measured off the drawn pixel, not off {@code colorOutline}.</b> It used to resolve
+     * that attribute and compare it to {@code colorSurface} - which is a true statement about
+     * Material's palette and says nothing about this icon, the same flaw
+     * {@link #theringsInsideItKeepApplesTonalOrdering} documents. It could not see the
+     * translucent step the disc is softened with, so it went on passing while the surround was
+     * lightened past the floor: at {@code fillAlpha="0.25"} it stayed green, and that is exactly
+     * the change it exists to stop.
+     *
+     * <p>Sampled straight down from the centre, where the cone does not reach - the same place
+     * the ladder test reads the surround.
      */
     @Test
     public void thesilhouetteClearsThreeToOneAgainstTheRow() {
         for (final boolean night : new boolean[] {false, true}) {
             final Context context = themed(night);
 
-            final int silhouette = resolved(context, com.google.android.material.R.attr.colorOutline);
+            final int silhouette = drawn(context, aThirdPartyTag()).getPixel(48, 48 + at(13));
             final int row = resolved(context, com.google.android.material.R.attr.colorSurface);
             final double ratio = contrast(silhouette, row);
 
-            assertTrue("the Find My mark sits at " + String.format("%.2f", ratio) + ":1 against"
-                            + " the row in " + (night ? "dark" : "light") + " mode",
+            assertTrue("the Find My mark's disc sits at " + String.format("%.2f", ratio) + ":1"
+                            + " against the row in " + (night ? "dark" : "light") + " mode",
                     ratio >= 3.0);
         }
     }

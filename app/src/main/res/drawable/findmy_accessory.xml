@@ -55,6 +55,28 @@
   <path
       android:pathData="M40,24c0,8.84 -7.16,16 -16,16S8,32.84 8,24c0,-5.99 3.28,-11.2 8.15,-13.95C18.47,8.75 21.15,8 24,8s5.53,0.75 7.85,2.05C36.72,12.8 40,18.01 40,24z"
       android:fillColor="?attr/colorOutline"/>
+  <!--
+      Softened, because colorOutline is a border colour and this is a fill.
+
+      #6F797A over #F5FAFB is about 4:1 - correct for a one-pixel divider and heavy for a 24dp
+      disc, which read as a dark blob sitting in a list of light rows. @parawanderer asked for
+      these to be lighter.
+
+      A translucent step rather than a lighter attribute, for the same reason the two steps below
+      are: it stays relative to whatever colorOutline resolves to, so it keeps working under
+      dynamic colours instead of pinning the icon to a fixed grey the rest of the theme has
+      moved away from. It also lightens the dark theme, where the surround sits on near-black and
+      had contrast to spare.
+
+      0.15 is the largest step that keeps the disc above the 3:1 a graphical object needs: it
+      lands at 3.22:1 in light mode against 2.94:1 at 0.20, which is already under. Held there by
+      ThemedFindMyIconTest, which also pins the ring-inner-surround ordering this sits at the
+      bottom of.
+  -->
+  <path
+      android:pathData="M40,24c0,8.84 -7.16,16 -16,16S8,32.84 8,24c0,-5.99 3.28,-11.2 8.15,-13.95C18.47,8.75 21.15,8 24,8s5.53,0.75 7.85,2.05C36.72,12.8 40,18.01 40,24z"
+      android:fillColor="#FFFFFF"
+      android:fillAlpha="0.15"/>
   <path
       android:pathData="M24,24m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"
       android:fillColor="#FFFFFF"
