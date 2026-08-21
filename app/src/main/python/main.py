@@ -1223,6 +1223,10 @@ def getLastReports(
             start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
             now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
 
+            # Measured before and after, because "found nothing" on its own says nothing.
+            # See _DEAD_TAG_WIDTH_INDICES.
+            width_before = _isAlignmentWide(airtag, start_dt, now_dt)
+
             # Per-accessory isolation. One beacon failing used to abort the whole call,
             # which meant no beacon's updated alignment was persisted - so every later
             # fetch started from the same wide range again and never converged.
@@ -1236,6 +1240,19 @@ def getLastReports(
                 continue
 
             print(f"Got {len(reports)} raw reports for {beaconId}")
+
+            # A search that stayed as wide as it started found nothing to align to, which is
+            # the difference between "no reports in the window asked for" and "no reports at
+            # all, anywhere in this tag's life".
+            width_after = _isAlignmentWide(airtag, start_dt, now_dt)
+            exhausted = (
+                not reports
+                and width_before > _DEAD_TAG_WIDTH_INDICES
+                and width_after >= width_before
+            )
+            if exhausted:
+                print(f"{beaconId} has nothing anywhere in {width_before} indices of history;"
+                      f" reporting it as one that appears to have stopped broadcasting.")
 
             if fetched.bounded_to_window:
                 filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
@@ -1254,6 +1271,19 @@ def getLastReports(
                 # Always written, even when there were no reports: the alignment may still
                 # have moved, and persisting it is what stops the next fetch re-searching.
                 "updatedAccessoryJson": json.dumps(airtag.to_json()),
+                # **Both of these have to be here, not only on the ranged variant.**
+                #
+                # This is the function the app actually calls; `getReports` has no caller in
+                # Java at all. Java reads these two keys to decide whether a tag is going
+                # quiet, and a missing key reads as False - so emitting them from the ranged
+                # variant alone silently disabled the whole backoff, with every empty answer
+                # counting as a healthy one. See PythonAppleService#toFetchResult.
+                "exhaustedWideSearch": exhausted,
+                # Whether this search was an expensive one at all. An accessory with a narrow
+                # key window costs a request or two, and an empty answer from one means only
+                # "nothing new in the window asked for" - the ordinary state of a tag that
+                # reported an hour ago and has not moved.
+                "wideSearch": width_before > _ALIGNMENT_PROBE_THRESHOLD_INDICES,
             }
 
         return _resultOrError(res, failures, num_items)

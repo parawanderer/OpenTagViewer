@@ -761,3 +761,140 @@ class TestClassifyingAFailedLogin:
         ClientConnectorError.__module__ = "aiohttp.client_exceptions"
 
         assert main.classifyLoginFailure(ClientConnectorError()) == main.REASON_NETWORK
+
+
+# --------------------------------------------------------------------------
+# The two flags that pace the silent-tag backoff.
+#
+# Java reads `wideSearch` and `exhaustedWideSearch` off each per-beacon dict to
+# decide whether a tag is going quiet. A missing key reads as False, so leaving
+# them off a code path does not fail - it silently turns the backoff off, and
+# every empty answer counts as a healthy one. That is exactly what happened:
+# they were emitted from `getReports` only, and Java calls `getLastReports`.
+# --------------------------------------------------------------------------
+
+class _FakeAirtagOfWidth:
+    """An accessory whose key-index window is a chosen width."""
+
+    def __init__(self, width, narrows_to=None):
+        self._width = width
+        self._narrows_to = narrows_to
+        self._fetched = False
+
+    def get_min_index(self, _dt):
+        return 0
+
+    def get_max_index(self, _dt):
+        if self._fetched and self._narrows_to is not None:
+            return self._narrows_to
+        return self._width
+
+    def markFetched(self):
+        self._fetched = True
+
+    def to_json(self):
+        return {"aligned": True}
+
+
+def _runGetLastReportsWith(monkeypatch, airtag, reports, hours_back=24):
+    monkeypatch.setattr(main, "accessoryFromJson", lambda _json: airtag)
+
+    def fetch(_account, accessory, _start, _end):
+        if hasattr(accessory, "markFetched"):
+            accessory.markFetched()
+        return main.AccessoryFetch(reports=reports, bounded_to_window=True)
+
+    monkeypatch.setattr(main, "_fetchReportsForAccessory", fetch)
+
+    return main.getLastReports(
+        account=object(),
+        idToAccessoryData=_FakeRequestList([_FakeRequest("beacon-1")]),
+        hoursBack=hours_back)["beacon-1"]
+
+
+def test_getlastreports_reports_whether_the_search_was_expensive(monkeypatch):
+    """
+    The regression. These keys were only ever written by `getReports`, which Java never calls,
+    so the live path reported nothing and every fruitless scan looked like a successful one.
+    """
+    held = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(50_000), reports=[])
+
+    assert "wideSearch" in held, "Java cannot pace the backoff without this key"
+    assert "exhaustedWideSearch" in held
+    assert held["wideSearch"] is True
+
+
+def test_an_aligned_tag_over_a_day_is_never_an_expensive_search(monkeypatch):
+    """
+    **The sharp edge, and the reason this is a test rather than a comment.**
+
+    `wideSearch` is derived from the width of the key-index range the fetch would search - not
+    from whether the accessory has an alignment record. For an *aligned* tag those are the same
+    question only because the app asks for a short window: keys rotate every 15 minutes, so 24
+    hours is ~96 indices against a threshold of 2000.
+
+    That leaves about twenty times' headroom, and it is entirely accidental. Raising
+    RefreshPolicy's cap past ~21 days would make every healthy tag's ordinary refresh look like
+    an expensive search, and they would all start accruing strikes and being asked less often -
+    the exact bug @parawanderer spotted in the database, reintroduced by a change nowhere near
+    this file.
+    """
+    indices_per_day = 4 * 24  # a key every 15 minutes
+
+    held = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(indices_per_day), reports=[])
+
+    assert held["wideSearch"] is False, (
+        "a day of an aligned tag's keys must not count as an expensive search; "
+        f"{indices_per_day} indices against a threshold of "
+        f"{main._ALIGNMENT_PROBE_THRESHOLD_INDICES}")
+
+    assert main._ALIGNMENT_PROBE_THRESHOLD_INDICES > indices_per_day * 7, (
+        "the threshold no longer covers even a week-long window, so ordinary refreshes of "
+        "healthy tags will be counted against them")
+
+
+def test_a_tag_that_answers_is_not_penalised_however_wide_the_search_was(monkeypatch):
+    """Finding something settles it. Java resets everything on a non-empty answer."""
+    found = FakeReport(datetime.now(timezone.utc))
+
+    held = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(50_000, narrows_to=10), reports=[found])
+
+    assert held["exhaustedWideSearch"] is False
+    assert held["reports"], "the report itself must still come back"
+
+
+def test_only_months_of_empty_history_counts_as_exhausted(monkeypatch):
+    """
+    Wide is not the same as dead.
+
+    A tag with no alignment record is wide on its first fetch and is perfectly healthy - it just
+    has not been located yet. Giving up needs the far larger _DEAD_TAG_WIDTH_INDICES and a
+    search that failed to narrow anything.
+    """
+    merely_wide = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(5_000), reports=[])
+
+    assert merely_wide["wideSearch"] is True
+    assert merely_wide["exhaustedWideSearch"] is False, (
+        "an unaligned tag must not be given up on for being unaligned")
+
+    truly_dead = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(50_000), reports=[])
+
+    assert truly_dead["exhaustedWideSearch"] is True
+
+
+def test_a_search_that_narrowed_is_not_exhausted_even_with_no_reports(monkeypatch):
+    """
+    Narrowing means something was found to align against, so the tag is broadcasting.
+
+    Without this the probe's own success would be read as failure whenever its report fell
+    outside the requested window.
+    """
+    held = _runGetLastReportsWith(
+        monkeypatch, _FakeAirtagOfWidth(50_000, narrows_to=10), reports=[])
+
+    assert held["exhaustedWideSearch"] is False
