@@ -2,3 +2,14 @@ pycryptodome==3.22.0
 PyYAML==6.0.2
 pytest==8.4.1
 pytest-cov==6.2.1
+# **Everything below is also declared in pyproject.toml, and has to be in both places.**
+#
+# CI installs the exporter with `uv sync --frozen` from pyproject; the local `setupTestVenv`
+# Gradle task installs this file. So a dependency present in one and not the other fails
+# `./gradlew testAll` on a clean checkout while every CI check stays green - which is how both
+# of these came to be missing. Adding a dependency to the exporter means editing both.
+
+# AES-encrypted zip output. zipfile can only read legacy ZipCrypto, never write encryption.
+pyzipper==0.4.0
+# Checkboxes and arrow-key selection for the CLI exporter. See exporter/prompts.py.
+questionary>=2.1.1
