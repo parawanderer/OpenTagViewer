@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google 지도 API 키가 없습니다</string>
     <string name="maps_api_key_missing_message">이 빌드에는 Google 지도 API 키가 없어 지도를 불러올 수 없습니다. secrets.properties에 MAPS_API_KEY를 추가한 후 다시 빌드하거나, 설정에서 다른 지도 제공자를 선택하세요.</string>
-    <string name="resolving_tags_banner">태그의 위치를 처음으로 확인하는 중입니다. 몇 분 정도 걸릴 수 있으니 앱을 열어 두세요.</string>
-    <string name="resolving_tags_banner_progress">태그 위치를 확인하는 중입니다 (%1$d/%2$d). 몇 분 정도 걸릴 수 있으니 앱을 열어 두세요.</string>
+    <string name="resolving_tags_banner">태그의 위치를 처음으로 확인하는 중입니다. 찾는 대로 최근에 확인된 것부터 표시됩니다. 앱을 열어 두세요.</string>
+    <string name="resolving_tags_banner_progress">태그 위치를 확인하는 중입니다(%2$d개 중 %1$d개). 찾는 대로 최근에 확인된 것부터 표시됩니다. 앱을 열어 두세요.</string>
     <string name="anisette_mode_title">로그인 데이터</string>
     <string name="anisette_mode_local">이 기기에서 생성</string>
     <string name="anisette_mode_remote">원격 서버</string>
@@ -245,4 +245,10 @@
     <string name="icloud_unlink_confirm_button">연결 해제</string>
     <string name="icloud_unlink_done">Apple 계정 연결이 해제되었습니다</string>
     <string name="icloud_unlink_failed">Apple 계정 연결을 해제하지 못했습니다. 다시 시도해 주세요.</string>
+    <string name="no_app_to_open_a_map_with">이 휴대전화에는 지도를 열 수 있는 앱이 없습니다</string>
+    <string name="icloud_loading_opening_account">Apple 계정을 여는 중…</string>
+    <string name="icloud_loading_waiting_for_location_check">위치 확인이 끝나기를 기다리는 중…</string>
+    <string name="export_logs">로그 내보내기</string>
+    <string name="log_file_has_been_exported_successfully">로그 파일을 내보냈습니다</string>
+    <string name="failed_to_export_log_file">로그 파일을 내보내지 못했습니다</string>
 </resources>

@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API-Schlüssel fehlt</string>
     <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
-    <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
-    <string name="resolving_tags_banner_progress">Ihre Tags werden geortet (%1$d von %2$d). Das kann einige Minuten dauern – bitte lassen Sie die App geöffnet.</string>
+    <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
+    <string name="resolving_tags_banner_progress">Tags werden geortet (%1$d von %2$d). Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
     <string name="anisette_mode_title">Anmeldedaten</string>
     <string name="anisette_mode_local">Auf diesem Gerät</string>
     <string name="anisette_mode_remote">Externer Server</string>
@@ -245,4 +245,10 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
     <string name="icloud_unlink_confirm_button">Verknüpfung aufheben</string>
     <string name="icloud_unlink_done">Dein Apple-Konto ist nicht mehr verknüpft</string>
     <string name="icloud_unlink_failed">Die Verknüpfung mit deinem Apple-Konto konnte nicht aufgehoben werden. Bitte versuche es erneut.</string>
+    <string name="no_app_to_open_a_map_with">Keine App auf diesem Telefon kann eine Karte öffnen</string>
+    <string name="icloud_loading_opening_account">Apple-Konto wird geöffnet …</string>
+    <string name="icloud_loading_waiting_for_location_check">Warten auf den Abschluss der Standortprüfung …</string>
+    <string name="export_logs">Protokolle exportieren</string>
+    <string name="log_file_has_been_exported_successfully">Protokolldatei wurde exportiert</string>
+    <string name="failed_to_export_log_file">Protokolldatei konnte nicht exportiert werden</string>
 </resources>

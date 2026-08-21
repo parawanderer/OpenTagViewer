@@ -173,12 +173,20 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             // user staring at the generic line has no way to tell those apart, and the second
             // one is the one they can act on - the tag page offers to look again.
             viewHolder.getLastUpdated().setText(R.string.tag_ignored_summary);
-            viewHolder.getWarningIcon().setVisibility(VISIBLE);
 
         } else {
             viewHolder.getLastUpdated().setText(R.string.no_last_location_known);
-            viewHolder.getWarningIcon().setVisibility(VISIBLE);
         }
+
+        // **No warning triangle on either of these.** Both lines already say exactly what is
+        // going on, in words, and the icon added alarm without adding information.
+        //
+        // It was also permanent for the people most likely to see it. The rows that carry these
+        // lines are largely the user's own Apple hardware, read from their account - a MacBook,
+        // an iPad - and those never report to the Find My network the way a tag does. So the
+        // list showed a column of warnings about a situation that is not a fault, cannot be
+        // fixed, and will still be there tomorrow. A warning that is always on is not a warning.
+        viewHolder.getWarningIcon().setVisibility(GONE);
 
         final boolean isSelected = this.selectedBeaconIds.contains(beaconId);
 
