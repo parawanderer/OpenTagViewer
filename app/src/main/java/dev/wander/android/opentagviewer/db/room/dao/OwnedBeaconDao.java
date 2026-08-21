@@ -21,8 +21,84 @@ public interface OwnedBeaconDao {
     @Query("SELECT * FROM OwnedBeacons WHERE id = :beaconId AND is_removed = 0")
     OwnedBeacon getById(String beaconId);
 
+    /**
+     * <b>REPLACE deletes the existing row, and that delete cascades.</b>
+     *
+     * <p>SQLite's {@code INSERT OR REPLACE} is not an update: on a primary key conflict it removes
+     * the old row and inserts a new one. Room turns foreign keys on, so that removal runs every
+     * {@code ON DELETE CASCADE} hanging off {@code OwnedBeacons} - and both
+     * {@code UserBeaconOptions} and {@code LocationReport} are children. Re-writing a beacon that
+     * already exists therefore erases the user's custom name and emoji for it and its entire
+     * location history, while reading at the call site exactly like an upsert.
+     *
+     * <p>So this is for rows that are genuinely new. Anything that re-writes a beacon the database
+     * may already hold wants {@link #insertIfNew} and {@link #refreshFromAccount} instead - see
+     * {@code AccountRefreshKeepsWhatTheUserOwnsTest}, which exists because this went unnoticed.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     List<Long> insertAll(OwnedBeacon... ownedBeacons);
+
+    /** Add beacons that are not held yet, leaving any that are exactly as they are. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    List<Long> insertIfNew(OwnedBeacon... ownedBeacons);
+
+    /**
+     * Bring a held beacon into line with what the account says, without touching anything else.
+     *
+     * <p>An UPDATE rather than a re-insert, so nothing cascades. Three of the columns are written
+     * defensively, and each {@code COALESCE} is deliberate:
+     *
+     * <ul>
+     *   <li><b>{@code accessory_json} keeps what is already there.</b> It is not a copy of the
+     *       plist - it carries the rolling-key alignment state that {@link #updateAccessoryJson}
+     *       maintains after every fetch. Overwriting it with a freshly converted one throws that
+     *       away and sends the next fetch back to searching the tag's whole history, which is the
+     *       expense the alignment record exists to avoid. It is only filled in when absent.</li>
+     *   <li><b>{@code alignment_plist} prefers the account's copy</b>, which is authoritative, but
+     *       will not be cleared by a read that happens not to carry one.</li>
+     *   <li><b>{@code content} likewise.</b> A null plist means this read did not include it, not
+     *       that the tag no longer has one.</li>
+     * </ul>
+     *
+     * <p>{@code is_removed} is cleared because a tag that left the account and came back should
+     * not be restored still marked as gone.
+     */
+    @Query("UPDATE OwnedBeacons SET"
+            + " content = COALESCE(:content, content),"
+            + " alignment_plist = COALESCE(:alignmentPlist, alignment_plist),"
+            + " accessory_json = COALESCE(accessory_json, :accessoryJson),"
+            + " version = :version,"
+            + " import_id = NULL,"
+            + " from_account = 1,"
+            + " is_removed = 0"
+            + " WHERE id = :beaconId")
+    void refreshFromAccount(String beaconId, String content, String alignmentPlist,
+                            String accessoryJson, String version);
+
+    /**
+     * The same, for a beacon arriving again in a newer zip.
+     *
+     * <p>Re-importing an export is an ordinary thing to do - a newer one carries a key alignment
+     * record an older one lacked - and it must not cost the user their custom names, the tag's
+     * location history, or the record of which days have already been fetched. All three are
+     * children of this table and all three cascade, so this re-links the import without deleting
+     * anything. The {@code COALESCE} choices are the same as {@link #refreshFromAccount}.
+     *
+     * <p>{@code from_account} is cleared, matching what a re-insert did: a beacon that arrived in
+     * a file is a file-imported beacon, and must not then be retired by an account refresh that
+     * does not list it.
+     */
+    @Query("UPDATE OwnedBeacons SET"
+            + " content = COALESCE(:content, content),"
+            + " alignment_plist = COALESCE(:alignmentPlist, alignment_plist),"
+            + " accessory_json = COALESCE(accessory_json, :accessoryJson),"
+            + " version = :version,"
+            + " import_id = :importId,"
+            + " from_account = 0,"
+            + " is_removed = 0"
+            + " WHERE id = :beaconId")
+    void refreshFromImport(String beaconId, String content, String alignmentPlist,
+                           String accessoryJson, String version, long importId);
 
     @Query("UPDATE OwnedBeacons SET is_removed = 1 WHERE id = :beaconId")
     void setRemoved(String beaconId);
