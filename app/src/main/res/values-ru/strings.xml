@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Отсутствует ключ API Google Карт</string>
     <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
-    <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Это может занять несколько минут — не закрывайте приложение.</string>
-    <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Это может занять несколько минут — не закрывайте приложение.</string>
+    <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
+    <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
     <string name="anisette_mode_title">Данные для входа</string>
     <string name="anisette_mode_local">На этом устройстве</string>
     <string name="anisette_mode_remote">Удалённый сервер</string>
@@ -245,4 +245,10 @@
     <string name="icloud_unlink_confirm_button">Отвязать</string>
     <string name="icloud_unlink_done">Учётная запись Apple больше не связана</string>
     <string name="icloud_unlink_failed">Не удалось отвязать учётную запись Apple. Повторите попытку.</string>
+    <string name="no_app_to_open_a_map_with">На этом телефоне нет приложения, способного открыть карту</string>
+    <string name="icloud_loading_opening_account">Открытие вашей учётной записи Apple…</string>
+    <string name="icloud_loading_waiting_for_location_check">Ожидание завершения проверки местоположения…</string>
+    <string name="export_logs">Экспорт журналов</string>
+    <string name="log_file_has_been_exported_successfully">Файл журнала экспортирован</string>
+    <string name="failed_to_export_log_file">Не удалось экспортировать файл журнала</string>
 </resources>

@@ -31,6 +31,7 @@ import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.parse.KeyAlignmentPlist;
 import dev.wander.android.opentagviewer.util.rx.ScanOrder;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
@@ -402,7 +403,12 @@ public class BeaconRepository {
             candidates.add(new ScanOrder.Candidate(
                     entry.getKey(),
                     row != null && row.lastScanAt != null,
-                    row != null && row.lastScanAt != null && row.fruitlessScans == 0));
+                    row != null && row.lastScanAt != null && row.fruitlessScans == 0,
+                    // Only ever consulted for a tag with no scan history, so this is read for
+                    // every candidate and used for very few. It is a small XPath over a plist
+                    // already in memory - cheaper than the schema change that storing it would
+                    // cost, and rule 1 makes that a migration.
+                    row == null ? null : KeyAlignmentPlist.observedAtMillis(row.alignmentPlist)));
         }
 
         if (ignored > 0 || waiting > 0) {

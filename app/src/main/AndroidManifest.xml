@@ -21,6 +21,22 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
         </intent>
+        <!--
+            Maps applications, so "navigate to this tag" can find one.
+
+            Without this the app cannot see any package that handles geo:, and on Android 11
+            and up that is not a permission error - resolveActivity simply returns null, as
+            though nothing on the phone could open a map. The button then did nothing at all
+            and logged, which is indistinguishable from a tag having no location.
+
+            It applied to every device on Android 11 or newer, Google Maps installed or not,
+            because package visibility hid the target package too - so naming it explicitly
+            could not have worked either. See MapsActivity#onClickNavigateTo.
+        -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
     </queries>
 
     <application
