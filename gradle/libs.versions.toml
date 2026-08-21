@@ -30,7 +30,11 @@ annotation = "1.6.0"
 googlePlayServicesLocation = "21.3.0"
 googlePlacesLib = "4.1.0"
 desugarJdkLibs = "2.1.5"
-emojiPicker = "1.5.0"
+# Emoji 16.0. Worth tracking rather than pinning and forgetting: this is the keyboard people
+# name their tags with, and a tag named with an emoji the picker does not know shows a blank
+# box. 1.5.0 was Emoji 15.1. Bumping also moved emoji2's own minSdk from 21 to 23, which is
+# below this app's 24 and so changes nothing here.
+emojiPicker = "1.6.0"
 cronetEmbedded = "143.7445.0"
 amapVersion = "9.8.3"
 # Reads the AES-256 (WinZip) encryption the exporter locks bundles with. java.util.zip cannot
