@@ -282,6 +282,46 @@ public class MyDevicesListActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Re-read the last known locations whenever this screen comes back to the front.
+     *
+     * <p><b>The list was only ever loaded in {@code onCreate}.</b> Coming back from the device
+     * page refreshed it only when that page said a device had been removed or changed, and
+     * fetching history is neither - so a tag whose locations had just been found through the
+     * history screen went on saying "No last location known" until something else recreated the
+     * activity. @parawanderer found it by going device → history → back and seeing no change,
+     * then reaching the same list through the map and seeing "3 days ago". The data had been
+     * there the whole time; this screen had not looked again.
+     *
+     * <p>Locations only. Rebuilding the beacons as well would re-sort and re-bind every row
+     * under somebody who is reading them, and their names and icons cannot change without the
+     * device page saying so - which it already does.
+     *
+     * <p>Skipped while the first load is still in flight, since {@code onResume} runs
+     * immediately after {@code onCreate} and there is nothing yet to refresh.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (this.beaconInfo.isEmpty()) {
+            return;
+        }
+
+        var async = this.beaconRepo.getLastLocationsForAll()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(latest -> {
+                    if (latest.equals(this.locations)) {
+                        return;
+                    }
+
+                    this.locations.clear();
+                    this.locations.putAll(latest);
+                    this.deviceListAdaptor.notifyItemRangeChanged(0, this.beaconInfo.size());
+                }, error -> Log.e(TAG, "Could not refresh the last known locations", error));
+    }
+
     private void fetchDeviceInfoAndRender() {
         var asyncLocations = this.beaconRepo.getLastLocationsForAll();
 

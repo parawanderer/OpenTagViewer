@@ -5,6 +5,8 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -420,6 +422,19 @@ public class BeaconRepository {
         }
 
         return due;
+    }
+
+    /**
+     * The beacons nobody has ever searched for, which get a wider first window.
+     *
+     * <p>Read once per batch rather than per accessory: it is one small query and the answer
+     * cannot change underneath a batch in a way that matters - a tag that becomes scanned
+     * halfway through simply gets the ordinary window next time, which is the intent.
+     */
+    public Observable<Set<String>> neverScanned() {
+        return Observable.fromCallable(
+                        () -> (Set<String>) new HashSet<>(db.ownedBeaconDao().neverScannedIds()))
+                .subscribeOn(Schedulers.io());
     }
 
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
