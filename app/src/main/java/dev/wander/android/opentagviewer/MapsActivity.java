@@ -134,6 +134,28 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private static final int HOURS_TO_GO_BACK_24H = 24;
 
+    /**
+     * How far back to look for a tag nothing has ever searched for.
+     *
+     * <p><b>A day is the wrong window for a tag's first fetch.</b> Everything else here asks
+     * about the time since the last fetch, which is right for a tag the app has been watching -
+     * but a tag that has just arrived from a zip or from the account has no history at all, and
+     * one last seen on Tuesday comes back empty from a window that starts this morning. It then
+     * sits in My Devices saying "No last location known" while its locations are sitting on
+     * Apple's servers, findable by opening the history screen and paging back - which is exactly
+     * how @parawanderer found this.
+     *
+     * <p>Seven days because that is all Apple keeps, so it is the whole of what can be had, and
+     * one request rather than a widening loop. It costs little: ~672 key indices for an aligned
+     * tag against the 2000 that makes a search count as expensive, so it does not look like a
+     * wide search and cannot push a healthy tag towards the backoff.
+     *
+     * <p>Applied per beacon and only while {@code last_scan_at} is null, so it happens once and
+     * then stops - a tag that has been searched drops back to the ordinary window whether or not
+     * that first search found anything.
+     */
+    private static final int HOURS_TO_GO_BACK_FIRST_TIME = 24 * 7;
+
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
     private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
@@ -589,8 +611,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Toast.makeText(this.getApplicationContext(), R.string.tag_ignored_retrying, LENGTH_LONG)
                 .show();
 
+        // **The whole week, not a day.** This tag was set aside precisely because it has not
+        // reported in a very long time, so asking about the last twenty-four hours is close to
+        // guaranteed to find nothing - and the person tapping "look again" would be told the
+        // same thing they were told before, having done the one thing the screen offered them.
         var async = this.fetchLastReportsFor(
-                        beaconId, beacon.getInfo().getOwnedBeaconPlistRaw(), HOURS_TO_GO_BACK_24H)
+                        beaconId, beacon.getInfo().getOwnedBeaconPlistRaw(),
+                        HOURS_TO_GO_BACK_FIRST_TIME)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         reports -> this.handleDeviceListChanged(),
@@ -1644,14 +1671,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
             final List<AccessoryRequest> requests, final int hoursToGoBack) {
 
-        return RxFlows.oneAtATime(
+        // **A tag nobody has searched for yet gets the whole week.** Read once for the batch,
+        // then applied per accessory - see HOURS_TO_GO_BACK_FIRST_TIME. Everything else keeps
+        // the window it asked for.
+        return this.beaconRepo.neverScanned().flatMap(neverScanned -> RxFlows.oneAtATime(
                 requests,
-                request -> this.appleService.getLastReports(List.of(request), hoursToGoBack)
+                request -> this.appleService.getLastReports(
+                                List.of(request),
+                                neverScanned.contains(request.getBeaconId())
+                                        ? HOURS_TO_GO_BACK_FIRST_TIME
+                                        : hoursToGoBack)
                         .flatMap(this.beaconRepo::storeFetchResult),
                 this::setLongFetchProgress,
                 (request, error) -> Log.e(TAG,
                         "Failed to fetch reports for beaconId=" + request.getBeaconId()
-                                + "; continuing with the remaining accessories", error));
+                                + "; continuing with the remaining accessories", error)));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {

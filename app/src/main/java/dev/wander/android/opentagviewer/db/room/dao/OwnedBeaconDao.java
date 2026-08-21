@@ -141,6 +141,18 @@ public interface OwnedBeaconDao {
             + " fruitless_scans = fruitless_scans + 1 WHERE id = :beaconId")
     void markIgnored(String beaconId, long at);
 
+    /**
+     * The beacons nobody has ever searched for.
+     *
+     * <p>They get a wider first window than everything else - see
+     * {@code MapsActivity#HOURS_TO_GO_BACK_FIRST_TIME}. A tag arriving from a zip or from the
+     * account has no reports at all yet, and asking only about the last day means one that was
+     * last seen on Tuesday shows "No last location known" on a screen that has never looked
+     * further back than this morning.
+     */
+    @Query("SELECT id FROM OwnedBeacons WHERE last_scan_at IS NULL AND is_removed = 0")
+    List<String> neverScannedIds();
+
     /** The beacons currently held as a cache of the Apple account. */
     @Query("SELECT id FROM OwnedBeacons WHERE from_account = 1 AND is_removed = 0")
     List<String> getAccountBeaconIds();
