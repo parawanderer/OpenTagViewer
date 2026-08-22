@@ -104,6 +104,7 @@ import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
+import dev.wander.android.opentagviewer.util.TagOrder;
 import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.util.android.AddressLookup;
@@ -1502,8 +1503,24 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         final long now = System.currentTimeMillis();
-        // remove all beacons that had cards that are now gone
-        for (final BeaconData beaconData : this.beacons.values()) {
+
+        // **In the order the user arranged, not the order the map happens to hold them in.**
+        //
+        // this.beacons is a ConcurrentHashMap, so its iteration order is hash order - arbitrary,
+        // and until now that was the carousel's order too. Cards are also only created once and
+        // reused, so whatever order they were first added in stuck for the life of the screen.
+        // Sorting here and placing each card at its index below is what makes a drag on the
+        // device list show up over here.
+        final List<BeaconInformation> inOrder = TagOrder.sorted(this.beacons.values().stream()
+                .map(BeaconData::getInfo)
+                .collect(Collectors.toList()));
+
+        int index = 0;
+        for (final BeaconInformation ordered : inOrder) {
+            final BeaconData beaconData = this.beacons.get(ordered.getBeaconId());
+            if (beaconData == null) {
+                continue;
+            }
             final BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
             final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
@@ -1523,7 +1540,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             if (!this.dynamicCardsForTag.containsKey(beaconId)) {
                 // MAKE A NEW CARD
                 v = (FrameLayout) this.getLayoutInflater().inflate(R.layout.maps_tag_card, null);
-                cardsContainer.addView(v);
+                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
                 this.dynamicCardsForTag.put(beaconId, v);
             } else {
                 // UPDATE EXISTING CARD
@@ -1582,6 +1599,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     DateUtils.MINUTE_IN_MILLIS
             ).toString();
             deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+
+            // **Put an existing card where it now belongs.** Cards are created once and reused,
+            // so a card added before the user rearranged anything keeps its original slot
+            // otherwise - the model would be in the new order and the screen in the old one.
+            // Only moved when it is actually in the wrong place: removeView/addView on every
+            // pass would detach and reattach every card on every refresh tick, which loses the
+            // scroll position and interrupts anything mid-animation.
+            if (cardsContainer.indexOfChild(v) != index) {
+                cardsContainer.removeView(v);
+                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
+            }
+
+            index++;
         }
 
 

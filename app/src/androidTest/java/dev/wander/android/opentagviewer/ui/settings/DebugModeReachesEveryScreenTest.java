@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ui.settings;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
@@ -125,12 +126,15 @@ public class DebugModeReachesEveryScreenTest {
     private void flipTheSwitchInSettings() {
         this.openTheScreen(SettingsActivity.class);
 
-        // No scrollTo: activity_settings has no ScrollView of any kind, so asking Espresso to
-        // scroll to a view inside it throws rather than doing nothing. The switch is on screen
-        // as soon as the page lays out.
+        // **scrollTo first, and this test is the reason the screen scrolls at all.** It used to
+        // say the opposite - that activity_settings had no ScrollView, so the switch was simply
+        // on screen once the page laid out. That was true only while the page happened to fit,
+        // and it stopped being true the moment a setting was added: the switch went below the
+        // fold, this went red, and nothing could reach it - not Espresso and not a user either.
         Eventually.check(() -> onView(withId(R.id.settings_app_debug_data_enabled))
+                .perform(scrollTo())
                 .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_app_debug_data_enabled)).perform(click());
+        onView(withId(R.id.settings_app_debug_data_enabled)).perform(scrollTo(), click());
 
         // Saved on change rather than on exit, and on a background scheduler - so the write is
         // in flight when the click returns.

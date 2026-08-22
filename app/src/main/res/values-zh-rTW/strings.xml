@@ -255,4 +255,6 @@
     <string name="show_apple_devices_explainer">你的 iPhone、iPad 和 Mac 在這裡只能透過「尋找」網路定位，方式與 AirTag 相同。因此它們更新得很少，時間也難以預期；蘋果自家的 App 則讀取裝置自己回報給 iCloud 的位置。由於這種涵蓋範圍根本上並不完整，此項預設關閉。關閉期間，這些裝置既不會顯示，也不會被查詢。</string>
     <string name="show_apple_devices_help_link">參與實作完整支援 →</string>
     <string name="no_app_to_open_a_link_with">此手機上沒有可以開啟網頁連結的 App</string>
+    <string name="reorder_tag">拖曳以重新排序</string>
+    <string name="move_to_top">移到最上方</string>
 </resources>

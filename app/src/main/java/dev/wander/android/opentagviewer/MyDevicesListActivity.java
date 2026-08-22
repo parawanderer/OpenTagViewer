@@ -22,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.stream.IntStream;
 
@@ -45,6 +47,7 @@ import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.util.TagOrder;
 import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
@@ -209,6 +212,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
         RecyclerView recyclerView = findViewById(R.id.my_devices_list);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(deviceListAdaptor);
+        this.attachDragToReorder(recyclerView);
 
         findViewById(R.id.my_devices_empty_import_button)
                 .setOnClickListener(v -> this.handleStartImport());
@@ -341,7 +345,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
         // left out unless the setting is on. See TagVisibility.
         var asyncBeacons = this.beaconRepo.getAllBeacons()
                 .flatMap(BeaconDataParser::parseAsync)
-                .map(all -> TagVisibility.visible(all, this.userSettings.shouldShowAppleDevices()));
+                .map(all -> TagVisibility.visible(all, this.userSettings.shouldShowAppleDevices()))
+                // Whatever the user dragged this into last time, and accessories before the
+                // owner's own devices for anything they have not touched.
+                .map(TagOrder::sorted);
 
         var async = Observable.zip(asyncBeacons, asyncLocations, Pair::create)
                 .subscribeOn(Schedulers.io())
@@ -473,6 +480,117 @@ public class MyDevicesListActivity extends AppCompatActivity {
         this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
     }
 
+    /**
+     * Dragging a row by its handle reorders the list, and the order is kept.
+     *
+     * <p><b>{@code setLongPressDragEnabled(false)} is the load-bearing line.</b> A long press on
+     * a row already means "start selecting", and that is the gesture {@code ItemTouchHelper}
+     * would otherwise claim for dragging. Leaving both on does not produce a conflict the
+     * framework resolves - it produces a row that sometimes selects and sometimes picks up,
+     * depending on how far the finger drifted, which is worse than either. So the handle is the
+     * only way in; see {@code DeviceListAdaptor#bindDragHandle}.
+     *
+     * <p><b>Written once, when the finger lifts.</b> {@code onMove} fires for every row the
+     * drag crosses, so persisting there would be a database write per row passed over, and a
+     * half-finished arrangement stored if the drag were cancelled. {@code clearView} is the end
+     * of the gesture.
+     */
+    private void attachDragToReorder(final RecyclerView recyclerView) {
+        final ItemTouchHelper helper = new ItemTouchHelper(
+                new ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return false;
+            }
+
+            @Override
+            public boolean isItemViewSwipeEnabled() {
+                return false;
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView view,
+                                  @NonNull RecyclerView.ViewHolder dragged,
+                                  @NonNull RecyclerView.ViewHolder target) {
+
+                final int from = dragged.getBindingAdapterPosition();
+                final int to = target.getBindingAdapterPosition();
+
+                if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) {
+                    return false;
+                }
+
+                // Through TagOrder rather than a swap here, so what a drag means is defined in
+                // one place and tested on the JVM. The list is the adapter's - it was handed
+                // the same object - so replacing its contents is what moves the rows.
+                final List<BeaconInformation> reordered =
+                        TagOrder.moved(MyDevicesListActivity.this.beaconInfo, from, to);
+                MyDevicesListActivity.this.beaconInfo.clear();
+                MyDevicesListActivity.this.beaconInfo.addAll(reordered);
+
+                MyDevicesListActivity.this.deviceListAdaptor.notifyItemMoved(from, to);
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // Nothing swipes here. Required by the base class.
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView view,
+                                  @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(view, viewHolder);
+                MyDevicesListActivity.this.rememberTheArrangement();
+            }
+        });
+
+        helper.attachToRecyclerView(recyclerView);
+        this.deviceListAdaptor.setOnDragHandleTouched(helper::startDrag);
+    }
+
+    /**
+     * Store the order now on screen.
+     *
+     * <p>Every visible tag gets a position, not only the ones that moved - see {@link TagOrder},
+     * which explains why a partial arrangement cannot be reasoned about.
+     */
+    private void rememberTheArrangement() {
+        var async = this.beaconRepo.storeArrangement(TagOrder.positionsFor(this.beaconInfo))
+                .subscribe(
+                        () -> Log.d(TAG, "Stored the arrangement of " + this.beaconInfo.size()
+                                + " tags"),
+                        error -> Log.e(TAG, "Could not store the tag arrangement", error));
+    }
+
+    /**
+     * Bring everything selected to the front of the list.
+     *
+     * <p>The bulk half of arranging. Dragging handles one tag well and several badly - it is one
+     * finger and one row at a time - so the case it is worst at gets a menu item instead of a
+     * more elaborate gesture. Selection mode already exists for exactly this shape of "do a
+     * thing to these tags", and this collides with nothing.
+     */
+    private void moveSelectionToTop() {
+        final Set<String> selected = this.deviceListAdaptor.getSelectedBeaconIds();
+        if (selected.isEmpty()) {
+            return;
+        }
+
+        final List<BeaconInformation> reordered = TagOrder.movedToTop(this.beaconInfo, selected);
+        this.beaconInfo.clear();
+        this.beaconInfo.addAll(reordered);
+
+        this.deviceListAdaptor.notifyItemRangeChanged(0, this.beaconInfo.size());
+        this.rememberTheArrangement();
+        this.endSelection();
+
+        // Otherwise the rows move under a list that is still scrolled to wherever the user was,
+        // and the tags they just sent to the top are off screen above them.
+        ((RecyclerView) findViewById(R.id.my_devices_list)).scrollToPosition(0);
+    }
+
     private void showSelectionMenu() {
         PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
         menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
@@ -485,12 +603,17 @@ public class MyDevicesListActivity extends AppCompatActivity {
         final boolean anythingSelected = !this.deviceListAdaptor.getSelectedBeacons().isEmpty();
         menu.getMenu().findItem(R.id.action_export_history).setEnabled(anythingSelected);
         menu.getMenu().findItem(R.id.action_remove_devices).setEnabled(anythingSelected);
+        menu.getMenu().findItem(R.id.action_move_to_top).setEnabled(anythingSelected);
 
         menu.setOnMenuItemClickListener(item -> {
             final int id = item.getItemId();
 
             if (id == R.id.action_export_history) {
                 this.exportHistoryForSelection();
+                return true;
+            }
+            if (id == R.id.action_move_to_top) {
+                this.moveSelectionToTop();
                 return true;
             }
             if (id == R.id.action_remove_devices) {

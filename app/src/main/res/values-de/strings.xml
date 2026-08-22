@@ -255,4 +255,6 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
     <string name="show_apple_devices_explainer">Deine iPhones, iPads und Macs lassen sich hier nur über das Wo-ist-Netzwerk orten, genau wie ein AirTag. Sie werden daher selten und unvorhersehbar aktualisiert – anders als in Apples eigener App, die die Position ausliest, die ein Gerät selbst an iCloud meldet. Standardmäßig aus, weil diese Abdeckung grundsätzlich unvollständig ist. Solange die Option aus ist, werden diese Geräte weder angezeigt noch gesucht.</string>
     <string name="show_apple_devices_help_link">Hilf mit, volle Unterstützung zu bauen →</string>
     <string name="no_app_to_open_a_link_with">Keine App auf diesem Telefon kann einen Weblink öffnen</string>
+    <string name="reorder_tag">Zum Umsortieren ziehen</string>
+    <string name="move_to_top">Nach oben verschieben</string>
 </resources>
