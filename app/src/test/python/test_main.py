@@ -1052,19 +1052,13 @@ def _aTrustedDeviceMethod():
     `isinstance` - a duck-typed stand-in would fall through to the "unmapped" branch and the
     test would pass while proving nothing.
 
-    The base class is abstract, so this fills in the two abstract methods and skips `__init__`,
-    which wants a live account.
+    The *sync* class, which is what a sync `AppleAccount` returns - it subclasses
+    `TrustedDeviceSecondFactorMethod`, so the isinstance check matches, and it is concrete. Its
+    `__init__` wants a live account, hence `__new__`.
     """
-    from findmy.reports.twofactor import TrustedDeviceSecondFactorMethod
+    from findmy.reports.twofactor import SyncTrustedDeviceSecondFactor
 
-    class _ATrustedDevice(TrustedDeviceSecondFactorMethod):
-        def request(self):
-            pass
-
-        def submit(self, code):
-            pass
-
-    return _ATrustedDevice.__new__(_ATrustedDevice)
+    return SyncTrustedDeviceSecondFactor.__new__(SyncTrustedDeviceSecondFactor)
 
 
 def test_a_logged_in_account_is_not_asked_for_a_second_factor():
