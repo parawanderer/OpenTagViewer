@@ -18,6 +18,8 @@
         <variable name="onClickMapProvider" type="Runnable" />
         <variable name="currentMapProvider" type="String" />
         <variable name="isDebugDataEnabled" type="boolean" />
+        <variable name="isShowAppleDevicesEnabled" type="boolean" />
+        <variable name="onClickAppleDevicesHelpLink" type="Runnable" />
         <variable name="isSystemColorsSupported" type="boolean" />
         <variable name="isSystemColorsEnabled" type="boolean" />
     </data>
@@ -25,7 +27,7 @@
     <LinearLayout
         android:id="@+id/settings_main_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <include
@@ -34,9 +36,39 @@
             app:onClickBack="@{handleClickBack}"
             app:pageTitle="@{@string/settings}" />
 
+        <!--
+            **This screen did not scroll.** Everything below the fold was simply unreachable -
+            not clipped-looking, not scrollable-but-awkward, just gone, with no indication there
+            was more. It fitted by luck on a tall enough screen and stopped fitting the moment
+            anything was added; the Apple-devices setting and its explanation were what tipped
+            it over, taking the debug and system-colours switches off the bottom with them.
+
+            Height 0 with weight 1, so the scrolling area is exactly what is left under the
+            toolbar. `fillViewport` so a short list still lays out against the full height
+            rather than collapsing to its content.
+        -->
+        <ScrollView
+            android:id="@+id/settings_scroll_area"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+        <!--
+            One child, because a ScrollView will only take one - the account section and the
+            settings section below it are siblings, and wrapping only the first left the second
+            outside. That is not a layout warning, it is an InflateException the moment Settings
+            is opened.
+        -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingLeft="8dp"
             android:paddingTop="20dp"
@@ -203,6 +235,74 @@
                 android:paddingLeft="22dp"
                 android:paddingTop="8dp"
                 android:paddingRight="22dp"
+                android:paddingBottom="0dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    app:srcCompat="@drawable/smartphone_24px" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/settings_show_apple_devices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22dp"
+                    android:checked="@{isShowAppleDevicesEnabled}"
+                    android:enabled="true"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/show_apple_devices"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!--
+                Indented to the switch's text, not to the icon, so it reads as belonging to the
+                switch rather than as a new setting. The explanation is long on purpose: the whole
+                point of the setting is that the incompleteness is invisible otherwise.
+            -->
+            <TextView
+                android:id="@+id/settings_show_apple_devices_explainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="72dp"
+                android:layout_marginEnd="22dp"
+                android:fontFamily="@font/nunito_medium"
+                android:text="@string/show_apple_devices_explainer"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/settings_show_apple_devices_help_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="72dp"
+                android:layout_marginEnd="22dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:text="@string/show_apple_devices_help_link"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                android:onClick="@{() -> onClickAppleDevicesHelpLink.run()}" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="22dp"
+                android:paddingTop="8dp"
+                android:paddingRight="22dp"
                 android:paddingBottom="8dp">
 
                 <ImageView
@@ -224,6 +324,10 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        </LinearLayout>
+
+        </ScrollView>
 
     </LinearLayout>
 </layout>

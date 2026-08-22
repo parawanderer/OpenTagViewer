@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 
 /**
  * Prompt for the user's own AMap API key.
@@ -73,11 +74,9 @@ public final class AmapApiKeyDialog {
             if (properties == null) {
                 return;
             }
-            final String guideUrl = properties.getProperty("amapWikiPage");
-            if (guideUrl == null || guideUrl.isBlank()) {
-                return;
-            }
-            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(guideUrl)));
+            // Through WebLink, which guards. This threw ActivityNotFoundException on a phone
+            // with no browser - the aosp-atd emulator the instrumented suite runs on is one.
+            WebLink.open(activity, properties.getProperty("amapWikiPage"));
         });
 
         new MaterialAlertDialogBuilder(activity)

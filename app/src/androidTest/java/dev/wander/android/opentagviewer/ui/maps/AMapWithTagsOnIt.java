@@ -14,8 +14,12 @@ import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
 import java.nio.charset.StandardCharsets;
+import android.widget.TextView;
+
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.MapsActivity;
@@ -244,6 +248,39 @@ public final class AMapWithTagsOnIt {
     public ActivityScenario<MapsActivity> open() {
         this.scenario = ActivityScenario.launch(new Intent(this.context, MapsActivity.class));
         return this.scenario;
+    }
+
+    /**
+     * Store an arrangement, as though the user had already dragged the device list into it.
+     *
+     * <p>Call after {@link #seed} and before {@link #open}. The arguments are seed positions, so
+     * {@code seed("Wallet", "Keys", "Bag").arrangedAs(2, 0, 1)} means the user put Bag first.
+     *
+     * <p>Written through the same DAO the app writes through, rather than by hand, so a test
+     * using this cannot pass against a storage shape the app does not actually produce.
+     */
+    public AMapWithTagsOnIt arrangedAs(final int... seedIndices) {
+        final Map<String, Integer> positions = new LinkedHashMap<>();
+        for (int position = 0; position < seedIndices.length; position++) {
+            positions.put(this.beaconIds.get(seedIndices[position]), position);
+        }
+
+        this.db.userBeaconOptionsDao().storeArrangement(positions, System.currentTimeMillis());
+        return this;
+    }
+
+    /** The names on the tag cards, left to right - which is the order the carousel shows. */
+    public List<String> cardNames() {
+        final List<String> names = new ArrayList<>();
+
+        for (final View card : this.cards()) {
+            final TextView name = card.findViewById(R.id.device_name);
+            if (name != null) {
+                names.add(name.getText().toString());
+            }
+        }
+
+        return names;
     }
 
     // ------------------------------------------------------------------ asking about cards

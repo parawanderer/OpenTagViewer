@@ -251,4 +251,10 @@ Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple
     <string name="export_logs">Exporter les journaux</string>
     <string name="log_file_has_been_exported_successfully">Le fichier journal a bien été exporté</string>
     <string name="failed_to_export_log_file">Impossible d’exporter le fichier journal</string>
+    <string name="show_apple_devices">Afficher mes appareils Apple</string>
+    <string name="show_apple_devices_explainer">Vos iPhone, iPad et Mac ne peuvent être localisés ici que via le réseau Localiser, exactement comme un AirTag. Ils se mettent donc à jour rarement et de façon imprévisible, contrairement à l’app d’Apple, qui lit la position que l’appareil transmet lui-même à iCloud. Désactivé par défaut, car cette couverture est fondamentalement incomplète. Tant que l’option est désactivée, ces appareils ne sont ni affichés ni recherchés.</string>
+    <string name="show_apple_devices_help_link">Aidez à construire une prise en charge complète →</string>
+    <string name="no_app_to_open_a_link_with">Aucune app sur ce téléphone ne peut ouvrir un lien web</string>
+    <string name="reorder_tag">Faites glisser pour réorganiser</string>
+    <string name="move_to_top">Déplacer en haut</string>
 </resources>

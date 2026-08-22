@@ -35,6 +35,14 @@ public final class BeaconDataParser {
 
     private static final String XPATH_REQUIRED_PRIVATE_KEY = "/plist/dict/key[.='privateKey']";
 
+    /**
+     * Presence only, never the value. This is one of the owner's devices' key material, and the
+     * question it answers here is what kind of thing the record is - see
+     * {@code BeaconInformation.isOwnDevice()} and findmy-export 06-output section 2.3.
+     */
+    private static final String XPATH_SECURE_LOCATIONS_SECRET =
+            "/plist/dict/key[.='secureLocationsSharedSecret']";
+
     private static final String TYPE_STRING = "string";
 
     private static final String TYPE_INTEGER = "integer";
@@ -62,6 +70,8 @@ public final class BeaconDataParser {
             final XPathExpression systemVersionQuery = getXPathFor(xPath, "systemVersion", TYPE_STRING);
             final XPathExpression vendorIdQuery = getXPathFor(xPath, "vendorId", TYPE_INTEGER);
             final XPathExpression privateKeyNodeExistsQuery = xPath.compile(XPATH_REQUIRED_PRIVATE_KEY);
+            final XPathExpression secureLocationsSecretQuery =
+                    xPath.compile(XPATH_SECURE_LOCATIONS_SECRET);
 
             var res = new ArrayList<BeaconInformation>();
             for (var beaconData : rawBeaconData) {
@@ -138,6 +148,8 @@ public final class BeaconDataParser {
                 final String stableIdentifier = getString(ownedBeacon, stableIdentifierQuery);
                 final String systemVersion = getString(ownedBeacon, systemVersionQuery);
                 final int vendorId = getInteger(ownedBeacon, vendorIdQuery);
+                final boolean secureLocationsSecret =
+                        isNodeNotEmpty(ownedBeacon, secureLocationsSecretQuery);
 
                 var extractedData = BeaconInformation.builder()
                         // BeaconNamingRecord
@@ -164,6 +176,7 @@ public final class BeaconDataParser {
                         .stableIdentifier(List.of(stableIdentifier))
                         .systemVersion(systemVersion)
                         .vendorId(vendorId)
+                        .secureLocationsSecret(secureLocationsSecret)
                         .fromAccount(beaconData.getOwnedBeaconInfo().fromAccount)
                         .ignoredAt(beaconData.getOwnedBeaconInfo().ignoredAt)
                         .fruitlessScans(beaconData.getOwnedBeaconInfo().fruitlessScans)
@@ -173,7 +186,8 @@ public final class BeaconDataParser {
                 if (userOverrides != null) {
                     // configure user overrides too
                     extractedData.userOverrideName(userOverrides.uiName)
-                            .userOverrideEmoji(userOverrides.uiEmoji);
+                            .userOverrideEmoji(userOverrides.uiEmoji)
+                            .uiOrder(userOverrides.uiOrder);
                 }
 
                 res.add(extractedData.build());

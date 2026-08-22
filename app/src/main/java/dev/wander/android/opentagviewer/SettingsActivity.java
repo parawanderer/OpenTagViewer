@@ -80,6 +80,7 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
@@ -116,6 +117,26 @@ public class SettingsActivity extends AppCompatActivity {
 
     private String initialAnisetteUrl = null;
     private boolean mapProviderChanged = false;
+
+    /**
+     * Whether the owner's own Apple devices were shown or hidden while this screen was open.
+     *
+     * <p>Reported back rather than acted on here, for the same reason as
+     * {@link #mapProviderChanged}: the map holds its tags in memory and that model decides both
+     * what it draws and what it asks Apple about, so it has to reload to notice.
+     */
+    private boolean shownDevicesChanged = false;
+
+    /**
+     * Where "help build full support" goes.
+     *
+     * <p>Deliberately an issue rather than a wiki page. Someone reading this setting has just
+     * been told the app cannot do something Apple's app can, and the useful next step is the
+     * write-up of what implementing it would take - including the part that says the tokens
+     * needed are already in hand and unused.
+     */
+    private static final String APPLE_DEVICES_ISSUE_URL =
+            "https://github.com/parawanderer/OpenTagViewer/issues/131";
 
     /** Reading whether the account is linked, so leaving does not land on dead views. */
     private Disposable membershipLookup;
@@ -167,6 +188,8 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setOnClickMapProvider(this::onClickEditMapProvider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
+        this.binding.setIsShowAppleDevicesEnabled(this.currentSettings.shouldShowAppleDevices());
+        this.binding.setOnClickAppleDevicesHelpLink(this::onClickAppleDevicesHelpLink);
         this.binding.setIsSystemColorsSupported(DynamicColors.isDynamicColorAvailable());
         this.binding.setIsSystemColorsEnabled(
                 this.currentSettings.getUseSystemColors() == Boolean.TRUE);
@@ -177,6 +200,9 @@ public class SettingsActivity extends AppCompatActivity {
 
         MaterialSwitch switcher = this.findViewById(R.id.settings_app_debug_data_enabled);
         switcher.setOnCheckedChangeListener(this::onDebugDataEnabledChange);
+
+        MaterialSwitch appleDevices = this.findViewById(R.id.settings_show_apple_devices);
+        appleDevices.setOnCheckedChangeListener(this::onShowAppleDevicesChange);
 
         MaterialSwitch systemColors = this.findViewById(R.id.settings_app_use_system_colors);
         systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
@@ -198,9 +224,10 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleEndActivity() {
-        if (this.mapProviderChanged) {
+        if (this.mapProviderChanged || this.shownDevicesChanged) {
             Intent data = new Intent();
-            data.putExtra("mapProviderChanged", true);
+            data.putExtra("mapProviderChanged", this.mapProviderChanged);
+            data.putExtra("shownDevicesChanged", this.shownDevicesChanged);
             setResult(RESULT_OK, data);
         }
         this.finish();
@@ -209,6 +236,39 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         this.handleEndActivity();
+    }
+
+    /**
+     * Shows or hides the owner's own Apple devices, on every screen and in the fetch.
+     *
+     * <p>Flagged back to whoever launched this so the map rebuilds - it holds the tags in
+     * memory and reads that model for what to draw <i>and</i> what to search for, so a change
+     * here is not visible until it reloads. Same mechanism as the map provider, which has the
+     * same problem for the same reason.
+     */
+    private void onShowAppleDevicesChange(CompoundButton buttonView, boolean isChecked) {
+        if (this.currentSettings.shouldShowAppleDevices() == isChecked) {
+            return;
+        }
+
+        this.currentSettings.setShowAppleDevices(isChecked);
+        this.binding.setIsShowAppleDevicesEnabled(isChecked);
+        this.shownDevicesChanged = true;
+        this.saveSettings();
+
+        Log.i(TAG, "The owner's own Apple devices are now " + (isChecked ? "shown" : "hidden")
+                + "; they are " + (isChecked ? "also" : "no longer") + " searched for");
+    }
+
+    /**
+     * Opens the issue tracking real support for locating the owner's own devices.
+     *
+     * <p>A link in a settings screen rather than a paragraph, because the honest answer to "why
+     * is this off" is "nobody has built the other half yet", and the useful thing to do with
+     * that information is go and read what building it would involve.
+     */
+    private void onClickAppleDevicesHelpLink() {
+        WebLink.open(this, APPLE_DEVICES_ISSUE_URL);
     }
 
     private void onDebugDataEnabledChange(CompoundButton buttonView, boolean isChecked) {
@@ -791,10 +851,7 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
 
-        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, url);
     }
 
     /** Set while the dialog is open; only meaningful until it is confirmed or dismissed. */

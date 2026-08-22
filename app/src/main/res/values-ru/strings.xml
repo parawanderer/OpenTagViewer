@@ -251,4 +251,10 @@
     <string name="export_logs">Экспорт журналов</string>
     <string name="log_file_has_been_exported_successfully">Файл журнала экспортирован</string>
     <string name="failed_to_export_log_file">Не удалось экспортировать файл журнала</string>
+    <string name="show_apple_devices">Показывать мои устройства Apple</string>
+    <string name="show_apple_devices_explainer">Ваши iPhone, iPad и Mac можно найти здесь только через сеть «Локатор», так же как AirTag. Поэтому они обновляются редко и непредсказуемо — в отличие от приложения Apple, которое считывает координаты, отправляемые самим устройством в iCloud. По умолчанию выключено, потому что такое покрытие принципиально неполное. Пока настройка выключена, эти устройства не отображаются и не запрашиваются.</string>
+    <string name="show_apple_devices_help_link">Помогите реализовать полную поддержку →</string>
+    <string name="no_app_to_open_a_link_with">На этом телефоне нет приложения, способного открыть веб-ссылку</string>
+    <string name="reorder_tag">Перетащите, чтобы изменить порядок</string>
+    <string name="move_to_top">Переместить наверх</string>
 </resources>
