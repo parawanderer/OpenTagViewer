@@ -309,4 +309,12 @@
     <string name="refresh_from_account">从 Apple 账户刷新</string>
     <string name="refresh_from_account_done">已与你的 Apple 账户同步</string>
     <string name="refresh_from_account_failed">此刻无法连接你的 Apple 账户。标签没有变化。</string>
+    <string name="play_sound_nearby">就近响铃</string>
+    <string name="play_sound_searching">正在通过蓝牙搜索附近设备…</string>
+    <string name="play_sound_success">正在播放声音。</string>
+    <string name="play_sound_not_nearby">附近未找到。请靠近后重试。</string>
+    <string name="play_sound_no_sound_service">已连接，但此配件没有声音服务。</string>
+    <string name="play_sound_no_candidate_macs">无法计算此配件当前的地址。</string>
+    <string name="play_sound_permission_denied">就近响铃需要蓝牙权限。</string>
+    <string name="play_sound_failed">无法播放声音。请重试。</string>
 </resources>

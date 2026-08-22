@@ -165,6 +165,46 @@ def test_json_that_is_not_an_accessory_is_refused(blob):
         main.accessoryFromJson(blob)
 
 
+# --------------------------------------------------------------------------
+# currentMacAddresses
+#
+# The BLE MAC address(es) an accessory might currently be advertising - what
+# dev.wander.android.opentagviewer.ble matches a scan result against to trigger an owned
+# accessory's sound directly, without going through Apple's Find My network.
+# --------------------------------------------------------------------------
+
+_MAC_RE = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){5}$")
+
+
+def test_current_mac_addresses_for_a_self_generated_tag():
+    macs = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert macs is not None
+    assert len(macs) > 0
+    for mac in macs:
+        assert _MAC_RE.match(mac), f"{mac!r} is not a MAC address"
+
+
+def test_current_mac_addresses_is_deterministic_for_a_fixed_key_tag():
+    """A self-generated tag's keys don't rotate, so asking twice must agree - unlike an Apple-
+    paired one, where this is only true at the exact same instant (rollover happens meanwhile)."""
+    once = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+    twice = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert once == twice
+
+
+def test_current_mac_addresses_returns_none_on_garbage():
+    """Failure must be None, not an exception - see AccessoryMacResolver's Java contract, which
+    reads None the same way as an empty answer: nothing to scan for yet."""
+    assert main.currentMacAddresses("not an accessory at all") is None
+
+
+def test_current_mac_addresses_refuses_an_unknown_accessory_type():
+    assert main.currentMacAddresses(
+        json.dumps({"type": "something_from_the_future"})) is None
+
+
 def test_convertPlistToJson_returns_none_on_garbage():
     """Failure must be None, not an exception - the caller retries later."""
     assert main.convertPlistToJson("not a plist at all") is None

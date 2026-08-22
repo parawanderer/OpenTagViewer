@@ -309,4 +309,12 @@
     <string name="refresh_from_account">從 Apple 帳戶重新整理</string>
     <string name="refresh_from_account_done">已與你的 Apple 帳戶同步</string>
     <string name="refresh_from_account_failed">此刻無法連線到你的 Apple 帳戶。標籤沒有變化。</string>
+    <string name="play_sound_nearby">就近響鈴</string>
+    <string name="play_sound_searching">正在透過藍牙搜尋附近裝置…</string>
+    <string name="play_sound_success">正在播放聲音。</string>
+    <string name="play_sound_not_nearby">附近未找到。請靠近後再試一次。</string>
+    <string name="play_sound_no_sound_service">已連線，但此配件沒有聲音服務。</string>
+    <string name="play_sound_no_candidate_macs">無法計算此配件目前的位址。</string>
+    <string name="play_sound_permission_denied">就近響鈴需要藍牙權限。</string>
+    <string name="play_sound_failed">無法播放聲音。請重試。</string>
 </resources>

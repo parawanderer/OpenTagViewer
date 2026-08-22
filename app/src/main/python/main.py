@@ -1017,6 +1017,30 @@ def accessoryFromJson(accessoryJson: str) -> StoredAccessory:
     return accessoryType.from_json(cast(Any, mapping))
 
 
+def currentMacAddresses(accessoryJson: str) -> list[str] | None:
+    """
+    The BLE MAC address(es) this accessory might currently be advertising.
+
+    Lets Java recognise an owned accessory's own advertisement in a BLE scan, so it can be
+    triggered directly (playing a sound) without going through Apple's Find My network - the
+    same thing Find My itself does when a tag is close enough to reach over Bluetooth.
+
+    Delegates to `RollingKeyPairSource.current_mac_addresses`, added to the pinned FindMy.py
+    fork alongside this feature: it spans the accessory's `get_min_index`/`get_max_index`
+    range for *now* rather than a single index, to account for rollover uncertainty since the
+    last observed alignment.
+
+    Returns None on failure so Java can decide how to recover - a missing or unreadable
+    accessory is worth telling apart from "no keys", which would be an empty list.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+        return sorted(accessory.current_mac_addresses())
+    except Exception:
+        print(f"currentMacAddresses failed: {traceback.format_exc()}")
+        return None
+
+
 def _isAlignmentWide(accessory: StoredAccessory, start, end) -> int:
     """Width of the key-index range a history fetch would search, or 0 if unknown."""
     try:

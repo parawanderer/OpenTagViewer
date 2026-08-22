@@ -309,4 +309,12 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="refresh_from_account">Vom Apple-Konto aktualisieren</string>
     <string name="refresh_from_account_done">Auf dem Stand deines Apple-Kontos</string>
     <string name="refresh_from_account_failed">Dein Apple-Konto war gerade nicht erreichbar. An deinen Tags hat sich nichts geändert.</string>
+    <string name="play_sound_nearby">In der Nähe klingeln lassen</string>
+    <string name="play_sound_searching">Suche in der Nähe per Bluetooth…</string>
+    <string name="play_sound_success">Ton wird jetzt abgespielt.</string>
+    <string name="play_sound_not_nearby">Nicht in der Nähe gefunden. Komm näher und versuche es erneut.</string>
+    <string name="play_sound_no_sound_service">Verbunden, aber dieses Zubehör hat keinen Ton-Dienst.</string>
+    <string name="play_sound_no_candidate_macs">Die aktuelle Adresse dieses Zubehörs konnte nicht berechnet werden.</string>
+    <string name="play_sound_permission_denied">Für das Klingeln in der Nähe wird die Bluetooth-Berechtigung benötigt.</string>
+    <string name="play_sound_failed">Ton konnte nicht abgespielt werden. Versuche es erneut.</string>
 </resources>
