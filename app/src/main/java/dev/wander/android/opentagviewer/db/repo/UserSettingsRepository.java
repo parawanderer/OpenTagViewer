@@ -6,6 +6,7 @@ import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStor
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_UPGRADE_OFFERED;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_SERVER_URL;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ENABLE_DEBUG_DATA;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ICLOUD_OFFER_MADE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.MAP_PROVIDER;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.SHOW_APPLE_DEVICES;
@@ -42,6 +43,7 @@ public class UserSettingsRepository {
                 String anisetteApkUri = settings.get(ANISETTE_APK_URI);
                 Boolean anisetteUpgradeOffered = settings.get(ANISETTE_UPGRADE_OFFERED);
                 Boolean showAppleDevices = settings.get(SHOW_APPLE_DEVICES);
+                Boolean icloudOfferMade = settings.get(ICLOUD_OFFER_MADE);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
@@ -55,6 +57,7 @@ public class UserSettingsRepository {
                         .anisetteApkUri(anisetteApkUri)
                         .anisetteUpgradeOffered(anisetteUpgradeOffered)
                         .showAppleDevices(showAppleDevices)
+                        .icloudOfferMade(icloudOfferMade)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -104,6 +107,11 @@ public class UserSettingsRepository {
             // Null reads as off, which is the intended default - the app shows only what it can
             // actually keep up to date. See UserSettings.showAppleDevices.
             mutablePreferences.set(SHOW_APPLE_DEVICES, userSettings.shouldShowAppleDevices());
+            // Once true this never goes back to false: somebody who dismissed the offer has
+            // answered it, and asking again is how a prompt becomes something people close
+            // without reading. See UserSettings.icloudOfferMade.
+            mutablePreferences.set(ICLOUD_OFFER_MADE,
+                    userSettings.getIcloudOfferMade() == Boolean.TRUE);
 
             return Single.just(mutablePreferences);
         }).subscribeOn(Schedulers.io())

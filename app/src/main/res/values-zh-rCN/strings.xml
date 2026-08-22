@@ -262,4 +262,10 @@
     <string name="two_factor_again_sign_out">改为退出登录</string>
     <string name="two_factor_again_wrong_code">验证码未通过。还剩 %1$d 次机会。</string>
     <string name="two_factor_again_giving_up">验证码未通过。正在退出登录，你需要重新登录。</string>
+    <string name="icloud_offer_title">从 iCloud 读取你的标签？</string>
+    <string name="icloud_offer_message">本应用可以连接你的 Apple 账户并直接读取标签。新标签会自动出现，重命名会写回账户，也不需要在 Mac 上导出 zip 文件。
+
+你可以现在设置，也可以随时到设置里再设置。</string>
+    <string name="icloud_offer_set_up_now">立即设置</string>
+    <string name="icloud_offer_not_now">暂不</string>
 </resources>

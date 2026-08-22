@@ -262,4 +262,10 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
     <string name="two_factor_again_sign_out">Stattdessen abmelden</string>
     <string name="two_factor_again_wrong_code">Dieser Code wurde nicht akzeptiert. Noch %1$d Versuche.</string>
     <string name="two_factor_again_giving_up">Dieser Code wurde nicht akzeptiert. Du wirst abgemeldet und musst dich erneut anmelden.</string>
+    <string name="icloud_offer_title">Deine Tags aus iCloud lesen?</string>
+    <string name="icloud_offer_message">Diese App kann sich mit deinem Apple-Konto verbinden und deine Tags direkt daraus lesen. Neue Tags erscheinen von selbst, ein neuer Name wird zurückgeschrieben, und es muss keine ZIP-Datei mehr auf einem Mac exportiert werden.
+
+Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</string>
+    <string name="icloud_offer_set_up_now">Jetzt einrichten</string>
+    <string name="icloud_offer_not_now">Jetzt nicht</string>
 </resources>

@@ -28,6 +28,7 @@ public final class UserSettingsDataStore {
     public static final Preferences.Key<String> ANISETTE_APK_URI = PreferencesKeys.stringKey("anisette_apk_uri");
     public static final Preferences.Key<Boolean> ANISETTE_UPGRADE_OFFERED = PreferencesKeys.booleanKey("anisette_upgrade_offered");
     public static final Preferences.Key<Boolean> SHOW_APPLE_DEVICES = PreferencesKeys.booleanKey("show_apple_devices");
+    public static final Preferences.Key<Boolean> ICLOUD_OFFER_MADE = PreferencesKeys.booleanKey("icloud_offer_made");
 
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (PREFERENCES_DATA_STORE == null) {
