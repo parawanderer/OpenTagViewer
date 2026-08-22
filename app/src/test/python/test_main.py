@@ -427,8 +427,9 @@ def test_an_aligned_tag_keeps_the_older_sightings_it_paid_to_fetch(monkeypatch):
     filter ran. Dropping them threw that work away and left a hole in stored history that the
     history screen would later pay to fetch all over again. See `getLastReports`.
 
-    `getReportsForDateRange` still filters, and should: there the range is the user asking for
-    a particular day, not an artefact of key granularity.
+    `getReportsForDateRange` does the same, for the same reason. Narrowing to the day somebody
+    is looking at is a display concern and happens in `HistoryViewActivity`, which filters the
+    remote answer before drawing it and reads the local half through a day-bounded query.
     """
     now = datetime.now(tz=timezone.utc)
     recent = FakeReport(now - timedelta(hours=1))
@@ -829,6 +830,47 @@ class _FakeAirtagOfWidth:
 
     def to_json(self):
         return {"aligned": True}
+
+
+def _runGetReports(monkeypatch, reports, start, end):
+    """The ranged variant, which the history screen calls one day at a time."""
+    monkeypatch.setattr(main, "accessoryFromJson", lambda _json: _FakeAirtag())
+    # The ranged variant has its own fetch helper, and it answers with a plain list rather
+    # than an AccessoryFetch - there is no window-versus-probe distinction to report here.
+    monkeypatch.setattr(main, "_fetchReportsInRange", lambda *args, **kwargs: reports)
+
+    return main.getReports(
+        account=object(),
+        idToAccessoryData=_FakeRequestList([_FakeRequest("beacon-1")]),
+        unixStartMs=_ms(start),
+        unixEndMs=_ms(end))
+
+
+def test_the_ranged_fetch_keeps_sightings_from_either_side_of_the_day(monkeypatch):
+    """
+    **Anything fetched is stored, whichever fetch found it.**
+
+    The history screen asks for one day, but the search underneath is over key indices, so
+    Apple hands back sightings either side of it. They cost the same to find and decrypt as the
+    in-range ones, and dropping them meant the next day the user stepped to paid to fetch them
+    again.
+
+    Narrowing to the day on screen happens in `HistoryViewActivity`, which filters this answer
+    before drawing it - so widening here fills the cache without changing what is shown.
+    """
+    day_start = datetime(2026, 3, 14, tzinfo=timezone.utc)
+    day_end = day_start + timedelta(days=1)
+
+    the_day_before = FakeReport(day_start - timedelta(hours=3))
+    during_the_day = FakeReport(day_start + timedelta(hours=9))
+    the_day_after = FakeReport(day_end + timedelta(hours=2))
+
+    out = _runGetReports(
+        monkeypatch, [the_day_before, during_the_day, the_day_after], day_start, day_end)
+
+    assert len(out["beacon-1"]["reports"]) == 3, (
+        "reports either side of the requested day are still worth storing"
+    )
 
 
 def _runGetLastReportsWith(monkeypatch, airtag, reports, hours_back=24):

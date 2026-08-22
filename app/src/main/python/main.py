@@ -1291,11 +1291,15 @@ def getLastReports(
                 "updatedAccessoryJson": json.dumps(airtag.to_json()),
                 # **Both of these have to be here, not only on the ranged variant.**
                 #
-                # This is the function the app actually calls; `getReports` has no caller in
-                # Java at all. Java reads these two keys to decide whether a tag is going
+                # This is the function the periodic refresh calls, and the backoff is about the
+                # periodic refresh. Java reads these two keys to decide whether a tag is going
                 # quiet, and a missing key reads as False - so emitting them from the ranged
                 # variant alone silently disabled the whole backoff, with every empty answer
                 # counting as a healthy one. See PythonAppleService#toFetchResult.
+                #
+                # (An earlier version of this note claimed `getReports` had no Java caller at
+                # all. It does: PythonAppleService#getReportsBetween, which is how the history
+                # screen fetches one day.)
                 "exhaustedWideSearch": exhausted,
                 # Whether this search was an expensive one at all. An accessory with a narrow
                 # key window costs a request or two, and an empty answer from one means only
@@ -1368,8 +1372,26 @@ def getReports(
                 print(f"{beaconId} has nothing anywhere in {width_before} indices of history;"
                       f" reporting it as one that appears to have stopped broadcasting.")
 
-            filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)
-            print(f"  -> {len(filtered)} reports after filtering to requested range")
+            # **Everything found is returned, in range or not.** Same reasoning as
+            # `getLastReports`: the search is over key indices, keys roll every fifteen minutes,
+            # and Apple answers with every report it holds for the keys asked about - so a fetch
+            # for one day routinely turns up sightings either side of it. Those cost exactly as
+            # much to find and decrypt as the in-range ones, and dropping them here means the
+            # next day the user opens pays to fetch them all over again.
+            #
+            # Anything fetched belongs in the database. Narrowing to the day the user is looking
+            # at is a display concern, and it is done where the display is - see
+            # `HistoryViewActivity.fetchReports`, which filters the remote answer before merging
+            # it, and reads the local half through a day-bounded query.
+            in_range = len(_filterReportsByTimeRange(reports, unixStartMs, unixEndMs))
+            filtered = reports
+
+            if len(filtered) > in_range:
+                print(f"  -> keeping {len(filtered)} reports, of which {in_range} fall in the "
+                      f"requested range; the rest are sightings either side of it for the same "
+                      f"keys and are stored rather than re-fetched later")
+            else:
+                print(f"  -> {len(filtered)} reports, all within the requested range")
 
             updated_accessory_json = json.dumps(airtag.to_json())
 
