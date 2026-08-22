@@ -2,9 +2,11 @@ package dev.wander.android.opentagviewer;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
@@ -222,6 +224,58 @@ public class SessionExpiredLoginTest {
                 () -> !isShowing(context.getString(R.string.session_expired_title)),
                 () -> onView(withText(context.getString(R.string.ok))).perform(click()));
         TestPace.afterAStep();
+    }
+
+    /**
+     * <b>A prefilled address counts, so typing only the password is enough to sign in.</b>
+     *
+     * <p><b>It was not.</b> The button is enabled from two flags kept by text watchers, and the
+     * watchers are attached when this page is shown - which happens <i>after</i> {@code onCreate}
+     * prefills the address. So nothing ever told the screen the email was valid, and no amount of
+     * typing in the password could turn Sign in on: a filled-in address next to a dead button,
+     * with nothing to explain it and no way forward except deleting an address that was already
+     * correct.
+     *
+     * <p>Worth guarding twice over, because this is the exact screen a session failure sends
+     * people to - so the recovery path ended at a button that could not be pressed.
+     */
+    @Test
+    public void aprefilledAddressAndATypedPasswordIsEnoughToSignIn() {
+        launchAfterExpiry(EMAIL);
+        this.dismissTheExplanation();
+
+        Eventually.check(() -> onView(withId(R.id.login_button_main))
+                .perform(scrollTo())
+                .check(matches(not(isEnabled()))));
+
+        onView(withId(R.id.password_input_field)).perform(scrollTo(), replaceText("hunter2"));
+        TestPace.afterAStep();
+
+        Eventually.check(() -> onView(withId(R.id.login_button_main))
+                .perform(scrollTo())
+                .check(matches(isEnabled())));
+    }
+
+    /**
+     * And clearing the prefilled address turns it off again.
+     *
+     * <p>Here so the fix cannot be "assume the email is fine whenever one was passed in", which
+     * would pass the test above and enable Sign in over an address the user had just deleted.
+     */
+    @Test
+    public void emptyingTheprefilledAddressDisablesItAgain() {
+        launchAfterExpiry(EMAIL);
+        this.dismissTheExplanation();
+
+        onView(withId(R.id.password_input_field)).perform(scrollTo(), replaceText("hunter2"));
+        Eventually.check(() -> onView(withId(R.id.login_button_main))
+                .perform(scrollTo()).check(matches(isEnabled())));
+
+        onView(withId(R.id.email_or_phone_input_field)).perform(scrollTo(), replaceText(""));
+
+        Eventually.check(() -> onView(withId(R.id.login_button_main))
+                .perform(scrollTo())
+                .check(matches(not(isEnabled()))));
     }
 
     private void launchAfterExpiry(final String email) {

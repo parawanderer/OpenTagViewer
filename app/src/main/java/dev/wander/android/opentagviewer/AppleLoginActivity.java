@@ -904,17 +904,58 @@ public class AppleLoginActivity extends AppCompatActivity {
         TextInputEditText emailOrPhoneInput = this.findViewById(R.id.email_or_phone_input_field);
         TextInputEditText passwordInput = this.findViewById(R.id.password_input_field);
 
-        emailOrPhoneInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
-            final String currentEmailOrPhone = s.toString();
-            this.getUiState().setValidEmailOrPhone(isEmailOrPhoneNumber(currentEmailOrPhone));
-            this.updateLoginButtonState();
-        }));
+        // **Attached once.** This method runs again every time the page is shown - coming back
+        // from the 2FA step, from the terms step - and addTextChangedListener appends, so
+        // without the guard each keystroke ends up firing a growing pile of identical watchers.
+        if (!this.loginFieldWatchersAttached) {
+            this.loginFieldWatchersAttached = true;
 
-        passwordInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
-            final String currentPassword = s.toString();
-            this.getUiState().setValidPassword(!currentPassword.isEmpty());
-            this.updateLoginButtonState();
-        }));
+            emailOrPhoneInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
+                final String currentEmailOrPhone = s.toString();
+                this.getUiState().setValidEmailOrPhone(isEmailOrPhoneNumber(currentEmailOrPhone));
+                this.updateLoginButtonState();
+            }));
+
+            passwordInput.addTextChangedListener(justWatchOnChanged((s, start, before, count) -> {
+                final String currentPassword = s.toString();
+                this.getUiState().setValidPassword(!currentPassword.isEmpty());
+                this.updateLoginButtonState();
+            }));
+        }
+
+        // **Read what is already in the fields, rather than waiting to be told it changed.**
+        //
+        // A watcher only hears about edits made after it exists, and the email is prefilled in
+        // onCreate - before this page is ever shown - when somebody is sent back here after
+        // their session expired. So the watcher never saw it, `validEmailOrPhone` stayed false,
+        // and typing the password could not enable the button no matter what was typed: the
+        // screen showed a filled-in email beside a dead Sign in button, with nothing to explain
+        // it and no way to proceed except retyping an address that was already correct.
+        //
+        // Seeding from the fields covers every way text can arrive without an edit event -
+        // prefill, restored instance state, an autofill service - rather than special-casing
+        // the one that was reported.
+        this.recheckWhetherLoginIsPossible();
+    }
+
+    /** Whether {@link #showAccountLoginAuthOptions} has already added its field watchers. */
+    private boolean loginFieldWatchersAttached = false;
+
+    /**
+     * Work out from the fields themselves whether signing in is possible, and update the button.
+     *
+     * <p>The same two rules the watchers apply, asked of the current contents instead of an edit.
+     */
+    private void recheckWhetherLoginIsPossible() {
+        final String email = Optional.ofNullable(this.emailOrPhoneInput.getText())
+                .map(CharSequence::toString).orElse("");
+        final String password = Optional.ofNullable(this.passwordInput.getText())
+                .map(CharSequence::toString).orElse("");
+
+        this.getUiState().setValidEmailOrPhone(isEmailOrPhoneNumber(email));
+        this.getUiState().setValidPassword(!password.isEmpty());
+
+        this.updateLoginButtonState();
     }
 
     private void show2FACodeEntryTextbox(Direction direction) {
