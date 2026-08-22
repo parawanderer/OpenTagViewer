@@ -471,17 +471,16 @@ public class TagCardLayoutTest {
      * card's height is fixed by its shortest neighbour - so the failure is a row of icons with
      * the words clipped away, on one card out of four.
      *
-     * <p><b>Ring is not among them, and that is deliberate.</b> Its container is
-     * {@code visibility="gone"} in the layout because the feature does not exist - FindMy.py has
-     * no ring implementation - so it measures nothing. Pinned separately below rather than
-     * quietly skipped here.
+     * <p>Ring is included alongside the other three - see
+     * {@code dev.wander.android.opentagviewer.ble} for what is behind it now.
      */
     @Test
     public void everyActionOnTheCardStillHasRoomWithTheWorstContent() {
-        final int[][] sizes = new int[3][2];
+        final int[][] sizes = new int[4][2];
         final int[] buttonIds = {
                 R.id.device_history_button_container,
                 R.id.device_refresh_button_container,
+                R.id.device_ring_button_container,
                 R.id.device_more_button_container,
         };
 
@@ -514,7 +513,10 @@ public class TagCardLayoutTest {
 
         // They share the row, so a card that has run out of width shows up as one of them being
         // visibly smaller than the rest rather than as anything failing.
-        final int widest = Math.max(Math.max(sizes[0][0], sizes[1][0]), sizes[2][0]);
+        int widest = 0;
+        for (final int[] size : sizes) {
+            widest = Math.max(widest, size[0]);
+        }
         for (int i = 0; i < buttonIds.length; i++) {
             assertTrue("button " + i + " is " + sizes[i][0] + "px against a widest of " + widest
                             + ", so the row is no longer sharing the width evenly",
@@ -523,16 +525,17 @@ public class TagCardLayoutTest {
     }
 
     /**
-     * <b>Ring is hidden, because there is nothing behind it.</b>
+     * <b>Ring is shown by default, at rest.</b>
      *
-     * <p>{@code onClickRing} logs and returns: FindMy.py cannot ring an accessory, so the
-     * control exists in the layout and is switched off. This is here so that stops being true
-     * on purpose rather than by accident - a stray edit making it visible ships a button that
-     * does nothing at all, which is worse than not offering it.
+     * <p>It used to be {@code visibility="gone"} because nothing implemented it. Now
+     * {@code MapsActivity#onClickRing} does (continuous ping over BLE, see
+     * {@code dev.wander.android.opentagviewer.ble}), so this is the opposite pin from before: a
+     * stray edit hiding it again ships a card silently missing an action, rather than a card
+     * offering one that does nothing.
      */
     @Test
-    public void theRingButtonStaysHiddenWhileThereIsNothingBehindIt() {
-        final int[] visibility = {View.VISIBLE};
+    public void theRingButtonIsShownAtRestByDefault() {
+        final int[] visibility = {View.GONE};
 
         getInstrumentation().runOnMainSync(() -> {
             final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
@@ -540,7 +543,67 @@ public class TagCardLayoutTest {
             visibility[0] = card.findViewById(R.id.device_ring_button_container).getVisibility();
         });
 
-        assertEquals("Ring is showing, but nothing implements it - see MapsActivity#onClickRing",
-                View.GONE, visibility[0]);
+        assertEquals("Ring is hidden, but MapsActivity#onClickRing now implements it",
+                View.VISIBLE, visibility[0]);
+    }
+
+    /** The label at rest, before anyone has tapped it - see {@link TagCardHelper#toggleRingActive}. */
+    @Test
+    public void theRingButtonStartsLabelledRing() {
+        final String[] text = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            text[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals(this.context.getString(R.string.do_ring), text[0]);
+    }
+
+    /**
+     * <b>{@link TagCardHelper#toggleRingActive} is what MapsActivity calls on tap, and on stop.</b>
+     *
+     * <p>Round-tripped in one test rather than two, because the failure that matters is the
+     * button getting stuck in one state - which only shows up by going there and back.
+     */
+    @Test
+    public void toggleRingActiveSwapsTheLabelBothWays() {
+        final String[] activeText = {null};
+        final String[] inactiveAgainText = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            TagCardHelper.toggleRingActive(card, true);
+            activeText[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+
+            TagCardHelper.toggleRingActive(card, false);
+            inactiveAgainText[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals(this.context.getString(R.string.stop_ringing), activeText[0]);
+        assertEquals(this.context.getString(R.string.do_ring), inactiveAgainText[0]);
+    }
+
+    /**
+     * <b>{@link TagCardHelper#setRingLabel} is what continuous ping updates between taps</b> -
+     * "Scanning...", "Connecting...", "Sending..." - without touching the icon or tint
+     * {@link TagCardHelper#toggleRingActive} owns. See {@code MapsActivity#handleContinuousPingUpdate}.
+     */
+    @Test
+    public void setRingLabelChangesOnlyTheText() {
+        final String[] text = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            TagCardHelper.setRingLabel(card, "Scanning…");
+            text[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals("Scanning…", text[0]);
     }
 }

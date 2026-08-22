@@ -181,7 +181,8 @@ public final class BeaconDataParser {
                         .ignoredAt(beaconData.getOwnedBeaconInfo().ignoredAt)
                         .fruitlessScans(beaconData.getOwnedBeaconInfo().fruitlessScans)
                         .lastScanAt(beaconData.getOwnedBeaconInfo().lastScanAt)
-                        .ownedBeaconPlistRaw(ownedBeaconPList);
+                        .ownedBeaconPlistRaw(ownedBeaconPList)
+                        .ownedBeaconAccessoryJson(beaconData.getOwnedBeaconInfo().accessoryJson);
 
                 if (userOverrides != null) {
                     // configure user overrides too

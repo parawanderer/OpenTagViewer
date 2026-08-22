@@ -128,9 +128,12 @@ import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
 import dev.wander.android.opentagviewer.util.rx.AccountReadPolicy;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
+import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 
@@ -141,6 +144,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private static final int RING_PERMISSION_REQUEST_CODE = 2;
 
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
@@ -194,6 +198,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private AddressLookup geocoder = null;
 
     private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
+
+    /** The beaconId continuous ping is currently running for, or null if it is off. Only one
+     * runs at a time - see {@link #onClickRing}. */
+    private String continuousPingBeaconId;
+
+    /** The in-flight continuous ping loop, so leaving the screen stops the radio work rather
+     * than leaving it running in the background with nothing left to show its state. */
+    private Disposable continuousPingDisposable;
+
+    /** Which tag's ring button asked for BLE permission, so the result callback - which carries
+     * no context of its own - knows what to start once it is granted. */
+    private String ringPermissionRequestBeaconId;
 
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
@@ -562,7 +578,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+
+        // Otherwise continuous ping keeps scanning/connecting in the background with no card
+        // left to show it is running, or a way to stop it short of force-closing the app.
+        if (this.continuousPingDisposable != null && !this.continuousPingDisposable.isDisposed()) {
+            this.continuousPingDisposable.dispose();
+        }
+
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onDestroy();
@@ -1272,8 +1294,82 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 });
     }
 
+    /**
+     * Toggle continuous ping (repeated scan + play-sound-nearby, see
+     * {@code AccessorySoundTrigger#playSoundContinuously}) for this card's tag - on until tapped
+     * again, unlike {@code DeviceInfoActivity}'s one-shot "Play Sound Nearby".
+     *
+     * <p>Only one tag at a time: starting it for a different tag stops whichever was running,
+     * since it is one Bluetooth radio and one thing to listen for.
+     */
     public void onClickRing(View view) {
-        Log.i(TAG, "The ring button was clicked");
+        Log.d(TAG, "The ring button was clicked");
+
+        final String beaconId = this.dynamicCardsForTag.entrySet()
+                .stream().filter(kvp -> kvp.getValue().findViewById(R.id.device_ring_button_container) == view)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Click ring event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
+
+        final boolean wasRunningForThisTag = beaconId.equals(this.continuousPingBeaconId);
+        this.stopContinuousPing();
+        if (wasRunningForThisTag) {
+            return;
+        }
+
+        if (!BlePermissions.granted(this)) {
+            Log.d(TAG, "Requesting BLE permission(s) before starting continuous ping for beaconId=" + beaconId);
+            this.ringPermissionRequestBeaconId = beaconId;
+            ActivityCompat.requestPermissions(this, BlePermissions.required(), RING_PERMISSION_REQUEST_CODE);
+            return;
+        }
+
+        this.startContinuousPing(beaconId);
+    }
+
+    private void startContinuousPing(final String beaconId) {
+        final BeaconData beaconData = this.beacons.get(beaconId);
+        if (beaconData == null) {
+            Log.w(TAG, "Cannot start continuous ping: no loaded data for beaconId=" + beaconId);
+            return;
+        }
+        final String accessoryJson = beaconData.getInfo().getOwnedBeaconAccessoryJson();
+
+        this.continuousPingBeaconId = beaconId;
+        final FrameLayout container = this.dynamicCardsForTag.get(beaconId);
+        if (container != null) {
+            TagCardHelper.toggleRingActive(container, true);
+        }
+
+        this.continuousPingDisposable = AppDependencies.accessorySoundTrigger()
+                .playSoundContinuously(this.getApplicationContext(), accessoryJson)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        (BleSoundTriggerResult result) -> Log.d(TAG, "Continuous ping attempt for beaconId="
+                                + beaconId + ": " + result.getStatus()
+                                + (result.getMessage() == null ? "" : " (" + result.getMessage() + ")")),
+                        error -> {
+                            // playSoundContinuously's contract is to never error onto this path -
+                            // see its interface doc - so reaching here means a bug in that
+                            // contract, not an ordinary "not found nearby" or "no permission".
+                            Log.e(TAG, "Continuous ping stopped unexpectedly for beaconId=" + beaconId, error);
+                            this.stopContinuousPing();
+                        });
+    }
+
+    private void stopContinuousPing() {
+        if (this.continuousPingDisposable != null && !this.continuousPingDisposable.isDisposed()) {
+            this.continuousPingDisposable.dispose();
+        }
+        this.continuousPingDisposable = null;
+
+        if (this.continuousPingBeaconId != null) {
+            final FrameLayout container = this.dynamicCardsForTag.get(this.continuousPingBeaconId);
+            if (container != null) {
+                TagCardHelper.toggleRingActive(container, false);
+            }
+        }
+        this.continuousPingBeaconId = null;
     }
 
     public void onClickMoreForDevice(View view) {
@@ -2318,6 +2414,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == RING_PERMISSION_REQUEST_CODE) {
+            final String beaconId = this.ringPermissionRequestBeaconId;
+            this.ringPermissionRequestBeaconId = null;
+
+            // Re-checked against BlePermissions.granted rather than the grantResults array
+            // directly - one place decides what "enough" means, matching DeviceInfoActivity's
+            // own permission flow and BlePermissions' class doc.
+            if (beaconId != null && BlePermissions.granted(this)) {
+                Log.i(TAG, "BLE permission granted; starting continuous ping for beaconId=" + beaconId);
+                this.startContinuousPing(beaconId);
+            } else {
+                Log.i(TAG, "BLE permission refused; not starting continuous ping");
+                Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
+            }
+            return;
+        }
+
         if (requestCode != LOCATION_PERMISSION_REQUEST_CODE) {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
             return;

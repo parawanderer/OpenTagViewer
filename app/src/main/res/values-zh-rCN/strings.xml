@@ -317,4 +317,5 @@
     <string name="play_sound_no_candidate_macs">无法计算此配件当前的地址。</string>
     <string name="play_sound_permission_denied">就近响铃需要蓝牙权限。</string>
     <string name="play_sound_failed">无法播放声音。请重试。</string>
+    <string name="stop_ringing">停止</string>
 </resources>

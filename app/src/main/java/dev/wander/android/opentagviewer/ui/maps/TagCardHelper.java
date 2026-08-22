@@ -3,10 +3,13 @@ package dev.wander.android.opentagviewer.ui.maps;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
+import android.content.res.ColorStateList;
 import android.util.Log;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.util.Map;
@@ -33,6 +36,26 @@ public final class TagCardHelper {
             }
         } catch (Exception e) {
             Log.e(TAG, "Failure while trying to toggle the loading status on a refresh button", e);
+        }
+    }
+
+    /**
+     * Shows whether continuous ping (repeated scan + play-sound-nearby) is running for this
+     * card's tag - the icon becomes a stop glyph, tinted with the theme's error colour so it
+     * reads as "tap to stop" at a glance, and the label swaps to match.
+     */
+    public static void toggleRingActive(FrameLayout container, boolean active) {
+        try {
+            ImageView icon = container.findViewById(R.id.perform_ring_icon);
+            TextView label = container.findViewById(R.id.ringText);
+
+            icon.setImageResource(active ? R.drawable.close_24px : R.drawable.volume_24);
+            icon.setImageTintList(ColorStateList.valueOf(active
+                    ? MaterialColors.getColor(container, com.google.android.material.R.attr.colorError)
+                    : MaterialColors.getColor(container, com.google.android.material.R.attr.colorOnSurfaceVariant)));
+            label.setText(active ? R.string.stop_ringing : R.string.do_ring);
+        } catch (Exception e) {
+            Log.e(TAG, "Failure while trying to toggle the ring button's active state", e);
         }
     }
 

@@ -317,4 +317,5 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="play_sound_no_candidate_macs">Kan het huidige adres van dit accessoire niet berekenen.</string>
     <string name="play_sound_permission_denied">Bluetooth-toestemming is nodig om het geluid in de buurt af te spelen.</string>
     <string name="play_sound_failed">Kan het geluid niet afspelen. Probeer het opnieuw.</string>
+    <string name="stop_ringing">Stoppen</string>
 </resources>

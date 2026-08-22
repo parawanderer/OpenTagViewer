@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ble;
 
 import android.content.Context;
 
+import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 
 /**
@@ -23,4 +24,15 @@ public interface AccessorySoundTrigger {
      * one lambda.
      */
     Single<BleSoundTriggerResult> playSound(Context context, String accessoryJson);
+
+    /**
+     * Repeats {@link #playSound} - scan, trigger (or fail), pause, scan again - for as long as
+     * the returned {@link Observable} stays subscribed. For walking toward a tag by ear: a
+     * single {@link #playSound} only ever gets one chance to be in range at the moment it scans.
+     *
+     * <p>Never errors, same as {@link #playSound} - each attempt's outcome is an item, not a
+     * terminal signal, so one failed attempt (e.g. briefly out of range) does not end the loop.
+     * Dispose the subscription to stop.
+     */
+    Observable<BleSoundTriggerResult> playSoundContinuously(Context context, String accessoryJson);
 }

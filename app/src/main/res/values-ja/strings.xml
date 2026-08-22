@@ -317,4 +317,5 @@
     <string name="play_sound_no_candidate_macs">このアクセサリの現在のアドレスを計算できませんでした。</string>
     <string name="play_sound_permission_denied">近くで音を鳴らすにはBluetoothの権限が必要です。</string>
     <string name="play_sound_failed">音を再生できませんでした。もう一度お試しください。</string>
+    <string name="stop_ringing">停止</string>
 </resources>

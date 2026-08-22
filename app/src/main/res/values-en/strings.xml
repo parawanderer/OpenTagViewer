@@ -317,4 +317,5 @@ You can set this up now, or any time later from Settings.</string>
     <string name="play_sound_no_candidate_macs">Could not compute this accessory\'s current address.</string>
     <string name="play_sound_permission_denied">Bluetooth permission is needed to play the sound nearby.</string>
     <string name="play_sound_failed">Could not play the sound. Try again.</string>
+    <string name="stop_ringing">Stop</string>
 </resources>
