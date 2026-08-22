@@ -110,7 +110,9 @@ final class CustomAccessoryParser {
                 .stableIdentifier(List.of());
 
         if (userOverrides != null) {
-            built.userOverrideName(userOverrides.uiName).userOverrideEmoji(userOverrides.uiEmoji);
+            built.userOverrideName(userOverrides.uiName)
+                    .userOverrideEmoji(userOverrides.uiEmoji)
+                    .uiOrder(userOverrides.uiOrder);
         }
 
         return built.build();

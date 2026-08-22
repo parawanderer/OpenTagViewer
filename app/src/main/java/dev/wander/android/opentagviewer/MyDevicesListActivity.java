@@ -41,13 +41,18 @@ import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
+import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -59,6 +64,9 @@ public class MyDevicesListActivity extends AppCompatActivity {
     private static final String TAG = MyDevicesListActivity.class.getSimpleName();
 
     private BeaconRepository beaconRepo;
+
+    /** Read once, in {@code onCreate}: this screen is recreated when the setting changes. */
+    private UserSettings userSettings;
 
     private final List<BeaconInformation> beaconInfo = new ArrayList<>();
 
@@ -166,6 +174,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+
+        this.userSettings = new UserSettingsRepository(
+                UserSettingsDataStore.getInstance(this.getApplicationContext()))
+                .getUserSettings();
 
         if (savedInstanceState != null) {
             this.devicesListChanged =
@@ -325,8 +337,11 @@ public class MyDevicesListActivity extends AppCompatActivity {
     private void fetchDeviceInfoAndRender() {
         var asyncLocations = this.beaconRepo.getLastLocationsForAll();
 
+        // The same rule the map applies, from the same place: the owner's own Apple devices are
+        // left out unless the setting is on. See TagVisibility.
         var asyncBeacons = this.beaconRepo.getAllBeacons()
-                .flatMap(BeaconDataParser::parseAsync);
+                .flatMap(BeaconDataParser::parseAsync)
+                .map(all -> TagVisibility.visible(all, this.userSettings.shouldShowAppleDevices()));
 
         var async = Observable.zip(asyncBeacons, asyncLocations, Pair::create)
                 .subscribeOn(Schedulers.io())
@@ -646,10 +661,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
             return;
         }
 
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, url);
     }
 
     private void handleStartImport() {

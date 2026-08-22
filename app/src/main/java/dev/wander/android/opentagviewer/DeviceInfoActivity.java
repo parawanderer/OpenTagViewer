@@ -65,6 +65,7 @@ import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
@@ -387,12 +388,16 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         this.beaconInformation.setUserOverrideName(newDeviceName);
         // save changes...
-        var async = this.beaconRepo.storeUserBeaconOptions(new UserBeaconOptions(
-                this.beaconId,
-                System.currentTimeMillis(),
-                this.beaconInformation.getUserOverrideName(),
-                this.beaconInformation.getUserOverrideEmoji()
-        )).observeOn(AndroidSchedulers.mainThread())
+        // Built rather than constructed positionally, per the entity convention - and so that
+        // uiOrder is left unset. Unset means "not supplied", and the repository fills it in
+        // from what is stored, which is what stops a rename from unarranging the tag.
+        var async = this.beaconRepo.storeUserBeaconOptions(UserBeaconOptions.builder()
+                .beaconId(this.beaconId)
+                .lastUpdate(System.currentTimeMillis())
+                .uiName(this.beaconInformation.getUserOverrideName())
+                .uiEmoji(this.beaconInformation.getUserOverrideEmoji())
+                .build()
+        ).observeOn(AndroidSchedulers.mainThread())
         .subscribe(() -> {
                 Log.d(TAG, "Successfully updated UI-facing device name for beaconId=" + this.beaconId);
                 this.hasNameChanges = true;
@@ -506,12 +511,16 @@ public class DeviceInfoActivity extends AppCompatActivity {
         this.beaconInformation.setUserOverrideEmoji(newEmoji);
 
         // save changes
-        var async = this.beaconRepo.storeUserBeaconOptions(new UserBeaconOptions(
-                this.beaconId,
-                System.currentTimeMillis(),
-                this.beaconInformation.getUserOverrideName(),
-                this.beaconInformation.getUserOverrideEmoji()
-        )).observeOn(AndroidSchedulers.mainThread())
+        // Built rather than constructed positionally, per the entity convention - and so that
+        // uiOrder is left unset. Unset means "not supplied", and the repository fills it in
+        // from what is stored, which is what stops a rename from unarranging the tag.
+        var async = this.beaconRepo.storeUserBeaconOptions(UserBeaconOptions.builder()
+                .beaconId(this.beaconId)
+                .lastUpdate(System.currentTimeMillis())
+                .uiName(this.beaconInformation.getUserOverrideName())
+                .uiEmoji(this.beaconInformation.getUserOverrideEmoji())
+                .build()
+        ).observeOn(AndroidSchedulers.mainThread())
         .subscribe(() -> {
                     Log.d(TAG, "Successfully updated UI-facing device emoji for beaconId=" + this.beaconId);
                     this.hasNameChanges = true;
@@ -666,10 +675,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
             return;
         }
 
-        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        if (intent.resolveActivity(this.getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, url);
     }
 
     private String getDeviceNameForTitle() {
