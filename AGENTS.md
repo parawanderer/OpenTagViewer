@@ -338,6 +338,13 @@ Two more rules that came out of the same failures:
   first one completed the sign-in and there is no activity left to close a keyboard on.
 - **A `GONE` view still matches `withId`.** "Not on screen" is `matches(not(isDisplayed()))`,
   never an expected `NoMatchingViewException`.
+- **`isEnabled()` on a popup menu item asks the wrong view.** `withText` finds the `TextView`
+  inside the row, and that reports itself enabled whatever the `MenuItem` says — so
+  `not(isEnabled())` passes for an item that is fully enabled, and the assertion proves nothing.
+  The state is on the containing `ListMenuItemView`:
+  `allOf(withClassName(endsWith("ListMenuItemView")), hasDescendant(withText(…)))`. Pair it with
+  a positive case using the same matcher, or you cannot tell a correct disabled item from a
+  matcher aimed at nothing. `ArrangingTheTagListTest` does both.
 - **`replaceText`, not `typeText`, for any field that moves focus as it fills.** The 2FA code
   boxes and the bundle passcode groups both advance when full, and Espresso's per-character
   typing fails the moment the field it started on stops being focused. It is also the case

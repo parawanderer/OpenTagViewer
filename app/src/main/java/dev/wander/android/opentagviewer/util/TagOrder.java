@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 
@@ -90,6 +91,59 @@ public final class TagOrder {
         }
 
         return positions;
+    }
+
+    /**
+     * The list with one tag picked up from {@code from} and put down at {@code to}.
+     *
+     * <p>What a drag means, kept here rather than in the adapter so it can be tested without a
+     * device. {@code Collections.rotate} semantics: everything between the two shuffles along by
+     * one, which is what a finger dragging a row past its neighbours looks like - as against a
+     * swap, which would leave the row that was passed over sitting in the wrong place.
+     *
+     * @return a new list. Out-of-range indices give back an unchanged copy rather than throwing:
+     *         this is driven by a gesture, and a view holder can be recycled mid-drag.
+     */
+    public static List<BeaconInformation> moved(
+            final List<BeaconInformation> tags, final int from, final int to) {
+
+        final List<BeaconInformation> out = new ArrayList<>(tags);
+
+        if (from < 0 || to < 0 || from >= out.size() || to >= out.size() || from == to) {
+            return out;
+        }
+
+        out.add(to, out.remove(from));
+        return out;
+    }
+
+    /**
+     * The list with everything selected brought to the front.
+     *
+     * <p>The bulk half of arranging, for the case dragging is worst at. Both groups keep the
+     * order they were already in - somebody who selected three tags scattered down the list gets
+     * them at the top in the order they appeared, not in the order they happened to tick them,
+     * because the list is what they are looking at.
+     *
+     * @param selected beacon ids. Anything in here that is not in {@code tags} is ignored.
+     */
+    public static List<BeaconInformation> movedToTop(
+            final List<BeaconInformation> tags, final Set<String> selected) {
+
+        final List<BeaconInformation> out = new ArrayList<>(tags.size());
+
+        for (final BeaconInformation tag : tags) {
+            if (selected.contains(tag.getBeaconId())) {
+                out.add(tag);
+            }
+        }
+        for (final BeaconInformation tag : tags) {
+            if (!selected.contains(tag.getBeaconId())) {
+                out.add(tag);
+            }
+        }
+
+        return out;
     }
 
     private static int half(@Nullable final Integer position) {

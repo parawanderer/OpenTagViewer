@@ -255,4 +255,6 @@
     <string name="show_apple_devices_explainer">iPhone, iPad, Mac은 여기서 AirTag와 같은 방식으로 나의 찾기 네트워크를 통해서만 위치를 확인할 수 있습니다. 그래서 갱신이 드물고 예측하기 어렵습니다. 기기가 직접 iCloud에 보고한 위치를 읽는 Apple 앱과는 다릅니다. 이런 범위는 근본적으로 불완전하므로 기본값은 꺼짐입니다. 꺼져 있는 동안 이 기기들은 표시되지도, 검색되지도 않습니다.</string>
     <string name="show_apple_devices_help_link">완전한 지원 구현에 참여하기 →</string>
     <string name="no_app_to_open_a_link_with">이 휴대전화에는 웹 링크를 열 수 있는 앱이 없습니다</string>
+    <string name="reorder_tag">드래그하여 순서 변경</string>
+    <string name="move_to_top">맨 위로 이동</string>
 </resources>

@@ -27,7 +27,7 @@
     <LinearLayout
         android:id="@+id/settings_main_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <include
@@ -36,9 +36,39 @@
             app:onClickBack="@{handleClickBack}"
             app:pageTitle="@{@string/settings}" />
 
+        <!--
+            **This screen did not scroll.** Everything below the fold was simply unreachable -
+            not clipped-looking, not scrollable-but-awkward, just gone, with no indication there
+            was more. It fitted by luck on a tall enough screen and stopped fitting the moment
+            anything was added; the Apple-devices setting and its explanation were what tipped
+            it over, taking the debug and system-colours switches off the bottom with them.
+
+            Height 0 with weight 1, so the scrolling area is exactly what is left under the
+            toolbar. `fillViewport` so a short list still lays out against the full height
+            rather than collapsing to its content.
+        -->
+        <ScrollView
+            android:id="@+id/settings_scroll_area"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+        <!--
+            One child, because a ScrollView will only take one - the account section and the
+            settings section below it are siblings, and wrapping only the first left the second
+            outside. That is not a layout warning, it is an InflateException the moment Settings
+            is opened.
+        -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingLeft="8dp"
             android:paddingTop="20dp"
@@ -294,6 +324,10 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        </LinearLayout>
+
+        </ScrollView>
 
     </LinearLayout>
 </layout>

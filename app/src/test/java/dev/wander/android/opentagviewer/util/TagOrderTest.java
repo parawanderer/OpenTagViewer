@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.junit.Test;
@@ -111,6 +112,131 @@ public class TagOrderTest {
                 device("new-ipad"), at(accessory("arranged"), 5), accessory("new-tag"));
 
         assertEquals(Arrays.asList("arranged", "new-tag", "new-ipad"), idsOf(TagOrder.sorted(list)));
+    }
+
+    // --- what a drag means ---------------------------------------------------------------------
+
+    /**
+     * <b>Dragging shuffles the rows in between along, it does not swap two of them.</b>
+     *
+     * <p>The distinction is the whole feel of the gesture. Dragging the first row to the third
+     * place should leave the two it passed over in their own order, one place higher - a swap
+     * would instead teleport the third row to the top, which looks like a bug even though the
+     * dragged row ends up in the right place.
+     */
+    @Test
+    public void dragging_a_row_down_shuffles_the_ones_it_passes() {
+        final List<BeaconInformation> list = Arrays.asList(
+                accessory("a"), accessory("b"), accessory("c"), accessory("d"));
+
+        assertEquals(Arrays.asList("b", "c", "a", "d"), idsOf(TagOrder.moved(list, 0, 2)));
+    }
+
+    /** And the same upwards. */
+    @Test
+    public void dragging_a_row_up_shuffles_the_ones_it_passes() {
+        final List<BeaconInformation> list = Arrays.asList(
+                accessory("a"), accessory("b"), accessory("c"), accessory("d"));
+
+        assertEquals(Arrays.asList("a", "d", "b", "c"), idsOf(TagOrder.moved(list, 3, 1)));
+    }
+
+    /**
+     * <b>An impossible move is a no-op, not a crash.</b>
+     *
+     * <p>This is driven by a finger, and a RecyclerView can recycle a holder mid-drag and hand
+     * back {@code NO_POSITION}. Throwing there takes the screen down during an ordinary gesture.
+     */
+    @Test
+    public void anout0fRangeMoveChangesNothing() {
+        final List<BeaconInformation> list = Arrays.asList(accessory("a"), accessory("b"));
+
+        assertEquals(Arrays.asList("a", "b"), idsOf(TagOrder.moved(list, -1, 1)));
+        assertEquals(Arrays.asList("a", "b"), idsOf(TagOrder.moved(list, 0, 9)));
+        assertEquals(Arrays.asList("a", "b"), idsOf(TagOrder.moved(list, 5, 0)));
+        assertEquals(Arrays.asList("a", "b"), idsOf(TagOrder.moved(list, 1, 1)));
+    }
+
+    /** Dragging leaves the caller's list alone; the activity replaces its contents itself. */
+    @Test
+    public void movingDoesNotModifyTheInputList() {
+        final List<BeaconInformation> original = new ArrayList<>(
+                Arrays.asList(accessory("a"), accessory("b")));
+
+        TagOrder.moved(original, 0, 1);
+
+        assertEquals(Arrays.asList("a", "b"), idsOf(original));
+    }
+
+    // --- move to top ----------------------------------------------------------------------------
+
+    /**
+     * <b>Selected tags come to the front in the order they were already in</b>, not the order
+     * they were ticked.
+     *
+     * <p>Somebody selecting three scattered rows is looking at a list, so the list is the order
+     * they mean. Ticking c then a then d and getting "c, a, d" at the top would be technically
+     * defensible and would read as scrambled.
+     */
+    @Test
+    public void movingToTheTopKeepsBothGroupsInTheirExistingOrder() {
+        final List<BeaconInformation> list = Arrays.asList(
+                accessory("a"), accessory("b"), accessory("c"), accessory("d"), accessory("e"));
+
+        final List<BeaconInformation> out = TagOrder.movedToTop(list, Set.of("d", "b"));
+
+        assertEquals(Arrays.asList("b", "d", "a", "c", "e"), idsOf(out));
+    }
+
+    /** Selecting everything is allowed, and changes nothing. */
+    @Test
+    public void movingEverythingToTheTopIsANoOp() {
+        final List<BeaconInformation> list = Arrays.asList(
+                accessory("a"), accessory("b"), accessory("c"));
+
+        assertEquals(Arrays.asList("a", "b", "c"),
+                idsOf(TagOrder.movedToTop(list, Set.of("a", "b", "c"))));
+    }
+
+    /** Selecting nothing is allowed, and changes nothing. */
+    @Test
+    public void movingNothingToTheTopIsANoOp() {
+        final List<BeaconInformation> list = Arrays.asList(accessory("a"), accessory("b"));
+
+        assertEquals(Arrays.asList("a", "b"), idsOf(TagOrder.movedToTop(list, Set.of())));
+    }
+
+    /**
+     * An id that is not in the list is ignored rather than fatal.
+     *
+     * <p>The selection is held by id and survives the list being rebuilt - a tag removed on
+     * another screen, or one that has just been hidden by the Apple-devices setting, can leave
+     * an id behind with no row.
+     */
+    @Test
+    public void anunknownSelectedIdIsIgnored() {
+        final List<BeaconInformation> list = Arrays.asList(accessory("a"), accessory("b"));
+
+        assertEquals(Arrays.asList("b", "a"),
+                idsOf(TagOrder.movedToTop(list, Set.of("b", "long-gone"))));
+    }
+
+    /**
+     * <b>Move to top wins over the accessories-first default</b>, because it is a deliberate
+     * choice and that is only a fallback.
+     */
+    @Test
+    public void adeviceMovedToTheTopStaysAtTheTopOnceStored() {
+        final List<BeaconInformation> list = Arrays.asList(
+                accessory("airtag"), device("ipad"), accessory("chipolo"));
+
+        final List<BeaconInformation> arranged = TagOrder.movedToTop(list, Set.of("ipad"));
+        final Map<String, Integer> stored = TagOrder.positionsFor(arranged);
+
+        final List<BeaconInformation> reloaded = withPositions(
+                Arrays.asList(accessory("chipolo"), accessory("airtag"), device("ipad")), stored);
+
+        assertEquals(Arrays.asList("ipad", "airtag", "chipolo"), idsOf(TagOrder.sorted(reloaded)));
     }
 
     // --- writing an arrangement back ----------------------------------------------------------
