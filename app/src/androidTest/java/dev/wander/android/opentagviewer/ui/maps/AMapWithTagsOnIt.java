@@ -274,6 +274,11 @@ public final class AMapWithTagsOnIt {
         this.appleDouble.callAttr("makeTheSessionNeedACode");
     }
 
+    /** The session needs a code and Apple offers no way to send one - see the double. */
+    public void theSessionGoesStaleBeyondRescue() {
+        this.appleDouble.callAttr("makeTheSessionUnrescuable");
+    }
+
     /** Whether a code put the session back - the rescue itself, not the UI reacting. */
     public boolean theSessionIsUsableAgain() {
         return this.appleDouble.callAttr("theSessionIsUsableAgain").toBoolean();

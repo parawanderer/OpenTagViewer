@@ -804,9 +804,19 @@ def getSecondFactorMethodsIfNeeded(account: AppleAccount) -> list | None:
             print(f"Account is in {state}, which a second factor does not resolve.")
             return None
 
-        print(f"Account is in {state}: asking for a second factor rather than giving up on it.")
+        methods = [_convertToJavaDictWrapper(method) for method in account.get_2fa_methods()]
 
-        return [_convertToJavaDictWrapper(method) for method in account.get_2fa_methods()]
+        # **An empty list is not the same as "nothing needed", and the caller must not read it
+        # that way.** A session can be in REQUIRE_2FA with no way to deliver a code - it is what
+        # FindMy.py means by "Unexpected login state after reauth ... Please log in again". There
+        # is nothing to type, so the only honest move left is a full sign-in, and a caller that
+        # treated this as "fine" would leave exactly the silent dead session this set out to fix.
+        #
+        # So: None means nothing needed, a list means a code is needed, and an empty one means a
+        # code is needed and cannot be asked for.
+        print(f"Account is in {state} and offers {len(methods)} way(s) to send a code.")
+
+        return methods
     except Exception:
         print(f"Could not work out whether a second factor is needed: {traceback.format_exc()}")
         return None

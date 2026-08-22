@@ -160,6 +160,10 @@ class _FakeAccount:
         self.rangedFetches: int = 0
         #: Whether Apple has decided this session needs a code again. See `needsASecondFactor`.
         self.wantsASecondFactor: bool = False
+        #: Needs a code, but offers no way to send one - what a real session does when FindMy.py
+        #: reports "Unexpected login state after reauth ... Please log in again". Nothing can be
+        #: typed, so the app has to sign out rather than show an unfillable box.
+        self.offersNoWayToSendOne: bool = False
         #: Codes submitted, right or wrong, so a test can assert an attempt was actually made
         #: rather than that a view merely changed.
         self.codesSubmitted: list[str] = []
@@ -177,6 +181,8 @@ class _FakeAccount:
         return LoginState.LOGGED_IN
 
     def get_2fa_methods(self) -> list:
+        if self.offersNoWayToSendOne:
+            return []
         return [_FakeTrustedDevice(self)]
 
     def _refuseIfNotLoggedIn(self) -> None:
@@ -313,6 +319,20 @@ def makeTheSessionNeedACode() -> None:
     """
     if theAccount is not None:
         theAccount.wantsASecondFactor = True
+
+
+def makeTheSessionUnrescuable() -> None:
+    """
+    The session needs a code and there is no way to send one.
+
+    **A real state, and the one a live account was found in.** FindMy.py reports it as
+    "Unexpected login state after reauth: REQUIRE_2FA. Please log in again" - the account is
+    stuck, ``get_2fa_methods`` has nothing to offer, and no amount of typing helps. The app has
+    to notice and sign out rather than put up a box that can never be filled.
+    """
+    if theAccount is not None:
+        theAccount.wantsASecondFactor = True
+        theAccount.offersNoWayToSendOne = True
 
 
 def theSessionIsUsableAgain() -> bool:
