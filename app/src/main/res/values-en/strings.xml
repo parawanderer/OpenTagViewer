@@ -323,4 +323,5 @@ You can set this up now, or any time later from Settings.</string>
     <string name="ring_status_scanning">Scanning…</string>
     <string name="ring_status_connecting">Connecting…</string>
     <string name="ring_status_triggering">Sending…</string>
+    <string name="ring_status_success">Ringing!</string>
 </resources>

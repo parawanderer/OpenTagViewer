@@ -1362,13 +1362,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * "Connecting...", "Sending..." - so it reads as active work rather than nothing happening,
      * without a toast firing every few seconds for as long as it runs.
      *
-     * <p>Between cycles ({@link BleSoundTriggerPhase#DONE}) the label goes back to "Stop" rather
-     * than showing that cycle's result: a failed or not-found attempt does not mean pinging has
-     * stopped, and showing it as if it had would read as broken.
-     * {@link BleSoundTriggerStatus#MISSING_PERMISSION} and
-     * {@link BleSoundTriggerStatus#NO_CANDIDATE_MACS} do not follow that rule: nothing about
-     * waiting and trying again fixes either, so looping on them is pure battery burn with no
-     * chance of succeeding - this stops the loop and says why instead.
+     * <p>Between cycles ({@link BleSoundTriggerPhase#DONE}) a successful write shows "Ringing!"
+     * rather than jumping straight back to "Stop" - the write itself is near-instant, so without
+     * this the sequence reads as scan, connect, done, with no visible moment where it actually
+     * worked. It shows for the whole {@code CONTINUOUS_PING_PAUSE_MS} gap before the next cycle's
+     * scan starts, which is also roughly how long an AirTag's chirp lasts. A not-found or failed
+     * attempt goes back to "Stop" directly and keeps looping - the tag may come into range on
+     * the next cycle. {@link BleSoundTriggerStatus#MISSING_PERMISSION} and
+     * {@link BleSoundTriggerStatus#NO_CANDIDATE_MACS} do not: nothing about waiting and trying
+     * again fixes either, so looping on them is pure battery burn with no chance of succeeding -
+     * this stops the loop and says why instead.
      */
     private void handleContinuousPingUpdate(final String beaconId, final BleSoundTriggerUpdate update) {
         Log.d(TAG, "Continuous ping update for beaconId=" + beaconId + ": " + update.getPhase()
@@ -1410,7 +1413,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 labelRes = R.string.ring_status_triggering;
                 break;
             case DONE:
-                labelRes = R.string.stop_ringing;
+                labelRes = update.getResult().getStatus() == BleSoundTriggerStatus.SUCCESS
+                        ? R.string.ring_status_success
+                        : R.string.stop_ringing;
                 break;
             case SCANNING:
             default:

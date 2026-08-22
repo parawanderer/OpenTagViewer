@@ -323,4 +323,5 @@
     <string name="ring_status_scanning">Поиск…</string>
     <string name="ring_status_connecting">Подключение…</string>
     <string name="ring_status_triggering">Отправка…</string>
+    <string name="ring_status_success">Звонит!</string>
 </resources>

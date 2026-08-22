@@ -323,4 +323,5 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="ring_status_scanning">Zoeken…</string>
     <string name="ring_status_connecting">Verbinden…</string>
     <string name="ring_status_triggering">Versturen…</string>
+    <string name="ring_status_success">Rinkelt!</string>
 </resources>

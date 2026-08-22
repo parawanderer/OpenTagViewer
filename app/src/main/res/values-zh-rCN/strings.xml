@@ -323,4 +323,5 @@
     <string name="ring_status_scanning">搜索中…</string>
     <string name="ring_status_connecting">连接中…</string>
     <string name="ring_status_triggering">发送中…</string>
+    <string name="ring_status_success">响铃中！</string>
 </resources>
