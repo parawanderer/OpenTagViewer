@@ -1114,3 +1114,101 @@ def test_failing_to_ask_is_not_read_as_needing_a_code():
     account = _FakeSecondFactorAccount(LoginState.REQUIRE_2FA, raises=True)
 
     assert main.getSecondFactorMethodsIfNeeded(account) is None
+
+
+# --------------------------------------------------------------------------
+# closeAccount - issue #133: a discarded account leaks its session and sockets
+# --------------------------------------------------------------------------
+
+class _FakeLoop:
+    def __init__(self, closed=False, raises=False):
+        self._closed = closed
+        self._raises = raises
+        self.ran = []
+
+    def is_closed(self):
+        return self._closed
+
+    def run_until_complete(self, coro):
+        if self._raises:
+            coro.close()  # or Python warns about it, which is the thing being fixed
+            raise RuntimeError("Event loop is closed")
+        self.ran.append(coro)
+        # Actually drive it, so "never awaited" cannot happen unnoticed.
+        try:
+            coro.send(None)
+        except StopIteration:
+            pass
+        return None
+
+
+class _FakeClosableAccount:
+    """An account shaped like the sync AppleAccount: async close, private loop."""
+
+    def __init__(self, loop, loopAttr="_evt_loop"):
+        setattr(self, loopAttr, loop)
+        self.closed = 0
+
+    async def close(self):
+        self.closed += 1
+
+
+def test_closing_an_account_shuts_its_session_down():
+    """
+    **The whole point.** Nothing called this before, so every discarded account left an aiohttp
+    session, a connector and two sockets open until the collector noticed - and the collector
+    cannot close them either, because `Closable.__del__` swallows the RuntimeError it gets.
+    """
+    loop = _FakeLoop()
+    account = _FakeClosableAccount(loop)
+
+    assert main.closeAccount(account) is True
+    assert account.closed == 1, "close() has to actually be awaited, not merely called"
+
+
+def test_theloop_is_found_under_either_name():
+    """
+    `_evt_loop` on the sync account, `_loop` on Closable. Both private, and there is no public
+    route - so this is pinned rather than assumed.
+    """
+    loop = _FakeLoop()
+    account = _FakeClosableAccount(loop, loopAttr="_loop")
+
+    assert main.closeAccount(account) is True
+    assert account.closed == 1
+
+
+def test_anaccount_with_no_loop_is_not_closed_and_does_not_raise():
+    """
+    The caller is discarding it either way, so this reports rather than fails - but it returns
+    False, because a FindMy.py that renamed the loop would otherwise silently stop closing
+    anything and nobody would know.
+    """
+    class _NoLoop:
+        async def close(self):
+            raise AssertionError("should never be reached")
+
+    assert main.closeAccount(_NoLoop()) is False
+
+
+def test_aclosedLoopIsNotUsed():
+    loop = _FakeLoop(closed=True)
+    account = _FakeClosableAccount(loop)
+
+    assert main.closeAccount(account) is False
+    assert account.closed == 0
+
+
+def test_afailureToCloseIsReportedRatherThanRaised():
+    """
+    This runs on paths already recovering from something else - a failed restore, a sign-out -
+    where a new exception would replace the original problem with this one.
+    """
+    loop = _FakeLoop(raises=True)
+    account = _FakeClosableAccount(loop)
+
+    assert main.closeAccount(account) is False
+
+
+def test_closingNothingIsHarmless():
+    assert main.closeAccount(None) is False

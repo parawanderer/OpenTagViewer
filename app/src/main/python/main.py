@@ -758,6 +758,9 @@ def getAccount(
                 "factor resolves that. Treating it as a failed restore so the user is asked to "
                 "sign in again rather than left with a map that never updates."
             )
+            # Built, found unusable, and about to go out of scope - so close it here rather than
+            # leaving a session and two sockets to a finaliser that cannot do it. See #133.
+            closeAccount(acc)
             return None
 
         return acc
@@ -820,6 +823,50 @@ def getSecondFactorMethodsIfNeeded(account: AppleAccount) -> list | None:
     except Exception:
         print(f"Could not work out whether a second factor is needed: {traceback.format_exc()}")
         return None
+
+
+def closeAccount(account: AppleAccount) -> bool:
+    """
+    Shut an account's HTTP session and event loop down, before letting go of it.
+
+    **Nothing did this, and the collector cannot.** An ``AppleAccount`` owns an aiohttp session,
+    a connector and an asyncio loop. Dropping one leaks all of it: two sockets, held until the
+    garbage collector runs, and then not released even so - ``Closable.__del__`` tries
+    ``loop.run_until_complete(self.close())`` and swallows the ``RuntimeError`` when that fails,
+    leaving the coroutine unawaited. That is the warning people see:
+
+        RuntimeWarning: coroutine 'AppleAccount.close' was never awaited
+        ResourceWarning: Unclosed client session / Unclosed connector / unclosed transport fd=181
+
+    **Why the caller has to do it explicitly.** The *sync* ``AppleAccount`` wraps every other
+    method as ``self._evt_loop.run_until_complete(self._asyncacc.<method>())`` - and then declares
+    ``close`` ``async`` anyway, alone among them. So a sync caller cannot simply call it, and the
+    one thing that tries is a finaliser running at an arbitrary moment on an arbitrary thread.
+    Worth reporting upstream; until then, this does what the sync wrapper should have.
+
+    :return: whether it was actually closed. False is not worth failing anything over - the
+        caller is discarding this account either way - but it is worth logging, because a
+        version of FindMy.py that renames the loop would silently stop closing anything.
+    """
+    if account is None:
+        return False
+
+    try:
+        # `_evt_loop` on the sync account, `_loop` on Closable. Both private, and there is no
+        # public route; asyncio.run would build a *new* loop, and the session belongs to this one.
+        loop = getattr(account, "_evt_loop", None) or getattr(account, "_loop", None)
+
+        if loop is None or loop.is_closed():
+            print("Not closing the account: it has no usable event loop to close it on.")
+            return False
+
+        loop.run_until_complete(account.close())
+        print("Closed the account's HTTP session and connector.")
+        return True
+    except Exception:
+        # Discarding this account regardless, so a failure here changes nothing the caller does.
+        print(f"Could not close the account cleanly: {traceback.format_exc()}")
+        return False
 
 
 def convertPlistToJson(
