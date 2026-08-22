@@ -384,6 +384,157 @@ public class OpenTagViewerDatabaseMigrationTest {
         }
     }
 
+    /**
+     * <b>v5 → v6 leaves every tag unarranged, which is what keeps everyone's order the same.</b>
+     *
+     * <p>{@code ui_order} is nullable rather than defaulted, and this is the assertion that says
+     * why: null means "never dragged", and {@code TagOrder} reads that as "sort after anything
+     * that was arranged, accessories first". A default of 0 would instead claim every existing
+     * tag had been deliberately put first, which is a silent reordering of every upgrader's
+     * list on the launch after the update.
+     */
+    @Test
+    public void migrate5To6_existingTagsAreUnarrangedRatherThanAllFirst() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+            insertUserBeaconOptions(db, BEACON_ID, "Keys", "🔑");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+
+        try (Cursor cursor = db.query(
+                "SELECT ui_name, ui_emoji, ui_order FROM UserBeaconOptions WHERE beacon_id = ?",
+                new Object[] {BEACON_ID})) {
+
+            assertTrue("the options row did not survive the upgrade", cursor.moveToFirst());
+            assertEquals("the nickname was lost", "Keys", cursor.getString(0));
+            assertEquals("the emoji was lost", "🔑", cursor.getString(1));
+            assertTrue("an existing tag must be unarranged, not put first", cursor.isNull(2));
+        }
+    }
+
+    /**
+     * A tag with no options row at all - which is most of them, because most people never
+     * rename anything - is untouched and gains nothing.
+     */
+    @Test
+    public void migrate5To6_atagWithNoOptionsRowIsLeftAlone() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM UserBeaconOptions")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("the migration must not invent options rows", 0, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("beacons lost on the v5 to v6 upgrade", 1, cursor.getInt(0));
+        }
+    }
+
+    @Test
+    public void migrate5To6_handlesEmptyDatabase() throws IOException {
+        helper.createDatabase(TEST_DB, 5).close();
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM UserBeaconOptions")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(0, cursor.getInt(0));
+        }
+    }
+
+    /**
+     * <b>The path an actual user takes, which is never one version at a time.</b>
+     *
+     * <p>People skip releases, so the upgrade that has to work is v1 straight to the current
+     * version - five migrations in a row over rows written by a schema none of them were tested
+     * against individually. Everything the user owns has to still be there at the end: their
+     * beacons, their location history, and the nicknames they set.
+     */
+    @Test
+    public void migrate1To6_directUpgradePreservesEverything() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
+            insertOwnedBeaconV1(db, "beacon-b", 1L, BEACON_PLIST, true);
+            insertLocationReport(db, "hash-1", "beacon-a", 1700000000000L);
+            insertUserBeaconOptions(db, "beacon-a", "Wallet", "👛");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 6, true,
+                OpenTagViewerDatabase.MIGRATION_1_2,
+                OpenTagViewerDatabase.MIGRATION_2_3,
+                OpenTagViewerDatabase.MIGRATION_3_4,
+                OpenTagViewerDatabase.MIGRATION_4_5,
+                OpenTagViewerDatabase.MIGRATION_5_6);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("beacons lost on a direct v1 to v6 upgrade", 2, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("location history lost on a direct v1 to v6 upgrade", 1, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query(
+                "SELECT ui_name, ui_order FROM UserBeaconOptions WHERE beacon_id = ?",
+                new Object[] {"beacon-a"})) {
+
+            assertTrue("the user's nickname did not survive five migrations", cursor.moveToFirst());
+            assertEquals("Wallet", cursor.getString(0));
+            assertTrue("nothing may arrive already arranged", cursor.isNull(1));
+        }
+    }
+
+    /**
+     * A beacon as v4 and v5 store one.
+     *
+     * <p>Separate from {@link #insertOwnedBeaconV1} because {@code from_account} arrived in v4
+     * as {@code NOT NULL}, so the v1 shape will not insert into a v5 database at all - it fails
+     * with a constraint violation rather than anything that looks like a migration problem.
+     * The v5 columns all have defaults and are left to take them, which is what a real row
+     * upgraded from v4 would have.
+     */
+    private static void insertOwnedBeaconV5(
+            SupportSQLiteDatabase db, String id, long importId, String content, boolean isRemoved) {
+        ContentValues values = new ContentValues();
+        values.put("id", id);
+        values.put("import_id", importId);
+        values.put("content", content);
+        values.put("version", "1.0");
+        values.put("is_removed", isRemoved ? 1 : 0);
+        values.put("from_account", 0);
+        values.put("fruitless_scans", 0);
+        db.insert("OwnedBeacons", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+    }
+
+    /**
+     * The options columns that have existed since the table did - deliberately without
+     * {@code ui_order}, so this seeds a v1 database as readily as a v5 one.
+     */
+    private static void insertUserBeaconOptions(
+            SupportSQLiteDatabase db, String beaconId, String uiName, String uiEmoji) {
+        ContentValues values = new ContentValues();
+        values.put("beacon_id", beaconId);
+        values.put("last_update", 1700000000000L);
+        values.put("ui_name", uiName);
+        values.put("ui_emoji", uiEmoji);
+        db.insert("UserBeaconOptions", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+    }
+
     private static void insertImport(SupportSQLiteDatabase db, long id) {
         ContentValues values = new ContentValues();
         values.put("id", id);
