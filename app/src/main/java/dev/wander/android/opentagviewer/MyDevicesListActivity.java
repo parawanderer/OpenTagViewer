@@ -557,6 +557,15 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * which explains why a partial arrangement cannot be reasoned about.
      */
     private void rememberTheArrangement() {
+        // **The map has to be told, or the arrangement only appears after a restart.**
+        //
+        // MapsActivity holds its tags in memory and reads uiOrder off them, so those objects
+        // carry whatever order was current when the screen loaded - going back to a map that
+        // is still alive shows the old one, and the app looks like it forgot. This is the
+        // existing "something about the tags changed" flag, which makes the map recreate on
+        // return; the reload is what picks the new positions up.
+        this.devicesListChanged = true;
+
         var async = this.beaconRepo.storeArrangement(TagOrder.positionsFor(this.beaconInfo))
                 .subscribe(
                         () -> Log.d(TAG, "Stored the arrangement of " + this.beaconInfo.size()
