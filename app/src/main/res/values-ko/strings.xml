@@ -262,4 +262,10 @@
     <string name="two_factor_again_sign_out">대신 로그아웃</string>
     <string name="two_factor_again_wrong_code">코드가 거부되었습니다. %1$d회 남았습니다.</string>
     <string name="two_factor_again_giving_up">코드가 거부되었습니다. 로그아웃합니다. 다시 로그인해야 합니다.</string>
+    <string name="icloud_offer_title">iCloud에서 태그를 불러올까요?</string>
+    <string name="icloud_offer_message">이 앱은 Apple 계정에 연결해 태그를 직접 불러올 수 있습니다. 새 태그가 저절로 나타나고, 이름을 바꾸면 계정에도 반영되며, Mac에서 zip을 내보낼 필요가 없습니다.
+
+지금 설정하거나, 나중에 설정에서 언제든 설정할 수 있습니다.</string>
+    <string name="icloud_offer_set_up_now">지금 설정</string>
+    <string name="icloud_offer_not_now">나중에</string>
 </resources>

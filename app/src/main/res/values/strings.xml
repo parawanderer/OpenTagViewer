@@ -294,4 +294,10 @@ You can link again later. That needs your Apple device passcode.</string>
     <string name="two_factor_again_sign_out">Sign out instead</string>
     <string name="two_factor_again_wrong_code">That code was not accepted. %1$d attempts left.</string>
     <string name="two_factor_again_giving_up">That code was not accepted. Signing out — you will need to sign in again.</string>
+    <string name="icloud_offer_title">Read your tags from iCloud?</string>
+    <string name="icloud_offer_message">This app can connect to your Apple account and read your tags from it directly. New tags show up on their own, renaming one writes it back, and there is no zip to export from a Mac.
+
+You can set this up now, or any time later from Settings.</string>
+    <string name="icloud_offer_set_up_now">Set up now</string>
+    <string name="icloud_offer_not_now">Not now</string>
 </resources>

@@ -262,4 +262,10 @@ Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple
     <string name="two_factor_again_sign_out">Se déconnecter plutôt</string>
     <string name="two_factor_again_wrong_code">Ce code a été refusé. Il reste %1$d tentatives.</string>
     <string name="two_factor_again_giving_up">Ce code a été refusé. Déconnexion : vous devrez vous reconnecter.</string>
+    <string name="icloud_offer_title">Lire vos balises depuis iCloud ?</string>
+    <string name="icloud_offer_message">Cette app peut se connecter à votre compte Apple et y lire vos balises directement. Les nouvelles balises apparaissent d’elles-mêmes, un changement de nom est réenregistré, et il n’y a plus d’archive zip à exporter depuis un Mac.
+
+Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.</string>
+    <string name="icloud_offer_set_up_now">Configurer</string>
+    <string name="icloud_offer_not_now">Plus tard</string>
 </resources>
