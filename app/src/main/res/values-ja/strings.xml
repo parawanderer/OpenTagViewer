@@ -257,4 +257,9 @@
     <string name="no_app_to_open_a_link_with">この端末には Web リンクを開けるアプリがありません</string>
     <string name="reorder_tag">ドラッグして並べ替え</string>
     <string name="move_to_top">先頭に移動</string>
+    <string name="two_factor_again_title">Apple が確認コードを求めています</string>
+    <string name="two_factor_again_message">セッションはログインしたままですが、Apple が再びコードを求めています。入力すると続行できます。それまでは何も位置を取得できません。</string>
+    <string name="two_factor_again_sign_out">代わりにサインアウト</string>
+    <string name="two_factor_again_wrong_code">コードが認証されませんでした。残り %1$d 回です。</string>
+    <string name="two_factor_again_giving_up">コードが認証されませんでした。サインアウトします。再度サインインしてください。</string>
 </resources>

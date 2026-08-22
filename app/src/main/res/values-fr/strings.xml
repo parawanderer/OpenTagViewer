@@ -257,4 +257,9 @@ Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple
     <string name="no_app_to_open_a_link_with">Aucune app sur ce téléphone ne peut ouvrir un lien web</string>
     <string name="reorder_tag">Faites glisser pour réorganiser</string>
     <string name="move_to_top">Déplacer en haut</string>
+    <string name="two_factor_again_title">Apple demande un code de vérification</string>
+    <string name="two_factor_again_message">Votre session est toujours connectée, mais Apple redemande un code. Saisissez-le pour continuer : rien ne peut être localisé avant.</string>
+    <string name="two_factor_again_sign_out">Se déconnecter plutôt</string>
+    <string name="two_factor_again_wrong_code">Ce code a été refusé. Il reste %1$d tentatives.</string>
+    <string name="two_factor_again_giving_up">Ce code a été refusé. Déconnexion : vous devrez vous reconnecter.</string>
 </resources>

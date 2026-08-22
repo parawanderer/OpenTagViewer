@@ -19,7 +19,18 @@ import lombok.NonNull;
 public class Apple2FACodeInputManager {
     private static final String TAG = Apple2FACodeInputManager.class.getSimpleName();
 
-    private final AppCompatActivity context;
+    /**
+     * Where the six boxes are looked up from.
+     *
+     * <p><b>A root view rather than the activity, so this works somewhere other than the login
+     * screen.</b> The same six boxes are now needed in an overlay on the map, for a session that
+     * has gone stale and wants a code - and that overlay is not an activity, so
+     * {@code activity.findViewById} would find nothing and every slot would be null.
+     *
+     * <p>The activity-taking constructor is kept and resolves to its content view, so the login
+     * screen is unchanged and there is no second copy of any of this.
+     */
+    private final View root;
 
     private final TextInputEditText[] slots = new TextInputEditText[6];
 
@@ -30,17 +41,24 @@ public class Apple2FACodeInputManager {
     private final Consumer<String> onFullyFilledCallback;
 
     public Apple2FACodeInputManager(@NonNull AppCompatActivity context, @NonNull Consumer<String> onFullyFilledCallback) {
-        this.context = context;
+        // The activity's content view, which is what findViewById on an activity searches
+        // anyway - so this is the same lookup, just named.
+        this(context.findViewById(android.R.id.content), onFullyFilledCallback);
+    }
+
+    /** For the boxes living inside something that is not an activity - see {@link #root}. */
+    public Apple2FACodeInputManager(@NonNull View root, @NonNull Consumer<String> onFullyFilledCallback) {
+        this.root = root;
         this.onFullyFilledCallback = onFullyFilledCallback;
     }
 
     public void init() {
-        TextInputEditText slot1 = this.context.findViewById(R.id.twofactorauth_textinput_1);
-        TextInputEditText slot2 = this.context.findViewById(R.id.twofactorauth_textinput_2);
-        TextInputEditText slot3 = this.context.findViewById(R.id.twofactorauth_textinput_3);
-        TextInputEditText slot4 = this.context.findViewById(R.id.twofactorauth_textinput_4);
-        TextInputEditText slot5 = this.context.findViewById(R.id.twofactorauth_textinput_5);
-        TextInputEditText slot6 = this.context.findViewById(R.id.twofactorauth_textinput_6);
+        TextInputEditText slot1 = this.root.findViewById(R.id.twofactorauth_textinput_1);
+        TextInputEditText slot2 = this.root.findViewById(R.id.twofactorauth_textinput_2);
+        TextInputEditText slot3 = this.root.findViewById(R.id.twofactorauth_textinput_3);
+        TextInputEditText slot4 = this.root.findViewById(R.id.twofactorauth_textinput_4);
+        TextInputEditText slot5 = this.root.findViewById(R.id.twofactorauth_textinput_5);
+        TextInputEditText slot6 = this.root.findViewById(R.id.twofactorauth_textinput_6);
 
         this.slots[0] = slot1;
         this.slots[1] = slot2;
