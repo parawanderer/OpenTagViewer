@@ -752,6 +752,51 @@ def getAccount(
         return None
 
 
+def getSecondFactorMethodsIfNeeded(account: AppleAccount) -> list | None:
+    """
+    The 2FA methods this account needs to go through, or None if it needs nothing.
+
+    **The session going stale mid-use, which used to be a permanent silent failure.** An account
+    restores as `LOGGED_IN`, works, and then at some later point Apple moves it to `REQUIRE_2FA`
+    - the device was removed from the account, the session aged out, something on Apple's side.
+    From that moment every fetch raises `InvalidStateError` before a request is even made.
+
+    Nothing recovered from that. The per-accessory handler counted each failure and carried on,
+    the whole call reported an error, and the app logged it and waited to retry - which never
+    helps, because the state does not heal itself. The user saw pins that stopped updating and
+    no reason anywhere.
+
+    **This is recoverable, and that is the point.** `REQUIRE_2FA` is not a dead session: the
+    account object is still usable and a second factor puts it back to `LOGGED_IN` without the
+    password. So the honest response is to ask for the code, not to throw the session away -
+    see issue #43 for the *other* door onto the same state, where discarding really is correct
+    because the account could not be restored at all.
+
+    :return: the same shape `getAccount` returns as ``loginMethods``, so Java reads it with the
+        code it already has. None when the account is fine, and **None on any failure to ask** -
+        an unreadable state is not evidence that a second factor would help, and prompting on a
+        guess trains people to type codes at random dialogs.
+    """
+    try:
+        state = account.login_state
+
+        if state == LoginState.LOGGED_IN:
+            return None
+
+        if state != LoginState.REQUIRE_2FA:
+            # Something else entirely - logged out, or a state this does not know. There is no
+            # code that fixes those, so say nothing rather than offering a box to type into.
+            print(f"Account is in {state}, which a second factor does not resolve.")
+            return None
+
+        print(f"Account is in {state}: asking for a second factor rather than giving up on it.")
+
+        return [_convertToJavaDictWrapper(method) for method in account.get_2fa_methods()]
+    except Exception:
+        print(f"Could not work out whether a second factor is needed: {traceback.format_exc()}")
+        return None
+
+
 def convertPlistToJson(
         plistXmlString: str,
         alignmentPlistXmlString: str | None = None) -> str | None:
