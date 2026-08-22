@@ -18,6 +18,8 @@
         <variable name="onClickMapProvider" type="Runnable" />
         <variable name="currentMapProvider" type="String" />
         <variable name="isDebugDataEnabled" type="boolean" />
+        <variable name="isShowAppleDevicesEnabled" type="boolean" />
+        <variable name="onClickAppleDevicesHelpLink" type="Runnable" />
         <variable name="isSystemColorsSupported" type="boolean" />
         <variable name="isSystemColorsEnabled" type="boolean" />
     </data>
@@ -188,6 +190,74 @@
                 app:title="@{@string/map_provider}"
                 app:onClick="@{onClickMapProvider}"
                 />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="22dp"
+                android:paddingTop="8dp"
+                android:paddingRight="22dp"
+                android:paddingBottom="0dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    app:srcCompat="@drawable/smartphone_24px" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/settings_show_apple_devices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22dp"
+                    android:checked="@{isShowAppleDevicesEnabled}"
+                    android:enabled="true"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/show_apple_devices"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!--
+                Indented to the switch's text, not to the icon, so it reads as belonging to the
+                switch rather than as a new setting. The explanation is long on purpose: the whole
+                point of the setting is that the incompleteness is invisible otherwise.
+            -->
+            <TextView
+                android:id="@+id/settings_show_apple_devices_explainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="72dp"
+                android:layout_marginEnd="22dp"
+                android:fontFamily="@font/nunito_medium"
+                android:text="@string/show_apple_devices_explainer"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/settings_show_apple_devices_help_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="72dp"
+                android:layout_marginEnd="22dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="@font/nunito_medium"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:text="@string/show_apple_devices_help_link"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                android:onClick="@{() -> onClickAppleDevicesHelpLink.run()}" />
 
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"

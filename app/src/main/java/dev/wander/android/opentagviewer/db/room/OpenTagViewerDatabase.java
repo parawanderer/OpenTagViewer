@@ -31,7 +31,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         DailyHistoryFetchRecord.class,
         UserBeaconOptions.class
     },
-    version = 5
+    version = 6
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -107,6 +107,29 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v5 → v6: adds {@code ui_order} to {@code UserBeaconOptions}, holding the position the user
+     * dragged a tag to on the device list.
+     *
+     * <p>Additive, and nullable rather than defaulted. Null means "never arranged", which is
+     * every existing row and is the honest answer for them - a default of 0 would claim every
+     * tag had been deliberately put first. {@code TagOrder} reads null as "sort after anything
+     * that was arranged, accessories before the owner's own devices", so an upgrade changes
+     * nobody's order.
+     *
+     * <p><b>No classification is done here, on purpose.</b> The obvious alternative - seed the
+     * column with the default order during the upgrade - would mean parsing every stored plist
+     * inside a migration, on the database thread, on every user's device, at the one moment
+     * where a throw destroys the database. The rule lives in a pure function instead and this
+     * stays a single ALTER.
+     */
+    public static final Migration MIGRATION_5_6 = new Migration(5, 6) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE UserBeaconOptions ADD COLUMN ui_order INTEGER");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -121,7 +144,8 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     context,
                     OpenTagViewerDatabase.class,
                     DATABASE_NAME)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                            MIGRATION_5_6)
                     .build();
         }
 
