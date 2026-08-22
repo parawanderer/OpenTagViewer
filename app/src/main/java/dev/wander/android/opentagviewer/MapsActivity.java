@@ -1125,14 +1125,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
         // Somebody is signed in, which is the only moment this is worth raising: they can see
         // what they already have, and what switching would cost them.
+        // **Asked before the dialog runs, not after.** `AnisetteUpgradeDialog.offerIfDue` marks
+        // itself as offered by mutating this very settings object, deliberately, so that a
+        // dismissal counts. That means asking afterwards whether it was due always answers "no"
+        // - and the iCloud offer below, whose whole condition is "not while Anisette is
+        // outstanding", would open on top of it. Both dialogs appeared at once, which is exactly
+        // the thing the deferral exists to prevent.
+        final boolean anisetteWasDue = this.userSettings.shouldOfferLocalAnisette(true);
+
         this.offerLocalAnisetteUpgradeIfDue();
 
-        // And, for anybody not already reading their account, the offer to start. Second
-        // deliberately: both are due at once for somebody updating, and the Anisette one wins
-        // because it is about the session continuing to work. This one is skipped entirely
-        // while that is outstanding and comes back on the next launch - see
-        // UserSettings.shouldOfferICloud.
-        this.offerICloudSetupIfDue();
+        // And, for anybody not already reading their account, the offer to start. Second and
+        // only when the screen is free: both are due at once for somebody updating, and the
+        // Anisette one wins because it is about the session continuing to work. Nothing marks
+        // this one as made in the meantime, so it returns on the next launch.
+        if (!anisetteWasDue) {
+            this.offerICloudSetupIfDue();
+        }
 
         // else stay here & restore the account.
         // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
