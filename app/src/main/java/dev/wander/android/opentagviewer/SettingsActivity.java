@@ -66,6 +66,7 @@ import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
@@ -1103,6 +1104,10 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void performLogout() {
+        // Let go of the Apple session too, closing its HTTP session and sockets rather
+        // than leaving them to a finaliser that cannot do it. See issue #133.
+        PythonAppleService.forget();
+
         var async = this.authRepository.clearUser()
                 .subscribe(() -> {
                     // logout by sending back to login page

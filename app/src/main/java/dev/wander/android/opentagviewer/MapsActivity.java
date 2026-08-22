@@ -1428,6 +1428,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void handleAccountRestoreFailureOnUiThread() {
         final String email = signedInEmailOrNull();
 
+        // Let go of the Apple session too, closing its HTTP session and sockets rather
+        // than leaving them to a finaliser that cannot do it. See issue #133.
+        PythonAppleService.forget();
+
+
         var disposable = this.userAuthRepo.clearUser()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
