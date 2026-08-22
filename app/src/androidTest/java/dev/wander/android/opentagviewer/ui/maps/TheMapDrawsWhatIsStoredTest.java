@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.MapsActivity;
@@ -103,6 +105,11 @@ public class TheMapDrawsWhatIsStoredTest {
 
     @Before
     public void seedTwoTagsAndSubstituteTheMap() {
+        // Or the map/login/settings screen loads Apple's real ADI library: a download,
+        // a dlopen and a native initialise, none of which this test is about - and two
+        // screens reaching it at once segfaults the process and aborts the whole run.
+        // See issue #135.
+        AppDependencies.replaceAnisette(whateverTheSettingsSay -> FakeAnisetteSource.ready());
         final Context context = getInstrumentation().getTargetContext();
 
         this.guard = DeviceStateGuard.capture(context);
@@ -179,6 +186,8 @@ public class TheMapDrawsWhatIsStoredTest {
 
     @After
     public void putEverythingBack() {
+        // Put the real Anisette source back, or the next class inherits the fake.
+        AppDependencies.reset();
         if (this.scenario != null) {
             this.scenario.close();
         }
