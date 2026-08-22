@@ -6,6 +6,7 @@ import android.os.Build;
 import android.util.Log;
 
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.util.LoadedOnce;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -64,6 +65,31 @@ public final class LocalAnisette implements AnisetteSource {
             "libc++_shared.so", "libstoreservicescore.so");
 
     private static final List<String> STUBS = Arrays.asList("CoreFoundation", "mediaplatform");
+
+    /**
+     * Apple's library and the identity it was initialised with - <b>one per process</b>.
+     *
+     * <p><b>Static, because what it holds is.</b> The libraries land at one path, are loaded into
+     * one process, and ADI keeps one lot of state. The old guard was {@code synchronized} on a
+     * {@code LocalAnisette}, and {@code AppDependencies} builds a new one for every caller - so
+     * two callers held two locks and proceeded together, unpacking the same {@code .so} and
+     * {@code dlopen}-ing it. That segfaults. See issue #135.
+     *
+     * <p>{@link LoadedOnce} covers the download and the unpack as well as the load, because the
+     * race starts at the file writes rather than at ADI.
+     */
+    private static final LoadedOnce<ApplesLibrary> APPLES_LIBRARY = new LoadedOnce<>();
+
+    /** Apple's library and the identity it was initialised with, which travel together. */
+    private static final class ApplesLibrary {
+        private final AdiLibrary adi;
+        private final AdiDeviceIdentity identity;
+
+        ApplesLibrary(final AdiLibrary adi, final AdiDeviceIdentity identity) {
+            this.adi = adi;
+            this.identity = identity;
+        }
+    }
 
     /**
      * Every library that has to be present before any of this can run.
@@ -126,12 +152,26 @@ public final class LocalAnisette implements AnisetteSource {
         }
 
         try {
-            final AdiLibraryManifest manifest = AdiLibraryManifest.load(this.context);
-            final File libraryDir = libraryDirectory(this.context, this.abi);
+            // **Once per process, one thread at a time.** Every caller of
+            // AppDependencies.anisette gets a *new* LocalAnisette, so the instance lock this
+            // used to rely on excluded nothing - and two threads getting here together is
+            // ordinary: the map restores a session on one, the restore fails, and the login
+            // screen it redirects to asks on another. They were unpacking the same .so files to
+            // the same paths and dlopening them, which segfaults. See issue #135.
+            //
+            // The download and the unpack are inside, not just the load, because the race starts
+            // at the file writes.
+            final ApplesLibrary loaded = APPLES_LIBRARY.get(() -> {
+                final AdiLibraryManifest manifest = AdiLibraryManifest.load(this.context);
+                final File libraryDir = libraryDirectory(this.context, this.abi);
 
-            download(manifest, libraryDir);
-            verify(manifest, libraryDir);
-            load(libraryDir);
+                download(manifest, libraryDir);
+                verify(manifest, libraryDir);
+                return load(libraryDir);
+            });
+
+            this.adi = loaded.adi;
+            this.identity = loaded.identity;
 
             this.unavailableReason = null;
             return true;
@@ -171,7 +211,29 @@ public final class LocalAnisette implements AnisetteSource {
         }
     }
 
-    private void load(File libraryDir) throws Exception {
+    /**
+     * Load Apple's library and initialise it - <b>once per process, not once per instance</b>.
+     *
+     * <p><b>Everything below the first line happens exactly once.</b> A shared object is loaded
+     * into a process, not into an object, and ADI keeps its state inside that library. The old
+     * code guarded this with {@code this.adi != null} on an instance that
+     * {@code AppDependencies} creates fresh for every caller, so the guard never fired and each
+     * caller re-ran the lot: another {@code dlopen}, another {@code ADILoadLibraryWithPath},
+     * another {@code ADISetProvisioningPath}, against a library already holding all of it.
+     *
+     * <p><b>Only ever called from inside {@link #APPLES_LIBRARY}</b>, which is what makes "once"
+     * true - see {@code ensureReady}.
+     *
+     * <p>Identity is cached with the library rather than re-derived, and not only to save the
+     * read: {@code loadOrCreateIdentity} *creates* one when there is none, so two threads
+     * arriving on a fresh install could mint two different identities and register the app twice
+     * on the user's Apple account. Rule 11 is emphatic that there is one identity.
+     *
+     * <p><b>If {@code ADIProvisioningErase} is ever wired up, it has to clear these.</b> Nothing
+     * calls it today, which is the only reason there is no invalidation here; resetting Anisette
+     * against a cached, already-initialised library would appear to work and change nothing.
+     */
+    private ApplesLibrary load(File libraryDir) throws Exception {
         for (final String stub : STUBS) {
             System.loadLibrary(stub);
         }
@@ -184,8 +246,11 @@ public final class LocalAnisette implements AnisetteSource {
         new AdiProvisioning(deviceIdentity, library)
                 .provisionIfNeeded(AdiProvisioning.ANONYMOUS_DS_ID);
 
-        this.adi = library;
-        this.identity = deviceIdentity;
+        // Returned rather than assigned: LoadedOnce caches only on success, so a throw above
+        // leaves nothing behind and the next caller tries again. A half-initialised library in
+        // the cache would be handed to everyone after it, and would read as Apple rejecting the
+        // app rather than as a bad load.
+        return new ApplesLibrary(library, deviceIdentity);
     }
 
     /**
