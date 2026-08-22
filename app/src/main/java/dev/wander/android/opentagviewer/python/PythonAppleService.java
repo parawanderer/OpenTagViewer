@@ -26,9 +26,63 @@ public class PythonAppleService {
 
     public static PythonAppleService INSTANCE = null;
 
+    /**
+     * Take this account as the signed-in one, closing whatever was here before.
+     *
+     * <p><b>Replacing used to leak the old one.</b> An {@code AppleAccount} owns an aiohttp
+     * session, a connector and an event loop, and dropping the reference releases none of it -
+     * Python's collector tries and fails, leaving two sockets open per discarded account. This
+     * screen is rebuilt on any theme, language or map-provider change, so somebody toggling dark
+     * mode a few times accumulates them. See issue #133.
+     */
     public static PythonAppleService setup(PythonAppleAccount account) {
+        final PythonAppleService previous = INSTANCE;
+
         INSTANCE = new PythonAppleService(account);
+
+        if (previous != null && previous.account != account) {
+            closeQuietly(previous.account);
+        }
+
         return INSTANCE;
+    }
+
+    /**
+     * Let go of the signed-in account, closing it.
+     *
+     * <p>For signing out, which is the clearest case of an account nobody will use again. Safe
+     * to call when there is none.
+     */
+    public static void forget() {
+        final PythonAppleService previous = INSTANCE;
+        INSTANCE = null;
+
+        if (previous != null) {
+            closeQuietly(previous.account);
+        }
+    }
+
+    /**
+     * Close an account's session, and never fail for it.
+     *
+     * <p>Every caller is discarding the account regardless, so there is nothing useful to do
+     * about a failure except say so - and this runs on paths that are already recovering from
+     * something else, where a new exception would replace the original problem with this one.
+     */
+    private static void closeQuietly(final PythonAppleAccount account) {
+        if (account == null) {
+            return;
+        }
+
+        try {
+            PythonLock.holding(() -> {
+                final var module = Python.getInstance().getModule(MODULE_MAIN);
+                module.callAttr("closeAccount", new Kwarg("account", account.getAccountObj()));
+                return null;
+            });
+        } catch (final Exception e) {
+            Log.w(TAG, "Could not close a discarded Apple account", e);
+        }
     }
 
     public static PythonAppleService getInstance() {
