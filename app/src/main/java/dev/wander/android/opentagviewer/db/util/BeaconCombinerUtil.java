@@ -62,10 +62,26 @@ public final class BeaconCombinerUtil {
         return combine(beaconData.getOwnedBeacons(), beaconData.getBeaconNamingRecords(), Collections.emptyList());
     }
 
+    /**
+     * Merge two sets of reports for one tag, dropping the ones that are the same sighting.
+     *
+     * <p><b>Duplicates inside {@code first} used to crash the screen.</b> {@code Collectors.toMap}
+     * throws {@code IllegalStateException} on a repeated key, and the key here is deliberately
+     * blind to {@code horizontalAccuracy} and {@code confidence} - see
+     * {@link BeaconLocationReportHasher}, which excludes them because they are the fields Apple
+     * is least consistent about. So two reports of the same sighting at the same instant,
+     * differing only in a stated accuracy of 97 metres versus 92, are *meant* to collapse into
+     * one - and instead took down the whole day's history with a stack trace.
+     *
+     * <p><b>The tighter accuracy wins, rather than whichever arrived last.</b> Order here is
+     * Apple's, which is arbitrary, so "last wins" would make the accuracy shown for a sighting
+     * change between fetches for no reason. Smaller is a better answer and a stable one.
+     */
     public static List<BeaconLocationReport> combineAndSort(final String beaconId, final List<BeaconLocationReport> first, final List<BeaconLocationReport> second) {
         Map<String, BeaconLocationReport> distinctItems = first.stream().collect(Collectors.toMap(
                 report -> BeaconLocationReportHasher.getSha256HashFor(beaconId, report),
-                report -> report
+                report -> report,
+                BeaconCombinerUtil::theMorePreciseOf
         ));
 
         // this will override items that we consider "duplicates" with the item from list 2
@@ -77,5 +93,17 @@ public final class BeaconCombinerUtil {
         return distinctItems.values().stream()
                 .sorted(Comparator.comparingLong(BeaconLocationReport::getTimestamp))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Of two reports the hash considers the same sighting, the one that claims to know better.
+     *
+     * <p>{@code horizontalAccuracy} is a radius in metres, so smaller is tighter. Ties keep the
+     * first, which only matters for making the result stable.
+     */
+    private static BeaconLocationReport theMorePreciseOf(
+            final BeaconLocationReport a, final BeaconLocationReport b) {
+
+        return b.getHorizontalAccuracy() < a.getHorizontalAccuracy() ? b : a;
     }
 }

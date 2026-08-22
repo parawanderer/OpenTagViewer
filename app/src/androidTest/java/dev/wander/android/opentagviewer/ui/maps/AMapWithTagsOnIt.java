@@ -34,6 +34,7 @@ import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
@@ -200,6 +201,26 @@ public final class AMapWithTagsOnIt {
         this.geocoder = new FakeGeocoder().saying(LATITUDE, LONGITUDE, WHERE_THAT_IS);
         AppDependencies.replaceGeocoder((ctx, locale) -> this.geocoder);
 
+        // **Otherwise the map loads Apple's real ADI library, and it can take the process down.**
+        //
+        // MapsActivity asks for Anisette on the way to restoring a session, and the real source
+        // dlopens libstoreservicescore.so and initialises it. That is correct in the app. In a
+        // suite it happens once per test, in one process, on whichever Rx thread got there - and
+        // it segfaults:
+        //
+        //   AnisetteStatus.of -> LocalAnisette.ensureReady -> LocalAnisette.load
+        //     -> AdiLibrary.initialise -> NativeAdi.callWithPath -> libstoreservicescore.so
+        //     signal 11 (SIGSEGV) in tid RxCachedThreadS
+        //
+        // A native crash takes the whole instrumentation with it, so the run does not merely
+        // fail - it *stops*, and every remaining test is reported as never having run. That is
+        // the intermittent whole-suite abort this repo has been living with; the stack above is
+        // from the CI logcat artefact, which is what finally caught it.
+        //
+        // Nothing built on this fixture is testing Anisette, so none of them should be loading
+        // it. The login-flow tests already do this; the map ones never did.
+        AppDependencies.replaceAnisette(whateverTheSettingsSay -> FakeAnisetteSource.ready());
+
         if (!Python.isStarted()) {
             Python.start(new AndroidPlatform(this.context));
         }
@@ -267,6 +288,26 @@ public final class AMapWithTagsOnIt {
 
         this.db.userBeaconOptionsDao().storeArrangement(positions, System.currentTimeMillis());
         return this;
+    }
+
+    /** Apple decides this session needs a verification code again, mid-use. */
+    public void theSessionGoesStale() {
+        this.appleDouble.callAttr("makeTheSessionNeedACode");
+    }
+
+    /** The session needs a code and Apple offers no way to send one - see the double. */
+    public void theSessionGoesStaleBeyondRescue() {
+        this.appleDouble.callAttr("makeTheSessionUnrescuable");
+    }
+
+    /** Whether a code put the session back - the rescue itself, not the UI reacting. */
+    public boolean theSessionIsUsableAgain() {
+        return this.appleDouble.callAttr("theSessionIsUsableAgain").toBoolean();
+    }
+
+    /** Codes actually sent to Apple, right or wrong. */
+    public int codesSubmitted() {
+        return this.appleDouble.callAttr("howManyCodesSubmitted").toInt();
     }
 
     /** The names on the tag cards, left to right - which is the order the carousel shows. */

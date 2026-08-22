@@ -49,6 +49,7 @@ import com.google.android.gms.maps.model.LatLng;
 
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
+import dev.wander.android.opentagviewer.ui.login.TwoFactorAgainOverlay;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
@@ -1110,6 +1111,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     AppDependencies.anisette(this, this.userSettings, true))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
+
+                // **The other door.** getAccount now hands back an account that needs a second
+                // factor rather than discarding it (see main.py, and issue #43), so a restore
+                // can land here already unusable. Asked on the main thread because it puts a
+                // view up; harmless when the session is fine, which is almost always.
+                this.runOnUiThread(this::askForACodeIfTheSessionNeedsOne);
+
                 return this.appleService;
             });
 
@@ -1174,7 +1182,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 // restore. Wipe the bad blob and route the user back to login with a hint.
                 Log.w(TAG, "Account restore failed; clearing saved auth and prompting re-login");
                 handleAccountRestoreFailureOnUiThread();
+                return;
             }
+
+            // **Not every fetch failure is weather.** The comment below is true of most of them
+            // and completely wrong about one: once Apple moves the session to REQUIRE_2FA every
+            // fetch fails its state check before a request leaves the phone, and no amount of
+            // retrying fixes it. That was permanent and silent - stale pins, nothing on screen.
+            this.askForACodeIfTheSessionNeedsOne();
             //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
             // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
@@ -1210,6 +1225,98 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         }, error -> Log.e(TAG,
                                 "Failed to record the local Anisette choice", error));
             }));
+    }
+
+    /**
+     * The overlay that rescues a session Apple wants a code for. Built on demand, because most
+     * sessions never need it.
+     */
+    private TwoFactorAgainOverlay twoFactorAgain;
+
+    /**
+     * Whether a check on the session's state is already in flight or answered.
+     *
+     * <p>Cleared when a code rescues the session, so a later staleness is caught too - and only
+     * then. Not cleared on sign-out, because there is nothing left to ask about.
+     */
+    private boolean alreadyAskingAboutTheSession = false;
+
+    /**
+     * Ask whether this session needs a code, and put the overlay up if it does.
+     *
+     * <p><b>Called from both doors onto the same state.</b> A restore can hand back an account
+     * already in {@code REQUIRE_2FA}, and a session that restored perfectly can be moved there
+     * by Apple later, failing every fetch from that moment. Before this, those two produced
+     * completely different behaviour - a forced re-login, and permanent silence - for one
+     * condition with one fix.
+     *
+     * <p>Cheap on the common path: a healthy account answers without Python asking it anything,
+     * and this only runs when a fetch has already failed outright or a restore has just landed.
+     *
+     * <p>Does nothing if the overlay is already up, so a periodic refresh ticking behind it
+     * cannot ask Apple for a second code while somebody is typing the first.
+     */
+    private void askForACodeIfTheSessionNeedsOne() {
+        // **Once, however many accessories failed.** Every tag in the batch fails for the same
+        // reason when a session goes stale, and each failure calls this - so without the latch a
+        // six-tag account would ask Apple for six codes, or sign out six times over. The check
+        // and the set are both on the main thread, which is why a plain boolean is enough.
+        if (this.appleService == null
+                || this.alreadyAskingAboutTheSession
+                || (this.twoFactorAgain != null && this.twoFactorAgain.isShowing())) {
+            return;
+        }
+        this.alreadyAskingAboutTheSession = true;
+
+        var async = PythonAuthService.secondFactorMethodsIfNeeded(this.appleService.getAccount())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(needed -> {
+                    if (needed.isEmpty()) {
+                        return; // nothing wrong with this session
+                    }
+
+                    final List<PythonAuthService.AuthMethod> methods = needed.get();
+
+                    if (methods.isEmpty()) {
+                        // **A code is needed and there is no way to ask for one.** Real sessions
+                        // reach this: FindMy.py reports "Unexpected login state after reauth ...
+                        // Please log in again". Showing an empty code box would be worse than
+                        // the bug this replaces, so this is the case that still signs out.
+                        Log.w(TAG, "The session needs a code but offers no way to send one;"
+                                + " signing out so the user can sign in properly");
+                        this.handleAccountRestoreFailureOnUiThread();
+                        return;
+                    }
+
+                    Log.i(TAG, "The session needs a second factor; asking for one");
+                    this.showTheTwoFactorOverlay(methods);
+                }, error -> Log.w(TAG,
+                        "Could not work out whether this session needs a code", error));
+    }
+
+    private void showTheTwoFactorOverlay(final List<PythonAuthService.AuthMethod> methods) {
+        if (this.twoFactorAgain == null) {
+            this.twoFactorAgain = new TwoFactorAgainOverlay(
+                    this,
+                    this.findViewById(R.id.two_factor_again_overlay),
+                    // Rescued: the session works again, so do what the failed fetch was for.
+                    // Unconditionally rather than through refreshIfAllowed, which would consult
+                    // the interval and usually decline - the fetch that just failed does not
+                    // count as one that happened, and the user has earned an answer by typing
+                    // a code.
+                    () -> {
+                        Log.i(TAG, "session rescued; fetching what the stale session could not");
+                        // Armed again: this session is healthy now, and could go stale later.
+                        this.alreadyAskingAboutTheSession = false;
+                        this.fetchAndUpdateCurrentBeacons();
+                    },
+                    // Given up on: delete the login and send them to sign in properly. The same
+                    // recovery a failed restore has always used.
+                    this::handleAccountRestoreFailureOnUiThread);
+        }
+
+        this.twoFactorAgain.show(methods);
     }
 
     private static boolean isAccountRestoreFailure(Throwable t) {
@@ -1783,9 +1890,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                                         : hoursToGoBack)
                         .flatMap(this.beaconRepo::storeFetchResult),
                 this::setLongFetchProgress,
-                (request, error) -> Log.e(TAG,
-                        "Failed to fetch reports for beaconId=" + request.getBeaconId()
-                                + "; continuing with the remaining accessories", error)));
+                (request, error) -> {
+                    Log.e(TAG, "Failed to fetch reports for beaconId=" + request.getBeaconId()
+                            + "; continuing with the remaining accessories", error);
+
+                    // **This handler is where a stale session actually surfaces**, not the outer
+                    // subscriber. Fetching is one accessory at a time and each failure is caught
+                    // here and stepped over, so a session Apple has stopped accepting fails
+                    // every accessory in turn and the stream completes as though it merely found
+                    // nothing. Carrying on is right for one tag that would not answer; it is not
+                    // right when the reason is the same for all of them and no retry will fix it.
+                    this.runOnUiThread(this::askForACodeIfTheSessionNeedsOne);
+                }));
     }
 
     private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {

@@ -160,4 +160,11 @@
 
     </LinearLayout>
 
+    <!--
+        Last child, so it is drawn over everything: with the session in this state nothing on
+        this screen can do its job, and a half-covered map invites tapping controls that will
+        silently fail. Hidden until a session actually needs a code.
+    -->
+    <include layout="@layout/two_factor_again_overlay" />
+
 </RelativeLayout>
