@@ -317,4 +317,5 @@
     <string name="play_sound_no_candidate_macs">無法計算此配件目前的位址。</string>
     <string name="play_sound_permission_denied">就近響鈴需要藍牙權限。</string>
     <string name="play_sound_failed">無法播放聲音。請重試。</string>
+    <string name="stop_ringing">停止</string>
 </resources>

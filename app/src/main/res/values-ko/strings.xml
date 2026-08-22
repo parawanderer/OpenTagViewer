@@ -317,4 +317,5 @@
     <string name="play_sound_no_candidate_macs">이 액세서리의 현재 주소를 계산할 수 없습니다.</string>
     <string name="play_sound_permission_denied">근처에서 소리를 재생하려면 블루투스 권한이 필요합니다.</string>
     <string name="play_sound_failed">소리를 재생할 수 없습니다. 다시 시도하세요.</string>
+    <string name="stop_ringing">중지</string>
 </resources>

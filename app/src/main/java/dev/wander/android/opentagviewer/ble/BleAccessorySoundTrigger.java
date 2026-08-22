@@ -5,8 +5,10 @@ import android.content.Context;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
@@ -29,6 +31,13 @@ public class BleAccessorySoundTrigger implements AccessorySoundTrigger {
      * does not leave a scan running indefinitely.
      */
     private static final long SCAN_TIMEOUT_MS = 15_000L;
+
+    /**
+     * How long {@link #playSoundContinuously} waits after one attempt (found or not) before the
+     * next. Short enough to feel responsive while walking toward a tag; long enough that a
+     * successful AirTag chirp (a few seconds) has time to finish before the next scan starts.
+     */
+    private static final long CONTINUOUS_PING_PAUSE_MS = 4_000L;
 
     private final AccessoryMacResolver macResolver;
 
@@ -57,6 +66,17 @@ public class BleAccessorySoundTrigger implements AccessorySoundTrigger {
                     .flatMap(device -> BleGattSoundTrigger.trigger(context, device))
                     .onErrorReturn(BleAccessorySoundTrigger::asResult);
         }).subscribeOn(Schedulers.io());
+    }
+
+    @Override
+    public Observable<BleSoundTriggerResult> playSoundContinuously(
+            final Context context, final String accessoryJson) {
+        // playSound is a Single, so it completes after its one item; repeatWhen re-subscribes
+        // it once the delayed completion signal fires, which is what turns "do it once" into
+        // "do it again after a pause", forever, until the subscriber disposes.
+        return playSound(context, accessoryJson)
+                .toObservable()
+                .repeatWhen(completed -> completed.delay(CONTINUOUS_PING_PAUSE_MS, TimeUnit.MILLISECONDS));
     }
 
     private static BleSoundTriggerResult asResult(final Throwable error) {

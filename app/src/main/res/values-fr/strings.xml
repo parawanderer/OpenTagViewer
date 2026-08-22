@@ -317,4 +317,5 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="play_sound_no_candidate_macs">Impossible de calculer l\'adresse actuelle de cet accessoire.</string>
     <string name="play_sound_permission_denied">L\'autorisation Bluetooth est nécessaire pour faire sonner l\'appareil à proximité.</string>
     <string name="play_sound_failed">Impossible de jouer le son. Réessayez.</string>
+    <string name="stop_ringing">Arrêter</string>
 </resources>

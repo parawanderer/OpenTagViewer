@@ -317,4 +317,5 @@
     <string name="play_sound_no_candidate_macs">Не удалось вычислить текущий адрес этого аксессуара.</string>
     <string name="play_sound_permission_denied">Для воспроизведения звука поблизости требуется разрешение Bluetooth.</string>
     <string name="play_sound_failed">Не удалось воспроизвести звук. Попробуйте снова.</string>
+    <string name="stop_ringing">Стоп</string>
 </resources>

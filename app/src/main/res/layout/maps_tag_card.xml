@@ -274,7 +274,7 @@
                     android:onClick="onClickRing"
                     android:orientation="vertical"
                     android:padding="5dp"
-                    android:visibility="gone">
+                    android:visibility="visible">
 
                     <FrameLayout
                         android:layout_width="40dp"
