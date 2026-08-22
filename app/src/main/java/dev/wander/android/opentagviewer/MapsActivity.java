@@ -51,6 +51,7 @@ import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
 import dev.wander.android.opentagviewer.ui.login.TwoFactorAgainOverlay;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
+import dev.wander.android.opentagviewer.ui.settings.ICloudSetupOfferDialog;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
@@ -291,6 +292,33 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             || data.getBooleanExtra("shownDevicesChanged", false))) {
                         this.recreate();
                     }
+                }
+            }
+    );
+
+    /**
+     * Connecting an iCloud account, from the one-time offer after signing in.
+     *
+     * <p>A rebuild when anything came back, for the reason the device list already does it: tags
+     * read from the account have to appear without the user going somewhere else and returning,
+     * and this screen accumulates its tags on load rather than merging.
+     */
+    private final ActivityResultLauncher<Intent> fetchFromICloudLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                final Intent data = result.getData();
+                if (data == null) {
+                    return;
+                }
+                // The iCloud screen offers a file import as its way out for anybody who cannot
+                // use an account; the picker lives here, so it asks us to start it.
+                if (data.getBooleanExtra(
+                        FetchFromICloudActivity.RESULT_WANTS_FILE_IMPORT, false)) {
+                    this.handleImport();
+                    return;
+                }
+                if (data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false)) {
+                    this.handleDeviceListChanged();
                 }
             }
     );
@@ -1097,7 +1125,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
         // Somebody is signed in, which is the only moment this is worth raising: they can see
         // what they already have, and what switching would cost them.
+        // **Asked before the dialog runs, not after.** `AnisetteUpgradeDialog.offerIfDue` marks
+        // itself as offered by mutating this very settings object, deliberately, so that a
+        // dismissal counts. That means asking afterwards whether it was due always answers "no"
+        // - and the iCloud offer below, whose whole condition is "not while Anisette is
+        // outstanding", would open on top of it. Both dialogs appeared at once, which is exactly
+        // the thing the deferral exists to prevent.
+        final boolean anisetteWasDue = this.userSettings.shouldOfferLocalAnisette(true);
+
         this.offerLocalAnisetteUpgradeIfDue();
+
+        // And, for anybody not already reading their account, the offer to start. Second and
+        // only when the screen is free: both are due at once for somebody updating, and the
+        // Anisette one wins because it is about the session continuing to work. Nothing marks
+        // this one as made in the meantime, so it returns on the next launch.
+        if (!anisetteWasDue) {
+            this.offerICloudSetupIfDue();
+        }
 
         // else stay here & restore the account.
         // Note: FindMy 0.9.x embeds the anisette URL in the account JSON itself,
@@ -1317,6 +1361,48 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         this.twoFactorAgain.show(methods);
+    }
+
+    /**
+     * Offer to connect an iCloud account, once, to anybody who has not.
+     *
+     * <p><b>Asked after the membership lookup rather than off {@link #accountIsLinked}.</b> That
+     * field is filled in asynchronously, and reading it here would usually catch its default of
+     * false - offering the account to somebody who already has one connected, and burning their
+     * one-and-only prompt on a question that does not apply to them.
+     *
+     * <p>Declining still saves, because the flag recording that the offer was made is written
+     * into the same settings object. Without that write the prompt returns on every launch,
+     * which is precisely what somebody happy importing zips should never see.
+     */
+    private void offerICloudSetupIfDue() {
+        var async = new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .get()
+                .firstOrError()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> ICloudSetupOfferDialog.offerIfDue(
+                                this, this.userSettings, held.isPresent(), this::recordICloudOffer),
+                        error -> Log.w(TAG,
+                                "Could not tell whether an account is linked, so not offering"
+                                        + " to connect one", error));
+    }
+
+    /** Persist the answer, and act on it if they said yes. */
+    private void recordICloudOffer(final boolean accepted) {
+        var async = this.userSettingsRepo.storeUserSettings(this.userSettings)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(() -> {
+                    if (accepted) {
+                        Log.i(TAG, "taking them to connect an iCloud account");
+                        this.fetchFromICloudLauncher.launch(
+                                new Intent(this, FetchFromICloudActivity.class));
+                    }
+                }, error -> Log.e(TAG, "Failed to record the iCloud offer", error));
     }
 
     private static boolean isAccountRestoreFailure(Throwable t) {

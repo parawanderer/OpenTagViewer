@@ -105,6 +105,19 @@ public class UserSettings {
      */
     private Boolean showAppleDevices;
 
+    /**
+     * Whether the one-time offer to connect an iCloud account has been made.
+     *
+     * <p>Reading tags live out of the account is the thing that removes the Mac from the story
+     * entirely, and it is buried in Settings where somebody who has just signed in has no reason
+     * to look. So it is worth putting in front of them once, at the moment it would help - which
+     * is the same argument, and the same mechanism, as {@link #anisetteUpgradeOffered}.
+     *
+     * <p><b>Once, and marked when shown rather than when answered.</b> A prompt that returns is
+     * a prompt people learn to dismiss without reading.
+     */
+    private Boolean icloudOfferMade;
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
 
@@ -176,5 +189,34 @@ public class UserSettings {
      */
     public boolean shouldShowAppleDevices() {
         return this.showAppleDevices == Boolean.TRUE;
+    }
+
+    /**
+     * Whether to offer connecting an iCloud account.
+     *
+     * <p>Two conditions, and between them they pick out exactly the people this helps:
+     *
+     * <ul>
+     *   <li><b>Nothing connected yet.</b> Somebody already reading their account does not need
+     *       to be asked, and asking would read as the app having lost track.</li>
+     *   <li><b>Never asked before.</b> Covers a fresh install and somebody updating from an
+     *       earlier version alike - neither has the flag - and stops the offer returning for
+     *       anyone who said no.</li>
+     * </ul>
+     *
+     * <p><b>Not while the Anisette offer is due.</b> Somebody updating qualifies for both, and
+     * two dialogs stacked on the map is how people learn to dismiss dialogs unread. Anisette
+     * goes first because it is about the session continuing to work at all; this one can wait
+     * for the next launch, and will, because nothing marks it made in the meantime.
+     *
+     * @param hasLinkedAccount whether an iCloud keychain membership is already held.
+     * @param hasExistingSession whether somebody is signed in, for the Anisette question.
+     */
+    public boolean shouldOfferICloud(
+            final boolean hasLinkedAccount, final boolean hasExistingSession) {
+
+        return !hasLinkedAccount
+                && this.icloudOfferMade != Boolean.TRUE
+                && !this.shouldOfferLocalAnisette(hasExistingSession);
     }
 }

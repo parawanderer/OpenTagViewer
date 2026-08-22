@@ -262,4 +262,10 @@
     <string name="two_factor_again_sign_out">Выйти из аккаунта</string>
     <string name="two_factor_again_wrong_code">Код не принят. Осталось попыток: %1$d.</string>
     <string name="two_factor_again_giving_up">Код не принят. Выполняется выход — потребуется войти снова.</string>
+    <string name="icloud_offer_title">Читать метки из iCloud?</string>
+    <string name="icloud_offer_message">Приложение может подключиться к вашей учётной записи Apple и читать метки прямо из неё. Новые метки появляются сами, переименование сохраняется обратно, и не нужно экспортировать zip-архив на Mac.
+
+Можно настроить сейчас или в любой момент позже в настройках.</string>
+    <string name="icloud_offer_set_up_now">Настроить</string>
+    <string name="icloud_offer_not_now">Не сейчас</string>
 </resources>

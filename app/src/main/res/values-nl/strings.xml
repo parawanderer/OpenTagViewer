@@ -262,4 +262,10 @@ Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-app
     <string name="two_factor_again_sign_out">In plaats daarvan uitloggen</string>
     <string name="two_factor_again_wrong_code">Die code is niet geaccepteerd. Nog %1$d pogingen over.</string>
     <string name="two_factor_again_giving_up">Die code is niet geaccepteerd. Je wordt uitgelogd en moet opnieuw inloggen.</string>
+    <string name="icloud_offer_title">Je tags uit iCloud lezen?</string>
+    <string name="icloud_offer_message">Deze app kan verbinding maken met je Apple-account en je tags er rechtstreeks uit lezen. Nieuwe tags verschijnen vanzelf, een nieuwe naam wordt teruggeschreven, en er hoeft geen zip meer vanaf een Mac te worden geëxporteerd.
+
+Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
+    <string name="icloud_offer_set_up_now">Nu instellen</string>
+    <string name="icloud_offer_not_now">Niet nu</string>
 </resources>

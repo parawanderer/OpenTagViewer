@@ -262,4 +262,10 @@
     <string name="two_factor_again_sign_out">改為登出</string>
     <string name="two_factor_again_wrong_code">驗證碼未通過。還剩 %1$d 次機會。</string>
     <string name="two_factor_again_giving_up">驗證碼未通過。正在登出，你需要重新登入。</string>
+    <string name="icloud_offer_title">從 iCloud 讀取你的標籤？</string>
+    <string name="icloud_offer_message">本 App 可以連接你的 Apple 帳戶並直接讀取標籤。新標籤會自動出現，重新命名會寫回帳戶，也不需要在 Mac 上匯出 zip 檔案。
+
+你可以現在設定，也可以隨時到設定裡再設定。</string>
+    <string name="icloud_offer_set_up_now">立即設定</string>
+    <string name="icloud_offer_not_now">暫不</string>
 </resources>

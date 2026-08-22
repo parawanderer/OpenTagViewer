@@ -46,6 +46,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.HistoryViewActivity;
@@ -133,6 +134,11 @@ public class TheHistoryScreenDrawsTheDayTest {
 
     @Before
     public void substituteTheWorldAndSeedATag() {
+        // Or the map/login/settings screen loads Apple's real ADI library: a download,
+        // a dlopen and a native initialise, none of which this test is about - and two
+        // screens reaching it at once segfaults the process and aborts the whole run.
+        // See issue #135.
+        AppDependencies.replaceAnisette(whateverTheSettingsSay -> FakeAnisetteSource.ready());
         final Context context = getInstrumentation().getTargetContext();
 
         this.guard = DeviceStateGuard.capture(context);
