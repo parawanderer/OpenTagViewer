@@ -4,6 +4,7 @@ import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.View.inflate;
 import static android.widget.Toast.LENGTH_LONG;
+import static android.widget.Toast.LENGTH_SHORT;
 
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
@@ -50,7 +51,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityDeviceInfoBinding;
@@ -132,6 +135,10 @@ public class DeviceInfoActivity extends AppCompatActivity
     /** The in-flight BLE scan/GATT trigger, so leaving the screen stops it rather than
      * leaving a scan running or a result landing on dead views. */
     private Disposable playSoundNearby;
+
+    /** Reused so each new status (searching/connecting/sending/result) replaces the last one
+     * on screen instead of queuing behind it - see {@link #showPlaySoundStatus}. */
+    private Toast playSoundStatusToast;
 
     private boolean hasNameChanges = false;
 
@@ -646,7 +653,7 @@ public class DeviceInfoActivity extends AppCompatActivity
     private void startPlaySoundNearby() {
         final String accessoryJson = this.beaconData.getOwnedBeaconInfo().accessoryJson;
 
-        Toast.makeText(this, R.string.play_sound_searching, LENGTH_LONG).show();
+        this.showPlaySoundStatus(R.string.play_sound_searching, LENGTH_SHORT);
 
         if (this.playSoundNearby != null && !this.playSoundNearby.isDisposed()) {
             this.playSoundNearby.dispose();
@@ -656,15 +663,39 @@ public class DeviceInfoActivity extends AppCompatActivity
                 .playSound(this.getApplicationContext(), accessoryJson)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        this::showPlaySoundResult,
+                        this::handlePlaySoundUpdate,
                         error -> {
                             // AccessorySoundTrigger's contract is to never error a failure onto
                             // this path - see its interface doc - so reaching here means a bug
                             // in that contract, not an ordinary "not found" or "no permission".
                             Log.e(TAG, "Unexpected error playing sound for beaconId="
                                     + this.beaconId, error);
-                            Toast.makeText(this, R.string.play_sound_failed, LENGTH_LONG).show();
+                            this.showPlaySoundStatus(R.string.play_sound_failed, LENGTH_LONG);
                         });
+    }
+
+    /**
+     * One item of the play-sound stream: a progress phase (shown and replaced, see
+     * {@link #showPlaySoundStatus}) or the terminal outcome.
+     */
+    private void handlePlaySoundUpdate(final BleSoundTriggerUpdate update) {
+        if (update.getPhase() != BleSoundTriggerPhase.DONE) {
+            this.showPlaySoundStatus(phaseMessageRes(update.getPhase()), LENGTH_SHORT);
+            return;
+        }
+        this.showPlaySoundResult(update.getResult());
+    }
+
+    private static int phaseMessageRes(final BleSoundTriggerPhase phase) {
+        switch (phase) {
+            case CONNECTING:
+                return R.string.play_sound_connecting;
+            case TRIGGERING:
+                return R.string.play_sound_sending;
+            case SCANNING:
+            default:
+                return R.string.play_sound_searching;
+        }
     }
 
     private void showPlaySoundResult(final BleSoundTriggerResult result) {
@@ -693,7 +724,21 @@ public class DeviceInfoActivity extends AppCompatActivity
                 messageRes = R.string.play_sound_failed;
                 break;
         }
-        Toast.makeText(this, messageRes, LENGTH_LONG).show();
+        this.showPlaySoundStatus(messageRes, LENGTH_LONG);
+    }
+
+    /**
+     * Cancels whichever status toast is on screen and shows the next one immediately, rather
+     * than queuing behind it. Plain sequential {@code Toast.makeText(...).show()} calls queue
+     * with a fixed display duration each, so "searching" would sit on screen for its whole
+     * duration even after "connecting" was already true - reading as stuck, not as progress.
+     */
+    private void showPlaySoundStatus(final int messageRes, final int duration) {
+        if (this.playSoundStatusToast != null) {
+            this.playSoundStatusToast.cancel();
+        }
+        this.playSoundStatusToast = Toast.makeText(this, messageRes, duration);
+        this.playSoundStatusToast.show();
     }
 
     /**

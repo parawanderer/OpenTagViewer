@@ -318,4 +318,9 @@
     <string name="play_sound_permission_denied">Для воспроизведения звука поблизости требуется разрешение Bluetooth.</string>
     <string name="play_sound_failed">Не удалось воспроизвести звук. Попробуйте снова.</string>
     <string name="stop_ringing">Стоп</string>
+    <string name="play_sound_connecting">Найдено поблизости, подключение…</string>
+    <string name="play_sound_sending">Отправка команды звука…</string>
+    <string name="ring_status_scanning">Поиск…</string>
+    <string name="ring_status_connecting">Подключение…</string>
+    <string name="ring_status_triggering">Отправка…</string>
 </resources>

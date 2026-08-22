@@ -59,6 +59,38 @@ public final class TagCardHelper {
         }
     }
 
+    /**
+     * Updates only the ring button's label text, leaving its icon/tint alone - for showing
+     * continuous ping's current phase (scanning/connecting/sending) between the on/off states
+     * {@link #toggleRingActive} sets.
+     */
+    public static void setRingLabel(FrameLayout container, CharSequence text) {
+        try {
+            TextView label = container.findViewById(R.id.ringText);
+            label.setText(text);
+        } catch (Exception e) {
+            Log.e(TAG, "Failure while trying to update the ring button's label", e);
+        }
+    }
+
+    /**
+     * Swaps the ring icon for a spinner while a scan/connect/trigger attempt is actually in
+     * flight - the label alone ("Scanning...", "Connecting...") was mistaken for a stall,
+     * since it can sit on screen for several seconds with nothing else moving. Independent of
+     * {@link #toggleRingActive}: this toggles per attempt, that toggles per on/off.
+     */
+    public static void setRingLoading(FrameLayout container, boolean loading) {
+        try {
+            ImageView icon = container.findViewById(R.id.perform_ring_icon);
+            CircularProgressIndicator progressIndicator = container.findViewById(R.id.ring_loading_indicator);
+
+            icon.setVisibility(loading ? GONE : VISIBLE);
+            progressIndicator.setVisibility(loading ? VISIBLE : GONE);
+        } catch (Exception e) {
+            Log.e(TAG, "Failure while trying to toggle the loading status on the ring button", e);
+        }
+    }
+
     public static void toggleRefreshLoadingAll(Map<String, FrameLayout> containers, boolean isLoading) {
         try {
             for (var frameLayout : containers.values()) {

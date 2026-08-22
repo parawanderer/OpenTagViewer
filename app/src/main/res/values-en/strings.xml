@@ -318,4 +318,9 @@ You can set this up now, or any time later from Settings.</string>
     <string name="play_sound_permission_denied">Bluetooth permission is needed to play the sound nearby.</string>
     <string name="play_sound_failed">Could not play the sound. Try again.</string>
     <string name="stop_ringing">Stop</string>
+    <string name="play_sound_connecting">Found nearby, connecting…</string>
+    <string name="play_sound_sending">Sending sound command…</string>
+    <string name="ring_status_scanning">Scanning…</string>
+    <string name="ring_status_connecting">Connecting…</string>
+    <string name="ring_status_triggering">Sending…</string>
 </resources>

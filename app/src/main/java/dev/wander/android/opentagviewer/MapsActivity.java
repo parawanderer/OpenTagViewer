@@ -129,7 +129,9 @@ import dev.wander.android.opentagviewer.util.rx.AccountReadPolicy;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import dev.wander.android.opentagviewer.ble.BlePermissions;
-import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerStatus;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -1345,9 +1347,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .playSoundContinuously(this.getApplicationContext(), accessoryJson)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        (BleSoundTriggerResult result) -> Log.d(TAG, "Continuous ping attempt for beaconId="
-                                + beaconId + ": " + result.getStatus()
-                                + (result.getMessage() == null ? "" : " (" + result.getMessage() + ")")),
+                        update -> this.handleContinuousPingUpdate(beaconId, update),
                         error -> {
                             // playSoundContinuously's contract is to never error onto this path -
                             // see its interface doc - so reaching here means a bug in that
@@ -1355,6 +1355,74 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             Log.e(TAG, "Continuous ping stopped unexpectedly for beaconId=" + beaconId, error);
                             this.stopContinuousPing();
                         });
+    }
+
+    /**
+     * Shows continuous ping's current phase on the card's ring label - "Scanning...",
+     * "Connecting...", "Sending..." - so it reads as active work rather than nothing happening,
+     * without a toast firing every few seconds for as long as it runs.
+     *
+     * <p>Between cycles ({@link BleSoundTriggerPhase#DONE}) the label goes back to "Stop" rather
+     * than showing that cycle's result: a failed or not-found attempt does not mean pinging has
+     * stopped, and showing it as if it had would read as broken.
+     * {@link BleSoundTriggerStatus#MISSING_PERMISSION} and
+     * {@link BleSoundTriggerStatus#NO_CANDIDATE_MACS} do not follow that rule: nothing about
+     * waiting and trying again fixes either, so looping on them is pure battery burn with no
+     * chance of succeeding - this stops the loop and says why instead.
+     */
+    private void handleContinuousPingUpdate(final String beaconId, final BleSoundTriggerUpdate update) {
+        Log.d(TAG, "Continuous ping update for beaconId=" + beaconId + ": " + update.getPhase()
+                + (update.getResult() == null ? "" : " (" + update.getResult().getStatus() + ")"));
+
+        // A card for a beaconId other than the one this loop is for stopped existing (e.g. the
+        // tag left the visible list) or continuous ping was stopped/switched to another tag
+        // since this update was emitted - either way, there is nothing left to show it on.
+        if (!beaconId.equals(this.continuousPingBeaconId)) {
+            return;
+        }
+
+        if (update.getPhase() == BleSoundTriggerPhase.DONE) {
+            final BleSoundTriggerStatus status = update.getResult().getStatus();
+            if (status == BleSoundTriggerStatus.MISSING_PERMISSION
+                    || status == BleSoundTriggerStatus.NO_CANDIDATE_MACS) {
+                Log.w(TAG, "Stopping continuous ping for beaconId=" + beaconId
+                        + ": unrecoverable status " + status);
+                this.stopContinuousPing();
+                Toast.makeText(this, status == BleSoundTriggerStatus.MISSING_PERMISSION
+                                ? R.string.play_sound_permission_denied
+                                : R.string.play_sound_no_candidate_macs,
+                        LENGTH_LONG).show();
+                return;
+            }
+        }
+
+        final FrameLayout container = this.dynamicCardsForTag.get(beaconId);
+        if (container == null) {
+            return;
+        }
+
+        final int labelRes;
+        switch (update.getPhase()) {
+            case CONNECTING:
+                labelRes = R.string.ring_status_connecting;
+                break;
+            case TRIGGERING:
+                labelRes = R.string.ring_status_triggering;
+                break;
+            case DONE:
+                labelRes = R.string.stop_ringing;
+                break;
+            case SCANNING:
+            default:
+                labelRes = R.string.ring_status_scanning;
+                break;
+        }
+        TagCardHelper.setRingLabel(container, this.getString(labelRes));
+
+        // The spinner runs for SCANNING/CONNECTING/TRIGGERING and stops at DONE - a label
+        // alone ("Scanning...", "Connecting...") can sit on screen for several seconds with
+        // nothing else moving, which reads as stuck rather than as work in progress.
+        TagCardHelper.setRingLoading(container, update.getPhase() != BleSoundTriggerPhase.DONE);
     }
 
     private void stopContinuousPing() {
@@ -1367,6 +1435,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             final FrameLayout container = this.dynamicCardsForTag.get(this.continuousPingBeaconId);
             if (container != null) {
                 TagCardHelper.toggleRingActive(container, false);
+                // In case this stopped mid-attempt (spinner showing) rather than between
+                // cycles - otherwise the icon stays hidden behind a spinner that will never
+                // update again.
+                TagCardHelper.setRingLoading(container, false);
             }
         }
         this.continuousPingBeaconId = null;

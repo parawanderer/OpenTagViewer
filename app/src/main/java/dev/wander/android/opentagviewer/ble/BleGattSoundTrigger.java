@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.core.Observable;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -31,7 +31,7 @@ import lombok.NoArgsConstructor;
  *
  * <p>Ported from a Kotlin prototype (a personal companion project, TrackerHunter) that already
  * exercised this against real AirTags; this is the same state machine expressed as a Java
- * {@link Single} instead of a coroutine, to match this app's RxJava3 convention. See
+ * {@link Observable} instead of a coroutine, to match this app's RxJava3 convention. See
  * {@code BleAccessorySoundTrigger} for the honesty about what has and has not actually been run.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -62,13 +62,16 @@ public final class BleGattSoundTrigger {
      * matching one's start command has been written (or all three failed). Does not wait for the
      * sound to finish playing.
      *
-     * <p>Emits exactly once. Disposing the returned {@link Single} before it emits disconnects
-     * and closes the GATT connection rather than leaving it open in the background.
+     * <p>Emits a {@link BleSoundTriggerPhase#CONNECTING} update immediately, a
+     * {@link BleSoundTriggerPhase#TRIGGERING} one once a matching sound service is found, then
+     * exactly one {@link BleSoundTriggerPhase#DONE} - so a caller can show "connecting..."
+     * instead of nothing for however long the handshake takes. Disposing before it completes
+     * disconnects and closes the GATT connection rather than leaving it open in the background.
      */
     @SuppressLint("MissingPermission")
-    public static Single<BleSoundTriggerResult> trigger(
+    public static Observable<BleSoundTriggerUpdate> trigger(
             final Context context, final BluetoothDevice device) {
-        return Single.create(emitter -> {
+        return Observable.create(emitter -> {
             final AtomicBoolean resumed = new AtomicBoolean(false);
             final BluetoothGatt[] gattRef = new BluetoothGatt[1];
 
@@ -79,10 +82,12 @@ public final class BleGattSoundTrigger {
 
                 private void finish(final BleSoundTriggerResult result) {
                     // Guards against a callback landing twice (e.g. a disconnect that follows a
-                    // successful write) - only the first one reaches the emitter, matching
-                    // Single's exactly-once contract.
+                    // successful write) - only the first one reaches the emitter, matching the
+                    // "exactly one DONE, then complete" contract.
                     if (!resumed.compareAndSet(false, true)) return;
-                    if (!emitter.isDisposed()) emitter.onSuccess(result);
+                    if (emitter.isDisposed()) return;
+                    emitter.onNext(BleSoundTriggerUpdate.done(result));
+                    emitter.onComplete();
                 }
 
                 @Override
@@ -115,6 +120,12 @@ public final class BleGattSoundTrigger {
                     final BluetoothGattCharacteristic dult = characteristicOf(gatt, DULT_SERVICE, DULT_CHARACTERISTIC);
                     final BluetoothGattCharacteristic findMy = findMyCharacteristic(gatt);
                     final BluetoothGattCharacteristic airtag = characteristicOf(gatt, AIRTAG_SERVICE, AIRTAG_CHARACTERISTIC);
+
+                    if (dult != null || findMy != null || airtag != null) {
+                        if (!emitter.isDisposed()) {
+                            emitter.onNext(BleSoundTriggerUpdate.progress(BleSoundTriggerPhase.TRIGGERING));
+                        }
+                    }
 
                     if (dult != null) {
                         enableNotifyThenWrite(gatt, dult, DULT_START_OPCODE, "DULT");
@@ -178,6 +189,7 @@ public final class BleGattSoundTrigger {
                 }
             };
 
+            emitter.onNext(BleSoundTriggerUpdate.progress(BleSoundTriggerPhase.CONNECTING));
             gattRef[0] = device.connectGatt(context, false, callback);
 
             emitter.setCancellable(() -> {
