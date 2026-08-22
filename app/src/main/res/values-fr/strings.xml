@@ -323,4 +323,5 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="ring_status_scanning">Recherche…</string>
     <string name="ring_status_connecting">Connexion…</string>
     <string name="ring_status_triggering">Envoi…</string>
+    <string name="ring_status_success">Sonne !</string>
 </resources>

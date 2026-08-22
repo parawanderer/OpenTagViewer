@@ -323,4 +323,5 @@
     <string name="ring_status_scanning">搜尋中…</string>
     <string name="ring_status_connecting">連線中…</string>
     <string name="ring_status_triggering">傳送中…</string>
+    <string name="ring_status_success">響鈴中！</string>
 </resources>

@@ -323,4 +323,5 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="ring_status_scanning">Suche…</string>
     <string name="ring_status_connecting">Verbinde…</string>
     <string name="ring_status_triggering">Sende…</string>
+    <string name="ring_status_success">Klingelt!</string>
 </resources>

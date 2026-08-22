@@ -323,4 +323,5 @@
     <string name="ring_status_scanning">검색 중…</string>
     <string name="ring_status_connecting">연결 중…</string>
     <string name="ring_status_triggering">전송 중…</string>
+    <string name="ring_status_success">울리는 중!</string>
 </resources>
