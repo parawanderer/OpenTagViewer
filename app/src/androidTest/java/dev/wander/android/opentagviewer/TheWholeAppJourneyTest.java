@@ -7,6 +7,7 @@ import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
@@ -320,6 +321,29 @@ public class TheWholeAppJourneyTest {
                 this.map.isReady()));
 
         assertTrue("a fresh install drew a pin for something", this.map.markers().isEmpty());
+        TestPace.afterAStep();
+
+        this.theofferToConnectTheAccountIsWaitingThere();
+    }
+
+    /**
+     * <b>The first thing a new user actually meets on the map.</b>
+     *
+     * <p>Somebody who has just signed in has no account connected and has never been asked, which
+     * is exactly who the offer is for - so it is part of this journey rather than something to
+     * suppress. Asserted rather than merely dismissed: it is the only time the app ever mentions
+     * the feature that removes the Mac from the story, and a journey test that quietly clicked
+     * past it would not notice it disappearing.
+     *
+     * <p>Declined, because the rest of this journey goes the long way round - through My Devices
+     * and the account screen - which is the route somebody who says "not now" then takes.
+     */
+    private void theofferToConnectTheAccountIsWaitingThere() {
+        Eventually.check(() -> onView(withText(R.string.icloud_offer_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        TestPace.afterAStep();
+
+        onView(withText(R.string.icloud_offer_not_now)).inRoot(isDialog()).perform(click());
         TestPace.afterAStep();
     }
 

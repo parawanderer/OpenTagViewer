@@ -262,4 +262,10 @@
     <string name="two_factor_again_sign_out">代わりにサインアウト</string>
     <string name="two_factor_again_wrong_code">コードが認証されませんでした。残り %1$d 回です。</string>
     <string name="two_factor_again_giving_up">コードが認証されませんでした。サインアウトします。再度サインインしてください。</string>
+    <string name="icloud_offer_title">iCloud からタグを読み込みますか？</string>
+    <string name="icloud_offer_message">このアプリは Apple アカウントに接続し、タグを直接読み込めます。新しいタグは自動的に表示され、名前の変更は書き戻され、Mac から zip を書き出す必要もありません。
+
+今すぐ設定することも、後から設定画面で行うこともできます。</string>
+    <string name="icloud_offer_set_up_now">今すぐ設定</string>
+    <string name="icloud_offer_not_now">今はしない</string>
 </resources>

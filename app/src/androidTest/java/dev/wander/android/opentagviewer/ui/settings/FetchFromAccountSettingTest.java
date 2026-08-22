@@ -26,6 +26,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
 import dev.wander.android.opentagviewer.R;
@@ -57,6 +59,11 @@ public class FetchFromAccountSettingTest {
 
     @Before
     public void answerTheFetchScreenAtTheDoor() {
+        // Or the map/login/settings screen loads Apple's real ADI library: a download,
+        // a dlopen and a native initialise, none of which this test is about - and two
+        // screens reaching it at once segfaults the process and aborts the whole run.
+        // See issue #135.
+        AppDependencies.replaceAnisette(whateverTheSettingsSay -> FakeAnisetteSource.ready());
         this.memberships = new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
                 new AppCryptographyUtil());
@@ -69,6 +76,8 @@ public class FetchFromAccountSettingTest {
 
     @After
     public void closeIt() {
+        // Put the real Anisette source back, or the next class inherits the fake.
+        AppDependencies.reset();
         if (this.scenario != null) {
             this.scenario.close();
         }
