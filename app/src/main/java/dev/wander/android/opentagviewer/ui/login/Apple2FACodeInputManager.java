@@ -52,6 +52,16 @@ public class Apple2FACodeInputManager {
         this.onFullyFilledCallback = onFullyFilledCallback;
     }
 
+    /**
+     * Bind the six boxes and start listening.
+     *
+     * <p><b>Not the way to reset after a wrong code — use {@link #clear()}.</b> This empties the
+     * boxes and re-attaches handlers, which looks like a reset and is not: {@link #currentIndex}
+     * is left wherever it was. After a full code that means six, so the manager never decides a
+     * code is "fully filled" again and the next one is <b>never submitted at all</b>. The user
+     * types and nothing happens, with no error, and only from the second attempt onwards.
+     * {@code clear()} is the one that puts the cursor back.
+     */
     public void init() {
         TextInputEditText slot1 = this.root.findViewById(R.id.twofactorauth_textinput_1);
         TextInputEditText slot2 = this.root.findViewById(R.id.twofactorauth_textinput_2);
