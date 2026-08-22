@@ -621,8 +621,52 @@ def _storedAccount(loggedIn: bool) -> str:
     return json.dumps(stored)
 
 
+def _storedAccountInState(state) -> str:
+    from findmy.reports import AppleAccount, RemoteAnisetteProvider
+
+    account = AppleAccount(RemoteAnisetteProvider("https://ani.example.com"))
+    stored = account.to_json()
+    stored["login"]["state"] = state.value
+    return json.dumps(stored)
+
+
 def test_a_session_apple_no_longer_accepts_is_a_failed_restore():
     assert main.getAccount(_storedAccount(loggedIn=False)) is None
+
+
+def test_a_restored_session_that_only_wants_a_code_is_kept():
+    """
+    **The issue #43 fix used to throw this away, and that was too much.**
+
+    Its reasoning was that the app only stores an account after a completed sign-in, so a
+    non-LOGGED_IN restore can only mean the session went bad later. True, and beside the point:
+    that is an argument about how the state arose, not about whether it can be fixed. REQUIRE_2FA
+    is precisely the state six digits resolve, and resolving it needs this account object rather
+    than the user's password.
+
+    So it comes back, and the caller asks what it needs. Discarding it cost somebody a full
+    sign-in for a session that was one code away from working.
+    """
+    from findmy.reports.state import LoginState
+
+    restored = main.getAccount(_storedAccountInState(LoginState.REQUIRE_2FA))
+
+    assert restored is not None, (
+        "a session needing a second factor must be handed back, not discarded"
+    )
+    assert main.getSecondFactorMethodsIfNeeded(restored) is not None, (
+        "and it must report that a second factor is what it needs"
+    )
+
+
+def test_a_logged_out_session_is_still_a_failed_restore():
+    """
+    The other half of #43, unchanged. No code fixes being logged out, so this one really is a
+    failed restore and the user has to sign in properly.
+    """
+    from findmy.reports.state import LoginState
+
+    assert main.getAccount(_storedAccountInState(LoginState.LOGGED_OUT)) is None
 
 
 def test_a_session_that_still_works_restores_normally():
