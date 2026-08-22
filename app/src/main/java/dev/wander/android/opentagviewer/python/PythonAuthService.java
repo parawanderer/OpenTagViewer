@@ -14,6 +14,7 @@ import org.json.JSONObject;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
@@ -80,33 +81,7 @@ public final class PythonAuthService {
             List<AuthMethod> authMethods = null;
 
             if (resultMap.get("loginMethods") != null) {
-                authMethods = new ArrayList<>();
-                var loginMethods = resultMap.get("loginMethods").asList();
-                for (int i = 0; i < loginMethods.size(); ++i) {
-                    // convert them
-                    var item = loginMethods.get(i).asMap();
-
-                    var type = TWO_FACTOR_METHOD.valueOf(item.get("type").toInt());
-                    var obj = item.get("obj");
-
-                    switch (type) {
-                        case PHONE:
-                            authMethods.add(new AuthMethodPhone(
-                                    type,
-                                    obj,
-                                    item.get("phoneNumber").toString(),
-                                    item.get("phoneNumberId").toString()
-                            ));
-                            break;
-                        case TRUSTED_DEVICE:
-                        case UNKNOWN:
-                            authMethods.add(new AuthMethod(
-                                    type,
-                                    obj
-                            ));
-                            break;
-                    }
-                }
+                authMethods = toAuthMethods(resultMap.get("loginMethods"));
             }
 
             return new PythonAuthResponse(
@@ -184,6 +159,91 @@ public final class PythonAuthService {
 
             return new TermsAcceptance(remaining, loginState);
         }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The ways a second factor can be delivered, out of Python's list-of-dicts.
+     *
+     * <p>Shared by signing in and by rescuing a session that has gone stale mid-use - the shape
+     * is the same because {@code main.py} builds both with {@code _convertToJavaDictWrapper},
+     * and two readers of one format is how one of them ends up not handling a new method type.
+     *
+     * <p>An unrecognised type still produces an {@link AuthMethod}, with {@code obj} intact, so
+     * a method Apple adds later is offered rather than silently dropped from the list.
+     */
+    private static List<AuthMethod> toAuthMethods(final PyObject methodList) {
+        final List<AuthMethod> authMethods = new ArrayList<>();
+        final var methods = methodList.asList();
+
+        for (int i = 0; i < methods.size(); ++i) {
+            final var item = methods.get(i).asMap();
+
+            final var type = TWO_FACTOR_METHOD.valueOf(item.get("type").toInt());
+            final var obj = item.get("obj");
+
+            switch (type) {
+                case PHONE:
+                    authMethods.add(new AuthMethodPhone(
+                            type,
+                            obj,
+                            item.get("phoneNumber").toString(),
+                            item.get("phoneNumberId").toString()
+                    ));
+                    break;
+                case TRUSTED_DEVICE:
+                case UNKNOWN:
+                    authMethods.add(new AuthMethod(
+                            type,
+                            obj
+                    ));
+                    break;
+            }
+        }
+
+        return authMethods;
+    }
+
+    /**
+     * What this already-restored account needs before it can be used, if anything.
+     *
+     * <p><b>Asked when a session that was working stops.</b> Apple can move an account to
+     * {@code REQUIRE_2FA} long after it was signed in, and from that moment every fetch fails
+     * its state check before a request leaves the phone. That used to be permanent and silent -
+     * see {@code main.py:getSecondFactorMethodsIfNeeded}.
+     *
+     * <p><b>Three answers, not two, and collapsing them is a bug I already made.</b> The first
+     * version returned a plain list and used empty for both "nothing needed" and "nothing can
+     * help" - so a session in {@code REQUIRE_2FA} that offered no way to send a code was read as
+     * healthy, and the app did nothing at all. That is the original silent dead session, with
+     * more code in front of it. A real one behaves this way: FindMy.py reports
+     * <i>"Unexpected login state after reauth ... Please log in again"</i>, and there is nothing
+     * to type.
+     *
+     * @return <ul>
+     *   <li>{@link Optional#empty()} - nothing is needed; carry on.</li>
+     *   <li>a present, <b>non-empty</b> list - ask for a code using one of these.</li>
+     *   <li>a present but <b>empty</b> list - a code is needed and cannot be asked for. Only a
+     *       full sign-in fixes this, so the caller signs the user out rather than showing a box
+     *       that can never be filled.</li>
+     * </ul>
+     */
+    public static Observable<Optional<List<AuthMethod>>> secondFactorMethodsIfNeeded(
+            final PythonAppleAccount account) {
+
+        return Observable.fromCallable(() -> PythonLock.holding(() -> {
+            final var py = Python.getInstance();
+            final var module = py.getModule(MODULE_MAIN);
+
+            final PyObject methods = module.callAttr(
+                    "getSecondFactorMethodsIfNeeded",
+                    new Kwarg("account", account.getAccountObj()));
+
+            if (methods == null) {
+                return Optional.<List<AuthMethod>>empty();
+            }
+
+            return Optional.of(toAuthMethods(methods));
+        })).subscribeOn(Schedulers.io());
     }
 
     public static Completable requestCode(AuthMethod selectedAuthMethod) {

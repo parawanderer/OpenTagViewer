@@ -257,4 +257,9 @@ Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-app
     <string name="no_app_to_open_a_link_with">Geen app op deze telefoon kan een weblink openen</string>
     <string name="reorder_tag">Sleep om te herschikken</string>
     <string name="move_to_top">Naar boven verplaatsen</string>
+    <string name="two_factor_again_title">Apple vraagt om een verificatiecode</string>
+    <string name="two_factor_again_message">Je sessie is nog steeds ingelogd, maar Apple vraagt opnieuw om een code. Voer die in om verder te gaan — tot dan kan er niets gevonden worden.</string>
+    <string name="two_factor_again_sign_out">In plaats daarvan uitloggen</string>
+    <string name="two_factor_again_wrong_code">Die code is niet geaccepteerd. Nog %1$d pogingen over.</string>
+    <string name="two_factor_again_giving_up">Die code is niet geaccepteerd. Je wordt uitgelogd en moet opnieuw inloggen.</string>
 </resources>

@@ -621,8 +621,52 @@ def _storedAccount(loggedIn: bool) -> str:
     return json.dumps(stored)
 
 
+def _storedAccountInState(state) -> str:
+    from findmy.reports import AppleAccount, RemoteAnisetteProvider
+
+    account = AppleAccount(RemoteAnisetteProvider("https://ani.example.com"))
+    stored = account.to_json()
+    stored["login"]["state"] = state.value
+    return json.dumps(stored)
+
+
 def test_a_session_apple_no_longer_accepts_is_a_failed_restore():
     assert main.getAccount(_storedAccount(loggedIn=False)) is None
+
+
+def test_a_restored_session_that_only_wants_a_code_is_kept():
+    """
+    **The issue #43 fix used to throw this away, and that was too much.**
+
+    Its reasoning was that the app only stores an account after a completed sign-in, so a
+    non-LOGGED_IN restore can only mean the session went bad later. True, and beside the point:
+    that is an argument about how the state arose, not about whether it can be fixed. REQUIRE_2FA
+    is precisely the state six digits resolve, and resolving it needs this account object rather
+    than the user's password.
+
+    So it comes back, and the caller asks what it needs. Discarding it cost somebody a full
+    sign-in for a session that was one code away from working.
+    """
+    from findmy.reports.state import LoginState
+
+    restored = main.getAccount(_storedAccountInState(LoginState.REQUIRE_2FA))
+
+    assert restored is not None, (
+        "a session needing a second factor must be handed back, not discarded"
+    )
+    assert main.getSecondFactorMethodsIfNeeded(restored) is not None, (
+        "and it must report that a second factor is what it needs"
+    )
+
+
+def test_a_logged_out_session_is_still_a_failed_restore():
+    """
+    The other half of #43, unchanged. No code fixes being logged out, so this one really is a
+    failed restore and the user has to sign in properly.
+    """
+    from findmy.reports.state import LoginState
+
+    assert main.getAccount(_storedAccountInState(LoginState.LOGGED_OUT)) is None
 
 
 def test_a_session_that_still_works_restores_normally():
@@ -975,3 +1019,98 @@ def test_a_search_that_narrowed_is_not_exhausted_even_with_no_reports(monkeypatc
         monkeypatch, _FakeAirtagOfWidth(50_000, narrows_to=10), reports=[])
 
     assert held["exhaustedWideSearch"] is False
+
+
+# --------------------------------------------------------------------------
+# A session that goes stale mid-use, and wants a second factor rather than
+# being thrown away.
+# --------------------------------------------------------------------------
+
+class _FakeSecondFactorAccount:
+    """
+    Enough of an AppleAccount to answer the one question. The methods it hands back are
+    passed straight to `_convertToJavaDictWrapper`, so they have to be real FindMy.py
+    method objects or the conversion is not the thing being tested.
+    """
+
+    def __init__(self, state, methods=None, raises=False):
+        self.login_state = state
+        self._methods = methods or []
+        self._raises = raises
+        self.asked = 0
+
+    def get_2fa_methods(self):
+        self.asked += 1
+        if self._raises:
+            raise RuntimeError("Apple said no")
+        return self._methods
+
+
+def _aTrustedDeviceMethod():
+    """
+    A real `TrustedDeviceSecondFactorMethod`, because `_convertToJavaDictWrapper` dispatches on
+    `isinstance` - a duck-typed stand-in would fall through to the "unmapped" branch and the
+    test would pass while proving nothing.
+
+    The *sync* class, which is what a sync `AppleAccount` returns - it subclasses
+    `TrustedDeviceSecondFactorMethod`, so the isinstance check matches, and it is concrete. Its
+    `__init__` wants a live account, hence `__new__`.
+    """
+    from findmy.reports.twofactor import SyncTrustedDeviceSecondFactor
+
+    return SyncTrustedDeviceSecondFactor.__new__(SyncTrustedDeviceSecondFactor)
+
+
+def test_a_logged_in_account_is_not_asked_for_a_second_factor():
+    """
+    The overwhelmingly common case, and it must cost nothing: no methods fetched, no dialog.
+    """
+    from findmy.reports.state import LoginState
+
+    account = _FakeSecondFactorAccount(LoginState.LOGGED_IN)
+
+    assert main.getSecondFactorMethodsIfNeeded(account) is None
+    assert account.asked == 0, "a healthy account must not be interrogated about 2FA"
+
+
+def test_an_account_that_wants_2fa_offers_its_methods():
+    """
+    **The bug this exists for.** The account restored fine and later moved to REQUIRE_2FA, at
+    which point every fetch failed its state check forever with nothing on screen. The state is
+    recoverable, so the answer is the list of ways to recover it.
+    """
+    from findmy.reports.state import LoginState
+
+    account = _FakeSecondFactorAccount(
+        LoginState.REQUIRE_2FA, methods=[_aTrustedDeviceMethod()])
+
+    methods = main.getSecondFactorMethodsIfNeeded(account)
+
+    assert methods is not None, "REQUIRE_2FA is recoverable and must be offered, not swallowed"
+    assert len(methods) == 1
+    assert "obj" in methods[0], "Java needs the method object back to request and submit a code"
+
+
+def test_a_logged_out_account_is_not_offered_a_code_box():
+    """
+    No code fixes being logged out, and putting a box on screen that cannot work is worse than
+    saying nothing - it teaches people to type codes into whatever asks.
+    """
+    from findmy.reports.state import LoginState
+
+    account = _FakeSecondFactorAccount(LoginState.LOGGED_OUT)
+
+    assert main.getSecondFactorMethodsIfNeeded(account) is None
+    assert account.asked == 0
+
+
+def test_failing_to_ask_is_not_read_as_needing_a_code():
+    """
+    An unreadable state is not evidence that a second factor would help. Prompting on a guess is
+    the failure mode this direction is chosen to avoid.
+    """
+    from findmy.reports.state import LoginState
+
+    account = _FakeSecondFactorAccount(LoginState.REQUIRE_2FA, raises=True)
+
+    assert main.getSecondFactorMethodsIfNeeded(account) is None

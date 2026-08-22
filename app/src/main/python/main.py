@@ -728,20 +728,35 @@ def getAccount(
         _preferLocalAnisette(acc, localAnisette)
 
         print(f"Restored account, login state: {acc.login_state}")
-        if acc.login_state != LoginState.LOGGED_IN:
-            # **Not a successful restore, and it used to be treated as one.** This account is
-            # readable and unusable: every fetch fails its state check before a request is even
-            # made, so the app came up showing stale pins and spinners that stopped, with the
-            # reason only in the log. Issue #43.
+
+        if acc.login_state == LoginState.REQUIRE_2FA:
+            # **Handed back rather than discarded, which is a change from the issue #43 fix.**
             #
-            # Reported as a failure so the caller can do the one thing that helps - send the
-            # user to sign in again. That is safe here because the app only ever stores an
-            # account after a completed sign-in: mid-2FA state is never written, so this state
-            # can only mean the session went bad afterwards.
+            # That fix treated any non-LOGGED_IN restore as a failure, on the reasoning that the
+            # app only stores an account after a completed sign-in, so this state can only mean
+            # the session went bad afterwards. That reasoning is about *how it got here*, and
+            # says nothing about whether it can be fixed - which was the gap. REQUIRE_2FA is
+            # exactly the state a second factor resolves, and resolving it needs this account
+            # object, not the password.
+            #
+            # So the caller is given the account and asks `getSecondFactorMethodsIfNeeded` what
+            # it needs. A code costs the user six digits; discarding costs them their Apple
+            # password and a full sign-in, for a session that may have been one step from
+            # working. If the code fails, the caller still falls back to signing in properly -
+            # strictly better when recoverable, no worse when not.
             print(
-                f"Restored account is not logged in (state: {acc.login_state}) - Apple has "
-                "stopped accepting this session. Treating it as a failed restore so the user "
-                "is asked to sign in again rather than left with a map that never updates."
+                "Restored account needs a second factor. Handing it back so the app can ask "
+                "for a code, rather than throwing away a session six digits might fix."
+            )
+            return acc
+
+        if acc.login_state != LoginState.LOGGED_IN:
+            # Logged out, or a state nothing here knows. No code fixes these, so this really is
+            # a failed restore: the caller signs the user in again. Issue #43's other half.
+            print(
+                f"Restored account is not logged in (state: {acc.login_state}) and no second "
+                "factor resolves that. Treating it as a failed restore so the user is asked to "
+                "sign in again rather than left with a map that never updates."
             )
             return None
 
@@ -749,6 +764,61 @@ def getAccount(
     except Exception:
         err = traceback.format_exc()
         print(f"Failed to restore account from string: {err}")
+        return None
+
+
+def getSecondFactorMethodsIfNeeded(account: AppleAccount) -> list | None:
+    """
+    The 2FA methods this account needs to go through, or None if it needs nothing.
+
+    **The session going stale mid-use, which used to be a permanent silent failure.** An account
+    restores as `LOGGED_IN`, works, and then at some later point Apple moves it to `REQUIRE_2FA`
+    - the device was removed from the account, the session aged out, something on Apple's side.
+    From that moment every fetch raises `InvalidStateError` before a request is even made.
+
+    Nothing recovered from that. The per-accessory handler counted each failure and carried on,
+    the whole call reported an error, and the app logged it and waited to retry - which never
+    helps, because the state does not heal itself. The user saw pins that stopped updating and
+    no reason anywhere.
+
+    **This is recoverable, and that is the point.** `REQUIRE_2FA` is not a dead session: the
+    account object is still usable and a second factor puts it back to `LOGGED_IN` without the
+    password. So the honest response is to ask for the code, not to throw the session away -
+    see issue #43 for the *other* door onto the same state, where discarding really is correct
+    because the account could not be restored at all.
+
+    :return: the same shape `getAccount` returns as ``loginMethods``, so Java reads it with the
+        code it already has. None when the account is fine, and **None on any failure to ask** -
+        an unreadable state is not evidence that a second factor would help, and prompting on a
+        guess trains people to type codes at random dialogs.
+    """
+    try:
+        state = account.login_state
+
+        if state == LoginState.LOGGED_IN:
+            return None
+
+        if state != LoginState.REQUIRE_2FA:
+            # Something else entirely - logged out, or a state this does not know. There is no
+            # code that fixes those, so say nothing rather than offering a box to type into.
+            print(f"Account is in {state}, which a second factor does not resolve.")
+            return None
+
+        methods = [_convertToJavaDictWrapper(method) for method in account.get_2fa_methods()]
+
+        # **An empty list is not the same as "nothing needed", and the caller must not read it
+        # that way.** A session can be in REQUIRE_2FA with no way to deliver a code - it is what
+        # FindMy.py means by "Unexpected login state after reauth ... Please log in again". There
+        # is nothing to type, so the only honest move left is a full sign-in, and a caller that
+        # treated this as "fine" would leave exactly the silent dead session this set out to fix.
+        #
+        # So: None means nothing needed, a list means a code is needed, and an empty one means a
+        # code is needed and cannot be asked for.
+        print(f"Account is in {state} and offers {len(methods)} way(s) to send a code.")
+
+        return methods
+    except Exception:
+        print(f"Could not work out whether a second factor is needed: {traceback.format_exc()}")
         return None
 
 
