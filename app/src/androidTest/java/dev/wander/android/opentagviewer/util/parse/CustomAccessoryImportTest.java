@@ -174,8 +174,12 @@ public class CustomAccessoryImportTest {
     @Test
     public void theusersOwnNameAndEmojiWin() {
         final OwnedBeacon row = imported().getOwnedBeacons().get(0);
-        final UserBeaconOptions chosen = new UserBeaconOptions(
-                row.id, System.currentTimeMillis(), "My hidden bike", "🚲");
+        final UserBeaconOptions chosen = UserBeaconOptions.builder()
+                .beaconId(row.id)
+                .lastUpdate(System.currentTimeMillis())
+                .uiName("My hidden bike")
+                .uiEmoji("🚲")
+                .build();
 
         final BeaconInformation info = BeaconDataParser.parse(List.of(
                 new BeaconData(row.id, row, null, chosen))).get(0);
@@ -240,8 +244,12 @@ public class CustomAccessoryImportTest {
     @Test
     public void thedeviceListSeesItToo() {
         final OwnedBeacon row = imported().getOwnedBeacons().get(0);
-        final UserBeaconOptions chosen = new UserBeaconOptions(
-                row.id, System.currentTimeMillis(), "My hidden bike", "🚲");
+        final UserBeaconOptions chosen = UserBeaconOptions.builder()
+                .beaconId(row.id)
+                .lastUpdate(System.currentTimeMillis())
+                .uiName("My hidden bike")
+                .uiEmoji("🚲")
+                .build();
 
         final List<BeaconData> joined = BeaconCombinerUtil.combine(
                 List.of(row), List.of(), List.of(chosen));
