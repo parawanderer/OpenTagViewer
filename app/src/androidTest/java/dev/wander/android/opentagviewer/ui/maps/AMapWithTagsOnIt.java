@@ -142,6 +142,14 @@ public final class AMapWithTagsOnIt {
                 UserSettingsDataStore.getInstance(this.context));
         final UserSettings settings = settingsRepo.getUserSettings();
         settings.setAnisetteUpgradeOffered(true);
+        // **And the same for the iCloud offer, for exactly the same reason.** A hand-written
+        // session with no keychain membership is precisely who that one is for, so without this
+        // every test built on this fixture opens the map behind a dialog and Espresso's default
+        // root becomes the dialog rather than the map.
+        //
+        // A test that is *about* the offer must not use this fixture's default - see
+        // TheICloudOfferAppearsOnceTest, which arranges its own state.
+        settings.setIcloudOfferMade(true);
         settingsRepo.storeUserSettings(settings).blockingAwait();
 
         final long importId = this.db.importDao().insert(Import.builder()
