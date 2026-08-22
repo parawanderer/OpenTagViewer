@@ -412,8 +412,21 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
                                     + " server and got " + locationsLocal.size() + " locations"
                                     + " from local DB for beaconId" + beaconId);
 
+                            // **Stored in full, shown for this day only.**
+                            //
+                            // The fetch above searches key indices rather than a clock range,
+                            // so Apple hands back sightings either side of the day asked for.
+                            // Those are kept and stored - they cost the same to find and would
+                            // otherwise be fetched again when the user steps to the next day -
+                            // but they must not be drawn on this one. The local half needs no
+                            // such filter: it comes from a day-bounded query.
+                            var remoteForThisDay = locationsRemote.stream()
+                                    .filter(report -> report.getTimestamp() >= beginningOfDay
+                                            && report.getTimestamp() < endOfDay)
+                                    .collect(Collectors.toList());
+
                             var mergedList = BeaconCombinerUtil.combineAndSort(
-                                    beaconId, locationsRemote, locationsLocal);
+                                    beaconId, remoteForThisDay, locationsLocal);
                             Log.d(TAG, "Final merged location history list has "
                                     + mergedList.size() + " items!");
 

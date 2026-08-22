@@ -18,6 +18,16 @@
         android:icon="@drawable/share_24px"
         android:title="@string/export_tags" />
 
+    <!--
+        The bulk half of reordering. Dragging moves one tag; this moves however many are
+        selected, which is the case dragging is worst at - and it needs no gesture, so it
+        cannot collide with selection mode the way a multi-item drag would.
+    -->
+    <item
+        android:id="@+id/action_move_to_top"
+        android:icon="@drawable/drag_handle_24px"
+        android:title="@string/move_to_top" />
+
     <item
         android:id="@+id/action_remove_devices"
         android:icon="@drawable/delete_24px"

@@ -89,6 +89,26 @@
                 "selected" twice, which is deliberate: the tint alone is easy to miss on a
                 wallpaper-derived palette, and the tick alone is easy to miss on a long list.
             -->
+            <!--
+                Grab here to reorder. On the right, on the thumb side, and away from the icon
+                and name so a normal tap cannot land on it by accident.
+
+                An explicit handle rather than long-press-to-drag, which is the usual gesture
+                and is already taken: a long press on this row starts selection mode. Two
+                different things on one gesture would make both unreliable, so
+                setLongPressDragEnabled(false) turns the built-in one off and this is the only
+                way in. See MyDevicesListActivity#attachDragToReorder.
+            -->
+            <ImageView
+                android:id="@+id/list_item_drag_handle"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="12dp"
+                android:contentDescription="@string/reorder_tag"
+                android:src="@drawable/drag_handle_24px"
+                android:tint="?attr/colorOutline" />
+
             <ImageView
                 android:id="@+id/list_item_selected_check"
                 android:layout_width="24dp"

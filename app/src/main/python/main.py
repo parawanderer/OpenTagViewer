@@ -1254,17 +1254,35 @@ def getLastReports(
                 print(f"{beaconId} has nothing anywhere in {width_before} indices of history;"
                       f" reporting it as one that appears to have stopped broadcasting.")
 
-            if fetched.bounded_to_window:
-                filtered = _filterReportsByTimeRange(reports, start_ms, now_ms)
-                print(f"  -> {len(filtered)} reports after filtering to last {hoursBack}h")
+            # **Everything found is kept, including reports older than the window.**
+            #
+            # They used to be dropped here, and that was throwing away the expensive part of
+            # the work. The window is a *key* range, not a time range: keys roll every fifteen
+            # minutes, so asking about the last hour asks Apple about a handful of key indices,
+            # and Apple answers with every report it holds for them - which routinely includes
+            # sightings timestamped before the window opened. Those reports have already been
+            # searched for, downloaded and decrypted by the time this line runs. Discarding
+            # them threw all of that away and left a hole in the stored history that the
+            # history screen would later pay to fetch again.
+            #
+            # Nothing downstream minds the extra. The cache de-duplicates on
+            # beacon id plus report (BeaconLocationReportHasher), the map draws the newest
+            # report rather than all of them, and the history screen merges by day. So this is
+            # additive: the same last-known position, with the gaps filled in for free.
+            in_window = len(_filterReportsByTimeRange(reports, start_ms, now_ms))
+            filtered = reports
+
+            if not fetched.bounded_to_window:
+                # The probe ignores the window on purpose - it walks back until it finds
+                # anything at all - so a tag that sat in a drawer for two days is normal here.
+                print(f"  -> keeping {len(filtered)} latest-known report(s); alignment was not "
+                      f"yet established, so the {hoursBack}h window was never applied")
+            elif len(filtered) > in_window:
+                print(f"  -> keeping {len(filtered)} reports, of which {in_window} fall inside "
+                      f"the last {hoursBack}h; the rest are older sightings for the same keys "
+                      f"and are kept rather than re-fetched later")
             else:
-                # The probe ignored the window on purpose - it walks back until it finds
-                # anything - so filtering to it here would throw away the only location we
-                # have. A tag that has sat in a drawer for two days would come back from an
-                # import showing nothing, despite the fetch having just found it.
-                filtered = reports
-                print(f"  -> keeping {len(filtered)} latest-known report(s) without applying "
-                      f"the {hoursBack}h window; alignment was not yet established")
+                print(f"  -> {len(filtered)} reports, all within the last {hoursBack}h")
 
             res[beaconId] = {
                 "reports": _serializeReports(filtered),
@@ -1273,11 +1291,15 @@ def getLastReports(
                 "updatedAccessoryJson": json.dumps(airtag.to_json()),
                 # **Both of these have to be here, not only on the ranged variant.**
                 #
-                # This is the function the app actually calls; `getReports` has no caller in
-                # Java at all. Java reads these two keys to decide whether a tag is going
+                # This is the function the periodic refresh calls, and the backoff is about the
+                # periodic refresh. Java reads these two keys to decide whether a tag is going
                 # quiet, and a missing key reads as False - so emitting them from the ranged
                 # variant alone silently disabled the whole backoff, with every empty answer
                 # counting as a healthy one. See PythonAppleService#toFetchResult.
+                #
+                # (An earlier version of this note claimed `getReports` had no Java caller at
+                # all. It does: PythonAppleService#getReportsBetween, which is how the history
+                # screen fetches one day.)
                 "exhaustedWideSearch": exhausted,
                 # Whether this search was an expensive one at all. An accessory with a narrow
                 # key window costs a request or two, and an empty answer from one means only
@@ -1350,8 +1372,26 @@ def getReports(
                 print(f"{beaconId} has nothing anywhere in {width_before} indices of history;"
                       f" reporting it as one that appears to have stopped broadcasting.")
 
-            filtered = _filterReportsByTimeRange(reports, unixStartMs, unixEndMs)
-            print(f"  -> {len(filtered)} reports after filtering to requested range")
+            # **Everything found is returned, in range or not.** Same reasoning as
+            # `getLastReports`: the search is over key indices, keys roll every fifteen minutes,
+            # and Apple answers with every report it holds for the keys asked about - so a fetch
+            # for one day routinely turns up sightings either side of it. Those cost exactly as
+            # much to find and decrypt as the in-range ones, and dropping them here means the
+            # next day the user opens pays to fetch them all over again.
+            #
+            # Anything fetched belongs in the database. Narrowing to the day the user is looking
+            # at is a display concern, and it is done where the display is - see
+            # `HistoryViewActivity.fetchReports`, which filters the remote answer before merging
+            # it, and reads the local half through a day-bounded query.
+            in_range = len(_filterReportsByTimeRange(reports, unixStartMs, unixEndMs))
+            filtered = reports
+
+            if len(filtered) > in_range:
+                print(f"  -> keeping {len(filtered)} reports, of which {in_range} fall in the "
+                      f"requested range; the rest are sightings either side of it for the same "
+                      f"keys and are stored rather than re-fetched later")
+            else:
+                print(f"  -> {len(filtered)} reports, all within the requested range")
 
             updated_accessory_json = json.dumps(airtag.to_json())
 

@@ -8,6 +8,7 @@ import android.content.res.Resources;
 import android.text.format.DateUtils;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -31,6 +32,7 @@ import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import lombok.Getter;
+import lombok.Setter;
 
 public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.ViewHolder> {
     private final List<BeaconInformation> beaconInfo;
@@ -76,6 +78,17 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
     @Getter
     private boolean selectionMode = false;
 
+    /**
+     * Told when somebody puts a finger on a row's drag handle, so the screen can hand that row
+     * to its {@code ItemTouchHelper}.
+     *
+     * <p>Settable rather than a constructor argument because the helper needs the adapter to
+     * exist before it can be built, and the adapter needs the helper to report to - one of them
+     * has to be wired up afterwards. Null until then, which is why the touch listener checks.
+     */
+    @Setter
+    private Consumer<ViewHolder> onDragHandleTouched;
+
     @Getter
     public static class ViewHolder extends RecyclerView.ViewHolder {
         private final FrameLayout container;
@@ -85,6 +98,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
         private final ImageView itemImage;
         private final ImageView warningIcon;
         private final ImageView selectedCheck;
+        private final ImageView dragHandle;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -95,6 +109,7 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             this.itemImage = itemView.findViewById(R.id.list_item_image);
             this.warningIcon = itemView.findViewById(R.id.warning_icon);
             this.selectedCheck = itemView.findViewById(R.id.list_item_selected_check);
+            this.dragHandle = itemView.findViewById(R.id.list_item_drag_handle);
         }
     }
 
@@ -213,6 +228,44 @@ public class DeviceListAdaptor extends RecyclerView.Adapter<DeviceListAdaptor.Vi
             this.onDeviceLongClickCallback.accept(v, beacon);
             // Consumed, so the row does not also fire its normal click.
             return true;
+        });
+
+        this.bindDragHandle(viewHolder);
+    }
+
+    /**
+     * The grab area for reordering, and the one gesture that starts a drag.
+     *
+     * <p><b>Hidden while selecting.</b> The tick occupies the same corner, and a row offering
+     * both is offering two different meanings for the same bit of screen - so during selection
+     * the only thing on the right is the state of the selection. Bulk reordering is the
+     * <i>Move to top</i> menu item instead, which needs no gesture at all.
+     *
+     * <p><b>Set on every bind, both ways round.</b> This is a RecyclerView: a row that was
+     * showing a handle is handed straight to the next tag, so a version that only ever hid it
+     * would leave rows with no handle scattered through the list after any pass through
+     * selection mode.
+     */
+    private void bindDragHandle(final ViewHolder viewHolder) {
+        if (this.selectionMode) {
+            viewHolder.getDragHandle().setVisibility(GONE);
+            viewHolder.getDragHandle().setOnTouchListener(null);
+            return;
+        }
+
+        viewHolder.getDragHandle().setVisibility(VISIBLE);
+
+        // ACTION_DOWN, not a click. A drag has to begin the moment the finger lands, because
+        // ItemTouchHelper follows that same gesture - waiting for a click would mean the finger
+        // is already moving before anything is picked up, and the row would jump to catch up.
+        viewHolder.getDragHandle().setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN
+                    && this.onDragHandleTouched != null) {
+                this.onDragHandleTouched.accept(viewHolder);
+            }
+            // Not consumed: returning true here would swallow the gesture before
+            // ItemTouchHelper ever saw it, and the handle would be inert.
+            return false;
         });
     }
 

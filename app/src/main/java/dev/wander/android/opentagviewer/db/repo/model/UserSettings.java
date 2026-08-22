@@ -84,6 +84,27 @@ public class UserSettings {
      */
     private String anisetteApkUri;
 
+    /**
+     * Whether the owner's own Apple devices are shown alongside their tags, and searched for.
+     *
+     * <p><b>Off unless somebody turns it on, and that is not a taste decision.</b> An iPhone,
+     * iPad or Mac is in the Find My zone and carries key material, so the app can locate one -
+     * but only through the crowd-sourced network, the same way it finds an AirTag. Apple's own
+     * app does not do that: a device reports its position to iCloud directly over its own
+     * network connection, which is a service this app does not speak. So a device shown here
+     * updates when some stranger's iPhone happens to walk past it, which for something the
+     * owner is carrying is rare and arbitrary.
+     *
+     * <p>Shown by default, that produces exactly one bug report, over and over: <i>my iPad is
+     * in the list and never moves, but the real Find My app has it - your app is broken</i>.
+     * It is not broken, it is incomplete, and the difference is invisible from the outside.
+     * Leaving these out by default means the app only shows what it can actually keep up to
+     * date, and the setting says plainly what turning them on gets you.
+     *
+     * <p>Null reads as off. See {@link #shouldShowAppleDevices()}.
+     */
+    private Boolean showAppleDevices;
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
 
@@ -147,5 +168,13 @@ public class UserSettings {
 
     public boolean hasAmapApiKey() {
         return this.amapApiKey != null && !this.amapApiKey.isBlank();
+    }
+
+    /**
+     * Whether to show and search for the owner's own Apple devices - see
+     * {@link #showAppleDevices}. Null means nobody has turned it on, which is off.
+     */
+    public boolean shouldShowAppleDevices() {
+        return this.showAppleDevices == Boolean.TRUE;
     }
 }

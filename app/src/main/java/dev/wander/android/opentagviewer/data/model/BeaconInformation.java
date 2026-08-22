@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.data.model;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -15,6 +16,15 @@ public class BeaconInformation {
     private static final String IPAD = "iPad";
 
     private static final int AIRTAG_PRODUCT_ID = 21760;
+
+    /**
+     * The {@code <family><major>,<minor>} shape Apple's own hardware uses and accessories do
+     * not - {@code iPad13,18}, {@code MacBookAir10,1}.
+     *
+     * <p>Kept character-for-character in step with {@code _APPLE_MODEL} in
+     * {@code opentagviewer_export/hardware.py}. See {@link #isOwnDevice()}.
+     */
+    private static final Pattern APPLE_MODEL = Pattern.compile("^[A-Za-z]+\\d+,\\d+$");
 
     /**
      * Beacon id. This is present in both {@code .plist} files,
@@ -170,6 +180,16 @@ public class BeaconInformation {
     @Setter
     private String userOverrideEmoji;
 
+    /**
+     * Where the user dragged this tag to on the device list, or null if they never have.
+     *
+     * <p>An override like the two above, and stored beside them - see
+     * {@code UserBeaconOptions.uiOrder}. Read by {@link dev.wander.android.opentagviewer.util.TagOrder},
+     * where null means "unarranged" rather than "first".
+     */
+    @Setter
+    private Integer uiOrder;
+
 
     public String getName() {
         return Optional.ofNullable(this.userOverrideName).orElse(this.originalName);
@@ -190,6 +210,53 @@ public class BeaconInformation {
      */
     public boolean isIpad() {
         return Optional.ofNullable(this.getModel()).map(model -> model.contains(IPAD)).orElse(false);
+    }
+
+    /**
+     * Whether this record carries {@code secureLocationsSharedSecret}.
+     *
+     * <p>The second of the two signals {@link #isOwnDevice()} reads. Only the presence of the
+     * node is kept, never the value: this is key material, and nothing in the app needs it -
+     * the question being asked is what kind of thing this is.
+     */
+    private final boolean secureLocationsSecret;
+
+    /**
+     * Whether this is one of the owner's own devices - an iPhone, iPad or Mac - rather than an
+     * accessory.
+     *
+     * <p><b>The same two signals as {@code opentagviewer_export.hardware.is_own_device}, and
+     * they have to stay the same two.</b> That function is the shared one, used by both desktop
+     * exporters and reachable from here over the bridge - but it costs a Python call and
+     * answers asynchronously, which is no use to a list being bound or a fetch batch being
+     * assembled. So this is a second implementation of one rule, which is a thing that drifts;
+     * {@code OwnDeviceMatchesThePythonRuleTest} runs both over the same fixtures for that
+     * reason.
+     *
+     * <ul>
+     *   <li><b>An Apple model identifier</b> in {@code model} - {@code iPad13,18},
+     *       {@code MacBookPro18,3}. An accessory leaves {@code model} empty and says what it is
+     *       through {@code productId} and {@code vendorId} instead.</li>
+     *   <li><b>{@link #secureLocationsSecret}</b>, which an iPhone, iPad or Mac carries in place
+     *       of the {@code secondarySharedSecret} an accessory carries. See findmy-export
+     *       06-output section 2.3.</li>
+     * </ul>
+     *
+     * <p><b>Unsure means accessory, and that direction is deliberate.</b> This decides whether a
+     * tag is hidden and whether it is searched for at all, so a false positive is a tag that
+     * silently stops being located - no error, no empty state, just a row that never updates
+     * and no way to tell why. A false negative is an iPad in the list, which is merely the
+     * behaviour of every version before this one.
+     *
+     * <p>AirPods are deliberately not caught, matching the Python: their model lives inside
+     * {@code stableIdentifier} rather than in {@code model}, and they are an accessory somebody
+     * bought rather than the computer they work on.
+     */
+    public boolean isOwnDevice() {
+        if (this.model != null && APPLE_MODEL.matcher(this.model).matches()) {
+            return true;
+        }
+        return this.secureLocationsSecret;
     }
 
     /**

@@ -104,6 +104,8 @@ import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
+import dev.wander.android.opentagviewer.util.TagOrder;
+import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.util.android.AddressLookup;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
@@ -281,7 +283,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         this.handleSendToLogin();
                         return;
                     }
-                    if (data != null && data.getBooleanExtra("mapProviderChanged", false)) {
+                    // Both want the same thing - a full rebuild. The tags live in memory here
+                    // and that model is what decides both what is drawn and what is fetched,
+                    // so showing or hiding the owner's devices is not a redraw.
+                    if (data != null && (data.getBooleanExtra("mapProviderChanged", false)
+                            || data.getBooleanExtra("shownDevicesChanged", false))) {
                         this.recreate();
                     }
                 }
@@ -1141,9 +1147,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.refreshPolicy.decide(
                         System.currentTimeMillis(), true, true, PythonAppleService.isBusy())
                     .shouldRefresh()
-            // map to expected format:
-            ? this.fetchLastReports(
-                    beacons.stream().collect(Collectors.toMap(BeaconInformation::getBeaconId, BeaconInformation::getOwnedBeaconPlistRaw)))
+            // From the model rather than from `beacons`, which is what came out of the parser
+            // and so still has the owner's own devices in it - see plistsToFetch.
+            ? this.fetchLastReports(this.plistsToFetch())
             : this.skipTheStartupFetch()
         ).flatMap(o -> o)
         .doOnNext(this::addBeaconLocationsToCurrent)
@@ -1259,7 +1265,31 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
     }
 
-    private synchronized void addBeaconToCurrent(final List<BeaconInformation> newBeaconInformation) {
+    /**
+     * Takes tags into the screen's model, <b>dropping the ones the user has chosen not to see</b>.
+     *
+     * <p><b>The one place that filter can go and cover everything.</b> {@link #beacons} is not
+     * just what the carousel draws from - it is also where both fetch paths get their list, the
+     * startup one at {@code loadEverything} and the periodic one in
+     * {@link #fetchAndUpdateCurrentBeacons()}. So a tag that never enters here is never drawn
+     * <i>and</i> never searched for, which is the whole point: an Apple device located only
+     * through the crowd-sourced network updates so rarely that asking about it costs a slot in
+     * the batch and buys nothing.
+     *
+     * <p>Filtering at the two fetch sites instead would have been three places to keep in step,
+     * and the failure mode of getting it wrong is silent both ways round. See
+     * {@link TagVisibility}.
+     */
+    private synchronized void addBeaconToCurrent(final List<BeaconInformation> allBeaconInformation) {
+        final List<BeaconInformation> newBeaconInformation = TagVisibility.visible(
+                allBeaconInformation, this.userSettings.shouldShowAppleDevices());
+
+        final int hidden = allBeaconInformation.size() - newBeaconInformation.size();
+        if (hidden > 0) {
+            Log.i(TAG, "Leaving out " + hidden + " of the owner's own Apple devices, which are"
+                    + " neither shown nor searched for unless the setting is on");
+        }
+
         newBeaconInformation.forEach(beacon -> {
             final String beaconId = beacon.getBeaconId();
             if (this.beacons.containsKey(beaconId)) {
@@ -1473,13 +1503,34 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         final long now = System.currentTimeMillis();
-        // remove all beacons that had cards that are now gone
-        for (final BeaconData beaconData : this.beacons.values()) {
+
+        // **In the order the user arranged, not the order the map happens to hold them in.**
+        //
+        // this.beacons is a ConcurrentHashMap, so its iteration order is hash order - arbitrary,
+        // and until now that was the carousel's order too. Cards are also only created once and
+        // reused, so whatever order they were first added in stuck for the life of the screen.
+        // Sorting here and placing each card at its index below is what makes a drag on the
+        // device list show up over here.
+        final List<BeaconInformation> inOrder = TagOrder.sorted(this.beacons.values().stream()
+                .map(BeaconData::getInfo)
+                .collect(Collectors.toList()));
+
+        int index = 0;
+        for (final BeaconInformation ordered : inOrder) {
+            final BeaconData beaconData = this.beacons.get(ordered.getBeaconId());
+            if (beaconData == null) {
+                continue;
+            }
             final BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
             final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
             if (maybeLast.isEmpty()) {
-                Log.w(TAG, "Found a beacon (" + beaconId + ") without locations! We can't draw such a beacon. Skipping...");
+                // Debug, not a warning. A tag with no locations yet is the ordinary state of a
+                // freshly imported one, and of any tag nobody has walked past since it was
+                // added - there is no card to draw because there is nowhere to draw it, which
+                // is correct rather than a fault. At warning level it sat in every logcat
+                // looking like the cause of whatever else was being investigated.
+                Log.d(TAG, "No locations held for beaconId=" + beaconId + " yet, so it has no card");
                 continue;
             }
             final BeaconLocationReport lastLocation = maybeLast.get();
@@ -1489,7 +1540,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             if (!this.dynamicCardsForTag.containsKey(beaconId)) {
                 // MAKE A NEW CARD
                 v = (FrameLayout) this.getLayoutInflater().inflate(R.layout.maps_tag_card, null);
-                cardsContainer.addView(v);
+                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
                 this.dynamicCardsForTag.put(beaconId, v);
             } else {
                 // UPDATE EXISTING CARD
@@ -1548,6 +1599,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     DateUtils.MINUTE_IN_MILLIS
             ).toString();
             deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+
+            // **Put an existing card where it now belongs.** Cards are created once and reused,
+            // so a card added before the user rearranged anything keeps its original slot
+            // otherwise - the model would be in the new order and the screen in the old one.
+            // Only moved when it is actually in the wrong place: removeView/addView on every
+            // pass would detach and reattach every card on every refresh tick, which loses the
+            // scroll position and interrupts anything mid-animation.
+            if (cardsContainer.indexOfChild(v) != index) {
+                cardsContainer.removeView(v);
+                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
+            }
+
+            index++;
         }
 
 
@@ -1590,19 +1654,30 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 : IMapProvider.MapStyle.LIGHT;
     }
 
-    private void fetchAndUpdateCurrentBeacons() {
-        // **Not Collectors.toMap**, which throws on a null value. This is the periodic refresh
-        // for every tag at once, so a single self-generated tag - which has no plist - took
-        // down the refresh for all of them, not just for itself.
-        // Same null-tolerant shape as the import path - see BeaconRepository.plistFallbacks.
-        final Map<String, String> beacons = new HashMap<>();
+    /**
+     * What to ask Apple about: every tag in the screen's model, with its plist where it has one.
+     *
+     * <p><b>Not {@code Collectors.toMap}</b>, which throws on a null value. A self-generated tag
+     * has no plist, and one of those used to take down the fetch for every other tag as well as
+     * itself. Same null-tolerant shape as the import path - see
+     * {@code BeaconRepository.plistFallbacks} - and a null here is meaningful rather than
+     * missing, so every id goes in.
+     *
+     * <p><b>Read from the model, which is already filtered.</b> {@link #addBeaconToCurrent} is
+     * where the owner's own devices are left out, so anything that reaches this map is something
+     * the user can see, and there is no second place for that rule to be got wrong.
+     */
+    private Map<String, String> plistsToFetch() {
+        final Map<String, String> plists = new HashMap<>();
         this.beacons.values().forEach(b ->
-                beacons.put(b.getInfo().getBeaconId(), b.getInfo().getOwnedBeaconPlistRaw()));
+                plists.put(b.getInfo().getBeaconId(), b.getInfo().getOwnedBeaconPlistRaw()));
+        return plists;
+    }
 
-
+    private void fetchAndUpdateCurrentBeacons() {
         TagCardHelper.toggleRefreshLoadingAll(this.dynamicCardsForTag, true);
 
-        var async = this.fetchLastReports(beacons)
+        var async = this.fetchLastReports(this.plistsToFetch())
                 // **Drawn as each tag lands, not once at the end.**
                 //
                 // The fetch is one accessory at a time, and a tag with no key alignment record

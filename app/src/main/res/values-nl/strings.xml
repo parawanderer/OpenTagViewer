@@ -251,4 +251,10 @@ Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-app
     <string name="export_logs">Logboeken exporteren</string>
     <string name="log_file_has_been_exported_successfully">Logbestand is geëxporteerd</string>
     <string name="failed_to_export_log_file">Kon het logbestand niet exporteren</string>
+    <string name="show_apple_devices">Mijn Apple-apparaten tonen</string>
+    <string name="show_apple_devices_explainer">Je iPhones, iPads en Macs kunnen hier alleen via het Zoek mijn-netwerk worden gevonden, net als een AirTag. Ze worden daardoor zelden en onvoorspelbaar bijgewerkt, anders dan in Apple’s eigen app, die de positie leest die een apparaat zelf aan iCloud doorgeeft. Standaard uit, omdat die dekking fundamenteel onvolledig is. Zolang dit uit staat, worden deze apparaten niet getoond en er ook niet naar gezocht.</string>
+    <string name="show_apple_devices_help_link">Help volledige ondersteuning te bouwen →</string>
+    <string name="no_app_to_open_a_link_with">Geen app op deze telefoon kan een weblink openen</string>
+    <string name="reorder_tag">Sleep om te herschikken</string>
+    <string name="move_to_top">Naar boven verplaatsen</string>
 </resources>

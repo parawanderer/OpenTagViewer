@@ -217,7 +217,10 @@ public class BeaconRepository {
             // **Any nickname over this tag has to go.** The name being written is now the tag's
             // real one, and an override wins at display time - leaving one would hide the value
             // that was just sent to Apple behind the value it replaced.
-            db.userBeaconOptionsDao().deleteById(beaconId);
+            //
+            // The nickname only, not the row: it also holds where the user dragged this tag to,
+            // which a rename has nothing to say about. See clearNameAndEmoji.
+            db.userBeaconOptionsDao().clearNameAndEmoji(beaconId, System.currentTimeMillis());
 
             final BeaconNamingRecord stored = db.beaconNamingRecordDao().getByBeaconId(beaconId);
 
@@ -269,12 +272,49 @@ public class BeaconRepository {
         }).subscribeOn(Schedulers.io());
     }
 
+    /**
+     * Store a nickname and emoji, <b>without disturbing where the tag was dragged to</b>.
+     *
+     * <p>The insert is {@code REPLACE}, so it writes the whole row - and callers here build the
+     * object from a rename dialog, which knows about a name and an emoji and nothing else. Its
+     * {@code uiOrder} is therefore null, meaning "not supplied" rather than "unarrange this",
+     * and writing it as-is would quietly send a renamed tag back to the end of the list.
+     *
+     * <p>So a null position is filled in from what is already stored. Nothing needs to clear one
+     * through this path; {@code UserBeaconOptionsDao.storeArrangement} is what writes positions.
+     */
     public Completable storeUserBeaconOptions(UserBeaconOptions userOptions) {
         return Completable.fromRunnable(() -> {
             try {
+                if (userOptions.uiOrder == null) {
+                    final UserBeaconOptions held =
+                            this.db.userBeaconOptionsDao().getById(userOptions.beaconId);
+                    if (held != null) {
+                        userOptions.uiOrder = held.uiOrder;
+                    }
+                }
+
                 this.db.userBeaconOptionsDao().insertAll(userOptions);
             } catch (Exception e) {
                 Log.e(TAG, "Error occurred when trying to insert user options for beaconId="+userOptions.beaconId, e);
+                throw new RepoQueryException(e);
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Record the order the user has just dragged their tags into.
+     *
+     * @param positions every visible tag's id to its place in the list, as produced by
+     *                  {@code TagOrder.positionsFor}. All of them, not only the one that moved.
+     */
+    public Completable storeArrangement(final Map<String, Integer> positions) {
+        return Completable.fromRunnable(() -> {
+            try {
+                this.db.userBeaconOptionsDao()
+                        .storeArrangement(positions, System.currentTimeMillis());
+            } catch (Exception e) {
+                Log.e(TAG, "Error occurred when trying to store the tag arrangement", e);
                 throw new RepoQueryException(e);
             }
         }).subscribeOn(Schedulers.io());

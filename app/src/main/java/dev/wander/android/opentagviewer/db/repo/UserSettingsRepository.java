@@ -8,6 +8,7 @@ import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStor
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ENABLE_DEBUG_DATA;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.MAP_PROVIDER;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.SHOW_APPLE_DEVICES;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_DARK_THEME;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_SYSTEM_COLORS;
 
@@ -40,6 +41,7 @@ public class UserSettingsRepository {
                 String anisetteMode = settings.get(ANISETTE_MODE);
                 String anisetteApkUri = settings.get(ANISETTE_APK_URI);
                 Boolean anisetteUpgradeOffered = settings.get(ANISETTE_UPGRADE_OFFERED);
+                Boolean showAppleDevices = settings.get(SHOW_APPLE_DEVICES);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
@@ -52,6 +54,7 @@ public class UserSettingsRepository {
                         .anisetteMode(anisetteMode)
                         .anisetteApkUri(anisetteApkUri)
                         .anisetteUpgradeOffered(anisetteUpgradeOffered)
+                        .showAppleDevices(showAppleDevices)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -98,6 +101,9 @@ public class UserSettingsRepository {
                     userSettings.getAnisetteApkUri() == null ? "" : userSettings.getAnisetteApkUri());
             mutablePreferences.set(ANISETTE_UPGRADE_OFFERED,
                     userSettings.getAnisetteUpgradeOffered() == Boolean.TRUE);
+            // Null reads as off, which is the intended default - the app shows only what it can
+            // actually keep up to date. See UserSettings.showAppleDevices.
+            mutablePreferences.set(SHOW_APPLE_DEVICES, userSettings.shouldShowAppleDevices());
 
             return Single.just(mutablePreferences);
         }).subscribeOn(Schedulers.io())

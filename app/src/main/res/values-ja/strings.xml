@@ -251,4 +251,10 @@
     <string name="export_logs">ログを書き出す</string>
     <string name="log_file_has_been_exported_successfully">ログファイルを書き出しました</string>
     <string name="failed_to_export_log_file">ログファイルを書き出せませんでした</string>
+    <string name="show_apple_devices">自分の Apple デバイスを表示</string>
+    <string name="show_apple_devices_explainer">お使いの iPhone、iPad、Mac は、AirTag と同じく「探す」ネットワーク経由でしか位置を特定できません。そのため更新は稀で、いつ届くかも分かりません。Apple 純正アプリはデバイス自身が iCloud に報告した位置を読み取るため、この点が異なります。この範囲では本質的に不完全なため、初期状態ではオフです。オフの間、これらのデバイスは表示も検索もされません。</string>
+    <string name="show_apple_devices_help_link">完全なサポートの実装に協力する →</string>
+    <string name="no_app_to_open_a_link_with">この端末には Web リンクを開けるアプリがありません</string>
+    <string name="reorder_tag">ドラッグして並べ替え</string>
+    <string name="move_to_top">先頭に移動</string>
 </resources>
