@@ -231,7 +231,25 @@ class ICloudSession:
         except Exception:
             return _unexpected("asking what this account can be recovered from")
 
-        self._records = list(options.recoverable)
+        # **This app's own escrow record is dropped, not shown.**
+        #
+        # Joining the trust circle registers this app as a device, so the account then holds a
+        # record for `0PENTAGVIEWR` alongside the user's real hardware - and the picker offered
+        # it, asking for "the screen-lock passcode of one of your Apple devices" for a device
+        # that has no screen and no lock. There is no answer to that question: the escrow
+        # passcode was generated, never shown, and is not the user's to know.
+        #
+        # Matched on the serial from `APP_IDENTITY`, which is the one place this app's identity
+        # is written (rule 11) - not on the name, which Apple does not carry for this entry, nor
+        # on a literal, which would be a second copy of the identity to keep in step.
+        #
+        # Filtered here rather than in the screen so the count below is honest: an account whose
+        # only recoverable record is this app's has nothing the user can recover from, and
+        # should be told so rather than shown one unusable tile.
+        self._records = [
+            record for record in options.recoverable
+            if record.serial != APP_IDENTITY.serial
+        ]
 
         if not self._records:
             if not options.viability_is_trustworthy:

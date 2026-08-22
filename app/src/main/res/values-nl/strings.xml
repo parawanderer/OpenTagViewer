@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API-sleutel ontbreekt</string>
     <string name="maps_api_key_missing_message">Deze build heeft geen Google Maps API-sleutel, dus de kaart wordt niet geladen. Voeg MAPS_API_KEY toe aan secrets.properties en bouw opnieuw, of kies een andere kaartaanbieder in de instellingen.</string>
-    <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Dit kan een paar minuten duren — houd de app open.</string>
-    <string name="resolving_tags_banner_progress">Je tags worden gelokaliseerd (%1$d van %2$d). Dit kan een paar minuten duren — houd de app open.</string>
+    <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Ze verschijnen zodra ze gevonden zijn, meest recent gezien eerst — houd de app open.</string>
+    <string name="resolving_tags_banner_progress">Je tags worden gelokaliseerd (%1$d van %2$d). Ze verschijnen zodra ze gevonden zijn, meest recent gezien eerst — houd de app open.</string>
     <string name="anisette_mode_title">Aanmeldgegevens</string>
     <string name="anisette_mode_local">Op dit apparaat</string>
     <string name="anisette_mode_remote">Externe server</string>
@@ -245,4 +245,10 @@ Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-app
     <string name="icloud_unlink_confirm_button">Ontkoppelen</string>
     <string name="icloud_unlink_done">Je Apple-account is niet meer gekoppeld</string>
     <string name="icloud_unlink_failed">Kan de koppeling met je Apple-account niet opheffen. Probeer het opnieuw.</string>
+    <string name="no_app_to_open_a_map_with">Geen app op deze telefoon kan een kaart openen</string>
+    <string name="icloud_loading_opening_account">Je Apple-account wordt geopend…</string>
+    <string name="icloud_loading_waiting_for_location_check">Wachten tot de locatiecontrole klaar is…</string>
+    <string name="export_logs">Logboeken exporteren</string>
+    <string name="log_file_has_been_exported_successfully">Logbestand is geëxporteerd</string>
+    <string name="failed_to_export_log_file">Kon het logbestand niet exporteren</string>
 </resources>

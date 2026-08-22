@@ -6,7 +6,7 @@ import static android.view.View.VISIBLE;
 import android.content.Context;
 import android.content.res.Resources;
 import android.location.Address;
-import android.location.Geocoder;
+import dev.wander.android.opentagviewer.util.android.AddressLookup;
 import android.text.format.DateFormat;
 import android.util.Log;
 import android.util.Pair;
@@ -48,7 +48,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
     private final List<BeaconLocationReport> locations;
 
     private final Set<Integer> selectedItems;
-    private final Geocoder geocoder;
+    private final AddressLookup geocoder;
     private final @lombok.NonNull UserSettings userSettings;
     private final Consumer<ClickedItemInfo> onClickCallback;
     private final @lombok.NonNull Resources resources;
@@ -56,7 +56,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
 
     public HistoryItemsAdapter(
             @lombok.NonNull Resources resources,
-            @lombok.NonNull Geocoder geocoder,
+            @lombok.NonNull AddressLookup geocoder,
             @lombok.NonNull List<BeaconLocationReport> locations,
             @lombok.NonNull UserSettings userSettings,
             @lombok.NonNull Set<Integer> selectedItems,

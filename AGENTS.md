@@ -285,8 +285,14 @@ Three consequences worth knowing:
   emulator's own window has focus on the host desktop, so against a hand-started emulator any
   UI test fails with `RootViewWithoutFocusException` the moment you alt-tab away. There is
   nothing to fix in the test when that happens — run it on the managed device.
-- `./gradlew testDebugUnitTest` is close to meaningless: there is exactly one JVM test and it
-  asserts `2 + 2 == 4`. Everything real is instrumented. Do not report "tests pass" off it.
+- `./gradlew testDebugUnitTest` runs **118 JVM tests in about ten seconds**, and is worth
+  running constantly while working on anything it covers: the pure logic. Refresh policy, scan
+  order, marker focus, the long-fetch banner, passcode parsing, the CSV and zip writers,
+  coordinate conversion. Anything that needs neither Android nor a device belongs there, not on
+  the emulator — it is two orders of magnitude faster to run.
+
+  It is still **not** the suite to report "tests pass" from. Every screen, every repository and
+  the whole Python bridge are instrumented, so a green JVM run says nothing about them.
 
 ### Writing an Espresso test that is not flaky
 

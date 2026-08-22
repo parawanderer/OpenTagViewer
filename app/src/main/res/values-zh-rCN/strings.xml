@@ -110,8 +110,8 @@
     <string name="how_do_i_get_the_zip"><u>如何获取 zip 文件？</u></string>
     <string name="maps_api_key_missing_title">缺少 Google 地图 API Key</string>
     <string name="maps_api_key_missing_message">此版本未包含 Google 地图 API Key，因此无法加载地图。请在 secrets.properties 中添加 MAPS_API_KEY 后重新构建，或在设置中选择其他地图提供商。</string>
-    <string name="resolving_tags_banner">正在首次定位你的标签。这可能需要几分钟，请保持应用开启。</string>
-    <string name="resolving_tags_banner_progress">正在定位你的标签（%1$d / %2$d）。这可能需要几分钟，请保持应用开启。</string>
+    <string name="resolving_tags_banner">正在首次定位你的标签。找到一个显示一个，最近出现过的优先，请保持应用开启。</string>
+    <string name="resolving_tags_banner_progress">正在定位你的标签（第 %1$d 个，共 %2$d 个）。找到一个显示一个，最近出现过的优先，请保持应用开启。</string>
     <string name="anisette_mode_title">登录数据</string>
     <string name="anisette_mode_local">在本设备生成</string>
     <string name="anisette_mode_remote">远程服务器</string>
@@ -245,4 +245,10 @@
     <string name="icloud_unlink_confirm_button">取消关联</string>
     <string name="icloud_unlink_done">你的 Apple 账户已取消关联</string>
     <string name="icloud_unlink_failed">无法取消关联你的 Apple 账户，请重试。</string>
+    <string name="no_app_to_open_a_map_with">此手机上没有可以打开地图的应用</string>
+    <string name="icloud_loading_opening_account">正在打开您的 Apple 账户…</string>
+    <string name="icloud_loading_waiting_for_location_check">正在等待位置检查完成…</string>
+    <string name="export_logs">导出日志</string>
+    <string name="log_file_has_been_exported_successfully">日志文件已导出</string>
+    <string name="failed_to_export_log_file">无法导出日志文件</string>
 </resources>

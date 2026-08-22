@@ -36,6 +36,16 @@ public class ScanOrderTest {
         return new ScanOrder.Candidate(id, false, false);
     }
 
+    /** Never scanned, but the export said when macOS last saw it. */
+    private static ScanOrder.Candidate neverScannedButObserved(
+            final String id, final long observedAtMillis) {
+        return new ScanOrder.Candidate(id, false, false, observedAtMillis);
+    }
+
+    private static final long JANUARY = 1_704_067_200_000L;   // 2024-01-01
+    private static final long JUNE = 1_719_792_000_000L;      // 2024-07-01
+    private static final long DECEMBER = 1_735_689_600_000L;  // 2025-01-01
+
     /** <b>Tags that answered last time come first.</b> They are cheap and they change the screen. */
     @Test
     public void tagsThatAnsweredGoBeforeTagsThatDidNot() {
@@ -130,5 +140,103 @@ public class ScanOrderTest {
     @Test
     public void anemptyBatchIsAnEmptyOrder() {
         assertTrue(ScanOrder.forScheduledFetch(List.of(), new Random(1)).isEmpty());
+    }
+
+    // --- what the export knows, on a first import ------------------------------------------
+
+    /**
+     * <b>The most recently observed tag is asked about first.</b>
+     *
+     * <p>The whole point of reading the alignment record. A tag macOS saw last week has a key
+     * window of a hundred or so indices; one it last saw a year ago has tens of thousands, and
+     * Apple takes about 290 keys per request. Asking in this order is the difference between a
+     * pin appearing in seconds and an empty map for minutes.
+     */
+    @Test
+    public void themostRecentlyObservedTagIsAskedAboutFirst() {
+        final List<String> order = ScanOrder.forScheduledFetch(List.of(
+                neverScannedButObserved("old", JANUARY),
+                neverScannedButObserved("newest", DECEMBER),
+                neverScannedButObserved("middling", JUNE)),
+                new Random(1));
+
+        assertEquals(List.of("newest", "middling", "old"), order);
+    }
+
+    /**
+     * <b>Tags the export knew nothing about go behind the ones it did.</b>
+     *
+     * <p>No alignment record means the search starts at the pairing date and covers the tag's
+     * whole life, which is the most expensive thing in the batch. Putting those first would
+     * spend the user's first minute on the one tag least likely to answer quickly.
+     */
+    @Test
+    public void tagsWithNoAlignmentRecordGoBehindTheOnesThatHaveOne() {
+        final List<String> order = ScanOrder.forScheduledFetch(List.of(
+                neverScanned("unknown-one"),
+                neverScannedButObserved("observed", JANUARY),
+                neverScanned("unknown-two")),
+                new Random(1));
+
+        assertEquals("a tag with an alignment record should be asked about first",
+                "observed", order.get(0));
+        assertTrue(order.containsAll(List.of("unknown-one", "unknown-two")));
+    }
+
+    /**
+     * <b>And they are still shuffled among themselves.</b>
+     *
+     * <p>The reason the original group was shuffled at all, and it survives the change: the
+     * batch is sequential and routinely abandoned, so a fixed order among the expensive tags
+     * would leave the same one permanently last and therefore permanently unscanned. Ordering
+     * the groups is fine; ordering within the last group is not.
+     */
+    @Test
+    public void tagsWithNoAlignmentAreNotAlwaysInTheSameOrder() {
+        final Set<String> everFirst = new HashSet<>();
+
+        for (int seed = 0; seed < 50; seed++) {
+            final List<String> order = ScanOrder.forScheduledFetch(List.of(
+                    neverScanned("a"), neverScanned("b"), neverScanned("c")),
+                    new Random(seed));
+            everFirst.add(order.get(0));
+        }
+
+        assertTrue("the unaligned tags are in a fixed order, so one of them is always last and"
+                + " never gets scanned at all", everFirst.size() > 1);
+    }
+
+    /**
+     * <b>A real scan still beats anything a file says.</b>
+     *
+     * <p>The alignment date is evidence about cost, not about whether the tag answers. Once
+     * there has been an actual fetch, that is better evidence - so a tag known to be answering
+     * goes first even if its record is ancient, and a tag known to be silent goes last even if
+     * its record is fresh.
+     */
+    @Test
+    public void alignmentOnlyDecidesAnythingForTagsNobodyHasScannedYet() {
+        final List<String> order = ScanOrder.forScheduledFetch(List.of(
+                new ScanOrder.Candidate("silent-but-freshly-aligned", true, false, DECEMBER),
+                neverScannedButObserved("never-scanned", JUNE),
+                new ScanOrder.Candidate("answering-but-ancient", true, true, JANUARY)),
+                new Random(1));
+
+        assertEquals(List.of(
+                "answering-but-ancient", "never-scanned", "silent-but-freshly-aligned"), order);
+    }
+
+    /** And nothing is lost or duplicated by the extra bucket. */
+    @Test
+    public void everyTagIsStillAskedAboutExactlyOnceWithAlignmentInPlay() {
+        final List<String> order = ScanOrder.forScheduledFetch(List.of(
+                answering("a"), silent("b"),
+                neverScanned("c"), neverScannedButObserved("d", JUNE),
+                neverScannedButObserved("e", JANUARY)),
+                new Random(7));
+
+        assertEquals(5, order.size());
+        assertEquals(5, new HashSet<>(order).size());
+        assertTrue(order.containsAll(List.of("a", "b", "c", "d", "e")));
     }
 }

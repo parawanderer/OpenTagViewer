@@ -462,6 +462,15 @@ public class MyDevicesListActivity extends AppCompatActivity {
         PopupMenu menu = new PopupMenu(this, this.binding.selectionToolbar.selectionMenuButton);
         menu.getMenuInflater().inflate(R.menu.device_selection_menu, menu.getMenu());
 
+        // **Nothing selected means nothing to do to it, and the menu has to say so.** Both of
+        // these read the selection, find it empty and return - so with "0 selected" they were
+        // offered in full, did nothing at all when tapped, and gave no reason. Disabled rather
+        // than hidden, for the reason already written on Export Tags: a menu that changes shape
+        // is harder to learn than one where an item is visibly not available yet.
+        final boolean anythingSelected = !this.deviceListAdaptor.getSelectedBeacons().isEmpty();
+        menu.getMenu().findItem(R.id.action_export_history).setEnabled(anythingSelected);
+        menu.getMenu().findItem(R.id.action_remove_devices).setEnabled(anythingSelected);
+
         menu.setOnMenuItemClickListener(item -> {
             final int id = item.getItemId();
 

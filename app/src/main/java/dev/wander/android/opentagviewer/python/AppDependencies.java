@@ -1,11 +1,14 @@
 package dev.wander.android.opentagviewer.python;
 
 import android.content.Context;
+import android.location.Geocoder;
 
 import org.chromium.net.CronetEngine;
 
 import androidx.annotation.VisibleForTesting;
 
+import java.util.Locale;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -15,6 +18,7 @@ import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
+import dev.wander.android.opentagviewer.util.android.AddressLookup;
 
 /**
  * What the sign-in screen depends on, in one place a test can replace.
@@ -69,6 +73,35 @@ public final class AppDependencies {
      * "an accessory nothing recognises" renderable on demand, rather than needing such a tag.
      */
     private static HardwareDescriber hardwareDescriber = new ChaquopyHardwareDescriber();
+
+    /**
+     * Turns coordinates into something a person recognises.
+     *
+     * <p><b>Here because a screen with no geocoder does not look broken.</b> The card falls back
+     * to the raw latitude and longitude, which is a perfectly reasonable thing for it to show
+     * when an address genuinely cannot be found - so a geocoder that answers nothing at all is
+     * indistinguishable, on screen and in a screenshot, from one that answered honestly.
+     *
+     * <p>Which is the state every instrumented run is in: the {@code aosp-atd} image carries no
+     * geocoding backend, so {@code getFromLocation} returns an empty list for every point on
+     * earth and the whole path - the rounding, the cache, the fallback - is exercised by
+     * nothing. A test that wants to assert a place name has to be able to supply one.
+     *
+     * <p>A factory rather than an instance, because a {@link Geocoder} is built per screen from
+     * that screen's context and the current locale.
+     */
+    private static BiFunction<Context, Locale, AddressLookup> geocoderFactory =
+            (context, locale) -> AddressLookup.through(new Geocoder(context, locale));
+
+    public static AddressLookup geocoder(final Context context, final Locale locale) {
+        return geocoderFactory.apply(context, locale);
+    }
+
+    @VisibleForTesting
+    public static void replaceGeocoder(
+            final BiFunction<Context, Locale, AddressLookup> replacement) {
+        geocoderFactory = replacement;
+    }
 
     /**
      * Opens a conversation with iCloud on the signed-in account.
@@ -153,5 +186,7 @@ public final class AppDependencies {
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         icloudFactory = AppDependencies::openRealICloud;
+        geocoderFactory = (context, locale) ->
+                AddressLookup.through(new Geocoder(context, locale));
     }
 }
