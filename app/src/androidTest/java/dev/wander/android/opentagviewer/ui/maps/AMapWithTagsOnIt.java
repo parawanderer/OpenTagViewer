@@ -269,6 +269,21 @@ public final class AMapWithTagsOnIt {
         return this;
     }
 
+    /** Apple decides this session needs a verification code again, mid-use. */
+    public void theSessionGoesStale() {
+        this.appleDouble.callAttr("makeTheSessionNeedACode");
+    }
+
+    /** Whether a code put the session back - the rescue itself, not the UI reacting. */
+    public boolean theSessionIsUsableAgain() {
+        return this.appleDouble.callAttr("theSessionIsUsableAgain").toBoolean();
+    }
+
+    /** Codes actually sent to Apple, right or wrong. */
+    public int codesSubmitted() {
+        return this.appleDouble.callAttr("howManyCodesSubmitted").toInt();
+    }
+
     /** The names on the tag cards, left to right - which is the order the carousel shows. */
     public List<String> cardNames() {
         final List<String> names = new ArrayList<>();

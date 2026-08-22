@@ -27,6 +27,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from findmy.reports.twofactor import SyncTrustedDeviceSecondFactor
+
 import main
 
 _originals: dict[str, Any] = {}
@@ -104,6 +106,50 @@ class _FakeAccessory:
         return {"type": "accessory", "id": self._id}
 
 
+#: The code the fake accepts. Anything else is rejected, the way Apple rejects a wrong one.
+THE_RIGHT_CODE = "123456"
+
+
+class _FakeTrustedDevice(SyncTrustedDeviceSecondFactor):
+    """
+    A second-factor method that behaves like the real one in the two ways that matter.
+
+    **A real subclass, not a duck.** ``main._convertToJavaDictWrapper`` dispatches on
+    ``isinstance``, so a stand-in would fall through to the unmapped branch and Java would get a
+    method typed UNKNOWN - a test passing while the app would not work.
+
+    **The sync class specifically**, which is what a sync ``AppleAccount`` hands back. It
+    subclasses ``TrustedDeviceSecondFactorMethod``, so the isinstance check still matches, and
+    its ``request``/``submit`` are ordinary methods - the async base's are coroutines, and
+    overriding those with plain methods is a fake that could never behave like the real thing.
+
+    The base wants a live account, so ``__init__`` is not called up to.
+    """
+
+    def __init__(self, account: "_FakeAccount") -> None:  # noqa: D107 - see above
+        self._account = account
+        self.requested = 0
+
+    def request(self) -> None:
+        self._account.wantsASecondFactor = True  # still needed until a code is accepted
+        self.requested += 1
+
+    def submit(self, code: str) -> Any:
+        """Returns the resulting LoginState, as the real one does - see its signature."""
+        from findmy.reports import LoginState
+
+        self._account.codesSubmitted.append(code)
+
+        if code != THE_RIGHT_CODE:
+            # What FindMy.py raises for a code Apple refused. The app must count this as an
+            # attempt and must not treat it as the session being unrecoverable.
+            raise ValueError(f"Apple rejected the code {code}")
+
+        # Accepted: the session is usable again, which is the whole point of asking.
+        self._account.wantsASecondFactor = False
+        return LoginState.LOGGED_IN
+
+
 class _FakeAccount:
     """The account object `getAccount` hands back, with the sockets left out."""
 
@@ -112,16 +158,38 @@ class _FakeAccount:
         #: Ranged fetches, counted separately - the history screen is the only caller, and
         #: "did the day's fetch happen at all" is a different question from "did any fetch".
         self.rangedFetches: int = 0
+        #: Whether Apple has decided this session needs a code again. See `needsASecondFactor`.
+        self.wantsASecondFactor: bool = False
+        #: Codes submitted, right or wrong, so a test can assert an attempt was actually made
+        #: rather than that a view merely changed.
+        self.codesSubmitted: list[str] = []
 
-    # `main` only ever reads this to decide whether a restore succeeded, and only inside the
-    # real getAccount - which is replaced. Present so anything else that looks is not surprised.
     @property
     def login_state(self) -> Any:
         from findmy.reports import LoginState
 
+        # **The state a session goes to mid-use, which used to be a permanent silent failure.**
+        # Real fetches raise before a request is made when this is REQUIRE_2FA; the fakes below
+        # do the same, so a test sees the app's behaviour rather than a shortcut.
+        if self.wantsASecondFactor:
+            return LoginState.REQUIRE_2FA
+
         return LoginState.LOGGED_IN
 
+    def get_2fa_methods(self) -> list:
+        return [_FakeTrustedDevice(self)]
+
+    def _refuseIfNotLoggedIn(self) -> None:
+        from findmy.errors import InvalidStateError
+        from findmy.reports import LoginState
+
+        if self.wantsASecondFactor:
+            raise InvalidStateError(
+                f"Invalid login state! Currently: {LoginState.REQUIRE_2FA} "
+                f"but should be one of: ({LoginState.LOGGED_IN},)")
+
     def fetch_location(self, accessory: Any) -> list[_FakeReport]:
+        self._refuseIfNotLoggedIn()
         self.fetchedFor.append(getattr(accessory, "_id", "?"))
         return list(_reports)
 
@@ -133,6 +201,8 @@ class _FakeAccount:
         key to reports. A double that answered only the first looks correct and turns every
         history fetch into an exception the screen reports as a failed day.
         """
+        self._refuseIfNotLoggedIn()
+
         if isinstance(accessoryOrKeys, list):
             self.rangedFetches += 1
             # All under the first key. Which key carries them does not matter to the caller,
@@ -231,6 +301,33 @@ def uninstall() -> None:
     _originals.clear()
     theAccount = None
     _reports = []
+
+
+def makeTheSessionNeedACode() -> None:
+    """
+    Apple decides this session needs a second factor, mid-use.
+
+    The state a working session actually goes to - not a torn-down account, not a broken blob.
+    Every fetch from here raises the way FindMy.py's own state check does, until a code is
+    accepted. See :data:`THE_RIGHT_CODE`.
+    """
+    if theAccount is not None:
+        theAccount.wantsASecondFactor = True
+
+
+def theSessionIsUsableAgain() -> bool:
+    """Whether a code put it back - for asserting the rescue happened, not just the UI moved."""
+    return theAccount is not None and not theAccount.wantsASecondFactor
+
+
+def howManyCodesSubmitted() -> int:
+    """
+    Codes actually sent to Apple, right or wrong.
+
+    The assertion that separates "the overlay counted a strike" from "the overlay changed a
+    label": only a code Apple looked at should cost an attempt.
+    """
+    return 0 if theAccount is None else len(theAccount.codesSubmitted)
 
 
 def howManyFetches() -> int:
