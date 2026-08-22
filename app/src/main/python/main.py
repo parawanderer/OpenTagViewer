@@ -728,20 +728,35 @@ def getAccount(
         _preferLocalAnisette(acc, localAnisette)
 
         print(f"Restored account, login state: {acc.login_state}")
-        if acc.login_state != LoginState.LOGGED_IN:
-            # **Not a successful restore, and it used to be treated as one.** This account is
-            # readable and unusable: every fetch fails its state check before a request is even
-            # made, so the app came up showing stale pins and spinners that stopped, with the
-            # reason only in the log. Issue #43.
+
+        if acc.login_state == LoginState.REQUIRE_2FA:
+            # **Handed back rather than discarded, which is a change from the issue #43 fix.**
             #
-            # Reported as a failure so the caller can do the one thing that helps - send the
-            # user to sign in again. That is safe here because the app only ever stores an
-            # account after a completed sign-in: mid-2FA state is never written, so this state
-            # can only mean the session went bad afterwards.
+            # That fix treated any non-LOGGED_IN restore as a failure, on the reasoning that the
+            # app only stores an account after a completed sign-in, so this state can only mean
+            # the session went bad afterwards. That reasoning is about *how it got here*, and
+            # says nothing about whether it can be fixed - which was the gap. REQUIRE_2FA is
+            # exactly the state a second factor resolves, and resolving it needs this account
+            # object, not the password.
+            #
+            # So the caller is given the account and asks `getSecondFactorMethodsIfNeeded` what
+            # it needs. A code costs the user six digits; discarding costs them their Apple
+            # password and a full sign-in, for a session that may have been one step from
+            # working. If the code fails, the caller still falls back to signing in properly -
+            # strictly better when recoverable, no worse when not.
             print(
-                f"Restored account is not logged in (state: {acc.login_state}) - Apple has "
-                "stopped accepting this session. Treating it as a failed restore so the user "
-                "is asked to sign in again rather than left with a map that never updates."
+                "Restored account needs a second factor. Handing it back so the app can ask "
+                "for a code, rather than throwing away a session six digits might fix."
+            )
+            return acc
+
+        if acc.login_state != LoginState.LOGGED_IN:
+            # Logged out, or a state nothing here knows. No code fixes these, so this really is
+            # a failed restore: the caller signs the user in again. Issue #43's other half.
+            print(
+                f"Restored account is not logged in (state: {acc.login_state}) and no second "
+                "factor resolves that. Treating it as a failed restore so the user is asked to "
+                "sign in again rather than left with a map that never updates."
             )
             return None
 
