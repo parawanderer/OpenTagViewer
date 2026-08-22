@@ -413,20 +413,55 @@ def test_a_newly_imported_tag_keeps_a_location_older_than_the_window(monkeypatch
         "the latest known location must survive, however old it is"
 
 
-def test_an_aligned_tag_still_has_its_history_bounded_to_the_window(monkeypatch):
+def test_an_aligned_tag_keeps_the_older_sightings_it_paid_to_fetch(monkeypatch):
     """
-    The other half: once alignment is known the fetch returns everything Apple holds, and the
-    window is what makes "the last 24 hours" true. Keeping everything here would quietly widen
-    every refresh.
+    **Reports from outside the window are kept, not dropped.**
+
+    This used to assert the opposite, on the reasoning that the window is what makes "the last
+    24 hours" true. That reasoning does not survive what the window actually is: a *key* range,
+    not a time range. Keys roll every fifteen minutes, so asking for the last hour asks Apple
+    about a few key indices, and Apple answers with every report it holds for them - which
+    routinely includes sightings from before the window opened.
+
+    Those reports have already been searched for, downloaded and decrypted by the time the
+    filter ran. Dropping them threw that work away and left a hole in stored history that the
+    history screen would later pay to fetch all over again. See `getLastReports`.
+
+    `getReportsForDateRange` still filters, and should: there the range is the user asking for
+    a particular day, not an artefact of key granularity.
     """
     now = datetime.now(tz=timezone.utc)
     recent = FakeReport(now - timedelta(hours=1))
-    too_old = FakeReport(now - timedelta(days=2))
+    older = FakeReport(now - timedelta(days=2))
 
     out = _runGetLastReports(
-        monkeypatch, main.AccessoryFetch([recent, too_old], bounded_to_window=True))
+        monkeypatch, main.AccessoryFetch([recent, older], bounded_to_window=True))
 
-    assert len(out["beacon-1"]["reports"]) == 1, "the two-day-old report should be dropped"
+    assert len(out["beacon-1"]["reports"]) == 2, (
+        "an older sighting for the same keys costs nothing extra and fills in history"
+    )
+
+
+def test_keeping_older_sightings_does_not_change_the_latest_position(monkeypatch):
+    """
+    The property that made widening safe, pinned separately so it stays true.
+
+    The map draws the newest report, so adding older ones to the answer must not move the pin.
+    If this ever fails, widening has become visible to the user rather than being purely
+    additive to stored history.
+    """
+    now = datetime.now(tz=timezone.utc)
+    newest = FakeReport(now - timedelta(hours=1))
+    older = FakeReport(now - timedelta(days=2))
+
+    out = _runGetLastReports(
+        monkeypatch, main.AccessoryFetch([older, newest], bounded_to_window=True))
+
+    timestamps = [report["timestamp"] for report in out["beacon-1"]["reports"]]
+
+    assert max(timestamps) == _ms(now - timedelta(hours=1)), (
+        "the newest report - the one the map draws - must be unaffected"
+    )
 
 
 def test_unknown_width_falls_back_to_the_history_fetch():

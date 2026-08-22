@@ -1479,7 +1479,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             final String beaconId = beacon.getBeaconId();
             final Optional<BeaconLocationReport> maybeLast = this.beaconLocations.lastLocationOf(beaconId);
             if (maybeLast.isEmpty()) {
-                Log.w(TAG, "Found a beacon (" + beaconId + ") without locations! We can't draw such a beacon. Skipping...");
+                // Debug, not a warning. A tag with no locations yet is the ordinary state of a
+                // freshly imported one, and of any tag nobody has walked past since it was
+                // added - there is no card to draw because there is nowhere to draw it, which
+                // is correct rather than a fault. At warning level it sat in every logcat
+                // looking like the cause of whatever else was being investigated.
+                Log.d(TAG, "No locations held for beaconId=" + beaconId + " yet, so it has no card");
                 continue;
             }
             final BeaconLocationReport lastLocation = maybeLast.get();

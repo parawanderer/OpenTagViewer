@@ -251,4 +251,8 @@ You can link again later. That needs your Apple device passcode.</string>
     <string name="export_logs">Export Logs</string>
     <string name="log_file_has_been_exported_successfully">Log file has been exported successfully</string>
     <string name="failed_to_export_log_file">Could not export the log file</string>
+    <string name="show_apple_devices">Show my Apple devices</string>
+    <string name="show_apple_devices_explainer">Your iPhones, iPads and Macs can only be located here through the Find My network, the same way an AirTag is. That means they update rarely and unpredictably, unlike Apple\'s own app, which reads the position a device reports to iCloud itself. Off by default because that coverage is fundamentally incomplete. While off, these devices are neither shown nor searched for.</string>
+    <string name="show_apple_devices_help_link">Help build full support →</string>
+    <string name="no_app_to_open_a_link_with">No app on this phone can open a web link</string>
 </resources>

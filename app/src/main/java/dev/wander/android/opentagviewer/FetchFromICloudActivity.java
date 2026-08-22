@@ -44,6 +44,7 @@ import dev.wander.android.opentagviewer.ui.login.StepTransition.Direction;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 
 /**
@@ -556,10 +557,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             return;
         }
 
-        final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        if (intent.resolveActivity(this.getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, url);
     }
 
     private void leaveForFileImport() {
