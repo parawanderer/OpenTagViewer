@@ -257,4 +257,9 @@
     <string name="no_app_to_open_a_link_with">此手机上没有可以打开网页链接的应用</string>
     <string name="reorder_tag">拖动以重新排序</string>
     <string name="move_to_top">移到顶部</string>
+    <string name="two_factor_again_title">Apple 需要验证码</string>
+    <string name="two_factor_again_message">你的会话仍处于登录状态，但 Apple 再次要求验证码。输入后才能继续，在此之前无法定位任何设备。</string>
+    <string name="two_factor_again_sign_out">改为退出登录</string>
+    <string name="two_factor_again_wrong_code">验证码未通过。还剩 %1$d 次机会。</string>
+    <string name="two_factor_again_giving_up">验证码未通过。正在退出登录，你需要重新登录。</string>
 </resources>

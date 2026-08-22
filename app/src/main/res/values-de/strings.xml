@@ -257,4 +257,9 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
     <string name="no_app_to_open_a_link_with">Keine App auf diesem Telefon kann einen Weblink öffnen</string>
     <string name="reorder_tag">Zum Umsortieren ziehen</string>
     <string name="move_to_top">Nach oben verschieben</string>
+    <string name="two_factor_again_title">Apple benötigt einen Bestätigungscode</string>
+    <string name="two_factor_again_message">Deine Sitzung ist weiterhin angemeldet, aber Apple verlangt erneut einen Code. Gib ihn ein, um fortzufahren – bis dahin kann nichts geortet werden.</string>
+    <string name="two_factor_again_sign_out">Stattdessen abmelden</string>
+    <string name="two_factor_again_wrong_code">Dieser Code wurde nicht akzeptiert. Noch %1$d Versuche.</string>
+    <string name="two_factor_again_giving_up">Dieser Code wurde nicht akzeptiert. Du wirst abgemeldet und musst dich erneut anmelden.</string>
 </resources>

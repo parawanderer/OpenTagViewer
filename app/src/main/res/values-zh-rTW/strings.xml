@@ -257,4 +257,9 @@
     <string name="no_app_to_open_a_link_with">此手機上沒有可以開啟網頁連結的 App</string>
     <string name="reorder_tag">拖曳以重新排序</string>
     <string name="move_to_top">移到最上方</string>
+    <string name="two_factor_again_title">Apple 需要驗證碼</string>
+    <string name="two_factor_again_message">你的工作階段仍處於登入狀態，但 Apple 再次要求驗證碼。輸入後才能繼續，在此之前無法定位任何裝置。</string>
+    <string name="two_factor_again_sign_out">改為登出</string>
+    <string name="two_factor_again_wrong_code">驗證碼未通過。還剩 %1$d 次機會。</string>
+    <string name="two_factor_again_giving_up">驗證碼未通過。正在登出，你需要重新登入。</string>
 </resources>

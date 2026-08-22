@@ -257,4 +257,9 @@ You can link again later. That needs your Apple device passcode.</string>
     <string name="no_app_to_open_a_link_with">No app on this phone can open a web link</string>
     <string name="reorder_tag">Drag to reorder</string>
     <string name="move_to_top">Move to top</string>
+    <string name="two_factor_again_title">Apple needs a verification code</string>
+    <string name="two_factor_again_message">Your session is still signed in, but Apple has asked for a code again. Enter it to carry on — nothing can be located until you do.</string>
+    <string name="two_factor_again_sign_out">Sign out instead</string>
+    <string name="two_factor_again_wrong_code">That code was not accepted. %1$d attempts left.</string>
+    <string name="two_factor_again_giving_up">That code was not accepted. Signing out — you will need to sign in again.</string>
 </resources>

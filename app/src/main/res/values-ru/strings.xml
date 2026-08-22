@@ -257,4 +257,9 @@
     <string name="no_app_to_open_a_link_with">На этом телефоне нет приложения, способного открыть веб-ссылку</string>
     <string name="reorder_tag">Перетащите, чтобы изменить порядок</string>
     <string name="move_to_top">Переместить наверх</string>
+    <string name="two_factor_again_title">Apple запрашивает код подтверждения</string>
+    <string name="two_factor_again_message">Сеанс всё ещё активен, но Apple снова запросила код. Введите его, чтобы продолжить — до этого ничего найти нельзя.</string>
+    <string name="two_factor_again_sign_out">Выйти из аккаунта</string>
+    <string name="two_factor_again_wrong_code">Код не принят. Осталось попыток: %1$d.</string>
+    <string name="two_factor_again_giving_up">Код не принят. Выполняется выход — потребуется войти снова.</string>
 </resources>

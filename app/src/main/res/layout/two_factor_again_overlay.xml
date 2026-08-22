@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Asking for a verification code when a working session has gone stale.
+
+    **An overlay rather than a dismissible dialog, and that is the point.** Once Apple moves the
+    session to REQUIRE_2FA the app cannot fetch anything at all - not account tags, not imported
+    ones, because locating any tag needs an authenticated session. So there is no useful state
+    behind this: dismissing it into the map would leave somebody looking at a screen that has
+    quietly stopped working, which is the bug this exists to end.
+
+    Two ways out, both honest: enter the code, or sign out. Nothing here returns to a broken map.
+
+    Full-screen and clickable, so nothing underneath can be tapped through it, and with an opaque
+    background so the stale map is not visible and mistaken for live.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/two_factor_again_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone"
+    tools:visibility="visible">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nunito_medium"
+            android:text="@string/two_factor_again_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/two_factor_again_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:fontFamily="@font/nunito_medium"
+            android:gravity="center_horizontal"
+            android:text="@string/two_factor_again_message"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp" />
+
+        <include layout="@layout/two_factor_code_row" />
+
+        <!--
+            Its own message rather than the login screen's: that one is inside a container this
+            layout does not have, and reusing the id would give Apple2FACodeInputManager two
+            views to find.
+        -->
+        <TextView
+            android:id="@+id/two_factor_again_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:fontFamily="@font/nunito_medium"
+            android:gravity="center_horizontal"
+            android:textColor="?attr/colorError"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="That code was not accepted. 2 attempts left."
+            tools:visibility="visible" />
+
+        <ProgressBar
+            android:id="@+id/two_factor_again_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/two_factor_again_sign_out"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="@font/nunito_medium"
+            android:text="@string/two_factor_again_sign_out" />
+    </LinearLayout>
+</FrameLayout>

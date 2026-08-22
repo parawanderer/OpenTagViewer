@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The six boxes an Apple verification code is typed into.
+
+    **Extracted so there is exactly one of these.** It was inline in activity_apple_login, and
+    the same row is now needed in an overlay on the map for a session that has gone stale and
+    wants a code. A second copy would drift - and the ids are load-bearing, because
+    Apple2FACodeInputManager finds the slots by id and silently gets nulls if one is renamed.
+
+    Included rather than merged into a ViewGroup of its own, so the including layout decides the
+    surrounding padding and gravity.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_1"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_1"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_2"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_2"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_3"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_3"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_4"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_4"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_5"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_5"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/twofactorauth_textinput_container_6"
+            style="?attr/textInputOutlinedDenseStyle"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/twofactorauth_textinput_6"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:padding="10dp"
+                android:singleLine="true"
+                android:textSize="16sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+    </LinearLayout>
