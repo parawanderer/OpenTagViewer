@@ -90,8 +90,72 @@ jobs:
       # defined only here. Gradle provisions and tears it down itself, so there is no action to
       # keep in step with the AVD in app/build.gradle.kts - and "it passed locally" means it
       # passed on this device.
+      # Output is kept so the step after this can tell "some tests failed" apart from "the run
+      # died and the rest never ran". `pipefail` so tee does not swallow Gradle's exit code.
       - name: Run instrumented tests
-        run: ./gradlew :app:testEmulatorDebugAndroidTest --console=plain
+        run: |
+          set -o pipefail
+          ./gradlew :app:testEmulatorDebugAndroidTest --console=plain 2>&1 \
+            | tee instrumented-run.log
+
+      # **Did every test actually run?**
+      #
+      # A crashed instrumentation process is reported as a couple of failed tests, and those two
+      # names are whichever were in flight when it died - arbitrary, and nothing to do with the
+      # cause. The truth is in a line nobody reads: "Tests 362/543 completed", followed by
+      # "Finished 362 tests". The other 181 never ran, and the summary does not say so.
+      #
+      # That cost real time on PR #129: the two names were treated as clues for a while before
+      # the count was noticed. This turns the count into the headline.
+      - name: Check the whole suite actually ran
+        if: always()
+        run: |
+          if [ ! -f instrumented-run.log ]; then
+            echo "No run log, so nothing to check."
+            exit 0
+          fi
+
+          if grep -q "Test run failed to complete" instrumented-run.log; then
+            echo "::error::The instrumentation process died part-way through. Any test named as"\
+                 "failing above was in flight when it happened and is not the cause - look at the"\
+                 "logcat artefact, not at those names."
+          fi
+
+          # The last "Tests N/M completed" line carries both numbers.
+          expected=$(grep -oE "Tests [0-9]+/[0-9]+ completed" instrumented-run.log \
+            | tail -1 | grep -oE "/[0-9]+" | tr -d '/')
+          finished=$(grep -oE "Finished [0-9]+ tests" instrumented-run.log \
+            | tail -1 | grep -oE "[0-9]+")
+
+          if [ -z "$expected" ] || [ -z "$finished" ]; then
+            echo "Could not read a test count from the run log; leaving the verdict to Gradle."
+            exit 0
+          fi
+
+          echo "Finished $finished of $expected tests."
+
+          if [ "$finished" -lt "$expected" ]; then
+            echo "::error::Only $finished of $expected tests ran. The suite aborted - this is not"\
+                 "the same as $((expected - finished)) tests failing, and it is not the same as a"\
+                 "pass. Download the logcat artefact to see what killed the process."
+            exit 1
+          fi
+
+      # **The logcat, which is the only thing that names a crash.**
+      #
+      # The reports below are HTML summaries: useful for reading assertions, useless for a
+      # process that died. The logcat sits somewhere else entirely and was being thrown away, so
+      # a CI-only crash could be seen and never diagnosed - `Process crashed` and nothing more.
+      # Costs nothing on a green run; it is the difference between a diagnosis and a guess.
+      - name: Upload logcat and raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-logcat
+          path: |
+            app/build/outputs/androidTest-results/
+            instrumented-run.log
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: always()
