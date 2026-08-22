@@ -31,6 +31,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.DataBindingUtil;
@@ -48,6 +49,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityDeviceInfoBinding;
@@ -82,8 +85,11 @@ import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
 
-public class DeviceInfoActivity extends AppCompatActivity {
+public class DeviceInfoActivity extends AppCompatActivity
+        implements ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = DeviceInfoActivity.class.getSimpleName();
+
+    private static final int PERMISSION_REQUEST_PLAY_SOUND_NEARBY = 1001;
 
     private static final double DEFAULT_LONGITUDE = 0d;
     private static final double DEFAULT_LATITUDE = 0d;
@@ -122,6 +128,10 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
     /** The in-flight write to the account, so leaving the screen does not land on dead views. */
     private Disposable accountRename;
+
+    /** The in-flight BLE scan/GATT trigger, so leaving the screen stops it rather than
+     * leaving a scan running or a result landing on dead views. */
+    private Disposable playSoundNearby;
 
     private boolean hasNameChanges = false;
 
@@ -590,7 +600,100 @@ public class DeviceInfoActivity extends AppCompatActivity {
         if (this.accountRename != null && !this.accountRename.isDisposed()) {
             this.accountRename.dispose();
         }
+        // Here disposing does cancel the underlying work - see BleGattSoundTrigger.trigger's
+        // cancellable, which closes the GATT connection rather than leaving it dangling.
+        if (this.playSoundNearby != null && !this.playSoundNearby.isDisposed()) {
+            this.playSoundNearby.dispose();
+        }
         super.onDestroy();
+    }
+
+    /**
+     * Ask to play this accessory's sound directly over Bluetooth, without going through Apple's
+     * Find My network - see {@code dev.wander.android.opentagviewer.ble}. Only reachable while
+     * the accessory is close enough to answer a BLE scan, unlike the network-based search this
+     * screen otherwise relies on.
+     */
+    private void onClickPlaySoundNearby() {
+        if (!BlePermissions.granted(this)) {
+            Log.d(TAG, "Requesting BLE permission(s) before playing sound nearby");
+            ActivityCompat.requestPermissions(
+                    this, BlePermissions.required(), PERMISSION_REQUEST_PLAY_SOUND_NEARBY);
+            return;
+        }
+        this.startPlaySoundNearby();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            final int requestCode, @androidx.annotation.NonNull final String[] permissions,
+            @androidx.annotation.NonNull final int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != PERMISSION_REQUEST_PLAY_SOUND_NEARBY) return;
+
+        // Re-checked against the same BlePermissions.granted this action gates on elsewhere,
+        // rather than reading grantResults directly - one place decides what "enough" means,
+        // matching the reasoning in BlePermissions' own class doc.
+        if (BlePermissions.granted(this)) {
+            Log.i(TAG, "BLE permission granted; playing sound nearby for beaconId=" + this.beaconId);
+            this.startPlaySoundNearby();
+        } else {
+            Log.i(TAG, "BLE permission refused; not playing sound nearby for beaconId=" + this.beaconId);
+            Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
+        }
+    }
+
+    private void startPlaySoundNearby() {
+        final String accessoryJson = this.beaconData.getOwnedBeaconInfo().accessoryJson;
+
+        Toast.makeText(this, R.string.play_sound_searching, LENGTH_LONG).show();
+
+        if (this.playSoundNearby != null && !this.playSoundNearby.isDisposed()) {
+            this.playSoundNearby.dispose();
+        }
+
+        this.playSoundNearby = AppDependencies.accessorySoundTrigger()
+                .playSound(this.getApplicationContext(), accessoryJson)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::showPlaySoundResult,
+                        error -> {
+                            // AccessorySoundTrigger's contract is to never error a failure onto
+                            // this path - see its interface doc - so reaching here means a bug
+                            // in that contract, not an ordinary "not found" or "no permission".
+                            Log.e(TAG, "Unexpected error playing sound for beaconId="
+                                    + this.beaconId, error);
+                            Toast.makeText(this, R.string.play_sound_failed, LENGTH_LONG).show();
+                        });
+    }
+
+    private void showPlaySoundResult(final BleSoundTriggerResult result) {
+        Log.d(TAG, "Play sound result for beaconId=" + this.beaconId + ": " + result.getStatus()
+                + (result.getMessage() == null ? "" : " (" + result.getMessage() + ")"));
+
+        final int messageRes;
+        switch (result.getStatus()) {
+            case SUCCESS:
+                messageRes = R.string.play_sound_success;
+                break;
+            case NOT_NEARBY:
+                messageRes = R.string.play_sound_not_nearby;
+                break;
+            case NO_SOUND_SERVICE:
+                messageRes = R.string.play_sound_no_sound_service;
+                break;
+            case NO_CANDIDATE_MACS:
+                messageRes = R.string.play_sound_no_candidate_macs;
+                break;
+            case MISSING_PERMISSION:
+                messageRes = R.string.play_sound_permission_denied;
+                break;
+            case FAILED:
+            default:
+                messageRes = R.string.play_sound_failed;
+                break;
+        }
+        Toast.makeText(this, messageRes, LENGTH_LONG).show();
     }
 
     /**
@@ -726,6 +829,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
             if (menuItem.getItemId() == R.id.device_location_history) {
                 this.redirectToDeviceHistory();
+            } else if (menuItem.getItemId() == R.id.device_play_sound_nearby) {
+                this.onClickPlaySoundNearby();
             } else if (menuItem.getItemId() == R.id.device_delete) {
                 this.onClickDeviceDelete();
             }

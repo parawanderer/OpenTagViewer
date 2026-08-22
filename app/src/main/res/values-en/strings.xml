@@ -309,4 +309,12 @@ You can set this up now, or any time later from Settings.</string>
     <string name="refresh_from_account">Refresh from Apple account</string>
     <string name="refresh_from_account_done">Up to date with your Apple account</string>
     <string name="refresh_from_account_failed">Could not reach your Apple account just now. Your tags are unchanged.</string>
+    <string name="play_sound_nearby">Play Sound Nearby</string>
+    <string name="play_sound_searching">Searching nearby over Bluetooth…</string>
+    <string name="play_sound_success">Playing sound now.</string>
+    <string name="play_sound_not_nearby">Not found nearby. Move closer and try again.</string>
+    <string name="play_sound_no_sound_service">Connected, but this accessory has no sound service.</string>
+    <string name="play_sound_no_candidate_macs">Could not compute this accessory\'s current address.</string>
+    <string name="play_sound_permission_denied">Bluetooth permission is needed to play the sound nearby.</string>
+    <string name="play_sound_failed">Could not play the sound. Try again.</string>
 </resources>

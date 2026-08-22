@@ -8,6 +8,18 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!--
+        For DeviceInfoActivity's "play sound nearby" - direct BLE GATT to an owned accessory,
+        bypassing Apple's Find My network. Below API 31 this instead requires the location
+        permissions above, which the app already declares. neverForLocation is accurate: the
+        scan is only ever matched against a MAC address computed from the accessory's own keys
+        (see dev.wander.android.opentagviewer.ble), never used to derive or report a position.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- 高德地图SDK所需权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

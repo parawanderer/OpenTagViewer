@@ -309,4 +309,12 @@
     <string name="refresh_from_account">Обновить из учётной записи Apple</string>
     <string name="refresh_from_account_done">Данные соответствуют учётной записи Apple</string>
     <string name="refresh_from_account_failed">Сейчас не удалось связаться с учётной записью Apple. Метки не изменились.</string>
+    <string name="play_sound_nearby">Издать звук поблизости</string>
+    <string name="play_sound_searching">Поиск поблизости через Bluetooth…</string>
+    <string name="play_sound_success">Воспроизведение звука…</string>
+    <string name="play_sound_not_nearby">Не найдено поблизости. Подойдите ближе и попробуйте снова.</string>
+    <string name="play_sound_no_sound_service">Подключено, но у этого аксессуара нет звуковой службы.</string>
+    <string name="play_sound_no_candidate_macs">Не удалось вычислить текущий адрес этого аксессуара.</string>
+    <string name="play_sound_permission_denied">Для воспроизведения звука поблизости требуется разрешение Bluetooth.</string>
+    <string name="play_sound_failed">Не удалось воспроизвести звук. Попробуйте снова.</string>
 </resources>

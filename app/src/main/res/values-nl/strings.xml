@@ -309,4 +309,12 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="refresh_from_account">Vernieuwen vanaf Apple-account</string>
     <string name="refresh_from_account_done">Bijgewerkt met je Apple-account</string>
     <string name="refresh_from_account_failed">Je Apple-account was even niet bereikbaar. Je tags zijn ongewijzigd.</string>
+    <string name="play_sound_nearby">In de buurt laten piepen</string>
+    <string name="play_sound_searching">Zoeken in de buurt via Bluetooth…</string>
+    <string name="play_sound_success">Geluid wordt nu afgespeeld.</string>
+    <string name="play_sound_not_nearby">Niet in de buurt gevonden. Kom dichterbij en probeer het opnieuw.</string>
+    <string name="play_sound_no_sound_service">Verbonden, maar dit accessoire heeft geen geluidsservice.</string>
+    <string name="play_sound_no_candidate_macs">Kan het huidige adres van dit accessoire niet berekenen.</string>
+    <string name="play_sound_permission_denied">Bluetooth-toestemming is nodig om het geluid in de buurt af te spelen.</string>
+    <string name="play_sound_failed">Kan het geluid niet afspelen. Probeer het opnieuw.</string>
 </resources>

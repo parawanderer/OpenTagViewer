@@ -309,4 +309,12 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="refresh_from_account">Actualiser depuis le compte Apple</string>
     <string name="refresh_from_account_done">À jour avec votre compte Apple</string>
     <string name="refresh_from_account_failed">Impossible de joindre votre compte Apple pour le moment. Vos tags sont inchangés.</string>
+    <string name="play_sound_nearby">Faire sonner à proximité</string>
+    <string name="play_sound_searching">Recherche à proximité via Bluetooth…</string>
+    <string name="play_sound_success">Lecture du son en cours.</string>
+    <string name="play_sound_not_nearby">Introuvable à proximité. Rapprochez-vous et réessayez.</string>
+    <string name="play_sound_no_sound_service">Connecté, mais cet accessoire n\'a pas de service sonore.</string>
+    <string name="play_sound_no_candidate_macs">Impossible de calculer l\'adresse actuelle de cet accessoire.</string>
+    <string name="play_sound_permission_denied">L\'autorisation Bluetooth est nécessaire pour faire sonner l\'appareil à proximité.</string>
+    <string name="play_sound_failed">Impossible de jouer le son. Réessayez.</string>
 </resources>
