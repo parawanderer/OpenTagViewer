@@ -151,6 +151,32 @@ public class ASessionThatWantsACodeAgainTest {
         assertEquals("no code should have been sent", 0, this.theMap.codesSubmitted());
     }
 
+    /**
+     * <b>A session that needs a code but offers no way to send one signs out.</b>
+     *
+     * <p><b>Found on a real account, not imagined.</b> FindMy.py reports it as <i>"Unexpected
+     * login state after reauth: REQUIRE_2FA. Please log in again"</i> - the session is stuck and
+     * there is genuinely nothing to type.
+     *
+     * <p>The first version of this fix did nothing at all here, because it used an empty list to
+     * mean both "nothing needed" and "nothing can help". That silently recreated the original
+     * bug with more code in front of it, which is why the two are now different answers.
+     */
+    @Test
+    public void asessionWithNoWayToSendACodeSignsOutRatherThanAskingForOne() {
+        this.theMap.seed("Wallet");
+        this.theMap.theSessionGoesStaleBeyondRescue();
+        this.theMap.open();
+
+        Eventually.check(() -> assertTrue(
+                "there is no code that fixes this session, so the app must sign out rather than"
+                        + " leaving a map that silently cannot fetch",
+                !this.stillSignedIn()));
+
+        assertEquals("nothing could have been submitted - there was nowhere to send a code",
+                0, this.theMap.codesSubmitted());
+    }
+
     // --- helpers ------------------------------------------------------------------------------
 
     /**

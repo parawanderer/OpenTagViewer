@@ -14,6 +14,7 @@ import org.json.JSONObject;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
@@ -210,12 +211,23 @@ public final class PythonAuthService {
      * its state check before a request leaves the phone. That used to be permanent and silent -
      * see {@code main.py:getSecondFactorMethodsIfNeeded}.
      *
-     * @return the ways to send a code, or an <b>empty list</b> when nothing is needed or when
-     *         nothing would help. Empty rather than null so callers cannot forget the case, and
-     *         because "no second factor fixes this" and "this account is fine" both mean the
-     *         same thing to the caller: do not put a code box on screen.
+     * <p><b>Three answers, not two, and collapsing them is a bug I already made.</b> The first
+     * version returned a plain list and used empty for both "nothing needed" and "nothing can
+     * help" - so a session in {@code REQUIRE_2FA} that offered no way to send a code was read as
+     * healthy, and the app did nothing at all. That is the original silent dead session, with
+     * more code in front of it. A real one behaves this way: FindMy.py reports
+     * <i>"Unexpected login state after reauth ... Please log in again"</i>, and there is nothing
+     * to type.
+     *
+     * @return <ul>
+     *   <li>{@link Optional#empty()} - nothing is needed; carry on.</li>
+     *   <li>a present, <b>non-empty</b> list - ask for a code using one of these.</li>
+     *   <li>a present but <b>empty</b> list - a code is needed and cannot be asked for. Only a
+     *       full sign-in fixes this, so the caller signs the user out rather than showing a box
+     *       that can never be filled.</li>
+     * </ul>
      */
-    public static Observable<List<AuthMethod>> secondFactorMethodsIfNeeded(
+    public static Observable<Optional<List<AuthMethod>>> secondFactorMethodsIfNeeded(
             final PythonAppleAccount account) {
 
         return Observable.fromCallable(() -> PythonLock.holding(() -> {
@@ -227,10 +239,10 @@ public final class PythonAuthService {
                     new Kwarg("account", account.getAccountObj()));
 
             if (methods == null) {
-                return List.<AuthMethod>of();
+                return Optional.<List<AuthMethod>>empty();
             }
 
-            return toAuthMethods(methods);
+            return Optional.of(toAuthMethods(methods));
         })).subscribeOn(Schedulers.io());
     }
 
