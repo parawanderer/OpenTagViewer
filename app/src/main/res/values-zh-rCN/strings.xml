@@ -251,4 +251,8 @@
     <string name="export_logs">导出日志</string>
     <string name="log_file_has_been_exported_successfully">日志文件已导出</string>
     <string name="failed_to_export_log_file">无法导出日志文件</string>
+    <string name="show_apple_devices">显示我的 Apple 设备</string>
+    <string name="show_apple_devices_explainer">你的 iPhone、iPad 和 Mac 在这里只能通过“查找”网络定位，方式与 AirTag 相同。因此它们更新得很少，而且时间不可预测；苹果自家的应用则读取设备自己上报给 iCloud 的位置。由于这种覆盖从根本上并不完整，此项默认关闭。关闭期间，这些设备既不显示也不会被查询。</string>
+    <string name="show_apple_devices_help_link">参与实现完整支持 →</string>
+    <string name="no_app_to_open_a_link_with">此手机上没有可以打开网页链接的应用</string>
 </resources>

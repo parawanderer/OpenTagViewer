@@ -30,6 +30,7 @@ import dev.wander.android.opentagviewer.databinding.ActivityInformationBinding;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.widget.FlowLayout;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 
 public class InformationActivity extends AppCompatActivity {
     private static final String TAG = InformationActivity.class.getSimpleName();
@@ -146,14 +147,7 @@ public class InformationActivity extends AppCompatActivity {
     }
 
     private void openUrl(final String url) {
-        if (url == null || url.isBlank()) {
-            return;
-        }
-
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, url);
     }
 
     /** Shape of assets/contributors.json. */
@@ -175,13 +169,7 @@ public class InformationActivity extends AppCompatActivity {
 
         var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
         assert properties != null;
-        final String projectGithub = properties.getProperty("projectWiki");
-
-        Uri devSite = Uri.parse(projectGithub);
-        Intent intent = new Intent(Intent.ACTION_VIEW, devSite);
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, properties.getProperty("projectWiki"));
     }
 
     public void onClickGithub(View view) {
@@ -189,12 +177,6 @@ public class InformationActivity extends AppCompatActivity {
 
         var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
         assert properties != null;
-        final String projectGithub = properties.getProperty("projectGithub");
-
-        Uri devSite = Uri.parse(projectGithub);
-        Intent intent = new Intent(Intent.ACTION_VIEW, devSite);
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            this.startActivity(intent);
-        }
+        WebLink.open(this, properties.getProperty("projectGithub"));
     }
 }

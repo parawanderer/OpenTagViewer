@@ -21,6 +21,9 @@
 #define LOG_TAG "adi"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+// For the things that happen on every request rather than once per install. At info level they
+// crowd out everything else in a logcat, which is where anything actually wrong has to be found.
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 namespace {
 
@@ -279,7 +282,10 @@ Java_dev_wander_android_opentagviewer_anisette_NativeAdi_otpRequest(
     env->SetObjectArrayElement(pair, 0, machine_id_copy);
     env->SetObjectArrayElement(pair, 1, otp_copy);
 
-    LOGI("ADIOTPRequest ok: %u byte machine id, %u byte password",
+    // Debug: this runs once per Anisette generation, so once per Apple request. Provisioning
+    // above stays at info - that happens once for the life of the install, and is the thing
+    // worth seeing in a bug report.
+    LOGD("ADIOTPRequest ok: %u byte machine id, %u byte password",
          machine_id_length, otp_length);
     return pair;
 }
