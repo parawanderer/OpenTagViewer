@@ -93,7 +93,7 @@ public final class AppDependencies {
      * one in a test replaces what the other depends on too.
      */
     private static AccessorySoundTrigger accessorySoundTrigger =
-            new BleAccessorySoundTrigger(accessoryMacResolver);
+            BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
 
     /**
      * Strips personal identifiers out of a log before it is offered to anybody.
@@ -263,7 +263,7 @@ public final class AppDependencies {
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         accessoryMacResolver = new ChaquopyAccessoryMacResolver();
-        accessorySoundTrigger = new BleAccessorySoundTrigger(accessoryMacResolver);
+        accessorySoundTrigger = BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
         logRedactor = new ChaquopyLogRedactor();
         bundleBuilder = new ChaquopyBundleBuilder();
         icloudFactory = AppDependencies::openRealICloud;

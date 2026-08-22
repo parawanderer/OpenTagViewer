@@ -318,4 +318,9 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="play_sound_permission_denied">L\'autorisation Bluetooth est nécessaire pour faire sonner l\'appareil à proximité.</string>
     <string name="play_sound_failed">Impossible de jouer le son. Réessayez.</string>
     <string name="stop_ringing">Arrêter</string>
+    <string name="play_sound_connecting">Trouvé à proximité, connexion…</string>
+    <string name="play_sound_sending">Envoi de la commande sonore…</string>
+    <string name="ring_status_scanning">Recherche…</string>
+    <string name="ring_status_connecting">Connexion…</string>
+    <string name="ring_status_triggering">Envoi…</string>
 </resources>

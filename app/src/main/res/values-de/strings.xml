@@ -318,4 +318,9 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="play_sound_permission_denied">Für das Klingeln in der Nähe wird die Bluetooth-Berechtigung benötigt.</string>
     <string name="play_sound_failed">Ton konnte nicht abgespielt werden. Versuche es erneut.</string>
     <string name="stop_ringing">Stopp</string>
+    <string name="play_sound_connecting">Gefunden, verbinde…</string>
+    <string name="play_sound_sending">Sende Ton-Befehl…</string>
+    <string name="ring_status_scanning">Suche…</string>
+    <string name="ring_status_connecting">Verbinde…</string>
+    <string name="ring_status_triggering">Sende…</string>
 </resources>

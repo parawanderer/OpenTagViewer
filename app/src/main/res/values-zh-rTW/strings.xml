@@ -318,4 +318,9 @@
     <string name="play_sound_permission_denied">就近響鈴需要藍牙權限。</string>
     <string name="play_sound_failed">無法播放聲音。請重試。</string>
     <string name="stop_ringing">停止</string>
+    <string name="play_sound_connecting">已找到，正在連線…</string>
+    <string name="play_sound_sending">正在傳送聲音指令…</string>
+    <string name="ring_status_scanning">搜尋中…</string>
+    <string name="ring_status_connecting">連線中…</string>
+    <string name="ring_status_triggering">傳送中…</string>
 </resources>

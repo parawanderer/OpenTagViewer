@@ -318,4 +318,9 @@
     <string name="play_sound_permission_denied">근처에서 소리를 재생하려면 블루투스 권한이 필요합니다.</string>
     <string name="play_sound_failed">소리를 재생할 수 없습니다. 다시 시도하세요.</string>
     <string name="stop_ringing">중지</string>
+    <string name="play_sound_connecting">근처에서 찾았습니다, 연결 중…</string>
+    <string name="play_sound_sending">소리 명령 전송 중…</string>
+    <string name="ring_status_scanning">검색 중…</string>
+    <string name="ring_status_connecting">연결 중…</string>
+    <string name="ring_status_triggering">전송 중…</string>
 </resources>

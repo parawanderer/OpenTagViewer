@@ -318,4 +318,9 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="play_sound_permission_denied">Bluetooth-toestemming is nodig om het geluid in de buurt af te spelen.</string>
     <string name="play_sound_failed">Kan het geluid niet afspelen. Probeer het opnieuw.</string>
     <string name="stop_ringing">Stoppen</string>
+    <string name="play_sound_connecting">Gevonden, verbinden…</string>
+    <string name="play_sound_sending">Geluidscommando versturen…</string>
+    <string name="ring_status_scanning">Zoeken…</string>
+    <string name="ring_status_connecting">Verbinden…</string>
+    <string name="ring_status_triggering">Versturen…</string>
 </resources>
