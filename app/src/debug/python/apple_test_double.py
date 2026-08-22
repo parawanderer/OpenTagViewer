@@ -70,12 +70,35 @@ class _FakeAccessory:
 
     def __init__(self, beaconId: str) -> None:
         self._id = beaconId
+        #: Every ``(timestamp, index)`` the ranged fetch fed back in, so a test can ask whether
+        #: alignment was maintained rather than only whether reports came out.
+        self.alignedAt: list[tuple[Any, int]] = []
 
     def get_min_index(self, _dt: Any) -> int:
         return 0
 
     def get_max_index(self, _dt: Any) -> int:
         return 96  # a day of keys, at one every fifteen minutes
+
+    def keys_between(self, _start: Any, _end: Any) -> list[tuple[int, str]]:
+        """
+        The ``(index, key)`` pairs a ranged fetch searches.
+
+        **The history screen cannot be reached without this.** ``getLastReports`` asks the
+        account for a location; ``getReports`` does not - it generates the window's keys itself
+        and asks for *those*, because 0.9.x's ``fetch_location_history(accessory)`` ignores any
+        range it is given. So a double with no ``keys_between`` sends every history fetch down
+        ``_keysForRange``'s except branch, which returns an empty list and reports the day as
+        genuinely empty. Which is the shape of the bug that path exists to fix, arriving from
+        the test double instead.
+
+        Four keys rather than one: ``_fetchChunkAndAlign`` maps reports back to indices through
+        the key they arrived under, and a single-key window would let a mix-up there pass.
+        """
+        return [(index, f"key-{self._id}-{index}") for index in range(4)]
+
+    def update_alignment(self, timestamp: Any, index: int) -> None:
+        self.alignedAt.append((timestamp, index))
 
     def to_json(self) -> dict[str, Any]:
         return {"type": "accessory", "id": self._id}
@@ -86,6 +109,9 @@ class _FakeAccount:
 
     def __init__(self) -> None:
         self.fetchedFor: list[str] = []
+        #: Ranged fetches, counted separately - the history screen is the only caller, and
+        #: "did the day's fetch happen at all" is a different question from "did any fetch".
+        self.rangedFetches: int = 0
 
     # `main` only ever reads this to decide whether a restore succeeded, and only inside the
     # real getAccount - which is replaced. Present so anything else that looks is not surprised.
@@ -99,8 +125,22 @@ class _FakeAccount:
         self.fetchedFor.append(getattr(accessory, "_id", "?"))
         return list(_reports)
 
-    def fetch_location_history(self, accessory: Any) -> list[_FakeReport]:
-        self.fetchedFor.append(getattr(accessory, "_id", "?"))
+    def fetch_location_history(self, accessoryOrKeys: Any) -> Any:
+        """
+        **Two callers, two argument types, two return types** - which is FindMy.py's shape, not
+        an invention here. ``_fetchReportsForAccessory`` passes the accessory and expects a list
+        of reports; ``_fetchChunkAndAlign`` passes a list of plain keys and expects a dict of
+        key to reports. A double that answered only the first looks correct and turns every
+        history fetch into an exception the screen reports as a failed day.
+        """
+        if isinstance(accessoryOrKeys, list):
+            self.rangedFetches += 1
+            # All under the first key. Which key carries them does not matter to the caller,
+            # but it must be one `keys_between` handed out, or the index lookup that follows
+            # finds nothing and alignment is silently never updated.
+            return {accessoryOrKeys[0]: list(_reports)} if accessoryOrKeys else {}
+
+        self.fetchedFor.append(getattr(accessoryOrKeys, "_id", "?"))
         return list(_reports)
 
 
@@ -159,6 +199,28 @@ def installWithNothingToReport() -> None:
     _reports = []
 
 
+def clearReports() -> None:
+    """Forget what the fetches return, leaving the account restorable. Pairs with `reportAt`."""
+    global _reports
+
+    _reports = []
+
+
+def reportAt(unixMs: int, latitude: float, longitude: float) -> None:
+    """
+    Add one report at an exact moment, rather than at an offset from now.
+
+    **The history screen is why this takes an absolute time.** It asks for one local day at a
+    time, so "two hours ago" lands on yesterday for anybody running the suite shortly after
+    midnight - a test that passes all day and fails at 00:30 for reasons that have nothing to
+    do with the app. The caller knows which day it means; it says so.
+    """
+    _reports.append(_FakeReport(
+        timestamp=datetime.fromtimestamp(unixMs / 1000, tz=timezone.utc),
+        latitude=latitude,
+        longitude=longitude))
+
+
 def uninstall() -> None:
     """Put the real functions back. Safe to call without a matching install."""
     global theAccount, _reports
@@ -174,3 +236,14 @@ def uninstall() -> None:
 def howManyFetches() -> int:
     """How many accessories were fetched for, for a test to assert on from Java."""
     return 0 if theAccount is None else len(theAccount.fetchedFor)
+
+
+def howManyRangedFetches() -> int:
+    """
+    How many requests the ranged path made - the history screen's, and nothing else's.
+
+    Separate from :func:`howManyFetches` because the two say different things, and only this
+    one distinguishes "the day was searched and Apple had nothing" from "the day was never
+    searched". The screen renders both as an empty list.
+    """
+    return 0 if theAccount is None else theAccount.rangedFetches

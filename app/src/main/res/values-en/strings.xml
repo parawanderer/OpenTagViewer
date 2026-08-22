@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API key missing</string>
     <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
-    <string name="resolving_tags_banner">Locating your tags for the first time. This can take a few minutes — please keep the app open.</string>
-    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). This can take a few minutes — please keep the app open.</string>
+    <string name="resolving_tags_banner">Locating your tags for the first time. They appear as they are found, most recently seen first — please keep the app open.</string>
+    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). They appear as they are found, most recently seen first — please keep the app open.</string>
     <string name="anisette_mode_title">Sign-in data</string>
     <string name="anisette_mode_local">On this device</string>
     <string name="anisette_mode_remote">Remote server</string>
@@ -245,4 +245,10 @@ You can link again later. That needs your Apple device passcode.</string>
     <string name="icloud_unlink_confirm_button">Unlink</string>
     <string name="icloud_unlink_done">Your Apple account is no longer linked</string>
     <string name="icloud_unlink_failed">Could not unlink your Apple account. Please try again.</string>
+    <string name="no_app_to_open_a_map_with">No app on this phone can open a map</string>
+    <string name="icloud_loading_opening_account">Opening your Apple account…</string>
+    <string name="icloud_loading_waiting_for_location_check">Waiting for the location check to finish…</string>
+    <string name="export_logs">Export Logs</string>
+    <string name="log_file_has_been_exported_successfully">Log file has been exported successfully</string>
+    <string name="failed_to_export_log_file">Could not export the log file</string>
 </resources>

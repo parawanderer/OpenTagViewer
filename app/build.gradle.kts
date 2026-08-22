@@ -469,6 +469,22 @@ dependencies {
     // MapsActivity is the end of the sign-in flow and needs Play Services, which the aosp-atd
     // managed device does not have.
     androidTestImplementation(libs.espresso.intents)
+    // RecyclerViewActions, for the two screens that are lists: the history of one tag, and the
+    // device list. Espresso's own matchers cannot reach a row that has not been scrolled to,
+    // and a test that only ever touches the first visible row is a test of the first row.
+    //
+    // **protobuf-lite is excluded, and without that this breaks unrelated tests.** contrib
+    // pulls com.google.protobuf:protobuf-lite:3.0.1 for its accessibility checks, which this
+    // suite does not use. That version predates
+    // `GeneratedMessageLite.registerDefaultInstance(Class, GeneratedMessageLite)`, and Cronet
+    // calls exactly that while deciding whether to use the HTTP engine - so anything that
+    // builds a CronetEngine dies with NoSuchMethodError. In this app that is the Anisette
+    // server tester, which SettingsActivity constructs, so simply adding this dependency
+    // stopped every Settings test from running - with a failure naming protobuf and Chromium
+    // and nothing about the test.
+    androidTestImplementation(libs.espresso.contrib) {
+        exclude(group = "com.google.protobuf", module = "protobuf-lite")
+    }
     androidTestImplementation(libs.android.room.testing)
 
     annotationProcessor(libs.projectlombok)

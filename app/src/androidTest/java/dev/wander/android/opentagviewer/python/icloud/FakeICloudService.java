@@ -65,6 +65,17 @@ public final class FakeICloudService implements ICloudService {
     private int refusalsBeforeAccepting = 0;
     private long answerDelayMs = 0;
 
+    /**
+     * How long an unlock attempt hangs before answering.
+     *
+     * <p>Separate from {@link #answerDelayMs}, which only ever applied to
+     * {@code recoveryOptions}. Holding the unlock open is the only way to observe the state
+     * where this screen deliberately refuses to be left - and setting the general delay does
+     * not produce it, because by the time a passcode is being tried the delayed call is long
+     * finished.
+     */
+    private long unlockDelayMs = 0;
+
     private final List<String> calls = new ArrayList<>();
     private final List<String> unlockedWith = new ArrayList<>();
     private String lastPasscode;
@@ -182,6 +193,18 @@ public final class FakeICloudService implements ICloudService {
         return this;
     }
 
+    /**
+     * Hang this long inside an unlock attempt, without slowing anything before it.
+     *
+     * <p>For the one state the screen will not let anybody out of: a passcode already on its
+     * way to Apple. Attempts are probably limited on their end, so abandoning one half way
+     * risks spending it for nothing - which is why back is swallowed there and nowhere else.
+     */
+    public FakeICloudService takingItsTimeToUnlock(final long millis) {
+        this.unlockDelayMs = millis;
+        return this;
+    }
+
     @Override
     public Completable unlock(final String serial, final String passcode) {
         this.calls.add("unlock");
@@ -198,7 +221,10 @@ public final class FakeICloudService implements ICloudService {
                     "That was not accepted. Worth trying the same passcode again."));
         }
 
-        return Completable.complete();
+        return this.unlockDelayMs > 0
+                ? Completable.complete()
+                        .delay(this.unlockDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                : Completable.complete();
     }
 
     @Override

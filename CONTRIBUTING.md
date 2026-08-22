@@ -134,6 +134,27 @@ wizard).
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
 | Test doubles for the bridge | `app/src/debug/python/` | installed from an instrumented test | provisioned for you |
+| Fakes for the screens | `app/src/androidTest/java/.../ui/maps/` | used directly by a test | provisioned for you |
+
+### Faking the world the screens sit in
+
+The Python doubles below get a session to restore. Three Java-side fakes get a *screen* to
+render, and they exist because the managed device cannot provide what the real ones need.
+
+| Fake | Stands in for | Why the real one cannot run here |
+| --- | --- | --- |
+| `FakeMapProvider` | `IMapProvider` | `aosp-atd` has no Play Services, so no real map initialises. It records what was drawn rather than drawing it, which is the more useful half: "there is a pin for this tag, at these coordinates" is a claim about the app's decision |
+| `FakeMapView` | the map surface | Only so a screenshot shows something. It draws a flat ground, a graticule and the pins, captioned as a fake — **nothing asserts on what it paints** |
+| `FakeGeocoder` | `AddressLookup` | The image has no geocoding backend, so `getFromLocation` returns empty for every point on earth — and the app's fallback for "no address" is to print the coordinates, so a missing geocoder is indistinguishable from an honest answer |
+
+`AddressLookup` is an interface rather than a `Geocoder` subclass because `Geocoder` is final;
+`AppDependencies.replaceGeocoder` is the seam.
+
+**`AMapWithTagsOnIt` is the fixture that arranges all of it.** Reaching a drawn map takes eight
+steps — a stored session, the Python double, a substituted provider, a geocoder, beacons with
+usable `accessory_json`, locations to draw them at, and `RefreshPolicy.resetShared()` so the
+startup fetch is not skipped. Seven tests need exactly that, and a copy of it that forgets the
+last step passes for a year because the fetch it meant to observe never ran.
 
 ### Faking Apple, on the Python side of the bridge
 
@@ -156,7 +177,7 @@ So there are two doubles, and they sit **below** the code under test rather than
 | Module | Replaces | So a test can |
 | --- | --- | --- |
 | `icloud_test_double` | the two functions in `exporter.icloud` that talk to Apple | drive sign-in, unlock, join, fetch, rename and close for real |
-| `apple_test_double` | `main.getAccount` and `main.accessoryFromJson` | have a stored session restore, so screens that wait on one will draw |
+| `apple_test_double` | `main.getAccount` and `main.accessoryFromJson` | have a stored session restore, so screens that wait on one will draw — and answer both fetch paths, so the map and the history screen both work |
 
 They live in the **debug source set**. Chaquopy compiles `src/<variant>/python` alongside
 `src/main/python`, so they are in the debug APK the instrumented tests run against and in no
@@ -338,8 +359,10 @@ python scripts/update_adi_stub_symbols.py --check   # what CI runs weekly
 
 ### Android unit tests
 
-Plain JVM, no Android framework, so these are the fastest tests in the project — seconds, no
-emulator.
+Plain JVM, no Android framework, so these are the fastest tests in the project — **118 of them
+in about ten seconds**, no emulator. Worth running constantly while working on anything they
+cover; anything needing neither Android nor a device belongs here rather than on the managed
+device, which is two orders of magnitude slower.
 
 Most of what lives here is in `util/rx/`: the stream compositions and decision logic behind
 the map, extracted out of `MapsActivity` precisely so it could be tested. They assert that a
@@ -347,6 +370,13 @@ call *happens* rather than that a value looks right, because the failures in thi
 silent — a stream disposed early, a marker that stops being raised, a fetch that returns
 nothing being indistinguishable from a fetch that failed. None of those throw, and none show
 up in logcat.
+
+`ui/maps/CoordinateConverterTest` is here for a different reason, and is worth knowing about:
+it is the **only** coverage of the AMap path that exists. Both real map providers need a device
+this project cannot provision — `aosp-atd` has no Play Services, and the AMap SDK is optional at
+compile time — so everything else runs against `FakeMapProvider`. The GCJ-02 conversion is the
+one piece that is pure arithmetic, and a wrong one puts every pin a few hundred metres out for
+every user in mainland China, silently.
 
 ```bash
 ./gradlew testDebugUnitTest

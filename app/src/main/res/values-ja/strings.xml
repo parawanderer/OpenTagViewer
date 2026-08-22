@@ -110,8 +110,8 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google マップ API キーがありません</string>
     <string name="maps_api_key_missing_message">このビルドには Google マップ API キーがないため、地図を読み込めません。secrets.properties に MAPS_API_KEY を追加してビルドし直すか、設定で別の地図プロバイダを選択してください。</string>
-    <string name="resolving_tags_banner">タグの位置を初めて特定しています。数分かかる場合があります。アプリを開いたままにしてください。</string>
-    <string name="resolving_tags_banner_progress">タグの位置を特定しています (%1$d/%2$d)。数分かかる場合があります。アプリを開いたままにしてください。</string>
+    <string name="resolving_tags_banner">タグの位置を初めて特定しています。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
+    <string name="resolving_tags_banner_progress">タグの位置を特定しています（%2$d 件中 %1$d 件）。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
     <string name="anisette_mode_title">サインインデータ</string>
     <string name="anisette_mode_local">この端末で生成</string>
     <string name="anisette_mode_remote">リモートサーバー</string>
@@ -245,4 +245,10 @@
     <string name="icloud_unlink_confirm_button">連携を解除</string>
     <string name="icloud_unlink_done">Apple アカウントの連携を解除しました</string>
     <string name="icloud_unlink_failed">Apple アカウントの連携を解除できませんでした。もう一度お試しください。</string>
+    <string name="no_app_to_open_a_map_with">この端末には地図を開けるアプリがありません</string>
+    <string name="icloud_loading_opening_account">Apple アカウントを開いています…</string>
+    <string name="icloud_loading_waiting_for_location_check">位置情報の確認が終わるのを待っています…</string>
+    <string name="export_logs">ログを書き出す</string>
+    <string name="log_file_has_been_exported_successfully">ログファイルを書き出しました</string>
+    <string name="failed_to_export_log_file">ログファイルを書き出せませんでした</string>
 </resources>

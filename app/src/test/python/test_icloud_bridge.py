@@ -270,6 +270,58 @@ class TestWhatCanBeRecoveredFrom:
         assert [d["serial"] for d in answer["devices"]] == ["F2LX9Q", "C02XK"]
         assert all(d["description"] for d in answer["devices"])
 
+    def test_this_apps_own_record_is_not_offered_to_unlock_with(self, session):
+        """
+        **Joining registers this app as a device, and its record is useless to the user.**
+
+        The screen asks for "the screen-lock passcode of one of your Apple devices". This app
+        has no screen and no lock: its escrow passcode was generated and never shown, so the
+        question has no answer a person could give. It was listed anyway, above the user's real
+        hardware, looking exactly like something they had forgotten the PIN to.
+        """
+        made = session(FakeClient(FakeOptions([
+            FakeRecord("F2LX9Q"),
+            FakeRecord(icloud_bridge.APP_IDENTITY.serial, name="OpenTagViewer"),
+            FakeRecord("C02XK"),
+        ])))
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert [d["serial"] for d in answer["devices"]] == ["F2LX9Q", "C02XK"]
+
+    def test_it_cannot_be_unlocked_with_either(self, session):
+        """
+        Dropped from the records, not merely from the listing.
+
+        `unlock` finds a record by serial in the same list, so filtering only the JSON would
+        leave the app's own record selectable by anything that already knew the serial - and
+        that is the one entry no passcode can ever open.
+        """
+        made = session(FakeClient(FakeOptions([
+            FakeRecord("F2LX9Q"),
+            FakeRecord(icloud_bridge.APP_IDENTITY.serial),
+        ])))
+        made.recoveryOptions()
+
+        answer = json.loads(made.unlock(icloud_bridge.APP_IDENTITY.serial, "123456"))
+
+        assert not answer["ok"]
+
+    def test_an_account_holding_only_this_apps_record_has_nothing_to_recover_from(self, session):
+        """
+        And it is told the truth rather than shown one unusable tile.
+
+        Filtering in the screen instead would leave this account reporting a device to choose
+        from, then presenting a list with nothing in it.
+        """
+        made = session(FakeClient(FakeOptions(
+            [FakeRecord(icloud_bridge.APP_IDENTITY.serial)], trustworthy=True)))
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert not answer["ok"]
+        assert answer["reason"] == icloud_bridge.REASON_NOTHING_TO_RECOVER_FROM
+
     def test_an_account_with_nothing_to_recover_from_says_so(self, session):
         """
         The real case this whole flow has to answer for.

@@ -36,6 +36,7 @@ import dev.wander.android.opentagviewer.python.icloud.ICloudFailure;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFetch;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
+import dev.wander.android.opentagviewer.python.PythonLock;
 import dev.wander.android.opentagviewer.python.icloud.RecoverableDevice;
 import dev.wander.android.opentagviewer.ui.RecoverableDeviceIcon;
 import dev.wander.android.opentagviewer.ui.login.StepTransition;
@@ -84,6 +85,13 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     private List<RecoverableDevice> devices = List.of();
 
     private RecoverableDevice chosenDevice;
+
+    /**
+     * Whether a passcode is currently being tried against Apple.
+     *
+     * <p>The one state this screen refuses to be left from - see {@link #onBackWithin}.
+     */
+    private boolean anUnlockIsInFlight;
 
     /**
      * Which attempt the next press will be, starting at 1.
@@ -165,7 +173,24 @@ public class FetchFromICloudActivity extends AppCompatActivity {
      */
     private void onBackWithin() {
         if (this.isShowing(R.id.icloud_loading_container)) {
-            Log.d(TAG, "Back pressed while a call was in flight; ignoring");
+            // **Only an unlock is worth trapping somebody for.** Swallowing every back press
+            // while the loading step was up meant that a screen waiting on PythonLock - which a
+            // first import holds for minutes, walking key indices for tags with no alignment -
+            // could not be left at all. Neither the in-app arrow nor the device's own back
+            // button did anything, and the wait looked like a hang.
+            //
+            // An unlock attempt is different: it is already talking to Apple, and attempts are
+            // probably a limited resource on their end, so abandoning one mid-flight risks
+            // spending it for nothing. Everything else here - opening the session, listing
+            // recovery options, importing - is safe to walk away from, and onDestroy closes the
+            // session behind us.
+            if (this.anUnlockIsInFlight) {
+                Log.d(TAG, "Back pressed during an unlock attempt; ignoring");
+                return;
+            }
+
+            Log.d(TAG, "Back pressed while waiting; leaving rather than trapping the user");
+            this.finish();
             return;
         }
 
@@ -194,7 +219,17 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
     /** Open a session and ask what the keychain can be recovered from. */
     private void start() {
-        this.showWaiting(R.string.icloud_loading_looking_for_devices);
+        // **Not "looking for a device", because at this point that is not what is happening -
+        // and for most people it never will be.** Whether a device is needed at all is decided
+        // by the membership check further down: an app that has already joined resumes as the
+        // member it is and never sees the device list. Saying otherwise up front tells somebody
+        // who just linked their account that the app is hunting for hardware to unlock with,
+        // when the thing it is actually waiting for is its turn to talk to Python.
+        //
+        // askForADevice() sets that message, at the point it becomes true.
+        this.showWaiting(PythonLock.isBusy()
+                ? R.string.icloud_loading_waiting_for_location_check
+                : R.string.icloud_loading_opening_account);
 
         if (this.icloud != null) {
             this.icloud.close();
@@ -333,11 +368,16 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         // to use it. So the membership is written before the fetch, and a failure to write stops
         // the flow rather than being logged past: carrying on would leave them with a peer this
         // app can neither use nor clean up, and nothing on screen to say so.
+        // Held from here until the chain settles, whichever way it goes - this is the one
+        // stretch the user is deliberately not allowed to walk out of. See onBackWithin.
+        this.anUnlockIsInFlight = true;
+
         var async = this.icloud.unlock(this.chosenDevice.getSerial(), passcode)
                 .andThen(this.icloud.join(EscrowPasscode.generate()))
                 .flatMapCompletable(this.membershipRepo::store)
                 .andThen(this.icloud.fetch())
                 .observeOn(AndroidSchedulers.mainThread())
+                .doFinally(() -> this.anUnlockIsInFlight = false)
                 .subscribe(this::importEverything, this::onUnlockFailed);
     }
 

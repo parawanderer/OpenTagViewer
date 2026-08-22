@@ -105,6 +105,7 @@ import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
+import dev.wander.android.opentagviewer.util.android.AddressLookup;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PermissionUtil;
 import dev.wander.android.opentagviewer.ui.maps.VectorImageGeneratorUtil;
@@ -180,7 +181,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private FusedLocationProviderClient fusedLocationClient = null;
 
-    private Geocoder geocoder = null;
+    private AddressLookup geocoder = null;
 
     private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
 
@@ -372,7 +373,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
         Places.initialize(this.getApplicationContext(), BuildConfig.MAPS_API_KEY);
-        this.geocoder = new Geocoder(this.getApplicationContext(), Locale.getDefault());
+        this.geocoder = AppDependencies.geocoder(
+                this.getApplicationContext(), Locale.getDefault());
 
         this.setupTagScrollArea();
 
@@ -716,12 +718,29 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
         final BeaconLocationReport lastLocation = maybeLast.get();
         Uri uri = Uri.parse(String.format(Locale.ROOT, "geo:%.7f,%.7f?q=%.7f,%.7f", lastLocation.getLatitude(), lastLocation.getLongitude(), lastLocation.getLatitude(), lastLocation.getLongitude()));
+
+        // **Whatever the user's maps application is, not Google's.** This used to name
+        // com.google.android.apps.maps, which is the wrong shape of answer twice over. geo: is
+        // a standard scheme that Organic Maps, OsmAnd, Magic Earth and the rest all register
+        // for, and naming one package means the system chooser - which already remembers what
+        // this user picked last time - never gets to offer any of them. This app exists for
+        // people who have opted out of one walled garden; sending them into another is the
+        // wrong default.
+        //
+        // It also could not work. From Android 11 the app cannot see a package it has not
+        // declared in <queries>, so resolveActivity returned null on every current device with
+        // or without Google Maps, and the button silently did nothing. The manifest now
+        // declares the geo: intent; without that entry this check fails again exactly as
+        // before, so the two changes belong together.
         Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
-        mapIntent.setPackage("com.google.android.apps.maps");
         if (mapIntent.resolveActivity(getPackageManager()) != null) {
             startActivity(mapIntent);
         } else {
-            Log.e(TAG, "Could not start maps activity for currently visible tag!");
+            // Said out loud, because the alternative is a button that does nothing. A phone
+            // with no maps application at all is unusual but entirely possible on a stripped
+            // build, and "nothing happened" is the one outcome the user cannot act on.
+            Log.e(TAG, "No installed application can open a geo: link for the visible tag");
+            Toast.makeText(this, R.string.no_app_to_open_a_map_with, LENGTH_SHORT).show();
         }
     }
 

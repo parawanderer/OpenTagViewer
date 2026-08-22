@@ -1003,12 +1003,31 @@ public class SettingsActivity extends AppCompatActivity {
         this.findViewById(R.id.login_details_placeholder).setVisibility(GONE);
         this.findViewById(R.id.login_details).setVisibility(VISIBLE);
 
+        // **A stored session might not carry a name and email, and that must not be fatal.**
+        // This used to chain straight through getAccount().getInfo(), so a session that
+        // deserialised without an account block - an older format, a partial write, anything
+        // FindMy.py's shape has changed since - took the whole Settings screen down with a
+        // NullPointerException on open. Settings is also where the sign-out button lives, which
+        // makes it precisely the screen somebody with a broken session needs to reach.
+        //
+        // Missing details are left blank instead. The account row still renders, and the row
+        // that actually matters - Sign out - is still there and still works.
+        final UserAuthData.UserAccountInfo info = userAuthData.getAccount() == null
+                ? null : userAuthData.getAccount().getInfo();
+
+        if (info == null) {
+            Log.w(TAG, "The stored session carries no account details, so the name and email are"
+                    + " left blank. Signing out still works, which is the point of showing the"
+                    + " row at all.");
+        }
+
         TextView firstnameLastnameText = this.findViewById(R.id.firstame_lastname_settings_block);
-        final String userFirstNameLastName = userAuthData.getAccount().getInfo().getFirstName() + " " + userAuthData.getAccount().getInfo().getLastName();
+        final String userFirstNameLastName = info == null
+                ? "" : info.getFirstName() + " " + info.getLastName();
         firstnameLastnameText.setText(userFirstNameLastName);
 
         TextView emailText = this.findViewById(R.id.email_settings_block);
-        final String userEmail = userAuthData.getAccount().getInfo().getAccountName();
+        final String userEmail = info == null ? "" : info.getAccountName();
         emailText.setText(userEmail);
 
         Button logoutButton = this.findViewById(R.id.logout_button);

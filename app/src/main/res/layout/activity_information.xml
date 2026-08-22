@@ -35,9 +35,26 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
                 android:paddingTop="30dp"
                 android:textAlignment="center">
+
+                <!--
+                    The same mark the sign-in screen opens with, and the same drawable - so it
+                    takes the theme's colours here too, including a wallpaper-derived one.
+
+                    Worth the space it occupies: this page had a large empty middle, and the app
+                    was named in text three times over without ever being shown. It is also the
+                    one screen a person opens on purpose to find out what this thing is.
+                -->
+                <ImageView
+                    android:id="@+id/appLogo"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:layout_marginBottom="16dp"
+                    android:contentDescription="@string/app_name"
+                    app:srcCompat="@drawable/opentagviewer_icon_themed" />
 
                 <TextView
                     android:id="@+id/appTitle"
