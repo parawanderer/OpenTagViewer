@@ -140,6 +140,15 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     private KeychainMembershipRepository membershipRepo;
 
     /**
+     * Whether this app was already a member of the keychain when this screen opened.
+     *
+     * <p><b>What separates connecting an account from re-reading one.</b> The two run almost the
+     * same flow, and only the first registers anything with Apple - so only the first has
+     * anything to explain about a device appearing in somebody's list.
+     */
+    private boolean wasAlreadyLinked;
+
+    /**
      * The one button, at the bottom, relabelled per step.
      *
      * <p>It was four - one at the bottom of whatever content each step happened to have - so it
@@ -294,6 +303,10 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             this.askForADevice();
             return;
         }
+
+        // Held before anything else runs: from here on the flow is identical to a first
+        // connection, and afterwards there is no way to tell which one this was.
+        this.wasAlreadyLinked = true;
 
         this.showWaiting(R.string.icloud_loading_importing);
 
@@ -524,9 +537,11 @@ public class FetchFromICloudActivity extends AppCompatActivity {
      * a different machine than the one on the account would send somebody hunting for a row that
      * is not there, and possibly deleting one that is.
      *
-     * <p>Shown on every connect. The entries accumulate - each fresh install adds another, all
-     * with this same title and model - so the person who saw this a year ago is precisely the one
-     * who has since forgotten which row it was.
+     * <p><b>Shown when a connection registers a device, and not when one is merely re-read.</b>
+     * The entries do accumulate - each fresh install adds another, all with this same title and
+     * model - so somebody who saw this a year ago has since forgotten which row it was, and a
+     * fresh install genuinely needs telling again. Re-reading a linked account adds nothing to
+     * the list, so the page would be describing something that did not happen.
      */
     private void showWhatWeRegisteredAs() {
         final AdiDeviceIdentity.Hardware hardware = LocalAnisette.profileToShow(this);
@@ -848,8 +863,17 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         if (stepId == R.id.icloud_passcode_container) {
             this.setPrimaryButton(R.string.icloud_unlock_action, this::submitPasscode);
         } else if (stepId == R.id.icloud_results_container) {
-            // Not the last step any more - what this app put on their account comes after.
-            this.setPrimaryButton(R.string.icloud_results_next, this::showWhatWeRegisteredAs);
+            // **The device note is for the connection that created the device, and nothing
+            // else.** It explains a row that has just appeared in somebody's Apple account, why
+            // it is there and why deleting it breaks their session - which is worth a screen
+            // once. Re-reading a linked account registers nothing and shows the same page again
+            // to somebody who has already read it, and a page that turns up when nothing has
+            // happened is one people learn to tap past, including the time it matters.
+            if (this.wasAlreadyLinked) {
+                this.setPrimaryButton(R.string.icloud_results_done, this::finish);
+            } else {
+                this.setPrimaryButton(R.string.icloud_results_next, this::showWhatWeRegisteredAs);
+            }
         } else if (stepId == R.id.icloud_registered_container) {
             this.setPrimaryButton(R.string.icloud_results_done, this::finish);
         } else if (stepId == R.id.icloud_no_tags_container) {
