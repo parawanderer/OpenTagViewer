@@ -251,6 +251,43 @@ The mechanics of all of this — `Eventually`, the managed device, rendering to 
 compacting the results — are under [Building and testing](#building-and-testing) below. Do not
 restate them here; this rule is about *what* to cover, that section is about *how*.
 
+### 13. If it does not need a device, test it on the JVM
+
+`./gradlew testDebugUnitTest` runs the JVM suite in about fifteen seconds. The emulator suite is
+**580 tests and twelve minutes**, and it has to boot a device first. So a test that could have
+been a JVM test and was written as an instrumented one costs that difference on every run, for
+every person, forever — and it is the reason a suite stops being run while working.
+
+**Ask what the class actually touches, not which package it lives in.** Parsing, arithmetic,
+policy, protocol shapes, anything taking bytes and returning bytes: JVM. A `dev.wander.…android…`
+package name is not an answer, and neither is "it feels like Android code".
+
+**A stray `Log` line is not a reason to go to the emulator.** This is the trap, because it looks
+like one: `android.util.Log` throws *"not mocked"* in a JVM test, so a class that is otherwise
+pure Java appears to require a device. It does not — `testOptions.unitTests.isReturnDefaultValues`
+is already on, and Log returns 0 instead of throwing.
+
+The worked example is `AdiLibraryFetcher`, which reads Apple's ADI libraries out of a 142 MB APK
+over HTTP range requests. Zip parsing, offset arithmetic, an inflate and an ELF check — and one
+`Log.i` in the middle of it, which is why it was first written as an instrumented test:
+
+| | |
+| --- | --- |
+| As an instrumented test | ~17s, after provisioning an emulator |
+| As a JVM test | **0.145s**, inside a suite you can run on every edit |
+
+Both were the *same six tests*, against the same code, serving a fixture zip off a socket on
+`127.0.0.1`. Nothing was given up by moving it.
+
+Two things follow:
+
+- **"It reaches the network" is rarely a reason either.** A `ServerSocket` and a byte array cover
+  an HTTP client completely, and far better than the real endpoint does — see `FakeApkServer`,
+  which can also refuse to honour range requests, something Apple's CDN will not do on request.
+- **The JVM suite is still not the one to report "tests pass" from.** Every screen, every
+  repository and the whole Python bridge are instrumented. Rule 12 is about what genuinely needs
+  a device; this rule is about not sending it things that do not.
+
 ---
 
 ## Building and testing
@@ -266,7 +303,7 @@ See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup and every test suite. Sho
 Gradle provisions the emulator, runs the tests, and destroys it:
 
 ```bash
-./gradlew :app:testEmulatorDebugAndroidTest    # 190 tests, about a minute
+./gradlew :app:testEmulatorDebugAndroidTest    # 580 tests, about twelve minutes
 ```
 
 Use this rather than `connectedDebugAndroidTest`. The Android Gradle Plugin holds its ADB
@@ -285,7 +322,7 @@ Three consequences worth knowing:
   emulator's own window has focus on the host desktop, so against a hand-started emulator any
   UI test fails with `RootViewWithoutFocusException` the moment you alt-tab away. There is
   nothing to fix in the test when that happens — run it on the managed device.
-- `./gradlew testDebugUnitTest` runs **118 JVM tests in about ten seconds**, and is worth
+- `./gradlew testDebugUnitTest` runs **181 JVM tests in about fifteen seconds**, and is worth
   running constantly while working on anything it covers: the pure logic. Refresh policy, scan
   order, marker focus, the long-fetch banner, passcode parsing, the CSV and zip writers,
   coordinate conversion. Anything that needs neither Android nor a device belongs there, not on

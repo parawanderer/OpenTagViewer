@@ -214,6 +214,21 @@ android {
         // test. Turning them off is the documented requirement for Espresso, not a workaround.
         animationsDisabled = true
 
+        unitTests {
+            // **So a class can be JVM-tested when the only Android thing in it is a log line.**
+            //
+            // Without this, android.util.Log throws "not mocked" and the whole class has to move
+            // to the emulator - two orders of magnitude slower, for logging. AdiLibraryFetcher is
+            // the case in point: zip parsing, range arithmetic and an ELF check, none of which
+            // needs a device, all of which was untested because Log.i sat in the middle of it.
+            //
+            // It only affects the android.jar stubs the JVM suite compiles against, which throw
+            // by default rather than doing anything. A test that genuinely needs Android
+            // behaviour still cannot get it here - it gets a zero or a null, which is a wrong
+            // answer rather than a slow one, and that test belongs in androidTest.
+            isReturnDefaultValues = true
+        }
+
         managedDevices {
             localDevices {
                 // Gradle provisions, boots, and tears down this emulator itself.
