@@ -275,8 +275,6 @@
     <string name="icloud_results_next">下一步</string>
     <string name="icloud_registered_serial_label">序號：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
-    <string name="imported_from_x">標籤匯入自 %1$s</string>
-    <string name="imported_from_nothing">沒有從檔案匯入的標籤</string>
     <string name="error_report_title">這是一個程式缺陷</string>
     <string name="error_report_body">回傳了本 App 無法解讀的內容，因此重試沒有用，你的設定也不需要更動。\n\n這通常表示 Apple 改動了什麼。附上日誌的回報才能讓它被修復——日誌幾乎總能指出是哪一部分。</string>
     <string name="error_report_button">回報問題</string>
@@ -306,4 +304,6 @@
     <string name="export_tags_nothing_to_export">無法匯出「%1$s」：App 沒有它的命名記錄，缺少這項的包匯入後什麼都沒有。從 Apple 帳戶讀取的標籤請透過「尋找」分享，而不是檔案。</string>
     <string name="export_tags_could_not_write">檔案寫入失敗，什麼都沒有儲存。</string>
     <string name="error_report_body_export">App 無法用你選取的標籤產生包，也說不出原因——用同樣的標籤重試沒有用。\n\n沒有傳送任何東西，這支手機上也沒有任何改變。你的標籤都還在。</string>
+    <string name="imported_from_x">最近一次匯入自 %1$s</string>
+    <string name="imported_from_nothing">沒有從檔案匯入的標籤</string>
 </resources>

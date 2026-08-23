@@ -275,8 +275,6 @@
     <string name="icloud_results_next">次へ</string>
     <string name="icloud_registered_serial_label">シリアル番号：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
-    <string name="imported_from_x">%1$s からインポートしたタグ</string>
-    <string name="imported_from_nothing">ファイルからインポートしたタグはありません</string>
     <string name="error_report_title">これは不具合です</string>
     <string name="error_report_body">このアプリが解釈できないものが返ってきました。再試行しても解決せず、設定を変える必要もありません。\n\nたいていは Apple 側の変更が原因です。ログを添えて報告していただければ修正できます。どの部分かは、ほぼ必ずログに書かれています。</string>
     <string name="error_report_button">報告する</string>
@@ -306,4 +304,6 @@
     <string name="export_tags_nothing_to_export">「%1$s」は書き出せません。対応する名前レコードがアプリにないため、これを欠いたバンドルは何も取り込めません。Apple アカウントから読み込んだタグは、ファイルではなく「探す」で共有します。</string>
     <string name="export_tags_could_not_write">ファイルを書き出せませんでした。何も保存していません。</string>
     <string name="error_report_body_export">選んだタグからバンドルを作成できず、その理由も判別できませんでした。同じタグで再試行しても解決しません。\n\n何も送信されておらず、この端末側も変わっていません。タグはそのまま残っています。</string>
+    <string name="imported_from_x">直近の取得元：%1$s</string>
+    <string name="imported_from_nothing">ファイルから取得したタグはありません</string>
 </resources>
