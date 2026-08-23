@@ -132,9 +132,7 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerStatus;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
-import dev.wander.android.opentagviewer.ble.NearbyDistanceLabel;
 import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
-import dev.wander.android.opentagviewer.ble.RssiDistance;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
@@ -705,20 +703,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private void showNearbyStatusOn(final FrameLayout card, final NearbyTagSighting sighting) {
         final TextView line = card.findViewById(R.id.device_last_update);
-        line.setText(this.getString(R.string.nearby_now_with_battery_and_distance,
+        line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                this.distanceStringFor(sighting)));
-    }
-
-    /**
-     * A rough "~5 m"/"~16 ft" for how far away a sighting's signal strength puts the tag - see
-     * {@link RssiDistance} for why this is an estimate and not a measurement.
-     */
-    private String distanceStringFor(final NearbyTagSighting sighting) {
-        final Locale locale = this.getResources().getConfiguration().getLocales().get(0);
-        final double metres = RssiDistance.estimateMetres(sighting.getRssi());
-        return this.getString(NearbyDistanceLabel.unitStringFor(locale),
-                NearbyDistanceLabel.roundedValueFor(metres, locale));
+                this.getString(NearbyTagLabel.signalStrengthLabel(sighting.getRssi()))));
     }
 
     @Override
