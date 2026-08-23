@@ -637,12 +637,25 @@ public class DeviceInfoActivity extends AppCompatActivity
             return;
         }
 
-        this.nearbyWatchDisposable = new NearbyTagWatcher(AppDependencies.accessoryMacResolver())
+        this.nearbyWatchDisposable = new NearbyTagWatcher(
+                AppDependencies.accessoryMacResolver(), this::correctAlignmentFromSighting)
                 .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         this::showLiveBattery,
                         error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error));
+    }
+
+    /**
+     * Feeds a passive sighting back into alignment self-correction, the same way the ring
+     * button's explicit scan already does - see {@code NearbyTagWatcher.SightingListener}.
+     */
+    private void correctAlignmentFromSighting(
+            final String beaconId, final String mac, final long seenAtMs) {
+        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
+                .subscribe(() -> { }, error -> Log.w(TAG,
+                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
+                        error));
     }
 
     private void stopWatchingForThisTag() {
