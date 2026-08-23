@@ -45,6 +45,19 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
 
     private static final Map<String, List<Address>> GEOCODING_CACHE = new ConcurrentHashMap<>();
 
+    /**
+     * Put a result in the cache directly.
+     *
+     * <p>So a test can arrange the state issue #41 needs - a point already looked up and
+     * found to have no address - without a geocoder, which on a test device answers nothing
+     * for every coordinate on earth and so cannot produce the interesting case on purpose.
+     */
+    @androidx.annotation.VisibleForTesting
+    static void cacheGeocodeForTest(final double latitude, final double longitude,
+                                    final List<Address> result) {
+        GEOCODING_CACHE.put(cacheKey(latitude, longitude), result);
+    }
+
     private final List<BeaconLocationReport> locations;
 
     private final Set<Integer> selectedItems;
@@ -149,8 +162,11 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
 
 
         var cachedLocation = this.getCachedGeocode(item.getLatitude(), item.getLongitude());
-        if (cachedLocation != null) {
-            viewHolder.getLocationName().setText(convertLocationToUIName(cachedLocation));
+        final String cachedName = cachedLocation == null
+                ? null : convertLocationToUIName(cachedLocation);
+
+        if (cachedName != null) {
+            viewHolder.getLocationName().setText(cachedName);
         } else {
             viewHolder.getLocationName().setText(
                     String.format(Locale.ROOT, "%.6f, %.6f", item.getLatitude(), item.getLongitude()));
@@ -173,28 +189,66 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
         }
     }
 
-    private List<Address> getCachedGeocode(double latitude, double longitude) {
-        final String key = String.format(Locale.ROOT, "%.4f,%.4f", latitude, longitude);
+    /**
+     * A cached address for this point, or null if there is not one worth using.
+     *
+     * <p><b>An empty list is not a cache hit.</b> It is what the geocoder returns when it could
+     * not answer - no backend on the device, no address at that point, a network lookup that
+     * failed - and it used to be stored and handed back like any other result. The caller then
+     * read element zero of it. That is issue #41: a crash that needs a coordinate which geocodes
+     * to nothing <i>and</i> a second bind of the same row, so the first view of a history list is
+     * always fine and scrolling back to it is not.
+     *
+     * <p>Treated as a miss rather than as an answer, so the point is looked up again later. A
+     * failed lookup is usually temporary; caching it made one bad moment permanent for the life
+     * of the process.
+     */
+    /** Rounded, so nearby points share an answer. One spelling, used by reader and writer. */
+    private static String cacheKey(final double latitude, final double longitude) {
+        return String.format(Locale.ROOT, "%.4f,%.4f", latitude, longitude);
+    }
+
+    @androidx.annotation.VisibleForTesting
+    static List<Address> getCachedGeocode(double latitude, double longitude) {
+        final String key = cacheKey(latitude, longitude);
         var cached = GEOCODING_CACHE.get(key);
-        if (cached != null) {
+        if (cached != null && !cached.isEmpty()) {
             Log.d(TAG, "Got geocoding data for " + key + " (rounded) from cache!");
             return cached;
         }
         return null;
     }
 
-    private static String convertLocationToUIName(@lombok.NonNull List<Address> geocodeData) {
+    /**
+     * The first address line, or null when there is nothing to show.
+     *
+     * <p>Guarded as well as the cache above, deliberately: "the cache holds a list" and "the list
+     * has something in it" are different claims, and only one caller was checking the second.
+     * Belt and braces here is cheap, and the failure it prevents is a crash on a screen the user
+     * is only scrolling.
+     */
+    @androidx.annotation.VisibleForTesting
+    static String convertLocationToUIName(@lombok.NonNull List<Address> geocodeData) {
+        if (geocodeData.isEmpty()) {
+            return null;
+        }
         var geocodingLocation = geocodeData.get(0);
         return geocodingLocation.getAddressLine(0);
     }
 
     private Observable<List<Address>> reverseGeocode(double latitude, double longitude) {
         return Observable.fromCallable(() -> {
-                    final String key = String.format(Locale.ROOT, "%.4f,%.4f", latitude, longitude);
+                    final String key = cacheKey(latitude, longitude);
                     Log.d(TAG, "Fetching geocoding data for " + key + " (rounded)...");
                     var result = this.geocoder.getFromLocation(latitude, longitude, 1);
-                    GEOCODING_CACHE.put(key, result);
-                    return result;
+
+                    // Only a real answer is remembered. Storing an empty one would turn a
+                    // momentary failure - no network, no backend - into a permanent "this place
+                    // has no name", and it is what the reader below would then index into.
+                    if (result != null && !result.isEmpty()) {
+                        GEOCODING_CACHE.put(key, result);
+                    }
+                    return result == null ? List.<Address>of() : result;
                 })
                 .subscribeOn(Schedulers.io());
     }
