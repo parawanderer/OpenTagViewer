@@ -73,6 +73,23 @@ public final class AdiLibraryFetcher {
      */
     public static long fetchInto(File destination, String abi, List<String> names)
             throws IOException {
+        return fetchInto(destination, abi, names, APK_URL);
+    }
+
+    /**
+     * The same, against a given URL.
+     *
+     * <p>Exists so the zip walking can be tested, which is the half of this that can be wrong
+     * without Apple changing anything: the EOCD search, the central directory parse, the range
+     * arithmetic and the inflate. The weekly {@code check-adi-libraries} workflow watches Apple's
+     * file from the outside and says nothing about whether this code still reads it correctly.
+     *
+     * <p><b>A parameter rather than a settable static.</b> These are static methods called from
+     * more than one thread - the whole reason {@code LoadedOnce} exists - so a URL field swapped
+     * by a test is a race in the app's own code path, and one a test could leave behind.
+     */
+    static long fetchInto(File destination, String abi, List<String> names, String apkUrl)
+            throws IOException {
         if (!destination.isDirectory() && !destination.mkdirs()) {
             throw new IOException("could not create " + destination);
         }
@@ -88,8 +105,8 @@ public final class AdiLibraryFetcher {
             return 0;
         }
 
-        final long apkSize = contentLength();
-        final byte[] centralDirectory = readCentralDirectory(apkSize);
+        final long apkSize = contentLength(apkUrl);
+        final byte[] centralDirectory = readCentralDirectory(apkUrl, apkSize);
         final Map<String, Entry> index = parseCentralDirectory(centralDirectory, abi, wanted);
 
         long downloaded = centralDirectory.length;
@@ -101,7 +118,7 @@ public final class AdiLibraryFetcher {
                         + "layout, or does this build not ship " + abi + "?");
             }
 
-            final byte[] contents = extract(entry);
+            final byte[] contents = extract(apkUrl, entry);
             if (contents.length < 4 || contents[0] != 0x7f || contents[1] != 'E'
                     || contents[2] != 'L' || contents[3] != 'F') {
                 throw new IOException(name + " does not look like an ELF file");
@@ -119,8 +136,8 @@ public final class AdiLibraryFetcher {
         return downloaded;
     }
 
-    private static long contentLength() throws IOException {
-        final HttpURLConnection connection = (HttpURLConnection) new URL(APK_URL).openConnection();
+    private static long contentLength(String apkUrl) throws IOException {
+        final HttpURLConnection connection = (HttpURLConnection) new URL(apkUrl).openConnection();
         try {
             connection.setRequestMethod("HEAD");
             // Content-Length has to describe the stored file, not a compressed transfer of it.
@@ -139,8 +156,8 @@ public final class AdiLibraryFetcher {
     }
 
     /** Fetch {@code [start, end]} inclusive. Fails loudly if the CDN ignores the range. */
-    private static byte[] range(long start, long end) throws IOException {
-        final HttpURLConnection connection = (HttpURLConnection) new URL(APK_URL).openConnection();
+    private static byte[] range(String apkUrl, long start, long end) throws IOException {
+        final HttpURLConnection connection = (HttpURLConnection) new URL(apkUrl).openConnection();
         try {
             connection.setRequestProperty("Range", "bytes=" + start + "-" + end);
             // Android's HttpURLConnection adds Accept-Encoding: gzip by default and then
@@ -175,9 +192,9 @@ public final class AdiLibraryFetcher {
         return out.toByteArray();
     }
 
-    private static byte[] readCentralDirectory(long apkSize) throws IOException {
+    private static byte[] readCentralDirectory(String apkUrl, long apkSize) throws IOException {
         final int window = (int) Math.min(EOCD_SEARCH_WINDOW, apkSize);
-        final byte[] tail = range(apkSize - window, apkSize - 1);
+        final byte[] tail = range(apkUrl, apkSize - window, apkSize - 1);
 
         final int eocd = lastIndexOf(tail, EOCD_SIGNATURE);
         if (eocd < 0) {
@@ -188,7 +205,7 @@ public final class AdiLibraryFetcher {
         final long size = buffer.getInt(eocd + 12) & 0xFFFFFFFFL;
         final long offset = buffer.getInt(eocd + 16) & 0xFFFFFFFFL;
 
-        return range(offset, offset + size - 1);
+        return range(apkUrl, offset, offset + size - 1);
     }
 
     private static Map<String, Entry> parseCentralDirectory(
@@ -224,14 +241,14 @@ public final class AdiLibraryFetcher {
      * different length from the central directory's, so it has to be read to find where the
      * data actually starts.
      */
-    private static byte[] extract(Entry entry) throws IOException {
-        final byte[] header = range(entry.localHeaderOffset, entry.localHeaderOffset + 29);
+    private static byte[] extract(String apkUrl, Entry entry) throws IOException {
+        final byte[] header = range(apkUrl, entry.localHeaderOffset, entry.localHeaderOffset + 29);
         final ByteBuffer buffer = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
         final int nameLength = buffer.getShort(26) & 0xFFFF;
         final int extraLength = buffer.getShort(28) & 0xFFFF;
 
         final long start = entry.localHeaderOffset + 30 + nameLength + extraLength;
-        final byte[] raw = range(start, start + entry.compressedSize - 1);
+        final byte[] raw = range(apkUrl, start, start + entry.compressedSize - 1);
 
         if (entry.method == 0) {
             return raw;
