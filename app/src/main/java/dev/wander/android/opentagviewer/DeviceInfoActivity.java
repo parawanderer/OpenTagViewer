@@ -663,7 +663,7 @@ public class DeviceInfoActivity extends AppCompatActivity
     private void showLiveBattery(final NearbyTagSighting sighting) {
         this.binding.setLiveBatteryLevel(this.getString(R.string.live_battery_with_signal,
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                this.getString(NearbyTagLabel.signalStrengthLabel(sighting.getRssi()))));
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
         this.findViewById(R.id.device_settings_live_battery).setVisibility(VISIBLE);
     }
 
