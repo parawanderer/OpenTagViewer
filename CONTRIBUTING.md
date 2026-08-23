@@ -129,6 +129,7 @@ wizard).
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
 | Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
+| Wiki screenshots | `app/src/androidTest/java/.../ui/WikiScreenshots*Test` | as above, **opt-in** | a windowed emulator |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop exporter tests | `python/test/` | pytest | no |
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
@@ -373,6 +374,39 @@ the verification manifest, then run them again:
 python scripts/update_adi_stub_symbols.py           # regenerate
 python scripts/update_adi_stub_symbols.py --check   # what CI runs weekly
 ```
+
+### Wiki screenshots (skipped by default)
+
+`WikiScreenshotsTest`, `WikiScreenshotsFromTheMapTest` and `WikiScreenshotsOfSigningInTest`
+photograph the app's screens for the wiki. They are a documentation tool rather than tests —
+each one ends in a `Shot` and asserts almost nothing — so they are skipped unless asked for:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.captureScreenshots=true \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.wander.android.opentagviewer.ui.WikiScreenshotsTest
+```
+
+Images land in `app/build/outputs/connected_android_test_additional_output/…`. **Copy them out
+before the next run** — AGP wipes that directory when a run starts, which has already lost a
+full set.
+
+Three things they need, and one that will surprise you:
+
+- **A windowed emulator with Play Services**, not the managed device: two of them photograph a
+  real Google map, and the managed `aosp-atd` image cannot draw one. Keep its window focused or
+  Espresso fails with `RootViewWithoutFocusException`.
+- **`connectedDebugAndroidTest` uninstalls the app afterwards**, wiping that device's session,
+  settings and imported beacons. Only ever aim it at a throwaway emulator, and set
+  `ANDROID_SERIAL` so it cannot reach a phone.
+- **The map class is slow, and it is the teardown.** About 50s per test, of which ~45s is
+  `AMapWithTagsOnIt.putItBack` — measured; setup is around two seconds. Worth knowing before
+  concluding that the map, the dialogs or the tile wait are responsible, all of which look
+  guilty and are not.
+
+Before publishing one, look at what is actually on it — a signed-in address, a real street name
+from the geocoder, a bundle passcode, a signing fingerprint.
+`.claude/skills/device-screenshots/blur.py` takes bands out by height fraction.
 
 ### Android unit tests
 
@@ -728,6 +762,19 @@ run regardless: each AES entry carries a fresh random salt.
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
 `:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
 emulator definition in CI to keep in step with `app/build.gradle.kts`.
+
+### A PR stacked on another PR gets no checks at all
+
+Every workflow above filters on `pull_request: branches: ["main"]`, and that filter matches the
+**base** of the PR, not the branch the changes are on. So a PR opened against another PR's branch
+runs nothing — no translation check, no tests, no build.
+
+It does not look like a problem. The checks section is simply absent rather than red or pending,
+which reads as "nothing to run here" and not as "nothing ran". Merge the base, retarget the child
+at `main`, and the whole suite appears.
+
+Stacking is still often the right shape for a chain of dependent work. Just know that the second
+PR is unverified until it points at `main`, and do not read its empty checks list as a pass.
 
 ---
 

@@ -40,7 +40,10 @@ from collections import OrderedDict
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw
+    # Pillow is not in the exporter venv pyright resolves against, so the pre-commit hook would
+    # reject this file for a dependency it is right not to have. Suppressed at the line rather
+    # than in pyrightconfig.json, which would hide genuinely missing imports everywhere else.
+    from PIL import Image, ImageDraw  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - the message is the whole point
     sys.exit("Pillow is required: python -m pip install pillow")
 

@@ -46,12 +46,22 @@
             Height 0 with weight 1, so the scrolling area is exactly what is left under the
             toolbar. `fillViewport` so a short list still lays out against the full height
             rather than collapsing to its content.
+
+            **The last row also has to clear the navigation bar.** The theme makes it
+            transparent, so this scrolling area runs underneath it, and the debug switch - which
+            is last - came to rest behind the gesture pill: drawn, but awkward to tap and on some
+            devices not reachable at all. The child below already leaves 20dp under its content,
+            which is the visual gap; the bar needs its own space on top of that, and how much is
+            a property of the device, so SettingsActivity applies the measured inset as padding
+            here. `clipToPadding="false"` is what makes that space scrollable rather than a strip
+            that clips the rows passing through it.
         -->
         <ScrollView
             android:id="@+id/settings_scroll_area"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
+            android:clipToPadding="false"
             android:fillViewport="true">
 
         <!--

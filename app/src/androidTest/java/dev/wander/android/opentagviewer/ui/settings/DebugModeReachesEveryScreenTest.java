@@ -16,7 +16,11 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.content.Intent;
 import android.view.View;
+import android.widget.ScrollView;
 
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
@@ -123,6 +127,111 @@ public class DebugModeReachesEveryScreenTest {
     // ------------------------------------------------------------------ each screen, asked
 
     /** Open Settings, tap the debug switch, and let it save. */
+    /**
+     * <b>Scrolled to the bottom, the switch is above the navigation bar rather than under it.</b>
+     *
+     * <p>The theme makes the navigation bar transparent, so the scrolling area runs underneath
+     * it. The debug switch is the last row and had nothing below it, so it came to rest behind
+     * the gesture pill: drawn, reachable by Espresso, and awkward or impossible to tap by hand -
+     * the failure this repo keeps meeting, where the build is green and the screen is wrong.
+     *
+     * <p><b>Asserted in pixels against the measured inset, not by eye and not by isDisplayed().</b>
+     * A view under a translucent navigation bar is still on screen as far as Espresso is
+     * concerned, so {@code isCompletelyDisplayed} passes for exactly the case this is about. The
+     * question is whether the switch ends above where the navigation bar begins, which is a
+     * number the device can be asked for.
+     *
+     * <p><b>Scrolled to the end, not merely scrolled to.</b> Espresso's {@code scrollTo()} moves
+     * the minimum needed to make a view visible, and
+     * {@code ScrollView.computeScrollDeltaToGetChildRectOnScreen} does that arithmetic against
+     * the full height with no regard for bottom padding - so with {@code clipToPadding="false"}
+     * it happily parks the row inside the padded strip and calls it visible. Written that way
+     * this failed against a correct fix, reporting the switch ending at exactly the screen
+     * height. What a person can do is keep scrolling, so the test does too.
+     *
+     * <p><b>And the geometry alone is not enough, which took measuring to find out.</b> On the
+     * Pixel 9 emulator with gesture navigation the row clears the bar by eleven pixels even with
+     * the fix removed, so a purely geometric assertion is green either way and says nothing. The
+     * assertion that actually holds the fix in place is the one about reserved space - see the
+     * comment on it. Both are here: the geometry is what a user experiences, the reserved space
+     * is what makes it true on a device this suite never runs on.
+     */
+    @Test
+    public void theLastRowEndsAboveTheNavigationBar() {
+        this.openTheScreen(SettingsActivity.class);
+
+        Eventually.check(() -> onView(withId(R.id.settings_app_debug_data_enabled))
+                .perform(scrollTo())
+                .check(matches(isDisplayed())));
+
+        // **The content's own height, not Integer.MAX_VALUE.** ScrollView.scrollTo clamps to the
+        // scroll range, which sounds like it makes the argument's size irrelevant - but the clamp
+        // adds the viewport height to it first, so MAX_VALUE overflows and the view lands at a
+        // huge negative offset. That reported the switch ending at -2147480706, which is below
+        // every threshold, so the assertion passed no matter what the layout did. A test that
+        // cannot fail is worse than no test; this is the shape it takes.
+        //
+        // Not fullScroll() either, which smooth-scrolls by default and would need waiting out.
+        this.screen.onActivity(activity -> {
+            final ScrollView scrollArea = activity.findViewById(R.id.settings_scroll_area);
+            scrollArea.scrollTo(0, scrollArea.getChildAt(0).getBottom());
+        });
+        getInstrumentation().waitForIdleSync();
+
+        final int[] switchEndsAt = new int[1];
+        final int[] navigationBarStartsAt = new int[1];
+        final int[] navigationBarNeeds = new int[1];
+        final int[] scrollAreaReserves = new int[1];
+        this.screen.onActivity(activity -> {
+            final View switcher = activity.findViewById(R.id.settings_app_debug_data_enabled);
+            final int[] onScreen = new int[2];
+            switcher.getLocationOnScreen(onScreen);
+            switchEndsAt[0] = onScreen[1] + switcher.getHeight();
+
+            // **In screen coordinates, because that is what the switch was measured in.**
+            // decor.getHeight() is a height, not a screen position, and the two coincide only
+            // when the decor view starts at y=0. On the managed aosp-atd device it does not, and
+            // this reported a 54px overlap that was purely the difference between two origins -
+            // on a device whose inset is zero and which therefore has nothing to overlap with.
+            final View decor = activity.getWindow().getDecorView();
+            final int[] decorOnScreen = new int[2];
+            decor.getLocationOnScreen(decorOnScreen);
+            final Insets bars = ViewCompat.getRootWindowInsets(decor)
+                    .getInsets(WindowInsetsCompat.Type.systemBars());
+            navigationBarStartsAt[0] = decorOnScreen[1] + decor.getHeight() - bars.bottom;
+
+            navigationBarNeeds[0] = bars.bottom;
+            scrollAreaReserves[0] =
+                    activity.findViewById(R.id.settings_scroll_area).getPaddingBottom();
+        });
+
+        // **The reserved space, as well as the geometry, and this is the assertion that bites.**
+        // Measured on the Pixel 9 emulator, gesture navigation: without the inset the switch ends
+        // at 2350 with the bar starting at 2361 - eleven pixels clear, so the geometric check
+        // below passes and proves nothing. Three-button navigation asks for around 126px instead
+        // of 63, and those eleven pixels become a switch underneath the bar.
+        //
+        // So this asks the question that has the same answer on every device: is the scrolling
+        // area reserving at least what the navigation bar takes? Confirmed to fail without the
+        // fix - "reserves 0px, needs 63px". Zero rather than the child's 20dp because that
+        // padding is inside the scrolling content, which is why it gives the eleven pixels above
+        // and no protection at all from a bar that wants more.
+        //
+        // **On the managed device this proves nothing, and that is worth saying out loud.**
+        // aosp-atd reports a systemBars bottom inset of 0 - no navigation bar - so both
+        // assertions here are vacuously true on the emulator CI actually runs. It earns its keep
+        // on a device that has one, which is every real phone and the windowed emulator the wiki
+        // captures use. Do not read a green CI run as evidence this screen is fine.
+        assertTrue("the scroll area reserves " + scrollAreaReserves[0] + "px at the bottom, but "
+                        + "the navigation bar takes " + navigationBarNeeds[0] + "px - the last "
+                        + "row is one taller navigation bar away from being unreachable",
+                scrollAreaReserves[0] >= navigationBarNeeds[0]);
+
+        assertTrue("the debug switch ends at " + switchEndsAt[0] + ", but the navigation bar "
+                        + "starts at " + navigationBarStartsAt[0] + " - it is underneath it",
+                switchEndsAt[0] <= navigationBarStartsAt[0]);
+    }
+
     private void flipTheSwitchInSettings() {
         this.openTheScreen(SettingsActivity.class);
 
