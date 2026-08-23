@@ -27,6 +27,13 @@ import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
  *
  * <p>No Android and no Bluetooth in here, so the expiry rule and the matching are covered by a
  * JVM test; the clock is a parameter for the same reason.
+ *
+ * <p><b>Written and read on different threads.</b> {@link #rebuild} runs on an Rx io thread
+ * (it is blocking Python), while {@link #beaconIdFor} runs on the Bluetooth stack's scan
+ * callback thread, once per advertisement of anything. Hence the volatile reference that is
+ * swapped whole rather than a map mutated in place: a reader sees either the old index or the
+ * new one, never a half-built or momentarily empty in-between - a race here would not crash,
+ * it would drop matches, which presents as "the tag is never nearby".
  */
 public final class NearbyTagIndex {
 
@@ -39,8 +46,8 @@ public final class NearbyTagIndex {
      */
     static final long MAX_AGE_MS = TimeUnit.MINUTES.toMillis(10);
 
-    private final Map<String, String> beaconIdByMac = new HashMap<>();
-    private long builtAtMs = Long.MIN_VALUE;
+    private volatile Map<String, String> beaconIdByMac = Map.of();
+    private volatile long builtAtMs = Long.MIN_VALUE;
 
     /** True when this has never been built, or was built long enough ago to be doubted. */
     public boolean isStale(final long nowMs) {
@@ -75,8 +82,8 @@ public final class NearbyTagIndex {
             }
         }
 
-        this.beaconIdByMac.clear();
-        this.beaconIdByMac.putAll(rebuilt);
+        // Swapped whole, not mutated in place - see the class doc on the reader thread.
+        this.beaconIdByMac = rebuilt;
         this.builtAtMs = nowMs;
     }
 
