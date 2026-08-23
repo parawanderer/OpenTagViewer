@@ -57,7 +57,13 @@ from findmy import (
 from findmy.keychain.recovery import RecoveryError
 
 from exporter.icloud import Candidate, ExportSourceError
-from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, GITHUB_ISSUES_LINK, VERSION
+from exporter.version import (
+    APP_TITLE,
+    EXPORT_VIA_WIZARD,
+    GITHUB_ISSUES_LINK,
+    VERSION,
+    describe_build,
+)
 from opentagviewer_export import (
     ExportError,
     KeyFileError,
@@ -1239,6 +1245,12 @@ def configure_logging() -> None:
         handlers=handlers,
         force=True,
     )
+
+    # **Before the caution, so it is the first line of every run.** A log that arrives attached
+    # to a report used to say nothing about what produced it, so `exporter-bug.yml` had to ask -
+    # and the answer people give is the version they remember, which on a checkout is whatever the
+    # last release set. This is the same gap the app has with `Import.via`.
+    logging.getLogger("exporter.version").info("OpenTagViewer exporter %s", describe_build())
 
     _warn_at_the_top_of_the_log()
 

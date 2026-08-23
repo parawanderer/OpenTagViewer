@@ -19,6 +19,10 @@ exports stamp `via:` too, so a build-time patch would make two artifacts from on
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 VERSION = "1.3.0"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
@@ -63,3 +67,56 @@ somebody with permission to label, which a person reporting a bug generally is n
 link silently - it degrades to a blank issue rather than an error, which is the failure nobody
 notices.
 """
+
+
+def describe_build() -> str:
+    """
+    What to write in a log so a report says which exporter produced it.
+
+    **`VERSION` alone is not the answer on a checkout.** It is a committed literal, so it says
+    whatever the last release set for every commit after it - a run from `main` two months into a
+    release cycle reports the old version perfectly confidently. The commit is the only thing that
+    identifies such a build, and `exporter-bug.yml` has to ask for it by hand precisely because
+    nothing in the program said it.
+
+    Three cases, distinguished because they are genuinely different builds:
+
+    - **Frozen**, which is what people download. There is no checkout to ask and `VERSION` is
+      exactly right, so nothing is spent finding that out.
+    - **A source tree with git**, where the commit is the truth and the version is a hint.
+    - **Anything else** - a source zip off a release tag, most likely, where `VERSION` is right
+      again and there is no commit to name.
+    """
+    if getattr(sys, "frozen", False):
+        return VERSION
+
+    commit = _commit()
+
+    return f"{VERSION} (from source, {commit})" if commit else VERSION
+
+
+def _commit() -> str | None:
+    """
+    The short commit of the checkout this is running from, or None if that is not a thing.
+
+    **Nothing here is allowed to matter.** It runs while logging is being set up, before anything
+    the user asked for has started, so every way it can go wrong returns None: no git on PATH, not
+    a repository, a git that hangs on a network-mounted directory. A version string is not worth
+    failing a run over, and it is certainly not worth waiting on.
+    """
+    try:
+        finished = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if finished.returncode != 0:
+        return None
+
+    return finished.stdout.strip() or None
