@@ -325,4 +325,12 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="ring_status_connecting">Connexion…</string>
     <string name="ring_status_triggering">Envoi…</string>
     <string name="ring_status_success">Sonne !</string>
+    <string name="nearby_now">À proximité</string>
+    <string name="nearby_now_with_battery">À proximité · Batterie %1$s</string>
+    <string name="battery_from_tag_itself">Lu à l\'instant depuis le tag via Bluetooth, pas depuis iCloud.</string>
+    <string name="battery_short_full">pleine</string>
+    <string name="battery_short_medium">moyenne</string>
+    <string name="battery_short_low">faible</string>
+    <string name="battery_short_very_low">critique</string>
+    <string name="battery">Batterie</string>
 </resources>

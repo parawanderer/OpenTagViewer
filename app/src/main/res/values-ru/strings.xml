@@ -325,4 +325,12 @@
     <string name="ring_status_connecting">Подключение…</string>
     <string name="ring_status_triggering">Отправка…</string>
     <string name="ring_status_success">Звонит!</string>
+    <string name="nearby_now">Рядом</string>
+    <string name="nearby_now_with_battery">Рядом · Батарея %1$s</string>
+    <string name="battery_from_tag_itself">Только что считано с метки по Bluetooth, а не из iCloud.</string>
+    <string name="battery_short_full">полный</string>
+    <string name="battery_short_medium">средний</string>
+    <string name="battery_short_low">низкий</string>
+    <string name="battery_short_very_low">критический</string>
+    <string name="battery">Батарея</string>
 </resources>

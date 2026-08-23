@@ -325,4 +325,12 @@
     <string name="ring_status_connecting">连接中…</string>
     <string name="ring_status_triggering">发送中…</string>
     <string name="ring_status_success">响铃中！</string>
+    <string name="nearby_now">在附近</string>
+    <string name="nearby_now_with_battery">在附近 · 电量%1$s</string>
+    <string name="battery_from_tag_itself">刚刚通过蓝牙从标签本身读取，而非来自 iCloud。</string>
+    <string name="battery_short_full">充足</string>
+    <string name="battery_short_medium">中等</string>
+    <string name="battery_short_low">偏低</string>
+    <string name="battery_short_very_low">极低</string>
+    <string name="battery">电量</string>
 </resources>

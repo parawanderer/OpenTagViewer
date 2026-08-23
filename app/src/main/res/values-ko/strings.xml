@@ -325,4 +325,12 @@
     <string name="ring_status_connecting">연결 중…</string>
     <string name="ring_status_triggering">전송 중…</string>
     <string name="ring_status_success">울리는 중!</string>
+    <string name="nearby_now">근처에 있음</string>
+    <string name="nearby_now_with_battery">근처에 있음 · 배터리 %1$s</string>
+    <string name="battery_from_tag_itself">방금 블루투스로 태그에서 직접 읽었습니다. iCloud 값이 아닙니다.</string>
+    <string name="battery_short_full">충분</string>
+    <string name="battery_short_medium">보통</string>
+    <string name="battery_short_low">부족</string>
+    <string name="battery_short_very_low">위험</string>
+    <string name="battery">배터리</string>
 </resources>
