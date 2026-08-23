@@ -705,7 +705,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         final TextView line = card.findViewById(R.id.device_last_update);
         line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                this.getString(NearbyTagLabel.signalStrengthLabel(sighting.getRssi()))));
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.ble;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -22,44 +23,40 @@ public class NearbyTagLabelTest {
     }
 
     @Test
-    public void aStrongSignalIsStrong() {
-        assertEquals(R.string.signal_strength_strong, NearbyTagLabel.signalStrengthLabel(-50));
-        assertEquals(R.string.signal_strength_strong, NearbyTagLabel.signalStrengthLabel(-60));
+    public void aStrongSignalFillsAllFiveDots() {
+        assertEquals(5, NearbyTagLabel.signalStrengthLevel(-50));
+        assertEquals("●●●●●", NearbyTagLabel.signalStrengthBars(-50));
     }
 
     @Test
-    public void aMidRangeSignalIsMedium() {
-        assertEquals(R.string.signal_strength_medium, NearbyTagLabel.signalStrengthLabel(-61));
-        assertEquals(R.string.signal_strength_medium, NearbyTagLabel.signalStrengthLabel(-75));
+    public void aFaintSignalFillsOnlyOneDot() {
+        assertEquals(1, NearbyTagLabel.signalStrengthLevel(-95));
+        assertEquals("●○○○○", NearbyTagLabel.signalStrengthBars(-95));
     }
 
     @Test
-    public void aFaintSignalIsWeak() {
-        assertEquals(R.string.signal_strength_weak, NearbyTagLabel.signalStrengthLabel(-76));
-        assertEquals(R.string.signal_strength_weak, NearbyTagLabel.signalStrengthLabel(-95));
+    public void neverFillsZeroDots() {
+        // A sighting existing at all means some signal was heard, however faint.
+        assertEquals(1, NearbyTagLabel.signalStrengthLevel(-200));
+    }
+
+    @Test
+    public void barsAlwaysHaveFiveDotsTotal() {
+        for (int rssi = -100; rssi <= -40; rssi++) {
+            assertEquals("rssi=" + rssi, 5, NearbyTagLabel.signalStrengthBars(rssi).length());
+        }
     }
 
     @Test
     public void aStrongerReadingNeverRanksBelowAWeakerOne() {
         // The whole point of showing this at all: as a reading improves while someone moves,
-        // the label must not go backwards.
-        final int[] fromWeakToStrong = {-95, -80, -75, -70, -60, -50};
-        int previousRank = -1;
+        // the dot count must not go backwards.
+        final int[] fromWeakToStrong = {-95, -85, -84, -75, -74, -65, -64, -55, -54, -50};
+        int previousLevel = 0;
         for (final int rssi : fromWeakToStrong) {
-            final int rank = rankOf(NearbyTagLabel.signalStrengthLabel(rssi));
-            org.junit.Assert.assertTrue(
-                    "rssi=" + rssi + " ranked below a weaker reading", rank >= previousRank);
-            previousRank = rank;
+            final int level = NearbyTagLabel.signalStrengthLevel(rssi);
+            assertTrue("rssi=" + rssi + " ranked below a weaker reading", level >= previousLevel);
+            previousLevel = level;
         }
-    }
-
-    private static int rankOf(final int stringRes) {
-        if (stringRes == R.string.signal_strength_weak) {
-            return 0;
-        }
-        if (stringRes == R.string.signal_strength_medium) {
-            return 1;
-        }
-        return 2;
     }
 }

@@ -335,7 +335,4 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="battery_short_very_low">kritisch</string>
     <string name="battery">Akku</string>
     <string name="live_battery_with_signal">%1$s · Signal %2$s</string>
-    <string name="signal_strength_strong">stark</string>
-    <string name="signal_strength_medium">mittel</string>
-    <string name="signal_strength_weak">schwach</string>
 </resources>
