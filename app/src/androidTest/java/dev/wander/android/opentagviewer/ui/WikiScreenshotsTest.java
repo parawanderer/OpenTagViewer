@@ -26,7 +26,6 @@ import androidx.test.filters.LargeTest;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -102,21 +101,28 @@ public class WikiScreenshotsTest {
     private File written;
 
     /**
-     * <b>{@code @BeforeClass}, not {@code @Before}, and that distinction is the whole of it.</b>
+     * <b>Skipped per test, and the teardown knows setup never ran.</b>
      *
-     * <p>An assumption failure in {@code @Before} skips the test body and then runs {@code @After}
-     * anyway - which tore down Intents that were never initialised and reported every test as
-     * FAILED with "init() must be called prior to using this method". Skipped tests that report as
-     * failures are worse than tests that run. From {@code @BeforeClass} the class is passed over
-     * whole, and neither hook runs.
+     * <p>Two wrong shapes were tried first, and each broke the suite a different way. In
+     * {@code @Before} alone, the assumption skips the test body but JUnit runs {@code @After}
+     * regardless, which tore down Intents that were never initialised and reported every test as
+     * FAILED. Moved to {@code @BeforeClass}, the class is passed over in silence - and the
+     * instrumentation then reports fewer results than the APK declares tests, so AGP calls the
+     * whole run aborted: "Expected 640 tests, received 623", where the 17 missing are exactly the
+     * contents of these three classes. Zero failures, and a red build that reads as a dead
+     * emulator.
+     *
+     * <p>So the assumption stays here, where each test is reported as skipped and counted, and
+     * {@link #putItBack} returns early rather than undoing work that was never done.
      */
-    @BeforeClass
-    public static void onlyWhenCapturing() {
-        OnlyWhenCapturing.wasAskedFor();
-    }
+    /** False when the assumption above skipped setup, so teardown undoes nothing. */
+    private boolean setUpRan;
 
     @Before
     public void cleanSlate() {
+        OnlyWhenCapturing.wasAskedFor();
+        this.setUpRan = true;
+
         final Context context = getInstrumentation().getTargetContext();
         this.db = OpenTagViewerDatabase.getInstance(context);
         this.written = new File(context.getCacheDir(), "wiki-shot.zip");
@@ -130,6 +136,10 @@ public class WikiScreenshotsTest {
 
     @After
     public void putItBack() {
+        if (!this.setUpRan) {
+            return;
+        }
+
         if (this.scenario != null) {
             this.scenario.close();
         }
