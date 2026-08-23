@@ -275,4 +275,27 @@
     <string name="icloud_results_next">下一步</string>
     <string name="icloud_registered_serial_label">序列号：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
+    <string name="imported_from_x">标签导入自 %1$s</string>
+    <string name="imported_from_nothing">没有从文件导入的标签</string>
+    <string name="error_report_title">这是一个程序缺陷</string>
+    <string name="error_report_body">返回了本应用无法解读的内容，因此重试没有用，你的设置也不需要改动。\n\n这通常意味着 Apple 改动了什么。附上日志的报告才能让它被修复——日志几乎总能指出是哪一部分。</string>
+    <string name="error_report_button">报告问题</string>
+    <string name="error_report_needs_github">将打开 GitHub，需要先登录或注册账号。</string>
+    <string name="error_report_share_log">获取日志</string>
+    <string name="error_report_log_cleaned">日志在离开应用前会先清理：%1$s</string>
+    <string name="error_report_log_unavailable">目前无法分享日志，因为负责移除个人信息的部分没有在运行。不带日志的报告同样有帮助。</string>
+    <string name="error_report_what_failed">失败的内容</string>
+    <string name="error_report_body_import">应用无法读取该文件，也说不出它哪里有问题——用同一个文件重试没有用。\n\n如果它来自导出工具，本应可以读取，正因如此才值得报告。日志通常会指出停在了哪一步。</string>
+    <string name="imported_but_not_located_title">标签已导入</string>
+    <string name="imported_but_not_located_body">标签已保存在这台手机上，不会丢失。没能成功的是向 Apple 询问它们在哪里：\n\n%1$s\n\n这通常是登录所经过的 Anisette 服务器造成的：公共服务器一旦停摆，位置就不再送达，而其他一切看起来都正常。改为在本机生成登录数据，就不必依赖别人的服务器。\n\n应用每分钟都会重试，短暂的故障会自行恢复。</string>
+    <string name="imported_but_not_located_open_settings">登录数据</string>
+    <string name="error_report_close">关闭</string>
+    <string name="error_report_log_how">你想要哪种形式的日志？</string>
+    <string name="error_report_log_copy">复制，用于粘贴到报告里</string>
+    <string name="error_report_log_save">保存为文件，用于上传附件</string>
+    <string name="error_report_log_copied">日志已复制</string>
+    <string name="export_logs_cannot_be_cleaned">日志无法保存，因为负责去除个人信息的部分没有运行。什么都没有写入——未经清理的日志不值得交出去。</string>
+    <string name="export_logs_cleaned">日志已保存。已先行清理：%1$s</string>
+    <string name="exported_with">导出工具</string>
+    <string name="exported_with_something_unrecorded">未记录——较旧的导出工具</string>
 </resources>

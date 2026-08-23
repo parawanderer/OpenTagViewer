@@ -275,4 +275,27 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="icloud_results_next">Suivant</string>
     <string name="icloud_registered_serial_label">Numéro de série : ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
+    <string name="imported_from_x">Balises importées depuis %1$s</string>
+    <string name="imported_from_nothing">Aucune balise importée depuis un fichier</string>
+    <string name="error_report_title">Ceci est un bug</string>
+    <string name="error_report_body">L’app a reçu quelque chose qu’elle ne sait pas lire : réessayer n’y changera rien, et il n’y a rien à modifier dans vos réglages.\n\nCela signifie généralement qu’Apple a changé quelque chose. Un rapport accompagné du journal est ce qui rend la correction possible : le journal indique presque toujours quelle partie est en cause.</string>
+    <string name="error_report_button">Signaler</string>
+    <string name="error_report_needs_github">Ouvre GitHub, qui vous demandera d’abord de vous connecter ou de créer un compte.</string>
+    <string name="error_report_share_log">Obtenir le journal</string>
+    <string name="error_report_log_cleaned">Le journal est nettoyé avant de quitter l’app : %1$s</string>
+    <string name="error_report_log_unavailable">Le journal ne peut pas être partagé pour l’instant : la partie de l’app qui en retire les données personnelles ne fonctionne pas. Signaler sans le journal aide quand même.</string>
+    <string name="error_report_what_failed">Ce qui a échoué</string>
+    <string name="error_report_body_import">L’app n’a pas pu lire ce fichier et ne sait pas dire ce qui ne va pas : réessayer avec le même fichier n’y changera rien.\n\nS’il vient de l’exportateur, il aurait dû fonctionner, et c’est bien pour cela que cela vaut la peine d’être signalé. Le journal indique généralement à quel endroit cela s’est arrêté.</string>
+    <string name="imported_but_not_located_title">Vos tags sont importés</string>
+    <string name="imported_but_not_located_body">Ils sont enregistrés sur ce téléphone et y resteront. Ce qui n’a pas fonctionné, c’est la demande à Apple de leur position :\n\n%1$s\n\nEn général, cela vient du serveur Anisette par lequel passe votre connexion : quand un serveur public est hors service, les positions cessent d’arriver alors que tout le reste semble normal. Produire les données de connexion sur cet appareil évite de dépendre du serveur de quelqu’un d’autre.\n\nL’app réessaie chaque minute : une panne brève se résout donc d’elle-même.</string>
+    <string name="imported_but_not_located_open_settings">Données de connexion</string>
+    <string name="error_report_close">Fermer</string>
+    <string name="error_report_log_how">Comment voulez-vous le journal ?</string>
+    <string name="error_report_log_copy">Le copier, pour le coller dans le signalement</string>
+    <string name="error_report_log_save">L’enregistrer comme fichier, pour le joindre</string>
+    <string name="error_report_log_copied">Le journal a été copié</string>
+    <string name="export_logs_cannot_be_cleaned">Le journal n’a pas pu être enregistré, car la partie de l’app qui en retire les données personnelles ne fonctionne pas. Rien n’a été écrit : un journal non nettoyé ne vaut pas la peine d’être diffusé.</string>
+    <string name="export_logs_cleaned">Journal enregistré. Il a d’abord été nettoyé : %1$s</string>
+    <string name="exported_with">Exporté avec</string>
+    <string name="exported_with_something_unrecorded">Non enregistré — un exportateur plus ancien</string>
 </resources>
