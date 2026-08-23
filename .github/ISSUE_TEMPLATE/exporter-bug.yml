@@ -82,7 +82,11 @@ body:
       description: |
         **From the window:** press **Save logs…** at the bottom. It writes a `.txt` and takes the
         obvious identifiers out on the way — email address, username, device names, serials.
-        Attach that file. **It is not the tags zip**; please do not attach that one.
+        Attach that file.
+
+        **Never attach the export zip itself, or anything unpacked out of it.** It contains the
+        private keys to your tags: anybody who has it can locate them, and it cannot be un-posted.
+        Nothing asked here needs it. The saved log is a different file and is the one to send.
 
         **From the command line:** re-run with `-vv` and keep the output.
 
