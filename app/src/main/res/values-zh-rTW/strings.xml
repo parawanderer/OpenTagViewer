@@ -275,4 +275,27 @@
     <string name="icloud_results_next">下一步</string>
     <string name="icloud_registered_serial_label">序號：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
+    <string name="imported_from_x">標籤匯入自 %1$s</string>
+    <string name="imported_from_nothing">沒有從檔案匯入的標籤</string>
+    <string name="error_report_title">這是一個程式缺陷</string>
+    <string name="error_report_body">回傳了本 App 無法解讀的內容，因此重試沒有用，你的設定也不需要更動。\n\n這通常表示 Apple 改動了什麼。附上日誌的回報才能讓它被修復——日誌幾乎總能指出是哪一部分。</string>
+    <string name="error_report_button">回報問題</string>
+    <string name="error_report_needs_github">將開啟 GitHub，需要先登入或註冊帳號。</string>
+    <string name="error_report_share_log">取得日誌</string>
+    <string name="error_report_log_cleaned">日誌在離開 App 前會先清理：%1$s</string>
+    <string name="error_report_log_unavailable">目前無法分享日誌，因為負責移除個人資訊的部分沒有在執行。不帶日誌的回報同樣有幫助。</string>
+    <string name="error_report_what_failed">失敗的內容</string>
+    <string name="error_report_body_import">App 無法讀取該檔案，也說不出它哪裡有問題——用同一個檔案重試沒有用。\n\n如果它來自匯出工具，本應可以讀取，正因如此才值得回報。日誌通常會指出停在了哪一步。</string>
+    <string name="imported_but_not_located_title">標籤已匯入</string>
+    <string name="imported_but_not_located_body">標籤已儲存在這支手機上，不會遺失。沒能成功的是向 Apple 詢問它們在哪裡：\n\n%1$s\n\n這通常是登入所經過的 Anisette 伺服器造成的：公用伺服器一旦停擺，位置就不再送達，而其他一切看起來都正常。改為在本機產生登入資料，就不必依賴別人的伺服器。\n\nApp 每分鐘都會重試，短暫的故障會自行恢復。</string>
+    <string name="imported_but_not_located_open_settings">登入資料</string>
+    <string name="error_report_close">關閉</string>
+    <string name="error_report_log_how">你想要哪種形式的日誌？</string>
+    <string name="error_report_log_copy">複製，用於貼到回報中</string>
+    <string name="error_report_log_save">儲存為檔案，用於上傳附件</string>
+    <string name="error_report_log_copied">日誌已複製</string>
+    <string name="export_logs_cannot_be_cleaned">日誌無法儲存，因為負責移除個人資訊的部分沒有運行。什麼都沒有寫入——未經清理的日誌不值得交出去。</string>
+    <string name="export_logs_cleaned">日誌已儲存。已先行清理：%1$s</string>
+    <string name="exported_with">匯出工具</string>
+    <string name="exported_with_something_unrecorded">未記錄——較舊的匯出工具</string>
 </resources>

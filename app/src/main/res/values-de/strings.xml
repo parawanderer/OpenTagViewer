@@ -275,4 +275,27 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="icloud_results_next">Weiter</string>
     <string name="icloud_registered_serial_label">Seriennummer: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
+    <string name="imported_from_x">Tags importiert aus %1$s</string>
+    <string name="imported_from_nothing">Keine Tags aus einer Datei importiert</string>
+    <string name="error_report_title">Das ist ein Fehler in der App</string>
+    <string name="error_report_body">Es kam etwas zurück, das diese App nicht lesen kann. Ein erneuter Versuch hilft daher nicht, und an deinen Einstellungen ist nichts zu ändern.\n\nMeist bedeutet das, dass Apple etwas geändert hat. Ein Bericht mit angehängtem Protokoll macht es behebbar – das Protokoll verrät fast immer, welcher Teil betroffen ist.</string>
+    <string name="error_report_button">Fehler melden</string>
+    <string name="error_report_needs_github">Öffnet GitHub. Dort musst du dich zuerst anmelden oder ein Konto erstellen.</string>
+    <string name="error_report_share_log">Protokoll holen</string>
+    <string name="error_report_log_cleaned">Das Protokoll wird bereinigt, bevor es die App verlässt: %1$s</string>
+    <string name="error_report_log_unavailable">Das Protokoll kann gerade nicht geteilt werden, weil der Teil der App, der persönliche Daten daraus entfernt, nicht läuft. Eine Meldung ohne Protokoll hilft trotzdem.</string>
+    <string name="error_report_what_failed">Was fehlgeschlagen ist</string>
+    <string name="error_report_body_import">Die App konnte diese Datei nicht lesen und kann nicht sagen, was daran nicht stimmt – ein erneuter Versuch mit derselben Datei hilft also nicht.\n\nWenn sie aus dem Exporter stammt, hätte es funktionieren müssen, und genau deshalb lohnt sich eine Meldung. Das Protokoll verrät meist, an welcher Stelle es abgebrochen ist.</string>
+    <string name="imported_but_not_located_title">Deine Tags sind importiert</string>
+    <string name="imported_but_not_located_body">Sie sind auf diesem Telefon gespeichert und bleiben dort. Nicht funktioniert hat die Abfrage bei Apple, wo sie sich befinden:\n\n%1$s\n\nMeist liegt das am Anisette-Server, über den deine Anmeldung läuft: Ist ein öffentlicher Server ausgefallen, kommen keine Standorte mehr an, während sonst alles normal aussieht. Werden die Anmeldedaten stattdessen auf diesem Gerät erzeugt, bist du von fremden Servern unabhängig.\n\nDie App versucht es jede Minute erneut, eine kurze Störung erledigt sich also von selbst.</string>
+    <string name="imported_but_not_located_open_settings">Anmeldedaten</string>
+    <string name="error_report_close">Schließen</string>
+    <string name="error_report_log_how">Wie möchtest du das Protokoll?</string>
+    <string name="error_report_log_copy">Kopieren, zum Einfügen in die Meldung</string>
+    <string name="error_report_log_save">Als Datei speichern, zum Anhängen</string>
+    <string name="error_report_log_copied">Das Protokoll wurde kopiert</string>
+    <string name="export_logs_cannot_be_cleaned">Das Protokoll konnte nicht gespeichert werden, weil der Teil der App, der persönliche Angaben daraus entfernt, nicht läuft. Es wurde nichts geschrieben – ein ungefiltertes Protokoll ist es nicht wert, weitergegeben zu werden.</string>
+    <string name="export_logs_cleaned">Protokoll gespeichert. Es wurde zuvor bereinigt: %1$s</string>
+    <string name="exported_with">Exportiert mit</string>
+    <string name="exported_with_something_unrecorded">Nicht vermerkt – ein älterer Exporter</string>
 </resources>
