@@ -268,4 +268,11 @@ You can link again later. That needs your Apple device passcode.</string>
 You can set this up now, or any time later from Settings.</string>
     <string name="icloud_offer_set_up_now">Set up now</string>
     <string name="icloud_offer_not_now">Not now</string>
+    <string name="icloud_registered_title">This app is a device on your Apple account</string>
+    <string name="icloud_registered_body"><b>Do not remove this entry.</b>\n\nApple shows it beside “If you do not recognise this device”, so it looks like something to tidy up. Removing it stops this app reading your tags — at best you will have to sign in and enter a verification code again, and it can sign you out completely.\n\nApple names the entry itself, so the serial ^1 is the only thing that tells it apart from a real Mac. Every fresh install adds another one.</string>
+    <string name="icloud_registered_lead">%1$s lists this app as one of your devices:</string>
+    <string name="icloud_registered_link">See your devices at ^1</string>
+    <string name="icloud_results_next">Next</string>
+    <string name="icloud_registered_serial_label">Serial Number: ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>

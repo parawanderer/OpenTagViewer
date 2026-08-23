@@ -268,4 +268,11 @@
 你可以現在設定，也可以隨時到設定裡再設定。</string>
     <string name="icloud_offer_set_up_now">立即設定</string>
     <string name="icloud_offer_not_now">暫不</string>
+    <string name="icloud_registered_title">此 App 是你 Apple 帳戶中的一部裝置</string>
+    <string name="icloud_registered_body"><b>請不要刪除這一項。</b>\n\nApple 會把它顯示在「如果你不認得這部裝置」旁邊，看起來像是該清掉的東西。刪除後，此 App 將無法再讀取你的標籤：順利的話你需要重新登入並輸入驗證碼，也可能被完全登出。\n\n項目的名稱由 Apple 自行決定，因此序號 ^1 是唯一能把它和真正的 Mac 區分開的資訊。每次重新安裝都會再新增一條。</string>
+    <string name="icloud_registered_lead">%1$s 的裝置列表中，此 App 顯示為：</string>
+    <string name="icloud_registered_link">可在 ^1 查看你的裝置</string>
+    <string name="icloud_results_next">下一步</string>
+    <string name="icloud_registered_serial_label">序號：^1</string>
+    <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
 </resources>

@@ -268,4 +268,11 @@
 Можно настроить сейчас или в любой момент позже в настройках.</string>
     <string name="icloud_offer_set_up_now">Настроить</string>
     <string name="icloud_offer_not_now">Не сейчас</string>
+    <string name="icloud_registered_title">Это приложение — устройство в вашей учётной записи Apple</string>
+    <string name="icloud_registered_body"><b>Не удаляйте эту запись.</b>\n\nApple показывает её рядом со словами «Если вы не узнаёте это устройство», поэтому она выглядит как что-то лишнее. Если удалить её, приложение не сможет читать ваши метки: в лучшем случае придётся войти заново и ввести код проверки, в худшем — вас полностью разлогинит.\n\nИмя записи задаёт сама Apple, поэтому серийный номер ^1 — единственное, что отличает её от настоящего Mac. Каждая новая установка добавляет ещё одну.</string>
+    <string name="icloud_registered_lead">%1$s показывает это приложение среди ваших устройств:</string>
+    <string name="icloud_registered_link">Посмотреть свои устройства на ^1</string>
+    <string name="icloud_results_next">Далее</string>
+    <string name="icloud_registered_serial_label">Серийный номер: ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>

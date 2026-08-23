@@ -268,4 +268,11 @@ Je kunt later opnieuw koppelen. Daarvoor heb je de toegangscode van je Apple-app
 Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="icloud_offer_set_up_now">Nu instellen</string>
     <string name="icloud_offer_not_now">Niet nu</string>
+    <string name="icloud_registered_title">Deze app is een apparaat in je Apple-account</string>
+    <string name="icloud_registered_body"><b>Verwijder dit item niet.</b>\n\nApple toont het naast “Als je dit apparaat niet herkent”, waardoor het lijkt of het opgeruimd moet worden. Verwijderen betekent dat deze app je tags niet meer kan lezen — in het beste geval moet je opnieuw inloggen en een verificatiecode invoeren, en je kunt volledig worden uitgelogd.\n\nApple bepaalt zelf de naam van het item, dus het serienummer ^1 is het enige waaraan je het van een echte Mac onderscheidt. Elke nieuwe installatie voegt er één toe.</string>
+    <string name="icloud_registered_lead">%1$s vermeldt deze app als een van je apparaten:</string>
+    <string name="icloud_registered_link">Bekijk je apparaten op ^1</string>
+    <string name="icloud_results_next">Volgende</string>
+    <string name="icloud_registered_serial_label">Serienummer: ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>

@@ -330,6 +330,36 @@
 
         </LinearLayout>
 
+        <!--
+          **What the user will find on their Apple account, said before they find it.**
+
+          Connecting registers this app as a device, and Apple shows that entry next to the words
+          "If you do not recognise this device" with a Remove button beside it. An unexplained row
+          is one people remove - and removing it is what breaks a connection that was working,
+          hours later, with nothing to connect the two.
+
+          **Its own step, after the tags rather than under them.** It was a card at the foot of the
+          results, below the thing the user actually came for, which is where a paragraph goes to
+          be scrolled past. This is not optional reading: the cost of missing it is landing back on
+          the login screen weeks later for no visible reason.
+
+          Shown on every connect, not once. Nothing about it stops being true, and the entries
+          accumulate - each fresh install adds another - so a person who saw it once a year ago is
+          exactly the person who has since forgotten.
+        -->
+        <LinearLayout
+            android:id="@+id/icloud_registered_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <include layout="@layout/icloud_registered_note" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
     </ScrollView>
