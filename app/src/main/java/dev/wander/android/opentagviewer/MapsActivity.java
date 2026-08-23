@@ -138,6 +138,7 @@ import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
+import dev.wander.android.opentagviewer.ble.NearbyTagIndex;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
@@ -695,12 +696,33 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * {@code currentMacAddresses}' margin in between - which reads as "stopped being found
      * nearby" for no visible reason, on a tag sitting right next to the phone.
      */
+    /**
+     * Feeds a passive sighting back into alignment self-correction - see
+     * {@code NearbyTagWatcher.SightingListener} - and, if it changed anything, re-reads {@link
+     * #beacons} and restarts the nearby watch from it.
+     *
+     * <p><b>The reread is what makes the correction worth anything this session.</b>
+     * {@code recordAccessorySighting} writes straight to {@code accessory_json} in Room; it does
+     * not touch {@link #beacons}, which is only ever refreshed by {@code loadEverything} or the
+     * periodic network fetch - neither of which this triggers. Without rereading here, the
+     * already-running {@link NearbyTagWatcher} keeps matching against the stale alignment its
+     * {@link NearbyTagIndex} was built from until one of those unrelated refreshes happens to
+     * run, which can be minutes away - a tag whose alignment just healed would still read as
+     * out of range for however long that takes.
+     */
     private void correctAlignmentFromSighting(
             final String beaconId, final String mac, final long seenAtMs) {
         this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
-                .subscribe(() -> { }, error -> Log.w(TAG,
-                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
-                        error));
+                .andThen(this.beaconRepo.getAllBeacons().flatMap(BeaconDataParser::parseAsync))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        allBeaconInformation -> {
+                            this.addBeaconToCurrent(allBeaconInformation);
+                            this.startWatchingForNearbyTags();
+                        },
+                        error -> Log.w(TAG,
+                                "Failed to persist a self-corrected alignment for beaconId="
+                                        + beaconId, error));
     }
 
     private void stopWatchingForNearbyTags() {
