@@ -125,14 +125,40 @@
 
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/device_last_update"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/nunito_semi_bold"
-                        android:text="@string/last_updated_x"
-                        android:textColor="?attr/colorOutline"
-                        android:textSize="12sp" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!--
+                            A live pulse for the map card only: lit briefly whenever this tag's
+                            own advertisement is actually heard, and dimmed again once
+                            NearbyStatusPulse.PULSE_WINDOW_MS has passed without another one -
+                            see MapsActivity#showNearbyStatusOn. GONE whenever the line below is
+                            the ordinary "last updated" one instead, since there is nothing live
+                            to show a pulse for then.
+                        -->
+                        <ImageView
+                            android:id="@+id/device_nearby_pulse"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_marginEnd="4dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/circle_filled"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <TextView
+                            android:id="@+id/device_last_update"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/nunito_semi_bold"
+                            android:text="@string/last_updated_x"
+                            android:textColor="?attr/colorOutline"
+                            android:textSize="12sp" />
+                    </LinearLayout>
                 </LinearLayout>
 
             </LinearLayout>

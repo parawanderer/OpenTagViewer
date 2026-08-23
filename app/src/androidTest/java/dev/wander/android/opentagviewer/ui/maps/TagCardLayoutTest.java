@@ -170,10 +170,10 @@ public class TagCardLayoutTest {
     }
 
     /**
-     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal, the
-     * longest battery word, three-digit seconds - must not wrap to a second line and grow the
-     * row. Built directly rather than through {@link #measureHeights}, which always writes a
-     * fixed string to this field.
+     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal and the
+     * longest battery word - must not wrap to a second line and grow the row. Built directly
+     * rather than through {@link #measureHeights}, which always writes a fixed string to this
+     * field.
      */
     @Test
     public void theLongestNearbyStatusLineDoesNotMakeItsCardTaller() {
@@ -200,7 +200,7 @@ public class TagCardLayoutTest {
             // filled dots is the longest signal reading; three digits covers up to the 30
             // second freshness window in NearbyTagSightings with room to spare.
             ((TextView) withNearbyStatus.findViewById(R.id.device_last_update))
-                    .setText("Nearby (●●●●● · 999s) · Battery critical");
+                    .setText("Nearby (●●●●●) · Battery critical");
 
             for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
                 card.measure(
