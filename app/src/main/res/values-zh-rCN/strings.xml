@@ -333,4 +333,6 @@
     <string name="battery_short_low">偏低</string>
     <string name="battery_short_very_low">极低</string>
     <string name="battery">电量</string>
+    <string name="nearby_now_with_battery_and_signal">在附近（%2$s）· 电量%1$s</string>
+    <string name="live_battery_with_signal">%1$s · 信号%2$s</string>
 </resources>

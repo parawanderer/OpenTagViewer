@@ -333,4 +333,6 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="battery_short_low">faible</string>
     <string name="battery_short_very_low">critique</string>
     <string name="battery">Batterie</string>
+    <string name="nearby_now_with_battery_and_signal">À proximité (%2$s) · Batterie %1$s</string>
+    <string name="live_battery_with_signal">%1$s · signal %2$s</string>
 </resources>

@@ -333,4 +333,6 @@
     <string name="battery_short_low">низкий</string>
     <string name="battery_short_very_low">критический</string>
     <string name="battery">Батарея</string>
+    <string name="nearby_now_with_battery_and_signal">Рядом (%2$s) · Батарея %1$s</string>
+    <string name="live_battery_with_signal">%1$s · сигнал %2$s</string>
 </resources>

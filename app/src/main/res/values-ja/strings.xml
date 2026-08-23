@@ -333,4 +333,6 @@
     <string name="battery_short_low">少</string>
     <string name="battery_short_very_low">危険</string>
     <string name="battery">バッテリー</string>
+    <string name="nearby_now_with_battery_and_signal">近くにあります（%2$s）· 電池 %1$s</string>
+    <string name="live_battery_with_signal">%1$s · 信号 %2$s</string>
 </resources>
