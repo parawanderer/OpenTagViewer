@@ -5,9 +5,9 @@ import android.util.Log;
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * The real resolver: calls {@code main.py:currentMacAddresses}, which delegates to
@@ -25,11 +25,11 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
     private static final String MODULE_MAIN = "main";
 
     @Override
-    public List<String> currentMacAddresses(final String accessoryJson) {
+    public Map<String, Integer> currentMacAddresses(final String accessoryJson) {
         if (accessoryJson == null || accessoryJson.isEmpty()) {
             // Not yet backfilled from the legacy plist - see OwnedBeacon.accessoryJson. A real
             // state, not a failure, so this reports it the same way Python does: nothing found.
-            return Collections.emptyList();
+            return Collections.emptyMap();
         }
 
         try {
@@ -38,19 +38,41 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
 
             if (returned == null) {
                 Log.w(TAG, "currentMacAddresses returned None (check python logs for details)");
-                return Collections.emptyList();
+                return Collections.emptyMap();
             }
 
-            final List<String> macs = new ArrayList<>();
-            for (final PyObject mac : returned.asList()) {
-                macs.add(mac.toString());
+            // Crossed once, here, and matched in Java from then on. A call per advertisement
+            // would pay the derivation and the marshalling for every device in range.
+            final Map<String, Integer> candidates = new HashMap<>();
+            for (final Map.Entry<PyObject, PyObject> entry : returned.asMap().entrySet()) {
+                candidates.put(entry.getKey().toString(), entry.getValue().toInt());
             }
-            return macs;
+            return candidates;
         } catch (final Exception e) {
             // Either Python has not started, or the accessory JSON could not be read. Neither
             // is worth failing the caller over: it reads as "nothing to match against yet".
             Log.w(TAG, "currentMacAddresses failed", e);
-            return Collections.emptyList();
+            return Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public String recordSeen(
+            final String accessoryJson, final int keyIndex, final long seenAtUnixMs) {
+        if (accessoryJson == null || accessoryJson.isEmpty()) {
+            return null;
+        }
+
+        try {
+            final var module = Python.getInstance().getModule(MODULE_MAIN);
+            final PyObject returned = module.callAttr(
+                    "recordAccessorySeen", accessoryJson, keyIndex, seenAtUnixMs);
+
+            return returned == null ? null : returned.toString();
+        } catch (final Exception e) {
+            // Losing a sighting costs the next scan a wider search, nothing else.
+            Log.w(TAG, "recordAccessorySeen failed", e);
+            return null;
         }
     }
 }

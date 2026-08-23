@@ -3,8 +3,7 @@ package dev.wander.android.opentagviewer.ble;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 
-import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -59,6 +58,17 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
     }
 
     /**
+     * Reads the BLE address off a found device. Real: {@code BluetoothDevice::getAddress}.
+     *
+     * <p>A seam for the same reason {@code D} is a type parameter at all: this class never looks
+     * at a device except to say which candidate it was, and requiring a real
+     * {@code BluetoothDevice} to answer that would put the whole class back on a device.
+     */
+    interface AddressOf<D> {
+        String address(D device);
+    }
+
+    /**
      * How long to scan before giving up. Long enough that an AirTag's ~1 second-ish advertising
      * interval is seen several times over, short enough that tapping the button and walking away
      * does not leave a scan running indefinitely.
@@ -89,6 +99,8 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
     private static final long CONTINUOUS_PING_PAUSE_MS = 4_000L;
 
     private final AccessoryMacResolver macResolver;
+
+    private final AddressOf<D> addressOf;
     private final PermissionCheck permissionCheck;
     private final Scanner<D> scanner;
     private final GattTrigger<D> gattTrigger;
@@ -107,6 +119,7 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             final AccessoryMacResolver macResolver) {
         return new BleAccessorySoundTrigger<>(macResolver, BlePermissions::granted,
                 NearbyAccessoryScanner::findNearby, BleGattSoundTrigger::trigger,
+                BluetoothDevice::getAddress,
                 GATT_ATTEMPTS, GATT_RETRY_DELAY_MS, CONTINUOUS_PING_PAUSE_MS);
     }
 
@@ -116,6 +129,7 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             final PermissionCheck permissionCheck,
             final Scanner<D> scanner,
             final GattTrigger<D> gattTrigger,
+            final AddressOf<D> addressOf,
             final int gattAttempts,
             final long gattRetryDelayMs,
             final long continuousPingPauseMs) {
@@ -123,6 +137,7 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
         this.permissionCheck = permissionCheck;
         this.scanner = scanner;
         this.gattTrigger = gattTrigger;
+        this.addressOf = addressOf;
         this.gattAttempts = gattAttempts;
         this.gattRetryDelayMs = gattRetryDelayMs;
         this.continuousPingPauseMs = continuousPingPauseMs;
@@ -134,23 +149,35 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             if (!this.permissionCheck.granted(context)) {
                 return Observable.just(BleSoundTriggerUpdate.done(new BleSoundTriggerResult(
                         BleSoundTriggerStatus.MISSING_PERMISSION, null,
-                        "Bluetooth scan/connect permission not granted")));
+                        "Bluetooth scan/connect permission not granted", null)));
             }
 
             // Blocking - starts a Python interpreter. Safe here because the whole chain is
             // subscribed on Schedulers.io() below, same as PythonAppleService's calls.
-            final List<String> macs = this.macResolver.currentMacAddresses(accessoryJson);
-            if (macs.isEmpty()) {
+            // Resolved once per attempt, not once per advertisement: the derivation and the
+            // trip across the Chaquopy bridge are the expensive parts, and the candidate set
+            // only moves when the fifteen-minute key interval ticks.
+            final Map<String, Integer> candidates =
+                    this.macResolver.currentMacAddresses(accessoryJson);
+            if (candidates.isEmpty()) {
                 return Observable.just(BleSoundTriggerUpdate.done(new BleSoundTriggerResult(
                         BleSoundTriggerStatus.NO_CANDIDATE_MACS, null,
-                        "Could not resolve a current MAC address for this accessory")));
+                        "Could not resolve a current MAC address for this accessory", null)));
             }
-            final Set<String> candidates = new HashSet<>(macs);
 
             return Observable.just(BleSoundTriggerUpdate.progress(BleSoundTriggerPhase.SCANNING))
-                    .concatWith(this.scanner.findNearby(context, candidates, SCAN_TIMEOUT_MS)
+                    .concatWith(this.scanner
+                            .findNearby(context, candidates.keySet(), SCAN_TIMEOUT_MS)
                             .toObservable()
-                            .flatMap(device -> this.triggerWithRetry(context, device, this.gattAttempts))
+                            .flatMap(device -> {
+                                // Which of the candidates answered - the index behind it is what
+                                // lets the caller pin the alignment and keep the next scan cheap.
+                                final Integer matched =
+                                        candidates.get(this.addressOf.address(device));
+
+                                return this.triggerWithRetry(context, device, this.gattAttempts)
+                                        .map(update -> update.withMatchedKeyIndex(matched));
+                            })
                             .onErrorReturn(BleAccessorySoundTrigger::asDoneUpdate));
         }).subscribeOn(Schedulers.io());
     }
@@ -192,9 +219,9 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
     private static BleSoundTriggerUpdate asDoneUpdate(final Throwable error) {
         if (error instanceof NearbyAccessoryScanner.NotNearbyException) {
             return BleSoundTriggerUpdate.done(new BleSoundTriggerResult(
-                    BleSoundTriggerStatus.NOT_NEARBY, null, error.getMessage()));
+                    BleSoundTriggerStatus.NOT_NEARBY, null, error.getMessage(), null));
         }
         return BleSoundTriggerUpdate.done(new BleSoundTriggerResult(
-                BleSoundTriggerStatus.FAILED, null, String.valueOf(error.getMessage())));
+                BleSoundTriggerStatus.FAILED, null, String.valueOf(error.getMessage()), null));
     }
 }

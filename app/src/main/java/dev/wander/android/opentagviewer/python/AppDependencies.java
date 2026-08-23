@@ -91,9 +91,16 @@ public final class AppDependencies {
      *
      * <p>Built from {@link #accessoryMacResolver} rather than constructing its own, so replacing
      * one in a test replaces what the other depends on too.
+     *
+     * <p><b>Null until asked for, which is what makes the sentence above true.</b> Built eagerly
+     * here, it captured whichever resolver existed at class-init - a {@code final} field inside
+     * it - so {@link #replaceAccessoryMacResolver} swapped this class's field and left the
+     * trigger holding the real Chaquopy one. A test that stubbed only the resolver would then
+     * start CPython, which is the single thing that seam exists to avoid, and it would do it
+     * without failing: Chaquopy works on a device, so the test passes slowly rather than
+     * loudly.
      */
-    private static AccessorySoundTrigger accessorySoundTrigger =
-            BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
+    private static AccessorySoundTrigger accessorySoundTrigger = null;
 
     /**
      * Strips personal identifiers out of a log before it is offered to anybody.
@@ -195,6 +202,9 @@ public final class AppDependencies {
     }
 
     public static AccessorySoundTrigger accessorySoundTrigger() {
+        if (accessorySoundTrigger == null) {
+            accessorySoundTrigger = BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
+        }
         return accessorySoundTrigger;
     }
 
@@ -233,6 +243,9 @@ public final class AppDependencies {
     @VisibleForTesting
     public static void replaceAccessoryMacResolver(final AccessoryMacResolver replacement) {
         accessoryMacResolver = replacement;
+        // Dropped rather than rebuilt, so an explicit replaceAccessorySoundTrigger made after
+        // this one still wins. It is rebuilt from the new resolver on the next call.
+        accessorySoundTrigger = null;
     }
 
     @VisibleForTesting
@@ -263,7 +276,7 @@ public final class AppDependencies {
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         accessoryMacResolver = new ChaquopyAccessoryMacResolver();
-        accessorySoundTrigger = BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
+        accessorySoundTrigger = null;
         logRedactor = new ChaquopyLogRedactor();
         bundleBuilder = new ChaquopyBundleBuilder();
         icloudFactory = AppDependencies::openRealICloud;

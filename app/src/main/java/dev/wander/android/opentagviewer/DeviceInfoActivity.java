@@ -679,11 +679,33 @@ public class DeviceInfoActivity extends AppCompatActivity
      * {@link #showPlaySoundStatus}) or the terminal outcome.
      */
     private void handlePlaySoundUpdate(final BleSoundTriggerUpdate update) {
+        this.keepWhatTheSightingProved(update);
+
         if (update.getPhase() != BleSoundTriggerPhase.DONE) {
             this.showPlaySoundStatus(phaseMessageRes(update.getPhase()), LENGTH_SHORT);
             return;
         }
         this.showPlaySoundResult(update.getResult());
+    }
+
+    /**
+     * Keep the alignment a Bluetooth sighting proves, so the next scan is cheap.
+     *
+     * <p>Fire and forget: this runs after the sound has already played or failed, and the user
+     * asked for a noise rather than for a database write. See
+     * {@code BeaconRepository#recordAccessorySighting}.
+     */
+    private void keepWhatTheSightingProved(final BleSoundTriggerUpdate update) {
+        if (update.getPhase() != BleSoundTriggerPhase.DONE
+                || update.getResult().getMatchedKeyIndex() == null) {
+            return;
+        }
+        this.beaconRepo.recordAccessorySighting(
+                        this.beaconId,
+                        update.getResult().getMatchedKeyIndex(),
+                        System.currentTimeMillis())
+                .subscribe(() -> { }, error ->
+                        Log.d(TAG, "Could not keep the alignment from a sighting", error));
     }
 
     private static int phaseMessageRes(final BleSoundTriggerPhase phase) {
