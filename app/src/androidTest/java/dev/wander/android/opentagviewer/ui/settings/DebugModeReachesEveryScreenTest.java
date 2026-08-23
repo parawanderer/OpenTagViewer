@@ -188,10 +188,17 @@ public class DebugModeReachesEveryScreenTest {
             switcher.getLocationOnScreen(onScreen);
             switchEndsAt[0] = onScreen[1] + switcher.getHeight();
 
+            // **In screen coordinates, because that is what the switch was measured in.**
+            // decor.getHeight() is a height, not a screen position, and the two coincide only
+            // when the decor view starts at y=0. On the managed aosp-atd device it does not, and
+            // this reported a 54px overlap that was purely the difference between two origins -
+            // on a device whose inset is zero and which therefore has nothing to overlap with.
             final View decor = activity.getWindow().getDecorView();
+            final int[] decorOnScreen = new int[2];
+            decor.getLocationOnScreen(decorOnScreen);
             final Insets bars = ViewCompat.getRootWindowInsets(decor)
                     .getInsets(WindowInsetsCompat.Type.systemBars());
-            navigationBarStartsAt[0] = decor.getHeight() - bars.bottom;
+            navigationBarStartsAt[0] = decorOnScreen[1] + decor.getHeight() - bars.bottom;
 
             navigationBarNeeds[0] = bars.bottom;
             scrollAreaReserves[0] =
@@ -209,6 +216,12 @@ public class DebugModeReachesEveryScreenTest {
         // fix - "reserves 0px, needs 63px". Zero rather than the child's 20dp because that
         // padding is inside the scrolling content, which is why it gives the eleven pixels above
         // and no protection at all from a bar that wants more.
+        //
+        // **On the managed device this proves nothing, and that is worth saying out loud.**
+        // aosp-atd reports a systemBars bottom inset of 0 - no navigation bar - so both
+        // assertions here are vacuously true on the emulator CI actually runs. It earns its keep
+        // on a device that has one, which is every real phone and the windowed emulator the wiki
+        // captures use. Do not read a green CI run as evidence this screen is fine.
         assertTrue("the scroll area reserves " + scrollAreaReserves[0] + "px at the bottom, but "
                         + "the navigation bar takes " + navigationBarNeeds[0] + "px - the last "
                         + "row is one taller navigation bar away from being unreachable",
