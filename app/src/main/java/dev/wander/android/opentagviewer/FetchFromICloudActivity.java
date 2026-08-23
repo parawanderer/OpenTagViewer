@@ -4,9 +4,17 @@ import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 import android.text.format.DateFormat;
 import android.widget.Button;
@@ -24,8 +32,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.model.UserAuthData;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.python.AppDependencies;
@@ -38,6 +50,7 @@ import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.python.PythonLock;
 import dev.wander.android.opentagviewer.python.icloud.RecoverableDevice;
+import dev.wander.android.opentagviewer.ui.CodeChipSpan;
 import dev.wander.android.opentagviewer.ui.RecoverableDeviceIcon;
 import dev.wander.android.opentagviewer.ui.login.StepTransition;
 import dev.wander.android.opentagviewer.ui.login.StepTransition.Direction;
@@ -64,6 +77,18 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     private static final String TAG = FetchFromICloudActivity.class.getSimpleName();
 
     /**
+     * Where the user can see the device list this app is now in.
+     *
+     * <p>The root, not a deep link into the devices section. Apple has moved this page twice -
+     * it was {@code appleid.apple.com} - and a dead deep link on a screen telling somebody to go
+     * and look is worse than one extra click.
+     */
+    private static final String APPLE_ACCOUNT_URL = "https://account.apple.com";
+
+    /** The same place, as it is printed on screen - no scheme, because nobody reads one. */
+    private static final String APPLE_ACCOUNT_DOMAIN = "account.apple.com";
+
+    /**
      * The mutually exclusive steps, listed once.
      *
      * <p>So showing one is "show this" rather than every caller remembering to hide the other
@@ -76,6 +101,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             R.id.icloud_no_tags_container,
             R.id.icloud_retry_container,
             R.id.icloud_results_container,
+            R.id.icloud_registered_container,
     };
 
     /** Set when the screen should leave and let the caller open the file picker instead. */
@@ -486,6 +512,139 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.showOnly(R.id.icloud_results_container, R.string.icloud_results_title, Direction.FORWARD);
     }
 
+    /**
+     * What this app now is on the user's Apple account, and why to leave it alone.
+     *
+     * <p><b>A replica of the row, not a description of one.</b> Apple synthesises the entry from
+     * the claimed model and ignores the name the app sends, so what the user will scroll past is
+     * titled {@code MacBookPro} - not "OpenTagViewer". The tile is built from the same
+     * {@link AdiDeviceIdentity.Hardware} the app registers under, because a screen that described
+     * a different machine than the one on the account would send somebody hunting for a row that
+     * is not there, and possibly deleting one that is.
+     *
+     * <p>Shown on every connect. The entries accumulate - each fresh install adds another, all
+     * with this same title and model - so the person who saw this a year ago is precisely the one
+     * who has since forgotten which row it was.
+     */
+    private void showWhatWeRegisteredAs() {
+        final AdiDeviceIdentity.Hardware hardware = LocalAnisette.profileToShow(this);
+
+        this.<TextView>findViewById(R.id.icloud_registered_device_name)
+                .setText(hardware.deviceListName());
+
+        // The model and OS are transcriptions of what Apple prints - it prints "macOS 13.1"
+        // whatever language the account is in - so only the bracketing is localised.
+        this.<TextView>findViewById(R.id.icloud_registered_device_model)
+                .setText(this.getString(R.string.icloud_registered_model_and_os,
+                        hardware.marketingName(),
+                        hardware.osName() + " " + hardware.osVersion()));
+
+        this.<TextView>findViewById(R.id.icloud_registered_device_serial).setText(
+                TextUtils.expandTemplate(
+                        this.getText(R.string.icloud_registered_serial_label),
+                        this.serialAsCode()));
+
+        // The icon follows the claim, or the tile says Mac beside a picture of a phone.
+        this.<ImageView>findViewById(R.id.icloud_registered_icon).setImageResource(
+                hardware == AdiDeviceIdentity.Hardware.IPHONE
+                        ? R.drawable.smartphone_24px : R.drawable.laptop_24px);
+
+        // The same chip in the prose. It is the value the sentence is about, and it reads as a
+        // typo in body text - "0PENTAGVIEWR" has a zero for an O and no vowel in VIEWR.
+        // Read from the resource rather than from the view: the view may already hold an expanded
+        // copy from a previous visit to this step, and expanding twice leaves the ^1 gone and the
+        // chip applied to nothing.
+        this.<TextView>findViewById(R.id.icloud_registered_body).setText(
+                TextUtils.expandTemplate(
+                        this.getText(R.string.icloud_registered_body), this.serialAsCode()));
+
+        this.fillInTheAccountName();
+        this.setUpTheAccountLink();
+
+        this.showOnly(R.id.icloud_registered_container, R.string.icloud_registered_title,
+                Direction.FORWARD);
+    }
+
+    /** The serial, as a chip, ready to drop into a sentence or a label. */
+    private CharSequence serialAsCode() {
+        return CodeChipSpan.applyTo(
+                AdiDeviceIdentity.APP_SERIAL, AdiDeviceIdentity.APP_SERIAL, this.codeChip());
+    }
+
+    private CodeChipSpan codeChip() {
+        return new CodeChipSpan(
+                this.getResources().getDisplayMetrics().density,
+                this.colour(com.google.android.material.R.attr.colorSurfaceContainerHighest),
+                this.colour(com.google.android.material.R.attr.colorOnSurface));
+    }
+
+    /**
+     * "See your devices at <u>account.apple.com</u>", with only the address looking tappable.
+     *
+     * <p>The address is inserted rather than translated - it is a domain - and it carries the
+     * three marks that say "link" without an icon: the accent colour, an underline and a heavier
+     * weight. The words around it stay body text, so the line reads as a sentence that contains a
+     * link rather than as a button whose label happens to be a sentence.
+     */
+    private void setUpTheAccountLink() {
+        final SpannableString address = new SpannableString(APPLE_ACCOUNT_DOMAIN);
+        address.setSpan(new ForegroundColorSpan(this.colour(
+                        com.google.android.material.R.attr.colorPrimary)),
+                0, address.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        address.setSpan(new UnderlineSpan(),
+                0, address.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        address.setSpan(new StyleSpan(Typeface.BOLD),
+                0, address.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        final TextView link = this.findViewById(R.id.icloud_registered_link);
+        link.setText(TextUtils.expandTemplate(
+                this.getText(R.string.icloud_registered_link), address));
+        link.setOnClickListener(v -> WebLink.open(this, APPLE_ACCOUNT_URL));
+    }
+
+    private int colour(final int attr) {
+        final TypedValue value = new TypedValue();
+        this.getTheme().resolveAttribute(attr, value, true);
+        return value.data;
+    }
+
+    /**
+     * The account the entry is on, named if the session carries it.
+     *
+     * <p><b>Hidden rather than blank when it does not.</b> A stored session need not carry an
+     * account block - Settings already handles that case rather than crashing on it - and
+     * "%1$s lists this app" with an empty {@code %1$s} reads as a bug. The tile below says the
+     * same thing without it; the email only makes it concrete for somebody with more than one
+     * Apple account.
+     */
+    private void fillInTheAccountName() {
+        final TextView lead = this.findViewById(R.id.icloud_registered_lead);
+        lead.setVisibility(GONE);
+
+        var async = new UserAuthRepository(
+                UserAuthDataStore.getInstance(this.getApplicationContext()),
+                new AppCryptographyUtil())
+                .getUserAuth()
+                .filter(Optional::isPresent)
+                .map(auth -> auth.get().getUser())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        user -> {
+                            // Both halves can be absent on a session that deserialised without an
+                            // account block - the same case Settings guards, for the same reason.
+                            final UserAuthData.UserAccountInfo info = user.getAccount() == null
+                                    ? null : user.getAccount().getInfo();
+                            final String email = info == null ? null : info.getAccountName();
+
+                            if (email == null || email.isBlank()) {
+                                return;
+                            }
+                            lead.setText(this.getString(R.string.icloud_registered_lead, email));
+                            lead.setVisibility(VISIBLE);
+                        },
+                        error -> Log.w(TAG, "No account name for the device note", error));
+    }
+
     /** Whatever went wrong, on the screen written for it. */
     private void showFailure(final Throwable error) {
         final ICloudFailure failure = error instanceof ICloudException
@@ -676,6 +835,9 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         if (stepId == R.id.icloud_passcode_container) {
             this.setPrimaryButton(R.string.icloud_unlock_action, this::submitPasscode);
         } else if (stepId == R.id.icloud_results_container) {
+            // Not the last step any more - what this app put on their account comes after.
+            this.setPrimaryButton(R.string.icloud_results_next, this::showWhatWeRegisteredAs);
+        } else if (stepId == R.id.icloud_registered_container) {
             this.setPrimaryButton(R.string.icloud_results_done, this::finish);
         } else if (stepId == R.id.icloud_no_tags_container) {
             this.setPrimaryButton(R.string.icloud_import_from_file, this::leaveForFileImport);

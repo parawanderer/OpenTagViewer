@@ -268,4 +268,11 @@
 今すぐ設定することも、後から設定画面で行うこともできます。</string>
     <string name="icloud_offer_set_up_now">今すぐ設定</string>
     <string name="icloud_offer_not_now">今はしない</string>
+    <string name="icloud_registered_title">このアプリは Apple アカウントのデバイスとして登録されています</string>
+    <string name="icloud_registered_body"><b>この項目を削除しないでください。</b>\n\nApple はこれを「このデバイスに心当たりがない場合」の隣に表示するため、片付けるべきもののように見えます。削除すると、このアプリはタグを読み取れなくなります。うまくいっても再度のサインインと確認コードの入力が必要になり、完全にサインアウトされることもあります。\n\n項目の名前は Apple が付けるため、本物の Mac と見分けられるのはシリアル番号 ^1 だけです。インストールし直すたびに、もう一つ増えます。</string>
+    <string name="icloud_registered_lead">%1$s のデバイス一覧に、このアプリが次のように表示されます：</string>
+    <string name="icloud_registered_link">^1 でデバイスを確認できます</string>
+    <string name="icloud_results_next">次へ</string>
+    <string name="icloud_registered_serial_label">シリアル番号：^1</string>
+    <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
 </resources>

@@ -117,6 +117,11 @@ public class TheMapIsToldWhatChangedTest {
                 .check(matches(isDisplayed())));
         onView(withId(R.id.icloud_primary_button)).perform(click());
 
+        // What this app registered as on the Apple account, which the results step now leads to.
+        Eventually.check(() -> onView(withId(R.id.icloud_registered_container))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.icloud_primary_button)).perform(click());
+
         // The list rebuilds itself here - which is what used to lose the flag.
         Eventually.check(() -> onView(withId(R.id.my_devices_list))
                 .check(matches(isDisplayed())));

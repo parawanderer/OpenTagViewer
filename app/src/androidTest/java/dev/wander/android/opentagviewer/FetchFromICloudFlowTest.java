@@ -3,6 +3,7 @@ package dev.wander.android.opentagviewer;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.replaceText;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -12,9 +13,21 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.util.Log;
+import android.view.View;
+
+import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import com.google.android.material.color.MaterialColors;
+
+import java.io.File;
+import java.io.FileOutputStream;
 
 import org.junit.After;
 import org.junit.Test;
@@ -22,6 +35,7 @@ import org.junit.runner.RunWith;
 
 import java.util.List;
 
+import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
 import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
@@ -124,6 +138,143 @@ public class FetchFromICloudFlowTest {
         Eventually.check(() -> onView(withText(containsString("Bike")))
                 .check(matches(isDisplayed())));
         TestPace.afterAStep();
+    }
+
+    /**
+     * <b>And the results tell them what is now sitting on their Apple account.</b>
+     *
+     * <p>Connecting registered this app as a device. Apple will show that row next to "If you do
+     * not recognise this device" with a Remove button, and removing it breaks the connection this
+     * screen just made - hours later, somewhere else, with nothing linking the two.
+     *
+     * <p>{@code WhatWeRegisterAsIsLegibleTest} covers whether the card can be read. This covers
+     * the part that test cannot see: that it is on the screen the user actually arrives at, below
+     * the tags and reachable by scrolling. A card that inflates perfectly into a screen nobody
+     * routes to would pass there and be worth nothing.
+     */
+    @Test
+    public void theresultsSayWhatIsNowOnTheAppleAccount() {
+        this.open(FakeICloudService.withTags().alsoSkipping("My MacBook", "My iPhone"));
+
+        this.chooseTheFirstDevice();
+        this.typeThePasscode();
+
+        Eventually.check(() -> onView(withId(R.id.icloud_results_container))
+                .check(matches(isDisplayed())));
+        TestPace.afterAStep();
+
+        // The tags are not the last word: what this app put on the account comes after them.
+        Eventually.check(() -> onView(withId(R.id.icloud_primary_button))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.icloud_primary_button)).perform(click());
+        TestPace.afterAStep();
+
+        Eventually.check(() -> onView(withId(R.id.icloud_registered_container))
+                .check(matches(isDisplayed())));
+
+        // **The tile has to describe the machine the app actually registers as.** Read from the
+        // same profile the identity is built from rather than written out here, because a literal
+        // would keep passing after the profile changed - and the failure it would hide is a
+        // screen telling somebody to look for a device that is not on their account. Rule 11.
+        final AdiDeviceIdentity.Hardware hardware = AdiDeviceIdentity.Hardware.DEFAULT;
+
+        onView(withId(R.id.icloud_registered_device_name))
+                .check(matches(withText(hardware.deviceListName())));
+        // Model and OS share a line, and the serial sits behind a translated label, so these are
+        // containment checks - the surrounding wording is the locale's business, the values are
+        // not.
+        onView(withId(R.id.icloud_registered_device_model))
+                .check(matches(withText(containsString(hardware.marketingName()))));
+        onView(withId(R.id.icloud_registered_device_model))
+                .check(matches(withText(containsString(hardware.osVersion()))));
+        onView(withId(R.id.icloud_registered_device_serial))
+                .check(matches(withText(containsString(AdiDeviceIdentity.APP_SERIAL))));
+        TestPace.afterAStep();
+
+        onView(withId(R.id.icloud_registered_body)).perform(scrollTo());
+        onView(withId(R.id.icloud_registered_body))
+                .check(matches(withText(containsString(AdiDeviceIdentity.APP_SERIAL))));
+
+        // The serial reaches the sentence as well as the tile. The resource holds a ^1 slot, and
+        // a template that lost it expands to a sentence about "the serial" that never says which.
+        onView(withId(R.id.icloud_registered_link))
+                .check(matches(withText(containsString("account.apple.com"))));
+
+        // **The only picture of this page assembled.** WhatWeRegisterAsIsLegibleTest inflates the
+        // layout without an activity, so the tile is blank and the slots unexpanded there - the
+        // chip and the link styling exist only once something has filled them in.
+        this.writeShotOf(R.id.icloud_registered_container, "registered_page");
+        TestPace.afterAStep();
+    }
+
+    private void writeShotOf(final int id, final String name) {
+        final String dir = InstrumentationRegistry.getArguments()
+                .getString("additionalTestOutputDir");
+        if (dir == null) {
+            return;
+        }
+
+        this.scenario.onActivity(activity -> {
+            try {
+                final View view = activity.findViewById(id);
+                final Bitmap bitmap = Bitmap.createBitmap(
+                        view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+
+                // The container is transparent; without this the PNG is the page drawn on black.
+                final Canvas canvas = new Canvas(bitmap);
+                canvas.drawColor(MaterialColors.getColor(
+                        view, com.google.android.material.R.attr.colorSurface));
+                view.draw(canvas);
+
+                try (FileOutputStream out =
+                             new FileOutputStream(new File(new File(dir), name + ".png"))) {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                }
+            } catch (final Exception e) {
+                // A screenshot explains a failure; it is never the reason for one.
+                Log.w("FetchFromICloudFlowTest", "could not write " + name, e);
+            }
+        });
+    }
+
+    /**
+     * <b>And that page is the end of the flow, not a detour off it.</b>
+     *
+     * <p>It was reached by a button that used to say Done and now says Next, so the risk is a
+     * screen nobody can leave: the step is new, and the button it inherits is the one that used
+     * to close the activity.
+     */
+    @Test
+    public void thedeviceNoteIsTheLastStepAndCloses() {
+        this.open(FakeICloudService.withTags());
+
+        this.chooseTheFirstDevice();
+        this.typeThePasscode();
+
+        Eventually.check(() -> onView(withId(R.id.icloud_results_container))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.icloud_primary_button)).perform(click());
+
+        Eventually.check(() -> onView(withId(R.id.icloud_registered_container))
+                .check(matches(isDisplayed())));
+        TestPace.afterAStep();
+
+        // Asking the activity, not Espresso: a click that closed the screen and a click that
+        // missed both leave onView throwing, and only one of them is a failure.
+        Eventually.perform("the done button", this::isFinishing,
+                () -> onView(withId(R.id.icloud_primary_button)).perform(click()));
+    }
+
+    /**
+     * Whether the screen has gone.
+     *
+     * <p>Asked of the scenario, not of the activity. {@code onActivity} throws
+     * {@code "Cannot run onActivity since Activity has been destroyed already"} - so the obvious
+     * spelling of this fails precisely when the answer is yes, and a test waiting for the screen
+     * to close cannot use it to find out that the screen closed.
+     */
+    private boolean isFinishing() {
+        return this.scenario.getState() == Lifecycle.State.DESTROYED;
     }
 
     /** The passcode goes to the device that was actually chosen, not the first in the list. */

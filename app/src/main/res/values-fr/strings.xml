@@ -268,4 +268,11 @@ Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple
 Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.</string>
     <string name="icloud_offer_set_up_now">Configurer</string>
     <string name="icloud_offer_not_now">Plus tard</string>
+    <string name="icloud_registered_title">Cette app est un appareil de votre compte Apple</string>
+    <string name="icloud_registered_body"><b>Ne supprimez pas cette entrée.</b>\n\nApple l’affiche à côté de « Si vous ne reconnaissez pas cet appareil », ce qui donne l’impression qu’il faut faire le ménage. La supprimer empêche l’app de lire vos balises : au mieux vous devrez vous reconnecter et saisir un code de vérification, au pire vous serez déconnecté complètement.\n\nC’est Apple qui nomme l’entrée, donc le numéro de série ^1 est la seule chose qui la distingue d’un vrai Mac. Chaque nouvelle installation en ajoute une autre.</string>
+    <string name="icloud_registered_lead">%1$s répertorie cette app parmi vos appareils :</string>
+    <string name="icloud_registered_link">Voir vos appareils sur ^1</string>
+    <string name="icloud_results_next">Suivant</string>
+    <string name="icloud_registered_serial_label">Numéro de série : ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>

@@ -268,4 +268,11 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
 Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</string>
     <string name="icloud_offer_set_up_now">Jetzt einrichten</string>
     <string name="icloud_offer_not_now">Jetzt nicht</string>
+    <string name="icloud_registered_title">Diese App ist ein Gerät in deinem Apple-Account</string>
+    <string name="icloud_registered_body"><b>Entferne diesen Eintrag nicht.</b>\n\nApple zeigt ihn neben „Wenn du dieses Gerät nicht erkennst“ an, sodass er wie etwas zum Aufräumen wirkt. Wird er entfernt, kann diese App deine Tags nicht mehr lesen – im besten Fall musst du dich erneut anmelden und einen Bestätigungscode eingeben, im schlimmsten Fall wirst du ganz abgemeldet.\n\nApple vergibt den Namen des Eintrags selbst, deshalb ist die Seriennummer ^1 das Einzige, was ihn von einem echten Mac unterscheidet. Jede Neuinstallation fügt einen weiteren hinzu.</string>
+    <string name="icloud_registered_lead">%1$s führt diese App als eines deiner Geräte:</string>
+    <string name="icloud_registered_link">Deine Geräte ansehen auf ^1</string>
+    <string name="icloud_results_next">Weiter</string>
+    <string name="icloud_registered_serial_label">Seriennummer: ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>
