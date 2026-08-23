@@ -13,9 +13,10 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
 import io.reactivex.rxjava3.core.Observable;
@@ -85,7 +86,13 @@ public class NearbyTagWatcher {
     @Nullable
     private final SightingListener sightingListener;
 
-    private final Map<String, Long> lastListenerCallMs = new HashMap<>();
+    /** Written and read on the Bluetooth scan callback thread, but also constructed and first
+     * touched elsewhere - concurrent map so there is no thread this is unsafe from. */
+    private final Map<String, Long> lastListenerCallMs = new ConcurrentHashMap<>();
+
+    /** Guards {@link #maybeRebuildIndex} so a stale index triggers one rebuild, not one per
+     * advertisement that arrives while the first is still running. */
+    private final AtomicBoolean indexRebuildInFlight = new AtomicBoolean(false);
 
     public NearbyTagWatcher(final AccessoryMacResolver macResolver) {
         this(macResolver, null);
@@ -156,6 +163,11 @@ public class NearbyTagWatcher {
             final ScanCallback callback = new ScanCallback() {
                 @Override
                 public void onScanResult(final int callbackType, final ScanResult result) {
+                    // Checked per scan result, of anything, not only our own tags: once the
+                    // index is stale, our own tag's advertisements are exactly the ones that
+                    // no longer match, so they cannot be the trigger.
+                    maybeRebuildIndex(accessoryJsonByBeaconId);
+
                     final NearbyTagSighting sighting = sightingFrom(result);
                     if (sighting == null) {
                         return;
@@ -189,6 +201,41 @@ public class NearbyTagWatcher {
                 scanner.stopScan(callback);
             });
         }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Rebuilds the index in the background once it has gone stale, mid-subscription.
+     *
+     * <p><b>Without this, a watch outliving the key rollover goes quietly deaf.</b> The index
+     * is checked and rebuilt when {@link #watch} subscribes, but a screen left open longer than
+     * {@link NearbyTagIndex#MAX_AGE_MS} used to keep matching against rolled-past addresses for
+     * as long as the subscription lived - the tag next to the phone simply stopped appearing,
+     * with nothing failing anywhere, until an onPause/onResume bounce built a fresh watcher.
+     * Exactly the failure mode the expiry rule exists to prevent, made unreachable by only
+     * consulting it once.
+     *
+     * <p>Cheap on the hot path: a stale check is two long compares, and the rebuild itself -
+     * blocking Python, one interpreter call per tag - is handed to {@link Schedulers#io()}
+     * behind a single-flight guard. Until it completes, matching continues against the old
+     * index, which can only miss what it would have missed anyway.
+     */
+    private void maybeRebuildIndex(final Map<String, String> accessoryJsonByBeaconId) {
+        if (!this.index.isStale(this.clock.nowMs())) {
+            return;
+        }
+        if (!this.indexRebuildInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs());
+                Log.d(TAG, "Rebuilt the nearby index mid-watch: " + this.index.size()
+                        + " candidate address(es) for " + accessoryJsonByBeaconId.size()
+                        + " tag(s)");
+            } finally {
+                this.indexRebuildInFlight.set(false);
+            }
+        });
     }
 
     /**
