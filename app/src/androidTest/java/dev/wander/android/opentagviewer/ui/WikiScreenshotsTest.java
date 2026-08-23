@@ -26,6 +26,7 @@ import androidx.test.filters.LargeTest;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -100,10 +101,22 @@ public class WikiScreenshotsTest {
     private OpenTagViewerDatabase db;
     private File written;
 
+    /**
+     * <b>{@code @BeforeClass}, not {@code @Before}, and that distinction is the whole of it.</b>
+     *
+     * <p>An assumption failure in {@code @Before} skips the test body and then runs {@code @After}
+     * anyway - which tore down Intents that were never initialised and reported every test as
+     * FAILED with "init() must be called prior to using this method". Skipped tests that report as
+     * failures are worse than tests that run. From {@code @BeforeClass} the class is passed over
+     * whole, and neither hook runs.
+     */
+    @BeforeClass
+    public static void onlyWhenCapturing() {
+        OnlyWhenCapturing.wasAskedFor();
+    }
+
     @Before
     public void cleanSlate() {
-        OnlyWhenCapturing.wasAskedFor();
-
         final Context context = getInstrumentation().getTargetContext();
         this.db = OpenTagViewerDatabase.getInstance(context);
         this.written = new File(context.getCacheDir(), "wiki-shot.zip");

@@ -27,6 +27,7 @@ import androidx.test.filters.LargeTest;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -88,10 +89,22 @@ public class WikiScreenshotsFromTheMapTest {
 
     private final AMapWithTagsOnIt theMap = new AMapWithTagsOnIt();
 
+    /**
+     * <b>{@code @BeforeClass}, not {@code @Before}, and that distinction is the whole of it.</b>
+     *
+     * <p>An assumption failure in {@code @Before} skips the test body and then runs {@code @After}
+     * anyway - which tore down Intents that were never initialised and reported every test as
+     * FAILED with "init() must be called prior to using this method". Skipped tests that report as
+     * failures are worse than tests that run. From {@code @BeforeClass} the class is passed over
+     * whole, and neither hook runs.
+     */
+    @BeforeClass
+    public static void onlyWhenCapturing() {
+        OnlyWhenCapturing.wasAskedFor();
+    }
+
     @Before
     public void openTheMap() {
-        OnlyWhenCapturing.wasAskedFor();
-
         Intents.init();
 
         // **Everything except the two screens this actually walks into.** The test this was
