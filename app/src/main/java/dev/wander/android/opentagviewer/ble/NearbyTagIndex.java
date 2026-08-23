@@ -3,7 +3,7 @@ package dev.wander.android.opentagviewer.ble;
 import androidx.annotation.Nullable;
 
 import java.util.HashMap;
-import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +71,9 @@ public final class NearbyTagIndex {
         final Map<String, String> rebuilt = new HashMap<>();
 
         for (final Map.Entry<String, String> entry : accessoryJsonByBeaconId.entrySet()) {
-            final List<String> macs = resolver.currentMacAddresses(entry.getValue());
+            // Only the address is wanted here; the key index each maps to is not this class's
+            // business - see AccessoryMacResolver#recordSeen on why only Python may act on it.
+            final Set<String> macs = resolver.currentMacAddresses(entry.getValue()).keySet();
             for (final String mac : macs) {
                 if (mac != null) {
                     // Upper-cased on the way in so lookups need no normalisation per scan
