@@ -58,15 +58,15 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
 
     @Override
     public String recordSeen(
-            final String accessoryJson, final int keyIndex, final long seenAtUnixMs) {
-        if (accessoryJson == null || accessoryJson.isEmpty()) {
+            final String accessoryJson, final String mac, final long seenAtUnixMs) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || mac == null) {
             return null;
         }
 
         try {
             final var module = Python.getInstance().getModule(MODULE_MAIN);
             final PyObject returned = module.callAttr(
-                    "recordAccessorySeen", accessoryJson, keyIndex, seenAtUnixMs);
+                    "recordAccessorySeen", accessoryJson, mac, seenAtUnixMs);
 
             return returned == null ? null : returned.toString();
         } catch (final Exception e) {

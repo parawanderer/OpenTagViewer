@@ -170,13 +170,14 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
                             .findNearby(context, candidates.keySet(), SCAN_TIMEOUT_MS)
                             .toObservable()
                             .flatMap(device -> {
-                                // Which of the candidates answered - the index behind it is what
-                                // lets the caller pin the alignment and keep the next scan cheap.
-                                final Integer matched =
-                                        candidates.get(this.addressOf.address(device));
+                                // The address itself, not the index currentMacAddresses paired
+                                // it with - see BleSoundTriggerResult on why only the caller
+                                // (through Python, which alone can tell a primary key's index
+                                // from a secondary one's) may turn this into an alignment write.
+                                final String matchedMac = this.addressOf.address(device);
 
                                 return this.triggerWithRetry(context, device, this.gattAttempts)
-                                        .map(update -> update.withMatchedKeyIndex(matched));
+                                        .map(update -> update.withMatchedMac(matchedMac));
                             })
                             .onErrorReturn(BleAccessorySoundTrigger::asDoneUpdate));
         }).subscribeOn(Schedulers.io());

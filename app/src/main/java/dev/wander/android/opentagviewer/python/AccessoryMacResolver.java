@@ -31,17 +31,30 @@ public interface AccessoryMacResolver {
     Map<String, Integer> currentMacAddresses(String accessoryJson);
 
     /**
-     * Record that this accessory was seen advertising at {@code keyIndex}, and return its new
+     * Record that this accessory was seen advertising as {@code mac}, and return its new
      * serialized state for the caller to persist.
      *
      * <p>A BLE sighting is an observation of the same kind as a decrypted location report, and
-     * worth the same thing: it pins the rolling-key alignment, so the next scan derives three
-     * keys instead of a twelve-hour range. Persisting it is the caller's job - see
+     * can be worth the same thing: it can pin the rolling-key alignment, so the next scan
+     * derives three keys instead of a twelve-hour range. Persisting it is the caller's job - see
      * {@code BeaconRepository#recordAccessorySighting}.
      *
-     * @return the re-serialized accessory, or null if it could not be recorded. Null is not
-     * worth failing a caller over: the sighting is an optimisation, and the sound either played
-     * or it did not regardless.
+     * <p><b>The address, not the index {@code currentMacAddresses} paired it with.</b> That
+     * index is only trustworthy when {@code mac} came from a primary key - a secondary key's
+     * index is only a lower bound, not the true one - and this side of the bridge has no way to
+     * tell the two apart from the index alone. The real implementation re-derives the key at
+     * {@code mac} in Python, where the type is still known, and only accepts a primary match.
+     *
+     * @return the re-serialized accessory, or null if there was nothing worth recording - no
+     * match, only a secondary-key match, or a failure. Null is not worth failing a caller over:
+     * the sighting is an optimisation, and the sound either played or it did not regardless.
+     *
+     * <p>Defaulted to "records nothing" rather than a second required method, so a
+     * {@code currentMacAddresses}-only lambda - most of this interface's test doubles, which
+     * only ever care about the candidate set - keeps compiling. {@link ChaquopyAccessoryMacResolver}
+     * overrides it for real.
      */
-    String recordSeen(String accessoryJson, int keyIndex, long seenAtUnixMs);
+    default String recordSeen(String accessoryJson, String mac, long seenAtUnixMs) {
+        return null;
+    }
 }
