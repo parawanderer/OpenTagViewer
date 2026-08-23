@@ -45,6 +45,7 @@ import dev.wander.android.opentagviewer.python.icloud.EscrowPasscode;
 import dev.wander.android.opentagviewer.python.icloud.ICloudAccessory;
 import dev.wander.android.opentagviewer.python.icloud.ICloudException;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailure;
+import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFetch;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
@@ -58,6 +59,7 @@ import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 
 /**
@@ -664,6 +666,17 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             case NOT_SIGNED_IN:
                 Log.e(TAG, "The account is not usable, so this screen has nothing to do");
                 this.finish();
+                break;
+
+            case CREDENTIALS_REJECTED:
+                // **Not the retry screen, which is where this used to land.** Apple refused
+                // the stored password, and a keychain session needs a fresh token rather than the
+                // one held - so "worth trying again later" is false and every attempt fails alike.
+                // The stored blob goes with it - keeping one that cannot work means the next
+                // screen to use it meets the same wall with no idea why.
+                Log.w(TAG, "Apple refused the stored credentials; signing out so they can be"
+                        + " established again");
+                SignInAgain.from(this);
                 break;
 
             case SERVICE_UNSURE:

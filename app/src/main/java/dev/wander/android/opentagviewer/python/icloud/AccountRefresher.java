@@ -91,10 +91,25 @@ public final class AccountRefresher {
      * themselves.
      */
     private Observable<List<String>> recoverFrom(final Throwable error) {
-        final boolean membershipIsDead = error instanceof ICloudException
-                && ((ICloudException) error).getFailure() == ICloudFailure.MEMBERSHIP_UNUSABLE;
+        final ICloudFailure failure = error instanceof ICloudException
+                ? ((ICloudException) error).getFailure() : ICloudFailure.UNKNOWN;
 
-        if (!membershipIsDead) {
+        if (ICloudFailures.meansSignInAgain(error)) {
+            // **Said once, loudly, rather than every six hours quietly.** Apple refused the
+            // stored password, so nothing here will ever succeed again until it is replaced -
+            // and this read is silent by design, which means without this the tag list simply
+            // stops matching Find My and nobody is ever told.
+            //
+            // Not acted on here, though: this runs in the background with no screen of its own,
+            // and clearing somebody's session out from under whatever they are doing is worse
+            // than waiting for the next thing that needs it. The screens that use the account
+            // recognise the same failure and offer to sign in again.
+            Log.w(TAG, "Apple refused the stored credentials. The account cannot be re-read"
+                    + " until the user signs in again; their stored tags are untouched.", error);
+            return Observable.just(List.of());
+        }
+
+        if (failure != ICloudFailure.MEMBERSHIP_UNUSABLE) {
             Log.w(TAG, "Could not re-read the Apple account; leaving the stored tags alone", error);
             return Observable.just(List.of());
         }

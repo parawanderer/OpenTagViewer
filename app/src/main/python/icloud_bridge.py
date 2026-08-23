@@ -37,11 +37,13 @@ from __future__ import annotations
 import base64
 import json
 import plistlib
+import sys
 import traceback
 from typing import Any
 
 import identity as app_identity
 from exporter import icloud
+from findmy.errors import InvalidCredentialsError
 from findmy.keychain.enrolment import DeviceDescription
 from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
@@ -73,6 +75,28 @@ REASON_PASSCODE_REJECTED = "passcode_rejected"
 
 REASON_NOT_UNLOCKED = "not_unlocked"
 """A join was asked for before anything unlocked, so there is no peer to sponsor it."""
+
+REASON_CREDENTIALS_REJECTED = "credentials_rejected"
+"""
+Apple refused the stored password, so nothing needing the keychain can work.
+
+**The account state does carry the password** - FindMy.py serialises it in `to_json` and restores
+it - so this is not "nothing to authenticate with". It is Apple declining what was sent, and the
+message is Apple's own `em` string passed through verbatim, which is why it reads as though
+somebody mistyped something. Nobody typed anything.
+
+**And it cannot be worked around here.** Opening a keychain session calls `request_pet`, which
+re-runs the SRP exchange and raises rather than making do - unlike `_fresh_pet`, which falls back
+to the token already held. That difference is deliberate: keychain operations need a genuinely
+fresh PET. So the password working again is the only route, and that means a fresh sign-in.
+
+Causes worth telling apart, none of which this can distinguish: the Apple ID password was
+changed, Apple invalidated the credential, or this app's device was removed from the account.
+
+Untreated it reads as an outage. The account read is silent by design and runs every six hours,
+so the failure scrolls past a log nobody is watching while the tag list quietly stops matching
+Find My, with nothing on screen ever saying why.
+"""
 
 REASON_MEMBERSHIP_UNUSABLE = "membership_unusable"
 """
@@ -144,12 +168,43 @@ def _unexpected(what: str) -> str:
     detail = traceback.format_exc()
     print(f"iCloud bridge: {what} failed:\n{detail}")
 
+    # **Classified here rather than at each call site.** Every method on this class ends in the
+    # same `except Exception: return _unexpected(...)`, and there are eight of them; catching
+    # rejected credentials at one of those and not the others is how the retry screen keeps
+    # turning up for a session that can never work. Doing it here also covers whatever is added
+    # next, which the per-site version would not.
+    if _isCausedBy(sys.exc_info()[1], InvalidCredentialsError):
+        return _failure(REASON_CREDENTIALS_REJECTED, _lastLineOf(detail) or what + " was refused")
+
     # `str(e)` is empty for several of these - TimeoutError most of all - so the last line of
     # the traceback stands in. It names the exception type, which is not a good message but is
     # infinitely better than a colon with nothing after it.
-    lastLine = detail.strip().splitlines()[-1] if detail.strip() else ""
+    return _failure(
+        REASON_UNKNOWN,
+        _lastLineOf(detail) or f"{what} failed for an unrecorded reason",
+    )
 
-    return _failure(REASON_UNKNOWN, lastLine or f"{what} failed for an unrecorded reason")
+
+def _lastLineOf(detail: str) -> str:
+    return detail.strip().splitlines()[-1] if detail.strip() else ""
+
+
+def _isCausedBy(error: BaseException | None, wanted: type[BaseException]) -> bool:
+    """
+    Whether `wanted` is anywhere in the chain, not only at the top.
+
+    **Wrapping is the normal case here, not the exception.** These calls go through
+    `run_until_complete`, through FindMy.py's own layers, and anything that re-raises with
+    context puts the interesting error underneath. Matching only the outermost type means the
+    classification silently stops working the first time somebody adds a wrapper.
+    """
+    seen = set()
+    while error is not None and id(error) not in seen:
+        if isinstance(error, wanted):
+            return True
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return False
 
 
 def _asyncAccount(account: Any) -> Any:
@@ -208,6 +263,8 @@ class ICloudSession:
 
             return json.dumps({"ok": True})
         except Exception:
+            # Rejected credentials are classified inside _unexpected, which every method here
+            # funnels through - see REASON_CREDENTIALS_REJECTED.
             return _unexpected("opening the Find My client")
 
     def recoveryOptions(self) -> str:

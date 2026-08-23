@@ -101,6 +101,29 @@ public final class FakeICloudService implements ICloudService {
         return fake;
     }
 
+    /**
+     * Apple refuses the stored password, on whichever call is made first.
+     *
+     * <p><b>Set on every entry point, because the point is that they behave alike.</b> The real
+     * failure comes out of the SRP exchange, which any call needing the keychain performs - so a
+     * fake that only failed one of them would let a caller that mishandles the others pass.
+     */
+    public static FakeICloudService whereAppleRefusesTheCredentials() {
+        final FakeICloudService fake = new FakeICloudService();
+        final ICloudException refused = new ICloudException(
+                ICloudFailure.CREDENTIALS_REJECTED,
+                "InvalidCredentialsError: Password authentication failed:"
+                        + " Enter the correct password for this Apple Account.");
+
+        fake.openFailsWith = refused;
+        fake.optionsFailsWith = refused;
+        fake.unlockFailsWith = refused;
+        fake.fetchFailsWith = refused;
+        fake.joinFailsWith = refused;
+        fake.resumeFailsWith = refused;
+        return fake;
+    }
+
     /** Nothing reported usable at all, which reads as a service having a bad day. */
     public static FakeICloudService whereTheServiceIsUnsure() {
         final FakeICloudService fake = new FakeICloudService();

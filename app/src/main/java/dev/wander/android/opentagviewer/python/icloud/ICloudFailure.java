@@ -63,6 +63,25 @@ public enum ICloudFailure {
      * account - which is how somebody revokes this app - so the way forward is to ask for a
      * device passcode and join again, not to try the same stored keys a second time.
      */
+    /**
+     * Apple refused the stored password. Only signing in again fixes it.
+     *
+     * <p><b>Permanent, which is what separates it from everything else here.</b> The account
+     * state does carry a password - FindMy.py serialises it - so this is Apple declining what was
+     * sent rather than the app having nothing to send. The wording comes straight from Apple and
+     * says "enter the correct password"; nobody typed one.
+     *
+     * <p>It cannot be worked around: opening a keychain session calls {@code request_pet}, which
+     * re-runs the password exchange and raises, unlike {@code _fresh_pet} which makes do with the
+     * token already held. Keychain operations need a genuinely fresh one.
+     *
+     * <p>Left unclassified it reads as an outage and is retried every six hours forever, while
+     * the tag list quietly stops matching Find My and nothing on screen says why. That is the
+     * same mistake as an import error that named the wrong phase: a permanent failure handled as
+     * weather.
+     */
+    CREDENTIALS_REJECTED,
+
     MEMBERSHIP_UNUSABLE,
 
     /** An accessory was asked for that this session never fetched. Also a bug in the screen. */
@@ -103,6 +122,7 @@ public enum ICloudFailure {
             case "passcode_rejected": return PASSCODE_REJECTED;
             case "no_such_record": return NO_SUCH_RECORD;
             case "not_unlocked": return NOT_UNLOCKED;
+            case "credentials_rejected": return CREDENTIALS_REJECTED;
             case "membership_unusable": return MEMBERSHIP_UNUSABLE;
             case "no_such_accessory": return NO_SUCH_ACCESSORY;
             case "not_an_accessory": return NOT_AN_ACCESSORY;
