@@ -16,6 +16,7 @@ import com.chaquo.python.android.AndroidPlatform;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
 import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity.Hardware;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 
@@ -59,6 +60,24 @@ public class IdentityBridgeTest {
     private static PyObject profileFor(Hardware hardware) {
         return identity().callAttr(
                 "hardwareProfile", FakeAnisetteSource.ready().claiming(hardware));
+    }
+
+    /**
+     * <b>The serial Java shows the user is the serial Python sends Apple.</b>
+     *
+     * <p>Python owns {@code APP_SERIAL}; {@code AdiDeviceIdentity.APP_SERIAL} is a copy, so that
+     * the screen naming the device-list entry does not have to start CPython to draw a label. Two
+     * copies of one value is what rule 11 is about, and this is the pin that stops them drifting.
+     *
+     * <p>The failure it prevents is quiet and nasty: the app registers under one serial and the
+     * screen tells the user to look for another, so the row they find looks like somebody else's
+     * device - which is the exact belief that gets it removed.
+     */
+    @Test
+    public void theserialOnScreenIsTheSerialOnTheWire() {
+        assertEquals("Java shows a serial Python never sends",
+                identity().get("APP_SERIAL").toString(),
+                AdiDeviceIdentity.APP_SERIAL);
     }
 
     /**
