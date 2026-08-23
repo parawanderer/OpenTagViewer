@@ -170,6 +170,51 @@ public class TagCardLayoutTest {
     }
 
     /**
+     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal, the
+     * longest battery word, three-digit seconds - must not wrap to a second line and grow the
+     * row. Built directly rather than through {@link #measureHeights}, which always writes a
+     * fixed string to this field.
+     */
+    @Test
+    public void theLongestNearbyStatusLineDoesNotMakeItsCardTaller() {
+        final int[] heights = new int[2];
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout baseline = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            final FrameLayout withNearbyStatus = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
+                ((TextView) card.findViewById(R.id.device_name)).setText("Keys");
+                ((TextView) card.findViewById(R.id.device_location)).setText(SHORT_ADDRESS);
+                // Inflated with a null root, so there is no parent-given LayoutParams to read
+                // back - unlike measureHeights, which sets these after row.addView(card).
+                card.setLayoutParams(new ViewGroup.LayoutParams(
+                        CARD_WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+
+            ((TextView) baseline.findViewById(R.id.device_last_update))
+                    .setText("Last Updated: 2 minutes ago");
+            // "critical" (English) / "kritisch" (German) is the longest battery word; five
+            // filled dots is the longest signal reading; three digits covers up to the 30
+            // second freshness window in NearbyTagSightings with room to spare.
+            ((TextView) withNearbyStatus.findViewById(R.id.device_last_update))
+                    .setText("Nearby (●●●●● · 999s) · Battery critical");
+
+            for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
+                card.measure(
+                        View.MeasureSpec.makeMeasureSpec(CARD_WIDTH_PX, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            }
+            heights[0] = baseline.getMeasuredHeight();
+            heights[1] = withNearbyStatus.getMeasuredHeight();
+        });
+
+        assertEquals("the nearby status line wrapped and grew the card", heights[0], heights[1]);
+    }
+
+    /**
      * Why the height has to be set at all.
      * <br>
      * MapsActivity inflates with a null root, which drops the layout's own height, and the

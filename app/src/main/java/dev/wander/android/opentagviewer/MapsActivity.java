@@ -686,7 +686,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         final FrameLayout card = this.dynamicCardsForTag.get(sighting.getBeaconId());
         if (card != null) {
-            this.showNearbyStatusOn(card, sighting);
+            this.showNearbyStatusOn(card, sighting, System.currentTimeMillis());
         }
     }
 
@@ -701,11 +701,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * <p>The line goes back to the timestamp on its own once the sighting ages out, because
      * nothing announces that a tag has left; we simply stop hearing it.
      */
-    private void showNearbyStatusOn(final FrameLayout card, final NearbyTagSighting sighting) {
+    private void showNearbyStatusOn(
+            final FrameLayout card, final NearbyTagSighting sighting, final long nowMs) {
         final TextView line = card.findViewById(R.id.device_last_update);
+        // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
+        // callback, before the clock the caller reads has ticked past it.
+        final long secondsAgo = Math.max(0, (nowMs - sighting.getSeenAtMs()) / 1000);
         line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi()),
+                secondsAgo));
     }
 
     @Override
@@ -2333,7 +2338,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             TextView deviceLastUpdate = v.findViewById(R.id.device_last_update);
             final NearbyTagSighting heardNow = this.nearbySightings.freshFor(beaconId, now);
             if (heardNow != null) {
-                this.showNearbyStatusOn(v, heardNow);
+                this.showNearbyStatusOn(v, heardNow, now);
             } else {
                 final var timeAgo = DateUtils.getRelativeTimeSpanString(
                         lastLocation.getTimestamp(),
