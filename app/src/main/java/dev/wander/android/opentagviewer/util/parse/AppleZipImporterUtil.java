@@ -614,6 +614,18 @@ public class AppleZipImporterUtil {
     private static Import parseImportInfo(final String importInfo) throws JsonProcessingException {
         OpenTagViewerYamlContent content = YamlParser.MAPPER.readValue(importInfo, OpenTagViewerYamlContent.class);
 
+        // **Said once, here, so every log from now on answers it.**
+        //
+        // Which program wrote a bundle decides what to expect of it - the wizard, its CLI and
+        // the app all stamp their own `via:` - and it was stored and never mentioned again. The
+        // only way a user could answer "which exporter made this zip" was to open the bundle,
+        // which is a bad instruction generally and a dangerous one now that exports are
+        // password-protected by default: it walks somebody through decrypting a file holding
+        // their tags' private keys, on the way to reading one version line.
+        Log.i(TAG, String.format(
+                "Importing a bundle of format %s, written by %s",
+                content.getVersion(), content.getVia()));
+
         return Import.builder()
                 .importedAt(System.currentTimeMillis())
                 .exportedAt(content.getExportTimestamp())
