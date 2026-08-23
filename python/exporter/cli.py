@@ -49,7 +49,7 @@ from exporter.custom_tags import (
     suggested_name,
 )
 from exporter.icloud import Candidate, ExportSourceError
-from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION
+from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION, describe_build
 from opentagviewer_export import (
     ExportError,
     KeyFileError,
@@ -240,6 +240,10 @@ def configure_logging(verbosity: int) -> None:
         level=logging.WARNING if verbosity == 0 else logging.INFO,
         format="%(levelname)-8s %(name)s: %(message)s",
     )
+
+    # Same reason as the wizard's copy: a `-vv` log is what a report attaches, and it said
+    # nothing about which build wrote it.
+    logging.getLogger("exporter.version").info("OpenTagViewer exporter %s", describe_build())
 
     if verbosity >= 2:
         # **The package, not a list of its subpackages.** This used to name `findmy.cloudkit`,
