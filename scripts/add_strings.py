@@ -77,6 +77,7 @@ other angle bracket is escaped.
 
 from __future__ import annotations
 
+import collections
 import io
 import json
 import re
@@ -503,9 +504,101 @@ def check(locales: list[str]) -> int:
               file=sys.stderr)
         return 1
 
+    if not check_placeholders(root, locales):
+        return 1
+
     print(f"All {len(expected)} translatable strings are present in"
           f" all {len(locales) - 1} translated locale(s).")
     return 0
+
+
+# `%1$s` and friends, and `^1` as TextUtils.expandTemplate reads it.
+PLACEHOLDER = re.compile(r"%\d+\$[a-zA-Z]|\^\d+")
+
+
+def placeholders_in(text: str) -> collections.Counter:
+    return collections.Counter(PLACEHOLDER.findall(text))
+
+
+def check_placeholders(default_root, locales: list[str]) -> bool:
+    """Every locale's version of a string has the same slots as the default's.
+
+    **A dropped placeholder does not fail anywhere on its own.** The XML is valid, the string is
+    present, `--check` above is satisfied, and the app does not throw: `expandTemplate` finds no
+    `^1` and simply substitutes nothing, `getString` finds no `%1$s` and formats nothing. The
+    result is one locale where the sentence about the serial never says the serial - which is
+    only ever noticed by somebody reading that language.
+
+    An *extra* slot is the louder half of the same mistake: `getString` throws
+    `MissingFormatArgumentException` and takes the screen down, in that locale only.
+    """
+    wanted = expected_placeholders(default_root)
+    if not wanted:
+        return True
+
+    failed = False
+    for locale in locales:
+        if locale == DEFAULT_LOCALE:
+            continue
+
+        path = strings_file(locale)
+        if not path.is_file():
+            continue
+
+        for name, missing, extra in placeholder_mismatches(path, wanted):
+            failed = True
+            print(f"\n{path.relative_to(REPO_ROOT)}: {name}", file=sys.stderr)
+            if missing:
+                print(f"  missing {' '.join(sorted(missing.elements()))}", file=sys.stderr)
+            if extra:
+                print(f"  unexpected {' '.join(sorted(extra.elements()))}", file=sys.stderr)
+
+    if failed:
+        print("\nA missing slot silently drops whatever belonged in it, for that locale only."
+              " An unexpected one crashes the screen that formats it.", file=sys.stderr)
+
+    return not failed
+
+
+def expected_placeholders(default_root) -> dict[str, collections.Counter]:
+    """The slots each translatable string is supposed to have.
+
+    **Every translatable string, including the ones with no placeholders at all.** Keeping only
+    those that have some would cover the half that can go missing and skip the half that can
+    appear: a translation introducing a `%1$s` the default never had throws
+    `MissingFormatArgumentException` the moment that screen opens in that language.
+    """
+    wanted: dict[str, collections.Counter] = {}
+
+    for element in default_root.iter("string"):
+        name = element.get("name")
+        if name and element.get("translatable") != "false":
+            wanted[name] = placeholders_in(inner_markup(element))
+
+    return wanted
+
+
+def placeholder_mismatches(
+        path: Path, wanted: dict[str, collections.Counter],
+) -> list[tuple[str, collections.Counter, collections.Counter]]:
+    """Every string in one locale whose slots differ from the default's, as (name, missing, extra).
+
+    Counters rather than sets, so `^1 and ^1` losing one of its two is caught. Compared by
+    multiset and not in order: reordering is the whole point of the positional form, and
+    languages need it - `%2$s: %1$s` is a correct translation of `%1$s (%2$s)`.
+    """
+    mismatched = []
+
+    for element in ElementTree.parse(path).getroot().iter("string"):
+        name = element.get("name")
+        if name not in wanted:
+            continue
+
+        found = placeholders_in(inner_markup(element))
+        if found != wanted[name]:
+            mismatched.append((name, wanted[name] - found, found - wanted[name]))
+
+    return mismatched
 
 
 def load_spec(path: Path) -> dict | None:
@@ -539,15 +632,12 @@ def use_utf8_output() -> None:
             stream.reconfigure(encoding="utf-8")
 
 
-def main(argv: list[str]) -> int:
-    use_utf8_output()
+def run_without_input_file(argv: list[str], locales: list[str]) -> int | None:
+    """The modes that read the tree rather than a JSON file, or None if this is not one of them.
 
-    locales = discover_locales()
-
-    if not locales or DEFAULT_LOCALE not in locales:
-        print(f"Found no default strings.xml under {RES_DIR}", file=sys.stderr)
-        return 2
-
+    Split out of {@code main} only to keep its branch count under flake8's limit - the dispatch
+    was one arm too long once --check grew a second thing to check. No behaviour of its own.
+    """
     if argv == ["--locales"]:
         print(f"Discovered {len(locales)} locale(s) under {RES_DIR.relative_to(REPO_ROOT)}:")
         for locale in locales:
@@ -562,6 +652,22 @@ def main(argv: list[str]) -> int:
 
     if len(argv) >= 2 and argv[0] == "--remove":
         return remove_strings(argv[1:], locales)
+
+    return None
+
+
+def main(argv: list[str]) -> int:
+    use_utf8_output()
+
+    locales = discover_locales()
+
+    if not locales or DEFAULT_LOCALE not in locales:
+        print(f"Found no default strings.xml under {RES_DIR}", file=sys.stderr)
+        return 2
+
+    handled = run_without_input_file(argv, locales)
+    if handled is not None:
+        return handled
 
     mode = argv[0] if len(argv) == 2 and argv[0] in ("--fill", "--replace") else None
     if mode:

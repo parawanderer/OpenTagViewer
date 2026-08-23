@@ -132,6 +132,74 @@ def test_check_ignores_untranslatable_strings(res: Path):
 
 
 # ---------------------------------------------------------------------------------------
+# check: placeholder parity
+#
+# A translation that loses a placeholder is the quietest failure this tool can have. The
+# string is present, so the check above is satisfied; the XML is valid, so aapt is happy;
+# and the app does not throw - expandTemplate finds no ^1 and substitutes nothing. The
+# result is one language where the sentence naming the device's serial never names it.
+# ---------------------------------------------------------------------------------------
+
+def test_check_fails_when_a_translation_drops_a_template_slot(res: Path):
+    make_locale(res, "values", with_strings(
+        '<string name="serial">Serial Number: ^1</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="serial">Seriennummer</string>'))
+
+    assert add_strings.check(["default", "de"]) == 1
+
+
+def test_check_fails_when_a_translation_drops_a_format_argument(res: Path):
+    make_locale(res, "values", with_strings(
+        '<string name="found">Found %1$d tags</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="found">Tags gefunden</string>'))
+
+    assert add_strings.check(["default", "de"]) == 1
+
+
+def test_check_fails_on_an_unexpected_placeholder(res: Path):
+    # The louder half: getString throws MissingFormatArgumentException and takes the screen
+    # down, in that locale only.
+    make_locale(res, "values", with_strings(
+        '<string name="found">Found some tags</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="found">%1$d Tags gefunden</string>'))
+
+    assert add_strings.check(["default", "de"]) == 1
+
+
+def test_check_allows_placeholders_to_be_reordered(res: Path):
+    # Reordering is the entire point of the positional form, and languages need it.
+    make_locale(res, "values", with_strings(
+        '<string name="pair">%1$s (%2$s)</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="pair">%2$s: %1$s</string>'))
+
+    assert add_strings.check(["default", "de"]) == 0
+
+
+def test_check_counts_repeated_placeholders(res: Path):
+    make_locale(res, "values", with_strings(
+        '<string name="twice">^1 and ^1</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="twice">^1</string>'))
+
+    assert add_strings.check(["default", "de"]) == 1
+
+
+def test_check_passes_when_placeholders_match(res: Path):
+    make_locale(res, "values", with_strings(
+        '<string name="serial">Serial Number: ^1</string>',
+        '<string name="found">Found %1$d tags</string>'))
+    make_locale(res, "values-de", with_strings(
+        '<string name="serial">Seriennummer: ^1</string>',
+        '<string name="found">%1$d Tags gefunden</string>'))
+
+    assert add_strings.check(["default", "de"]) == 0
+
+
+# ---------------------------------------------------------------------------------------
 # add_strings
 # ---------------------------------------------------------------------------------------
 

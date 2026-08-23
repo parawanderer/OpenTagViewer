@@ -300,6 +300,26 @@ public final class LocalAnisette implements AnisetteSource {
     }
 
     /**
+     * Which machine this install presents as, for showing the user - and nothing else.
+     *
+     * <p><b>Read-only on purpose.</b> {@link #loadOrCreateIdentity()} writes an identity when
+     * there is none, because a caller that needs one needs it to persist. A screen describing the
+     * install must not have that side effect: opening it on a device that has never signed in
+     * would mint and store an identity, and the profile chosen for a fresh install is then fixed
+     * by having looked at a page. Nothing stored means nothing stored, and the answer is the
+     * default that {@link AdiDeviceIdentity#generate()} would pick.
+     *
+     * <p>Touches no native library, so it is safe on the main thread - see
+     * {@code ensureReady}, which is the expensive one.
+     */
+    public static AdiDeviceIdentity.Hardware profileToShow(final Context context) {
+        return hardwareFrom(
+                context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                        .getString(KEY_HARDWARE, null),
+                AdiDeviceIdentity.Hardware.DEFAULT);
+    }
+
+    /**
      * The stored profile, or {@code fallback} when there is nothing usable stored.
      *
      * <p>An unrecognised name falls back rather than throwing. A profile removed in a later

@@ -375,6 +375,13 @@ public class TheWholeAppJourneyTest {
         TestPace.afterAStep();
         onView(withId(R.id.icloud_primary_button)).perform(click());
 
+        // **The tags are not the last step.** What this app registered as on the Apple account
+        // comes after them, so the results button says Next and this one says Done.
+        Eventually.check(() -> onView(withId(R.id.icloud_registered_container))
+                .check(matches(isDisplayed())));
+        TestPace.afterAStep();
+        onView(withId(R.id.icloud_primary_button)).perform(click());
+
         // Back on the device list, which rebuilt itself when the fetch reported tags.
         Eventually.check(() -> onView(withId(R.id.my_devices_list))
                 .check(matches(isDisplayed())));

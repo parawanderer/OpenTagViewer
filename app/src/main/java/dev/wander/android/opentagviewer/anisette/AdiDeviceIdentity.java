@@ -67,9 +67,23 @@ public final class AdiDeviceIdentity {
      * which is what the exporter uses - so the app and the working program now introduce
      * themselves to Apple as the same machine.
      */
+    /**
+     * The serial Apple prints against this app's entry in the user's device list.
+     *
+     * <p><b>Python owns it</b> - {@code identity.APP_SERIAL} is what actually goes to Apple, and
+     * this is a copy for the screen that shows the user what to look for. A copy at all only
+     * because a UI thread should not have to start CPython to render a label.
+     *
+     * <p>Two copies of one value is exactly what rule 11 warns about, so they are pinned
+     * together: {@code IdentityBridgeTest} fails if they ever differ. A screen naming a serial
+     * Apple never saw is worse than naming none, because the user would go looking for it,
+     * not find it, and conclude the row in front of them belongs to somebody else.
+     */
+    public static final String APP_SERIAL = "0PENTAGVIEWR";
+
     public static AdiDeviceIdentity generate() {
         final SecureRandom random = new SecureRandom();
-        final Hardware hardware = Hardware.LEGACY_MAC;
+        final Hardware hardware = Hardware.DEFAULT;
 
         return new AdiDeviceIdentity(
                 UUID.randomUUID().toString().toUpperCase(Locale.ROOT),
@@ -114,6 +128,7 @@ public final class AdiDeviceIdentity {
          * not have it.
          */
         LEGACY_MAC(
+                "MacBook Pro 13\"",
                 "MacBookPro13,2", "macOS", "13.1", "22C65",
                 "1404.0.5", "22.3.0",
                 "com.apple.dt.Xcode/3594.4.19") {
@@ -161,6 +176,7 @@ public final class AdiDeviceIdentity {
          * claim on its own, unnamed and unserialled, would be worse than the Mac it replaces.
          */
         IPHONE(
+                "iPhone 14 Pro",
                 "iPhone15,2", "iPhone OS", "17.4", "21E219",
                 "1494.0.7", "23.4.0",
                 "com.apple.akd/1.0") {
@@ -207,6 +223,17 @@ public final class AdiDeviceIdentity {
          */
         public abstract String localUserHeader(String localUserUuid);
 
+        /**
+         * What an install with nothing stored will claim to be.
+         *
+         * <p>Named rather than written twice. {@link #generate()} decides it and the screen that
+         * tells the user what their Apple account now lists reads it, and those two disagreeing
+         * would put one machine on screen and register another - which is the failure rule 11 is
+         * about, arriving in the one place the user can actually see it.
+         */
+        public static final Hardware DEFAULT = LEGACY_MAC;
+
+        private final String marketingName;
         private final String model;
         private final String osName;
         private final String osVersion;
@@ -215,8 +242,10 @@ public final class AdiDeviceIdentity {
         private final String darwin;
         private final String authKitApp;
 
-        Hardware(String model, String osName, String osVersion, String osBuild,
+        Hardware(String marketingName,
+                 String model, String osName, String osVersion, String osBuild,
                  String cfnetwork, String darwin, String authKitApp) {
+            this.marketingName = marketingName;
             this.model = model;
             this.osName = osName;
             this.osVersion = osVersion;
@@ -240,6 +269,34 @@ public final class AdiDeviceIdentity {
 
         public String model() {
             return this.model;
+        }
+
+        /**
+         * The model as Apple prints it in the device list - {@code MacBook Pro 13"}.
+         *
+         * <p><b>Observed, not derived.</b> Confirmed against a real account in macOS Settings &gt;
+         * Apple Account &gt; My Devices, where {@code MacBookPro13,2} renders exactly this. It is
+         * a constant per profile rather than a lookup because there are two profiles and Apple's
+         * naming is not a formula - guessing "(13-inch, 2016)" from the identifier, which is the
+         * obvious guess, gets it wrong.
+         */
+        public String marketingName() {
+            return this.marketingName;
+        }
+
+        /**
+         * The row's title, which Apple synthesises and which is <b>not</b> this app's name.
+         *
+         * <p>{@code MacBookPro13,2} appears titled {@code MacBookPro}: the identifier with its
+         * version dropped. The app does send a name; Apple ignores it, and setting one properly
+         * needs a registration endpoint this app deliberately does not implement.
+         *
+         * <p><b>So the name cannot be what a user matches on, and the serial has to be.</b> Every
+         * install of this app produces a row with this same title and model, which is why
+         * {@code 0PENTAGVIEWR} carries the whole weight of telling it apart - rule 11.
+         */
+        public String deviceListName() {
+            return this.model.replaceAll("\\d+,\\d+$", "");
         }
 
         public String osName() {

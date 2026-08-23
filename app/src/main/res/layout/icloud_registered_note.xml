@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the user will find on their Apple account, shown the way they will find it.
+
+  **A replica of the row, not a description of it.** Connecting registers this app as a device,
+  and Apple renders that entry from the claimed model: title "MacBookPro", model "MacBook Pro 13"",
+  macOS 13.1, serial 0PENTAGVIEWR - confirmed against a real account in macOS Settings > Apple
+  Account > My Devices. The app does send a name and Apple ignores it, so nothing here says
+  "OpenTagViewer", because that is not what the user will be looking at.
+
+  The tile is deliberately the same shape as icloud_device_tile above it. Somebody has just picked
+  a real device out of a list that looks like this; the point is that they can match this one
+  against a list that also looks like this.
+
+  Its own file so it can be inflated and checked without an activity - see
+  WhatWeRegisterAsIsLegibleTest.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/icloud_registered_note"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/icloud_registered_lead"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        tools:text="shane@wander.dev lists this app as one of your devices:" />
+
+    <!--
+      The replica. Quiet lines under a bold title, in the order Apple stacks them, so matching it
+      against the real list is reading rather than translating.
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/layout_rounded"
+        android:backgroundTint="?attr/colorSurfaceContainerLow"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/icloud_registered_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/laptop_24px"
+            app:tint="?attr/colorOnSecondaryContainer" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/icloud_registered_device_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/nunito_medium"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp"
+                tools:text="MacBookPro" />
+
+            <!-- Model and OS together: one fact about the machine, not two. -->
+            <TextView
+                android:id="@+id/icloud_registered_device_model"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                tools:text="MacBook Pro 13&quot; (macOS 13.1)" />
+
+            <!--
+              **The only field that tells this entry from a real Mac**, so it is labelled and set
+              as code rather than left as a third grey line. Every install of this app produces
+              the same title and the same model; only this differs from real hardware, and it is
+              near-miss shaped - a zero for an O - so it is rendered as something to compare.
+            -->
+            <TextView
+                android:id="@+id/icloud_registered_device_serial"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                tools:text="Serial Number: 0PENTAGVIEWR" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/icloud_registered_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:lineSpacingExtra="3dp"
+        android:text="@string/icloud_registered_body"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp" />
+
+    <!--
+      Opened through WebLink, which says so rather than doing nothing when the device has no
+      browser. 48dp of touch target, which is why the padding is here and not a margin.
+
+      **The sentence is body text and only the address is a link.** Colouring the whole line
+      makes the words "See your devices at" look tappable too, and then nothing on the line
+      indicates where it goes. The address gets the colour, the underline and the weight - the
+      three things that say "link" without an icon - and the text around it stays prose. Set in
+      code, because the styled run is the part that must not be translated.
+    -->
+    <TextView
+        android:id="@+id/icloud_registered_link"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:paddingVertical="8dp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        tools:text="See your devices at account.apple.com" />
+
+</LinearLayout>

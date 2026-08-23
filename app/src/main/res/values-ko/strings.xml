@@ -268,4 +268,11 @@
 지금 설정하거나, 나중에 설정에서 언제든 설정할 수 있습니다.</string>
     <string name="icloud_offer_set_up_now">지금 설정</string>
     <string name="icloud_offer_not_now">나중에</string>
+    <string name="icloud_registered_title">이 앱은 Apple 계정의 기기로 등록되어 있습니다</string>
+    <string name="icloud_registered_body"><b>이 항목을 삭제하지 마세요.</b>\n\nApple은 이 항목을 “이 기기가 익숙하지 않다면” 문구 옆에 표시하므로 정리해야 할 것처럼 보입니다. 삭제하면 이 앱이 태그를 읽을 수 없게 됩니다. 잘 되어야 다시 로그인하고 확인 코드를 입력해야 하며, 완전히 로그아웃될 수도 있습니다.\n\n항목 이름은 Apple이 직접 정하므로, 실제 Mac과 구별할 수 있는 것은 일련번호 ^1뿐입니다. 새로 설치할 때마다 하나씩 늘어납니다.</string>
+    <string name="icloud_registered_lead">%1$s의 기기 목록에 이 앱이 다음과 같이 표시됩니다:</string>
+    <string name="icloud_registered_link">^1에서 기기를 확인할 수 있습니다</string>
+    <string name="icloud_results_next">다음</string>
+    <string name="icloud_registered_serial_label">일련번호: ^1</string>
+    <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
 </resources>
