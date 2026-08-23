@@ -43,11 +43,23 @@ A different producer, because it is one: same version, same format, different pr
 report that says which is worth more than one that says "the exporter".
 """
 
-GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
+GITHUB_ISSUES_LINK = (
+    "https://github.com/parawanderer/OpenTagViewer/issues/new?template=exporter-bug.yml"
+)
 """
 Where to report something neither the user nor this program can fix.
 
 Here rather than in `wizard.py`, which is where it used to live alone, so the CLI can say it too
 without importing tkinter - the same reason `VERSION` is here. Two copies of a URL is exactly the
 sort of thing that goes stale in one place and is never noticed, because nothing tests a link.
+
+**Straight at the template, not at a blank form.** The form asks for the version, the route and
+the log, which is most of what a report of this needs and almost none of what one arrives with -
+and its own front matter carries the labels. Labels can also be put in a URL, as
+`?labels=bug,%40exporter-tool`, and that is the worse way round: GitHub applies those only for
+somebody with permission to label, which a person reporting a bug generally is not.
+
+`exporter-bug.yml` is a filename in `.github/ISSUE_TEMPLATE/`, so renaming that file breaks this
+link silently - it degrades to a blank issue rather than an error, which is the failure nobody
+notices.
 """
