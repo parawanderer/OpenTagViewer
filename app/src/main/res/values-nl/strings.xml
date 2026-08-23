@@ -298,4 +298,12 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="export_logs_cleaned">Log opgeslagen. Het is eerst geschoond: %1$s</string>
     <string name="exported_with">Geëxporteerd met</string>
     <string name="exported_with_something_unrecorded">Niet vastgelegd — een oudere exporter</string>
+    <string name="exported_tags_title">Opgeslagen en vergrendeld</string>
+    <string name="exported_tags_body">Degene aan wie je dit bestand stuurt, heeft de onderstaande code nodig om het te openen.\n\nStuur die apart — een code in hetzelfde bericht als het bestand ligt op dezelfde plek als het bestand, en wie beide heeft kan deze tags volgen totdat je ze ontkoppelt.</string>
+    <string name="exported_tags_copy_code">Code kopiëren</string>
+    <string name="exported_tags_code_copied">Gekopieerd</string>
+    <string name="exported_tags_not_recoverable">Deze code wordt nergens bewaard en kan niet opnieuw worden getoond.</string>
+    <string name="export_tags_nothing_to_export">‘%1$s’ kan niet worden geëxporteerd: de app heeft er geen naamrecord voor, en een bundel zonder dat importeert niets. Tags uit je Apple-account deel je via Zoek mijn, niet via een bestand.</string>
+    <string name="export_tags_could_not_write">Het bestand kon niet worden weggeschreven. Er is niets opgeslagen.</string>
+    <string name="error_report_body_export">De app kon van de gekozen tags geen bundel maken en kan niet zeggen waarom — het opnieuw proberen met dezelfde tags helpt dus niet.\n\nEr is niets verstuurd en er is niets veranderd op deze telefoon. Je tags staan er nog.</string>
 </resources>

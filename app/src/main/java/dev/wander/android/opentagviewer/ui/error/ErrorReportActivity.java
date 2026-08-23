@@ -82,6 +82,25 @@ public class ErrorReportActivity extends AppCompatActivity {
                 .putExtra(EXTRA_BODY, bodyRes);
     }
 
+    /**
+     * The failure in the words it arrived in, for pasting into a report.
+     *
+     * <p>Class name and message rather than a stack trace: the trace is in the log the page
+     * offers, and a screenful of frames is not something anybody reads off a phone.
+     *
+     * <p>Here rather than beside each caller, because every screen that can reach this page needs
+     * exactly this string and two of them writing it slightly differently makes two reports of
+     * one bug look like two bugs.
+     */
+    public static String describe(final Throwable error) {
+        if (error == null) {
+            return "unknown";
+        }
+        return error.getMessage() == null
+                ? error.getClass().getSimpleName()
+                : error.getClass().getSimpleName() + ": " + error.getMessage();
+    }
+
     /** The redacted log, held once prepared so the share button is instant and cannot re-fail. */
     private LogRedactor.Redacted log;
 

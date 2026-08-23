@@ -298,4 +298,12 @@
     <string name="export_logs_cleaned">Журнал сохранён. Перед этим он был очищен: %1$s</string>
     <string name="exported_with">Экспортировано через</string>
     <string name="exported_with_something_unrecorded">Не записано — более старый экспортер</string>
+    <string name="exported_tags_title">Сохранено и защищено</string>
+    <string name="exported_tags_body">Тому, кому вы отправите этот файл, понадобится код ниже, чтобы его открыть.\n\nОтправьте код отдельно: код в том же сообщении, что и файл, лежит там же, где файл, и любой, у кого есть и то и другое, сможет находить эти метки, пока вы их не отвяжете.</string>
+    <string name="exported_tags_copy_code">Скопировать код</string>
+    <string name="exported_tags_code_copied">Скопировано</string>
+    <string name="exported_tags_not_recoverable">Этот код нигде не хранится и повторно показан не будет.</string>
+    <string name="export_tags_nothing_to_export">«%1$s» нельзя экспортировать: у приложения нет соответствующей записи имени, а пакет без неё не импортирует ничего. Метки из вашей учётной записи Apple передаются через «Локатор», а не файлом.</string>
+    <string name="export_tags_could_not_write">Файл не удалось записать. Ничего не сохранено.</string>
+    <string name="error_report_body_export">Приложение не смогло собрать пакет из выбранных меток и не может сказать почему, — повторная попытка с теми же метками не поможет.\n\nНичего не отправлено, и на телефоне ничего не изменилось. Ваши метки на месте.</string>
 </resources>

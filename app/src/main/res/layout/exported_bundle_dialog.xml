@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The code a bundle was locked with, at the only moment it exists in a readable form.
+
+  Nothing stores it: the zip keeps only what AES needs to verify it, the log does not have it, and
+  the app forgets it the moment this closes. So a bundle whose code was never read is a bundle
+  nobody can ever open — which is why this is a dialog to dismiss rather than a toast to miss.
+
+  Selectable and copyable both. Twelve characters read off a screen and typed into somebody else's
+  phone is exactly what Crockford's alphabet exists to survive, and the app can skip the
+  transcription error entirely.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="24dp">
+
+    <TextView
+        android:id="@+id/exported_bundle_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingExtra="3dp"
+        android:text="@string/exported_tags_body"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp" />
+
+    <!--
+      An EditText so the text can be selected, read-only rather than disabled: disabled greys it
+      out and blocks selection, which is the one thing it is here for.
+    -->
+    <EditText
+        android:id="@+id/exported_bundle_code"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/layout_rounded"
+        android:backgroundTint="?attr/colorSurfaceContainerHigh"
+        android:contentDescription="@string/exported_tags_title"
+        android:cursorVisible="false"
+        android:focusable="true"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:inputType="none"
+        android:longClickable="true"
+        android:padding="14dp"
+        android:textColor="?attr/colorOnSurface"
+        android:textIsSelectable="true"
+        android:textSize="22sp"
+        tools:text="H4K2-9WMR-7TQX" />
+
+    <TextView
+        android:id="@+id/exported_bundle_not_recoverable"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/exported_tags_not_recoverable"
+        android:textColor="?attr/colorOutline"
+        android:textSize="12sp" />
+
+</LinearLayout>

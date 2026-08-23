@@ -20,6 +20,7 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -52,7 +53,10 @@ import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.ui.mydevices.DeviceListAdaptor;
+import dev.wander.android.opentagviewer.ui.mydevices.ExportedBundleDialog;
+import dev.wander.android.opentagviewer.util.export.TagExporter;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
@@ -132,6 +136,25 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * import a bundle from somebody who owns them - so that screen hands the user straight back
      * here with a flag rather than making them find the other button themselves.
      */
+    /**
+     * Where to put a bundle of tags to share.
+     *
+     * <p>The document picker rather than a share sheet: the recipient gets this through whatever
+     * they already use, and a file they chose the location of is one they can find again. It also
+     * makes the two-step nature honest - the file goes one way, the code goes another, and they
+     * must not travel together.
+     */
+    private final ActivityResultLauncher<String> createBundleZipLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/zip"),
+            uri -> {
+                if (uri == null) {
+                    // Cancelled. Not an error, and the selection is left alone so it can be
+                    // tried again without picking every tag a second time.
+                    return;
+                }
+                this.writeBundleZip(uri, this.pendingExport);
+            });
+
     private final ActivityResultLauncher<Intent> fetchFromICloudLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             (ActivityResult result) -> {
@@ -403,6 +426,149 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * is needed, and the file lands where the user chose rather than somewhere they have to go
      * looking for.
      */
+    /**
+     * Write the selected tags as a bundle somebody else can import.
+     *
+     * <p><b>Sharing, not backing up.</b> An owner signed into their own account does not need a
+     * bundle - their tags arrive when they sign in. This is for giving a tag to another person,
+     * and the act is irreversible: exported key material cannot be withdrawn, and the only way to
+     * revoke it is to unpair the accessory.
+     */
+    private void exportTagsForSelection() {
+        this.pendingExport = this.deviceListAdaptor.getSelectedBeacons();
+
+        if (this.pendingExport.isEmpty()) {
+            return;
+        }
+
+        this.createBundleZipLauncher.launch(this.suggestedBundleName());
+    }
+
+    /**
+     * What the recipient sees as "exported by" on each tag's page.
+     *
+     * <p><b>A label, and deliberately not the Apple ID.</b> The shared package asks for one and
+     * says so, and it is right: this string travels inside a file that goes to another person and
+     * often onward from there, and the address it would otherwise carry is the one that signs in
+     * to the account these tags belong to.
+     *
+     * <p>The desktop exporter uses the operating system's user name, which is the same kind of
+     * thing. Android has no equivalent, so the device model stands in - it tells a recipient which
+     * phone a bundle came from, which is the useful half, without naming anybody.
+     */
+    private static String exportedByLabel() {
+        return android.os.Build.MODEL == null || android.os.Build.MODEL.isBlank()
+                ? "OpenTagViewer for Android"
+                : "OpenTagViewer on " + android.os.Build.MODEL;
+    }
+
+    /** Dated, so exporting twice does not ask about overwriting. */
+    private String suggestedBundleName() {
+        return "opentagviewer-tags-"
+                + DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
+                        .format(Instant.now())
+                + ".zip";
+    }
+
+    /**
+     * Reads each selected tag's stored records, builds the bundle, locks it, writes it.
+     *
+     * <p>Off the main thread throughout: a Python call and a zip write.
+     *
+     * <p><b>Three failures, three different screens</b>, and the difference matters. A tag that
+     * cannot go in a bundle is something the user picked and can change, so it is named in a
+     * toast. A file that will not write is the disk, and says so. Anything else is the app
+     * failing at something it should be able to do - and that one goes to the report page,
+     * because there is nothing for the user to change and no way for them to say what happened
+     * without one.
+     */
+    private void writeBundleZip(final Uri destination, final List<BeaconInformation> beacons) {
+        // **The write is a `map`, not something done inside `subscribe`.**
+        //
+        // Rx cannot deliver an exception thrown in the onNext consumer to the onError consumer -
+        // it is already in the terminal handler - so it goes to RxJavaPlugins.onError and takes
+        // the process with it. The first version of this had the write in the consumer, and an
+        // export that failed crashed the app instead of showing anything at all. Inside the
+        // stream, the same throw reaches onError and becomes a screen.
+        var async = Observable.fromIterable(beacons)
+                .concatMap(beacon -> this.beaconRepo.getById(beacon.getBeaconId())
+                        .map(data -> new TagExporter.Pairing(
+                                data.getOwnedBeaconInfo(),
+                                data.getBeaconNamingRecord(),
+                                beacon.getName())))
+                .toList()
+                .map(pairings -> {
+                    try (OutputStream out =
+                                 this.getContentResolver().openOutputStream(destination)) {
+                        if (out == null) {
+                            throw new IOException("the picker returned nothing to write to");
+                        }
+                        return TagExporter.writeTo(
+                                out,
+                                pairings,
+                                "OpenTagViewer.android:" + BuildConfig.VERSION_NAME,
+                                exportedByLabel(),
+                                System.currentTimeMillis());
+                    }
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(written -> {
+                    if (written.getWarning() != null) {
+                        Log.w(TAG, "The bundle was written without something: "
+                                + written.getWarning());
+                    }
+
+                    this.endSelection();
+                    final AlertDialog dialog =
+                            ExportedBundleDialog.show(this, written.getPasscode());
+                    ExportedBundleDialog.wireCopy(dialog, written.getPasscode());
+                }, this::onBundleExportFailed);
+    }
+
+    /**
+     * What to say when an export did not happen, and where to send them.
+     *
+     * <p>The report page is for the third case only. Offering it for a full disk, or for a tag
+     * that was never going to work, is how a page that means "this is a bug" stops meaning
+     * anything - see {@code ErrorReportActivity}.
+     */
+    private void onBundleExportFailed(final Throwable error) {
+        Log.e(TAG, "Could not export the selected tags", error);
+
+        // Already on the main thread - the stream observes there - so nothing here hops.
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof TagExporter.NothingToExportException) {
+                Toast.makeText(this,
+                        this.getString(R.string.export_tags_nothing_to_export, cause.getMessage()),
+                        LENGTH_LONG).show();
+                return;
+            }
+            if (cause instanceof IOException) {
+                Toast.makeText(this, R.string.export_tags_could_not_write, LENGTH_LONG).show();
+                return;
+            }
+            if (cause == cause.getCause()) {
+                break;
+            }
+        }
+
+        // **The cause, not the wrapper.** Rx wraps what a `map` throws, so `describe(error)` here
+        // would put "RuntimeException" on the page and bury the sentence the reporter needs.
+        this.startActivity(ErrorReportActivity.intentFor(
+                this, ErrorReportActivity.describe(rootOf(error)),
+                R.string.error_report_body_export));
+    }
+
+    /** The innermost cause, which is the one that says what actually happened. */
+    private static Throwable rootOf(final Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
+    }
+
     private void exportHistoryForSelection() {
         this.pendingExport = this.deviceListAdaptor.getSelectedBeacons();
 
@@ -611,6 +777,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
         // is harder to learn than one where an item is visibly not available yet.
         final boolean anythingSelected = !this.deviceListAdaptor.getSelectedBeacons().isEmpty();
         menu.getMenu().findItem(R.id.action_export_history).setEnabled(anythingSelected);
+        menu.getMenu().findItem(R.id.action_export_tags).setEnabled(anythingSelected);
         menu.getMenu().findItem(R.id.action_remove_devices).setEnabled(anythingSelected);
         menu.getMenu().findItem(R.id.action_move_to_top).setEnabled(anythingSelected);
 
@@ -619,6 +786,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
 
             if (id == R.id.action_export_history) {
                 this.exportHistoryForSelection();
+                return true;
+            }
+            if (id == R.id.action_export_tags) {
+                this.exportTagsForSelection();
                 return true;
             }
             if (id == R.id.action_move_to_top) {

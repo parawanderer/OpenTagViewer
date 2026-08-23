@@ -298,4 +298,12 @@
     <string name="export_logs_cleaned">ログを保存しました。事前に次のものを取り除いています：%1$s</string>
     <string name="exported_with">エクスポート元</string>
     <string name="exported_with_something_unrecorded">記録なし（古いエクスポーター）</string>
+    <string name="exported_tags_title">書き出しと同時にロックしました</string>
+    <string name="exported_tags_body">このファイルを渡す相手には、下のコードが必要です。\n\nコードはファイルとは別に送ってください。同じメッセージで送れば、コードはファイルと同じ場所に残ります。両方を持つ人は、ペアリングを解除するまでこれらのタグの位置を追えます。</string>
+    <string name="exported_tags_copy_code">コードをコピー</string>
+    <string name="exported_tags_code_copied">コピーしました</string>
+    <string name="exported_tags_not_recoverable">このコードはどこにも保存されず、再表示できません。</string>
+    <string name="export_tags_nothing_to_export">「%1$s」は書き出せません。対応する名前レコードがアプリにないため、これを欠いたバンドルは何も取り込めません。Apple アカウントから読み込んだタグは、ファイルではなく「探す」で共有します。</string>
+    <string name="export_tags_could_not_write">ファイルを書き出せませんでした。何も保存していません。</string>
+    <string name="error_report_body_export">選んだタグからバンドルを作成できず、その理由も判別できませんでした。同じタグで再試行しても解決しません。\n\n何も送信されておらず、この端末側も変わっていません。タグはそのまま残っています。</string>
 </resources>

@@ -298,4 +298,12 @@
     <string name="export_logs_cleaned">日誌已儲存。已先行清理：%1$s</string>
     <string name="exported_with">匯出工具</string>
     <string name="exported_with_something_unrecorded">未記錄——較舊的匯出工具</string>
+    <string name="exported_tags_title">已儲存並加鎖</string>
+    <string name="exported_tags_body">你把這個檔案發給誰，對方就需要下面這個碼才能開啟。\n\n請分開傳送——和檔案放在同一則訊息裡的碼，就和檔案在同一個地方。同時拿到兩者的人，在你解除配對之前都能定位這些標籤。</string>
+    <string name="exported_tags_copy_code">複製此碼</string>
+    <string name="exported_tags_code_copied">已複製</string>
+    <string name="exported_tags_not_recoverable">此碼不會儲存在任何地方，也無法再次顯示。</string>
+    <string name="export_tags_nothing_to_export">無法匯出「%1$s」：App 沒有它的命名記錄，缺少這項的包匯入後什麼都沒有。從 Apple 帳戶讀取的標籤請透過「尋找」分享，而不是檔案。</string>
+    <string name="export_tags_could_not_write">檔案寫入失敗，什麼都沒有儲存。</string>
+    <string name="error_report_body_export">App 無法用你選取的標籤產生包，也說不出原因——用同樣的標籤重試沒有用。\n\n沒有傳送任何東西，這支手機上也沒有任何改變。你的標籤都還在。</string>
 </resources>
