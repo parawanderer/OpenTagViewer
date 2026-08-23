@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -27,18 +26,28 @@ public class NearbyTagIndexTest {
         return tags;
     }
 
+    /** The candidate map shape currentMacAddresses returns; this class only reads its keys, so
+     * the indices are arbitrary placeholders. */
+    private static Map<String, Integer> macs(final String... addresses) {
+        final Map<String, Integer> byMac = new HashMap<>();
+        for (int i = 0; i < addresses.length; i++) {
+            byMac.put(addresses[i], i);
+        }
+        return byMac;
+    }
+
     /** Answers a different address set per accessory, so a mix-up between tags would show. */
-    private static AccessoryMacResolver resolverFor(final Map<String, List<String>> byJson) {
-        return json -> byJson.getOrDefault(json, List.of());
+    private static AccessoryMacResolver resolverFor(final Map<String, Map<String, Integer>> byJson) {
+        return json -> byJson.getOrDefault(json, Map.of());
     }
 
     @Test
     public void mapsEveryCandidateAddressBackToItsTag() {
-        final Map<String, List<String>> answers = new HashMap<>();
+        final Map<String, Map<String, Integer>> answers = new HashMap<>();
         answers.put("{\"type\":\"accessory\",\"tag\":\"keys\"}",
-                List.of("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02"));
+                macs("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02"));
         answers.put("{\"type\":\"accessory\",\"tag\":\"bike\"}",
-                List.of("BB:BB:BB:BB:BB:01"));
+                macs("BB:BB:BB:BB:BB:01"));
 
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(twoTags(), resolverFor(answers), 0L);
@@ -63,7 +72,7 @@ public class NearbyTagIndexTest {
     @Test
     public void matchingIgnoresCase() {
         final NearbyTagIndex index = new NearbyTagIndex();
-        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", List.of("aa:bb:cc:dd:ee:ff"))), 0L);
+        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", macs("aa:bb:cc:dd:ee:ff"))), 0L);
 
         assertEquals(KEYS, index.beaconIdFor("AA:BB:CC:DD:EE:FF"));
         assertEquals(KEYS, index.beaconIdFor("aa:bb:cc:dd:ee:ff"));
@@ -98,8 +107,8 @@ public class NearbyTagIndexTest {
     @Test
     public void rebuildingReplacesTheOldAddressesRatherThanAccumulating() {
         final NearbyTagIndex index = new NearbyTagIndex();
-        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", List.of("AA:AA:AA:AA:AA:01"))), 0L);
-        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", List.of("AA:AA:AA:AA:AA:99"))), 1L);
+        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", macs("AA:AA:AA:AA:AA:01"))), 0L);
+        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", macs("AA:AA:AA:AA:AA:99"))), 1L);
 
         assertEquals(1, index.size());
         assertNull("a rolled-past address must stop matching", index.beaconIdFor("AA:AA:AA:AA:AA:01"));
@@ -117,7 +126,7 @@ public class NearbyTagIndexTest {
         tags.put(BIKE, "unbackfilled");
 
         final NearbyTagIndex index = new NearbyTagIndex();
-        index.rebuild(tags, resolverFor(Map.of("good", List.of("AA:AA:AA:AA:AA:01"))), 0L);
+        index.rebuild(tags, resolverFor(Map.of("good", macs("AA:AA:AA:AA:AA:01"))), 0L);
 
         assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:01"));
         assertEquals(1, index.size());
@@ -128,7 +137,7 @@ public class NearbyTagIndexTest {
         final AtomicInteger calls = new AtomicInteger();
         final AccessoryMacResolver counting = json -> {
             calls.incrementAndGet();
-            return List.of();
+            return Map.of();
         };
 
         new NearbyTagIndex().rebuild(twoTags(), counting, 0L);
