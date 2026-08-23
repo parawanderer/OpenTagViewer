@@ -275,4 +275,27 @@
     <string name="icloud_results_next">次へ</string>
     <string name="icloud_registered_serial_label">シリアル番号：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
+    <string name="imported_from_x">%1$s からインポートしたタグ</string>
+    <string name="imported_from_nothing">ファイルからインポートしたタグはありません</string>
+    <string name="error_report_title">これは不具合です</string>
+    <string name="error_report_body">このアプリが解釈できないものが返ってきました。再試行しても解決せず、設定を変える必要もありません。\n\nたいていは Apple 側の変更が原因です。ログを添えて報告していただければ修正できます。どの部分かは、ほぼ必ずログに書かれています。</string>
+    <string name="error_report_button">報告する</string>
+    <string name="error_report_needs_github">GitHub を開きます。先にサインイン、またはアカウント作成を求められます。</string>
+    <string name="error_report_share_log">ログを取得</string>
+    <string name="error_report_log_cleaned">ログはアプリから出る前に整理されます：%1$s</string>
+    <string name="error_report_log_unavailable">個人情報を取り除く処理が動いていないため、いまはログを共有できません。ログなしの報告でも役に立ちます。</string>
+    <string name="error_report_what_failed">失敗した内容</string>
+    <string name="error_report_body_import">このファイルを読み取れず、どこがおかしいのかも判別できませんでした。同じファイルで再試行しても解決しません。\n\nエクスポーターで作成したものなら本来は読めるはずなので、報告する価値があります。どこで止まったかは、たいていログに書かれています。</string>
+    <string name="imported_but_not_located_title">タグの読み込みは完了しました</string>
+    <string name="imported_but_not_located_body">タグはこの端末に保存され、消えることはありません。できなかったのは、Apple に現在地を問い合わせることです：\n\n%1$s\n\n原因はたいてい、サインインが経由する Anisette サーバーです。公開サーバーが停止していると、ほかは正常に見えるのに位置情報だけ届かなくなります。サインイン用データをこの端末で生成すれば、他人のサーバーに頼らずに済みます。\n\nアプリは 1 分ごとに再試行するので、一時的な停止であれば自然に解消します。</string>
+    <string name="imported_but_not_located_open_settings">サインインデータ</string>
+    <string name="error_report_close">閉じる</string>
+    <string name="error_report_log_how">ログをどの形で受け取りますか？</string>
+    <string name="error_report_log_copy">コピーする（報告に貼り付ける用）</string>
+    <string name="error_report_log_save">ファイルとして保存する（添付する用）</string>
+    <string name="error_report_log_copied">ログをコピーしました</string>
+    <string name="export_logs_cannot_be_cleaned">ログを保存できませんでした。個人情報を取り除く部分が動作していないためです。ファイルは書き出していません。未処理のログを渡す価値はありません。</string>
+    <string name="export_logs_cleaned">ログを保存しました。事前に次のものを取り除いています：%1$s</string>
+    <string name="exported_with">エクスポート元</string>
+    <string name="exported_with_something_unrecorded">記録なし（古いエクスポーター）</string>
 </resources>

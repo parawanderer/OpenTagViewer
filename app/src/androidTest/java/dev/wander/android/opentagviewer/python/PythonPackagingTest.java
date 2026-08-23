@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.python;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -163,6 +164,34 @@ public class PythonPackagingTest {
             assertNotNull(module + " must be importable in the APK",
                     Python.getInstance().getModule(module));
         }
+    }
+
+    /**
+     * The log redactor imports, and still strips something.
+     *
+     * <p><b>The one whitelisted module whose absence would be silent and harmful.</b> Everything
+     * else here fails loudly when it is missing - no sign-in, no import. This one is reached at
+     * the moment somebody is about to send their log to a public issue, and a caller that
+     * shrugged off the import error would hand over an unredacted one. So the app refuses to
+     * produce a log it could not clean, and this is what says the refusal will not be the normal
+     * case.
+     *
+     * <p>Asserted by running it rather than by importing it: {@code redact} is patterns and a
+     * {@code Counter}, so an import that resolved against something empty would still be an
+     * import. The rules themselves are the exporter's to test - {@code python/test/test_redact.py},
+     * a different CI job - and duplicating them here would be the second copy this arrangement
+     * exists to avoid.
+     */
+    @Test
+    public void theredactorIsPackagedAndRedacts() {
+        final PyObject redact = Python.getInstance().getModule("exporter.redact");
+        assertNotNull("exporter.redact must be importable in the APK", redact);
+
+        final PyObject result = redact.callAttr("redact", "signed in as someone@example.com");
+        final String cleaned = result.asList().get(0).toString();
+
+        assertFalse("the address survived redaction: " + cleaned,
+                cleaned.contains("someone@example.com"));
     }
 
     /**

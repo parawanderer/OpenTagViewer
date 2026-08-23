@@ -67,6 +67,12 @@
             android:foregroundServiceType="location">
         </service>
 
+        <!-- Reached only when the app cannot name what went wrong - see the class doc. -->
+        <activity
+            android:name=".ui.error.ErrorReportActivity"
+            android:exported="false"
+            android:label="@string/error_report_title" />
+
         <activity
             android:name=".DeviceInfoActivity"
             android:exported="false"
