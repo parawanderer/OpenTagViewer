@@ -11,6 +11,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+// The row reads "SMS (+44 ******1234)", so an exact match on the number finds nothing. Matching
+// the number inside the label keeps this working whether or not the method is named around it.
+import static org.hamcrest.Matchers.containsString;
 
 import android.app.Activity;
 import android.app.Instrumentation.ActivityResult;
@@ -33,6 +36,9 @@ import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.Shot;
 import dev.wander.android.opentagviewer.TestPace;
 import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
@@ -65,6 +71,7 @@ public class WikiScreenshotsOfSigningInTest {
     @Before
     public void replaceApple() {
         AccountBeaconsForTests.forgetThemAll();
+        signOutFirst();
 
         this.apple = FakeAppleAuthService.wantsTwoFactor();
         AppDependencies.replaceAuthService(this.apple);
@@ -104,7 +111,7 @@ public class WikiScreenshotsOfSigningInTest {
         this.scenario = ActivityScenario.launch(AppleLoginActivity.class);
         this.signIn();
 
-        Eventually.check(() -> onView(withText(FakeAppleAuthService.PHONE_ONE))
+        Eventually.check(() -> onView(withText(containsString(FakeAppleAuthService.PHONE_ONE)))
                 .check(matches(isDisplayed())));
         Shot.ofTheScreen("login-2-2fa-methods");
     }
@@ -122,9 +129,9 @@ public class WikiScreenshotsOfSigningInTest {
         this.scenario = ActivityScenario.launch(AppleLoginActivity.class);
         this.signIn();
 
-        Eventually.check(() -> onView(withText(FakeAppleAuthService.PHONE_ONE))
+        Eventually.check(() -> onView(withText(containsString(FakeAppleAuthService.PHONE_ONE)))
                 .check(matches(isDisplayed())));
-        onView(withText(FakeAppleAuthService.PHONE_ONE)).perform(click());
+        onView(withText(containsString(FakeAppleAuthService.PHONE_ONE))).perform(click());
 
         Eventually.check(() -> onView(withId(R.id.twofa_sent_info_text))
                 .check(matches(isDisplayed())));
@@ -148,6 +155,28 @@ public class WikiScreenshotsOfSigningInTest {
         Eventually.check(() -> onView(withText(R.string.icloud_import_from_file))
                 .check(matches(isDisplayed())));
         Shot.ofTheScreen("import-1-my-devices-empty");
+    }
+
+    /**
+     * Make sure nobody is signed in, rather than hoping.
+     *
+     * <p><b>Every test here fails with {@code NoActivityResumedException} if a session exists</b>,
+     * and the reason is nowhere near the failure: AppleLoginActivity finishes itself and starts
+     * the map when it finds one, the map is stubbed out here, and Espresso then reports that no
+     * activity is resumed - which reads as a launch that did not happen rather than a screen that
+     * declined to appear.
+     *
+     * <p>It happened because a sibling capture class signs somebody in and puts it back in its
+     * {@code @After}, and three of its tests failed in a way that skipped the restore. Fixed on
+     * this side as well as that one: a class whose whole subject is the signed-out screens should
+     * establish signed-out itself, not inherit it from whatever ran before.
+     */
+    private static void signOutFirst() {
+        new UserAuthRepository(
+                UserAuthDataStore.getInstance(
+                        getInstrumentation().getTargetContext().getApplicationContext()),
+                new AppCryptographyUtil())
+                .clearUser().blockingAwait();
     }
 
     private void signIn() {

@@ -388,20 +388,28 @@ public final class AMapWithTagsOnIt {
 
     /** Call from {@code @After}, always - this overwrote the device's own settings. */
     public void putItBack() {
-        if (this.scenario != null) {
-            this.scenario.close();
-        }
-        if (this.appleDouble != null) {
-            this.appleDouble.callAttr("uninstall");
-        }
+        // **The restore runs even if the teardown above it throws.** It was last in a plain
+        // sequence, so a test that failed badly enough to upset the scenario close or the Python
+        // double took the settings and the stored session down with it - and the next class to
+        // run then met somebody signed in who should not have been, several tests away from
+        // anything that mentions a session. Whatever else goes wrong here, the device goes back
+        // to how it was found.
+        try {
+            if (this.scenario != null) {
+                this.scenario.close();
+            }
+            if (this.appleDouble != null) {
+                this.appleDouble.callAttr("uninstall");
+            }
 
-        MapProviderFactory.reset();
-        AppDependencies.reset();
+            MapProviderFactory.reset();
+            AppDependencies.reset();
 
-        this.forgetThem();
-
-        if (this.guard != null) {
-            this.guard.restore();
+            this.forgetThem();
+        } finally {
+            if (this.guard != null) {
+                this.guard.restore();
+            }
         }
     }
 

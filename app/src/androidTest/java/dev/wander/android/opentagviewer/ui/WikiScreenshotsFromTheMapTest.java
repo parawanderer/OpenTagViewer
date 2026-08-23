@@ -27,8 +27,12 @@ import androidx.test.filters.LargeTest;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
+
+import java.util.Set;
 
 import java.nio.charset.StandardCharsets;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
@@ -68,6 +72,20 @@ public class WikiScreenshotsFromTheMapTest {
     /** How long to let Google fetch tiles before photographing the map. */
     private static final long TILES_TAKE_A_MOMENT = 6000L;
 
+    /**
+     * The captures with a map actually in shot - everything else here photographs Settings.
+     *
+     * <p>Named rather than annotated because the decision is made in {@code @Before}, before any
+     * test body runs, and a name is the only thing available there. The cost of getting it wrong
+     * is visible either way: forget to add a map capture and it is photographed over a blank grey
+     * rectangle.
+     */
+    private static final Set<String> NEEDS_A_DRAWN_MAP =
+            Set.of("atheoverflowMenuOnTheMap", "gtheexportLogsButton");
+
+    @Rule
+    public final TestName testName = new TestName();
+
     private final AMapWithTagsOnIt theMap = new AMapWithTagsOnIt();
 
     @Before
@@ -87,18 +105,32 @@ public class WikiScreenshotsFromTheMapTest {
 
         this.theMap.seed("Bike", "Keys");
 
-        // **The real Google map, not the fake one.** The fixture substitutes FakeMapProvider
-        // because the managed device has no Play Services - but these are captured on a windowed
-        // emulator that has them, and the wiki page these replace shows a real map. Everything
-        // else the fixture arranges is still needed; only the drawing is handed back.
+        // **The real Google map, but only for the two captures that photograph one.** The fixture
+        // substitutes FakeMapProvider because the managed device has no Play Services; these are
+        // captured on a windowed emulator that has them, and the wiki page these replace shows a
+        // real map. Everything else the fixture arranges is still needed.
         //
         // The pin sits at 48.85837, 2.29448 - the Eiffel Tower - which is recognisable, obviously
         // nobody's home, and paired with a geocoder that answers "A made-up street, in a made-up
         // town" so no real address reaches a public page.
-        MapProviderFactory.reset();
+        //
+        // **It is handed back per test because it costs about fifty seconds.** Measured: the same
+        // fixture with the fake provider runs a test in 1.3-2.8s, and with the real Google map
+        // every test in this class landed between 52.4s and 55.0s - including the two that only
+        // open a dialog. Bringing the Maps SDK up and tearing it down again dominates everything
+        // else, and five of these seven screens are Settings, a full-screen activity with no map
+        // behind it at all. Paying for it there bought a blank sixth of a screenshot nobody sees.
+        final boolean weArePhotographingTheMap =
+                NEEDS_A_DRAWN_MAP.contains(this.testName.getMethodName());
+        if (weArePhotographingTheMap) {
+            MapProviderFactory.reset();
+        }
         givenSomebodyIsSignedIn();
 
         this.theMap.open();
+
+        Eventually.check(() -> onView(withId(R.id.button_more_settings))
+                .check(matches(isDisplayed())));
 
         // **Waiting for the chrome is not waiting for the map.** The overflow button is drawn
         // immediately; Google's tiles arrive over the network seconds later, and a screenshot
@@ -106,9 +138,9 @@ public class WikiScreenshotsFromTheMapTest {
         // a loading one. There is no callback to hang this on from out here, so it is a wait -
         // the one place in this repo where sleeping is the honest answer, because what is being
         // waited for is a third party's tile download and not anything the app decides.
-        Eventually.check(() -> onView(withId(R.id.button_more_settings))
-                .check(matches(isDisplayed())));
-        android.os.SystemClock.sleep(TILES_TAKE_A_MOMENT);
+        if (weArePhotographingTheMap) {
+            android.os.SystemClock.sleep(TILES_TAKE_A_MOMENT);
+        }
     }
 
     @After
@@ -180,7 +212,11 @@ public class WikiScreenshotsFromTheMapTest {
     public void ctheanisetteServerDialog() {
         this.openSettingsAndTap(R.id.setting_app_anisette_server);
 
-        Eventually.check(() -> onView(withText(R.string.anisette_server_url)).inRoot(isDialog())
+        // **Waited for by id, not by its label.** This matched the text "Anisette Server URL" and
+        // stopped matching when the dialog grew a local/remote mode dropdown: that string is now
+        // the field's helper text rather than a TextView of its own. The id survived the redesign
+        // and the wording will not.
+        Eventually.check(() -> onView(withId(R.id.anisetteServerUrl)).inRoot(isDialog())
                 .check(matches(isDisplayed())));
         Shot.ofTheScreen("settings-2-anisette-server");
     }
@@ -235,9 +271,14 @@ public class WikiScreenshotsFromTheMapTest {
         this.openTheOverflow();
         onView(withText(R.string.settings)).inRoot(isPlatformPopup()).perform(click());
 
+        // **Scroll first, then assert it is on screen** - not the other way round. The switch is
+        // the last row of the Settings ScrollView, so isDisplayed() is false until something
+        // brings it into view: Espresso reported it VISIBLE with a 832x126 size and an empty
+        // global visible rect, which reads as a contradiction until you notice it means
+        // "laid out, off screen". scrollTo() only needs the view to exist.
         Eventually.check(() -> onView(withId(R.id.settings_app_debug_data_enabled))
-                .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_app_debug_data_enabled)).perform(scrollTo(), click());
+                .perform(scrollTo()));
+        onView(withId(R.id.settings_app_debug_data_enabled)).perform(click());
 
         // Photographed switched on, since that is the state the next step needs. The fixture's
         // DeviceStateGuard puts the setting back afterwards.
@@ -262,9 +303,14 @@ public class WikiScreenshotsFromTheMapTest {
         this.openTheOverflow();
         onView(withText(R.string.settings)).inRoot(isPlatformPopup()).perform(click());
 
+        // **Scroll first, then assert it is on screen** - not the other way round. The switch is
+        // the last row of the Settings ScrollView, so isDisplayed() is false until something
+        // brings it into view: Espresso reported it VISIBLE with a 832x126 size and an empty
+        // global visible rect, which reads as a contradiction until you notice it means
+        // "laid out, off screen". scrollTo() only needs the view to exist.
         Eventually.check(() -> onView(withId(R.id.settings_app_debug_data_enabled))
-                .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_app_debug_data_enabled)).perform(scrollTo(), click());
+                .perform(scrollTo()));
+        onView(withId(R.id.settings_app_debug_data_enabled)).perform(click());
         Eventually.check(() -> onView(withId(R.id.settings_app_debug_data_enabled))
                 .check(matches(isChecked())));
 
