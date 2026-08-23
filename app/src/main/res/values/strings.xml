@@ -338,4 +338,7 @@ You can set this up now, or any time later from Settings.</string>
     <string name="error_report_body_export">The app could not build a bundle from the tags you picked, and cannot say why — so trying again with the same tags will not help.\n\nNothing was sent and nothing on this phone has changed. Your tags are still here.</string>
     <string name="imported_from_x">Most recently imported from %1$s</string>
     <string name="imported_from_nothing">No tags imported from a file</string>
+    <string name="refresh_from_account">Refresh from Apple account</string>
+    <string name="refresh_from_account_done">Up to date with your Apple account</string>
+    <string name="refresh_from_account_failed">Could not reach your Apple account just now. Your tags are unchanged.</string>
 </resources>
