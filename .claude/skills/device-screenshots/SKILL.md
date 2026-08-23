@@ -40,6 +40,26 @@ my_device_list_item-wallpaper.png                                    variant "wa
 
 Needs Pillow (`python -m pip install pillow`).
 
+## Screenshots that go somewhere public
+
+A capture destined for the wiki or an issue is a screenshot of *a real build on a real device*,
+and some of what is on it belongs to whoever took it. The AMap key dialog is the worked example:
+it prints the package name and signing fingerprint, because that is exactly what AMap's console
+asks you to paste — correct behaviour, and not something to publish.
+
+```bash
+py -3 .claude/skills/device-screenshots/blur.py shot.png --band 0.42 0.55
+```
+
+`--band` takes fractions of the height, so it survives a change of device resolution; repeat it
+for more than one strip. Blur rather than crop — a cropped dialog looks like it has fewer fields
+than it does, and the next person wonders what was removed. It pixelates before blurring, so the
+characters are gone rather than merely soft.
+
+Worth a look before publishing any capture: a signed-in email address, a real street name from
+the geocoder, a `XXXX-XXXX-XXXX` bundle passcode, coordinates. The capture classes fabricate all
+of those on purpose; a hand-taken screenshot does not.
+
 ## Getting the screenshots
 
 `SystemColorsLayoutTest` is the working example. Inflate a layout — or load a drawable —

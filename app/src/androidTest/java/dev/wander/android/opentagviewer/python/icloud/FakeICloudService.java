@@ -124,6 +124,12 @@ public final class FakeICloudService implements ICloudService {
         return fake;
     }
 
+    /** Make the next unlock fail. For screenshots and for tests of the wrong-code state. */
+    public FakeICloudService failUnlockWith(final ICloudException failure) {
+        this.unlockFailsWith = failure;
+        return this;
+    }
+
     /** Nothing reported usable at all, which reads as a service having a bad day. */
     public static FakeICloudService whereTheServiceIsUnsure() {
         final FakeICloudService fake = new FakeICloudService();
