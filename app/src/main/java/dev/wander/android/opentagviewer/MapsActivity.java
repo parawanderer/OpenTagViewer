@@ -673,7 +673,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             return;
         }
 
-        this.nearbyWatchDisposable = new NearbyTagWatcher(AppDependencies.accessoryMacResolver())
+        this.nearbyWatchDisposable = new NearbyTagWatcher(
+                AppDependencies.accessoryMacResolver(), this::correctAlignmentFromSighting)
                 .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
@@ -683,6 +684,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.nearbyStatusTickerDisposable = Observable
                 .interval(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
                 .subscribe(tick -> this.updateBeaconCards());
+    }
+
+    /**
+     * Feeds a passive sighting back into alignment self-correction, the same way the ring
+     * button's explicit scan already does - see {@code NearbyTagWatcher.SightingListener}.
+     *
+     * <p>Without this, a tag nobody has rung recently only gets a chance to correct its
+     * alignment when the periodic Apple-network fetch runs, and can silently drift out of
+     * {@code currentMacAddresses}' margin in between - which reads as "stopped being found
+     * nearby" for no visible reason, on a tag sitting right next to the phone.
+     */
+    private void correctAlignmentFromSighting(
+            final String beaconId, final String mac, final long seenAtMs) {
+        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
+                .subscribe(() -> { }, error -> Log.w(TAG,
+                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
+                        error));
     }
 
     private void stopWatchingForNearbyTags() {

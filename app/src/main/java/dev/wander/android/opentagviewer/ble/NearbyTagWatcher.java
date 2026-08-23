@@ -13,7 +13,9 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
 import io.reactivex.rxjava3.core.Observable;
@@ -46,17 +48,55 @@ public class NearbyTagWatcher {
         long nowMs();
     }
 
+    /**
+     * Told, off the scan callback thread and throttled, when a sighting matches one of the
+     * caller's own tags - so a passive scan can feed alignment self-correction the same way the
+     * ring button's explicit scan does. Real: {@code BeaconRepository#recordAccessorySighting}.
+     *
+     * <p>Without this, a tag only ever heard through this class - never rung, and refreshed by
+     * the periodic Apple-network fetch only as often as that runs - has no way to correct a
+     * stored alignment that has drifted since the last fetch. It stays inside
+     * {@code currentMacAddresses}' 12 hour margin for a while and then, once the drift exceeds
+     * that, simply stops being found - with nothing failing anywhere to say why.
+     */
+    public interface SightingListener {
+        void onSighting(String beaconId, String mac, long seenAtMs);
+    }
+
+    /**
+     * How often {@link SightingListener#onSighting} fires for the same beacon.
+     *
+     * <p>A tag in range advertises every one to three seconds, and each one is a candidate
+     * correction - reporting every single one would start a Python interpreter that often. A
+     * correction that already matches the stored alignment is a no-op on the far side anyway,
+     * so nothing is lost by not attempting most of them.
+     */
+    static final long SIGHTING_LISTENER_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
+
     private final AccessoryMacResolver macResolver;
     private final NearbyTagIndex index;
     private final Clock clock;
 
+    @Nullable
+    private final SightingListener sightingListener;
+
+    private final Map<String, Long> lastListenerCallMs = new HashMap<>();
+
     public NearbyTagWatcher(final AccessoryMacResolver macResolver) {
-        this(macResolver, new NearbyTagIndex(), System::currentTimeMillis);
+        this(macResolver, null);
     }
 
-    NearbyTagWatcher(final AccessoryMacResolver macResolver, final NearbyTagIndex index,
+    public NearbyTagWatcher(
+            final AccessoryMacResolver macResolver, @Nullable final SightingListener listener) {
+        this(macResolver, listener, new NearbyTagIndex(), System::currentTimeMillis);
+    }
+
+    NearbyTagWatcher(final AccessoryMacResolver macResolver,
+                     @Nullable final SightingListener sightingListener,
+                     final NearbyTagIndex index,
                      final Clock clock) {
         this.macResolver = macResolver;
+        this.sightingListener = sightingListener;
         this.index = index;
         this.clock = clock;
     }
@@ -112,9 +152,14 @@ public class NearbyTagWatcher {
                 @Override
                 public void onScanResult(final int callbackType, final ScanResult result) {
                     final NearbyTagSighting sighting = sightingFrom(result);
-                    if (sighting != null && !emitter.isDisposed()) {
+                    if (sighting == null) {
+                        return;
+                    }
+                    if (!emitter.isDisposed()) {
                         emitter.onNext(sighting);
                     }
+                    maybeNotifySightingListener(
+                            sighting.getBeaconId(), result.getDevice().getAddress());
                 }
 
                 @Override
@@ -168,5 +213,26 @@ public class NearbyTagWatcher {
 
         return new NearbyTagSighting(beaconId, result.getRssi(), advertisement.getBatteryLevel(),
                 advertisement.getState(), this.clock.nowMs());
+    }
+
+    /**
+     * Calls {@link #sightingListener}, throttled per beacon, off the calling thread.
+     *
+     * <p>Off-thread because the real listener persists to Room through a Python call - see the
+     * interface doc - and this runs from {@code onScanResult}, which must not block.
+     */
+    void maybeNotifySightingListener(final String beaconId, final String mac) {
+        if (this.sightingListener == null) {
+            return;
+        }
+        final long nowMs = this.clock.nowMs();
+        final Long lastCallMs = this.lastListenerCallMs.get(beaconId);
+        if (lastCallMs != null && nowMs - lastCallMs < SIGHTING_LISTENER_INTERVAL_MS) {
+            return;
+        }
+        this.lastListenerCallMs.put(beaconId, nowMs);
+
+        Schedulers.io().scheduleDirect(
+                () -> this.sightingListener.onSighting(beaconId, mac, nowMs));
     }
 }
