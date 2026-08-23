@@ -275,8 +275,6 @@ You can set this up now, or any time later from Settings.</string>
     <string name="icloud_results_next">Next</string>
     <string name="icloud_registered_serial_label">Serial Number: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
-    <string name="imported_from_x">Tags imported from %1$s</string>
-    <string name="imported_from_nothing">No tags imported from a file</string>
     <string name="error_report_title">This one is a bug</string>
     <string name="error_report_body">Something came back that this app does not know how to read, so retrying will not help and there is nothing to change in your settings.\n\nThat usually means Apple altered something. A report with the log attached is what makes it fixable — the log almost always says which part.</string>
     <string name="error_report_button">Report this</string>
@@ -298,4 +296,14 @@ You can set this up now, or any time later from Settings.</string>
     <string name="export_logs_cleaned">Log saved. It was cleaned first: %1$s</string>
     <string name="exported_with">Exported with</string>
     <string name="exported_with_something_unrecorded">Not recorded — an older exporter</string>
+    <string name="exported_tags_title">Sent, and locked</string>
+    <string name="exported_tags_body">The person you send this file to needs the code below to open it.\n\nSend it to them separately — a code sent in the same message as the file is in the same place as the file, and anyone who has both can locate these tags until you unpair them.</string>
+    <string name="exported_tags_copy_code">Copy the code</string>
+    <string name="exported_tags_code_copied">Copied</string>
+    <string name="exported_tags_not_recoverable">This code is not stored anywhere and cannot be shown again.</string>
+    <string name="export_tags_nothing_to_export">“%1$s” cannot be exported: this app has no naming record for it, and a bundle without one imports as nothing. Tags read from your Apple account are shared through Find My rather than through a file.</string>
+    <string name="export_tags_could_not_write">The file could not be written. Nothing was saved.</string>
+    <string name="error_report_body_export">The app could not build a bundle from the tags you picked, and cannot say why — so trying again with the same tags will not help.\n\nNothing was sent and nothing on this phone has changed. Your tags are still here.</string>
+    <string name="imported_from_x">Most recently imported from %1$s</string>
+    <string name="imported_from_nothing">No tags imported from a file</string>
 </resources>

@@ -128,6 +128,16 @@ So releasing is two steps, in this order:
 1. Commit the `VERSION` bump to `main`
 2. Tag that commit `exporter-v<the same version>` and publish the release
 
+**And the app's release goes out before the exporter's, whenever the exporter's changes what a
+bundle is.** They are separate releases with separate tags, which makes them look independent;
+they are not. Exporter 1.4.0 locks bundles by default, and an app older than 1.1.0 cannot decrypt
+one at all — it fails with a message about the zip rather than about a code. Publish the exporter
+first and every bundle written that day is unopenable by whoever receives it, and the recipient is
+the one person in that transaction who chose none of it and can fix none of it.
+
+Nothing enforces this — `release_version.py` checks a tag against a version, not one release
+against another — so it is a thing to remember, which is why it is written here.
+
 `scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`
 before any build job. A tag that disagrees fails the release rather than shipping a build that
 lies about itself. `macos-exporter-v` is the old spelling and still resolves, because tags already

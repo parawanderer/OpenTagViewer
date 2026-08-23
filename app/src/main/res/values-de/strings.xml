@@ -275,8 +275,6 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="icloud_results_next">Weiter</string>
     <string name="icloud_registered_serial_label">Seriennummer: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
-    <string name="imported_from_x">Tags importiert aus %1$s</string>
-    <string name="imported_from_nothing">Keine Tags aus einer Datei importiert</string>
     <string name="error_report_title">Das ist ein Fehler in der App</string>
     <string name="error_report_body">Es kam etwas zurück, das diese App nicht lesen kann. Ein erneuter Versuch hilft daher nicht, und an deinen Einstellungen ist nichts zu ändern.\n\nMeist bedeutet das, dass Apple etwas geändert hat. Ein Bericht mit angehängtem Protokoll macht es behebbar – das Protokoll verrät fast immer, welcher Teil betroffen ist.</string>
     <string name="error_report_button">Fehler melden</string>
@@ -298,4 +296,14 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="export_logs_cleaned">Protokoll gespeichert. Es wurde zuvor bereinigt: %1$s</string>
     <string name="exported_with">Exportiert mit</string>
     <string name="exported_with_something_unrecorded">Nicht vermerkt – ein älterer Exporter</string>
+    <string name="exported_tags_title">Gespeichert und gesperrt</string>
+    <string name="exported_tags_body">Wer diese Datei von dir bekommt, braucht den Code unten, um sie zu öffnen.\n\nSchicke ihn getrennt davon – ein Code in derselben Nachricht wie die Datei liegt am selben Ort wie die Datei, und wer beides hat, kann diese Tags orten, bis du sie entkoppelst.</string>
+    <string name="exported_tags_copy_code">Code kopieren</string>
+    <string name="exported_tags_code_copied">Kopiert</string>
+    <string name="exported_tags_not_recoverable">Dieser Code wird nirgends gespeichert und kann nicht erneut angezeigt werden.</string>
+    <string name="export_tags_nothing_to_export">„%1$s“ kann nicht exportiert werden: Der App fehlt der zugehörige Namenseintrag, und ein Bundle ohne ihn importiert nichts. Tags aus deinem Apple-Konto teilst du über „Wo ist?“ statt über eine Datei.</string>
+    <string name="export_tags_could_not_write">Die Datei konnte nicht geschrieben werden. Es wurde nichts gespeichert.</string>
+    <string name="error_report_body_export">Die App konnte aus den gewählten Tags kein Bundle erstellen und kann nicht sagen, warum – ein erneuter Versuch mit denselben Tags hilft also nicht.\n\nEs wurde nichts verschickt und auf diesem Telefon hat sich nichts geändert. Deine Tags sind weiterhin da.</string>
+    <string name="imported_from_x">Zuletzt importiert aus %1$s</string>
+    <string name="imported_from_nothing">Keine Tags aus einer Datei importiert</string>
 </resources>

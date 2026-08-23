@@ -96,8 +96,8 @@ android {
         applicationId = "dev.wander.android.opentagviewer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.5"
+        versionCode = 4
+        versionName = "1.1.0"
 
         // Null unless a build type sets it - see the debug block. A release is built from a tag
         // and its versionName is exactly right, so there is nothing a commit would add; the

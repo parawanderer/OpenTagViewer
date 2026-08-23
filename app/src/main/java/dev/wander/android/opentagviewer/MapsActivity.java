@@ -1004,12 +1004,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * offers, and a screenful of frames is not something anybody reads off a phone.
      */
     private static String describe(final Throwable error) {
-        if (error == null) {
-            return "unknown";
-        }
-        return error.getMessage() == null
-                ? error.getClass().getSimpleName()
-                : error.getClass().getSimpleName() + ": " + error.getMessage();
+        return ErrorReportActivity.describe(error);
     }
 
     /**
