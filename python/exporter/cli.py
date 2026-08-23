@@ -831,6 +831,21 @@ async def run(arguments: argparse.Namespace) -> int:
         for skipped in fetched.skipped:
             print(f"Not exportable: {skipped.beacon_id} {skipped.reason}", file=sys.stderr)
 
+        if fetched.undecryptable:
+            # **Not phrased as a failure**, because it usually is not one: a zone holds records
+            # belonging to other parties too. It is said at all because the alternative is a
+            # shorter list with nothing to explain it, and "fewer tags than expected" reads
+            # exactly like "some of those were never tags".
+            print(
+                f"\n{fetched.undecryptable} record(s) in the account could not be read, and are"
+                " not in the list above.",
+                file=sys.stderr,
+            )
+            print("Records belonging to somebody else look like this too, so this is often"
+                  " nothing. It is", file=sys.stderr)
+            print("worth a second look only if it is close to the number of tags you expected"
+                  " to see.", file=sys.stderr)
+
         if fetched.candidates:
             picked = (
                 _take_all(fetched.candidates, include_my_devices=arguments.include_my_devices)

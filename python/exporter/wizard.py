@@ -147,6 +147,7 @@ class WizardApp(tk.Tk):
         # What the source could not export, kept rather than passed around: the list is redrawn
         # whenever a key file is added, and that redraw knows nothing about the original read.
         self.skipped: list = []
+        self.undecryptable = 0
         self.route = source.detect()
 
         self._build()
@@ -396,6 +397,7 @@ class WizardApp(tk.Tk):
             return
 
         self.candidates = fetched.candidates
+        self.undecryptable = fetched.undecryptable
         # Read once. A second read would sign in again, register nothing new and rebuild the list
         # under the ticks somebody has already made.
         self.read_button.configure(state="disabled")
@@ -581,6 +583,16 @@ class WizardApp(tk.Tk):
         if self.skipped:
             notes.append(
                 f"{len(self.skipped)} record(s) could not be exported: they carry no key material.",
+            )
+
+        if self.undecryptable:
+            # Deliberately not "could not be exported", which is what the line above means and is
+            # a different thing: those were read and set aside, these were never read at all.
+            # Records belonging to other people look like this too, so it says so rather than
+            # implying something went wrong.
+            notes.append(
+                f"{self.undecryptable} record(s) could not be read, and are not listed - often"
+                " somebody else's, so this is usually nothing.",
             )
 
         if not self.choices.get_children():
