@@ -16,11 +16,12 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from findmy import InvalidCredentialsError, MobileMeDelegateError
+from findmy import InvalidCredentialsError, MobileMeDelegateError, UnhandledProtocolError
+from findmy.keychain.session import KeychainSessionError
 
 from exporter import cli, prompts
 from exporter.icloud import ExportSourceError
-from exporter.version import EXPORT_VIA_CLI
+from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK
 from opentagviewer_export import ExportBundle, generate_passcode
 
 KEY = bytes(range(28))
@@ -507,3 +508,59 @@ class TestIncludingYourOwnDevices:
         monkeypatch.setattr(prompts, "confirm", _no)
 
         assert asyncio.run(cli._confirm_devices([mac], or_nothing=True)) == []
+
+
+class TestWhereToReportSomethingUnfixable:
+    """
+    `UnhandledProtocolError` means Apple said something this library does not model.
+
+    There is nothing for the user to correct, so the only useful next step is a bug report - and
+    for years this asked for one without saying where to put it. The window has always named the
+    URL in its error dialog; the headless half said "if you report this" and stopped.
+
+    Issue #140 is the worked example: a `KeychainSessionError`, which is an
+    `UnhandledProtocolError` by inheritance, arriving as "no keychain keys are held" - which reads
+    as a broken account and is not one.
+    """
+
+    def _failing_run(self, monkeypatch, error):
+        # `run`, not `_run_and_return` - the handlers are inside the latter, so patching it
+        # would test nothing and let the exception straight out.
+        async def _boom(_arguments):
+            raise error
+
+        monkeypatch.setattr(cli, "run", _boom)
+
+    def test_it_names_where_to_report(self, monkeypatch, capsys):
+        self._failing_run(monkeypatch, UnhandledProtocolError("no keychain keys are held"))
+
+        assert cli.main([]) == 1
+        assert GITHUB_ISSUES_LINK in capsys.readouterr().err
+
+    def test_it_still_says_what_apple_did(self, monkeypatch, capsys):
+        # The link is an addition, not a replacement: the message is the only description of the
+        # actual problem anybody has.
+        self._failing_run(monkeypatch, UnhandledProtocolError("no keychain keys are held"))
+
+        cli.main([])
+
+        assert "no keychain keys are held" in capsys.readouterr().err
+
+    def test_a_keychain_failure_reaches_the_same_place(self, monkeypatch, capsys):
+        # By inheritance rather than by being listed, which is the only reason #140 got a usable
+        # message at all. A separate handler that forgot it would be silent here.
+        self._failing_run(
+            monkeypatch,
+            KeychainSessionError("No keychain keys are held, so nothing can be decrypted."),
+        )
+
+        assert cli.main([]) == 1
+        assert GITHUB_ISSUES_LINK in capsys.readouterr().err
+
+    def test_a_mistake_the_user_can_fix_does_not_ask_for_a_bug_report(self, monkeypatch, capsys):
+        # The distinction that makes the link worth anything. Being sent to file an issue about
+        # your own typo is wrong, and it teaches people to ignore the link when it matters.
+        self._failing_run(monkeypatch, ExportSourceError("Signing in was stopped."))
+
+        assert cli.main([]) == 1
+        assert GITHUB_ISSUES_LINK not in capsys.readouterr().err

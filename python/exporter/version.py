@@ -42,3 +42,12 @@ And what the headless one says.
 A different producer, because it is one: same version, same format, different program - and a bug
 report that says which is worth more than one that says "the exporter".
 """
+
+GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
+"""
+Where to report something neither the user nor this program can fix.
+
+Here rather than in `wizard.py`, which is where it used to live alone, so the CLI can say it too
+without importing tkinter - the same reason `VERSION` is here. Two copies of a URL is exactly the
+sort of thing that goes stale in one place and is never noticed, because nothing tests a link.
+"""
