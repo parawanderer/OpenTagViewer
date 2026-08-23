@@ -57,7 +57,7 @@ from findmy import (
 from findmy.keychain.recovery import RecoveryError
 
 from exporter.icloud import Candidate, ExportSourceError
-from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, VERSION
+from exporter.version import APP_TITLE, EXPORT_VIA_WIZARD, GITHUB_ISSUES_LINK, VERSION
 from opentagviewer_export import (
     ExportError,
     KeyFileError,
@@ -69,7 +69,6 @@ from opentagviewer_export.hardware import is_own_device
 
 logger = logging.getLogger(__name__)
 
-GITHUB_ISSUES_LINK = "https://github.com/parawanderer/OpenTagViewer/issues/new"
 # The "Need Help?" link. It points at the page covering both routes: the older `…-From-Mac` page
 # keeps its name because binaries already released open it, but a copy shipping now should send
 # people to the one that describes what it actually does.
