@@ -306,4 +306,7 @@
     <string name="error_report_body_export">应用无法用你选中的标签生成包，也说不出原因——用同样的标签重试没有用。\n\n没有发送任何东西，这台手机上也没有任何改变。你的标签都还在。</string>
     <string name="imported_from_x">最近一次导入自 %1$s</string>
     <string name="imported_from_nothing">没有从文件导入的标签</string>
+    <string name="refresh_from_account">从 Apple 账户刷新</string>
+    <string name="refresh_from_account_done">已与你的 Apple 账户同步</string>
+    <string name="refresh_from_account_failed">此刻无法连接你的 Apple 账户。标签没有变化。</string>
 </resources>

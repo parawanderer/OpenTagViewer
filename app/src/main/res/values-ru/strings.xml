@@ -306,4 +306,7 @@
     <string name="error_report_body_export">Приложение не смогло собрать пакет из выбранных меток и не может сказать почему, — повторная попытка с теми же метками не поможет.\n\nНичего не отправлено, и на телефоне ничего не изменилось. Ваши метки на месте.</string>
     <string name="imported_from_x">Последний импорт из %1$s</string>
     <string name="imported_from_nothing">Метки из файла не импортировались</string>
+    <string name="refresh_from_account">Обновить из учётной записи Apple</string>
+    <string name="refresh_from_account_done">Данные соответствуют учётной записи Apple</string>
+    <string name="refresh_from_account_failed">Сейчас не удалось связаться с учётной записью Apple. Метки не изменились.</string>
 </resources>

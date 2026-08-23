@@ -46,6 +46,9 @@ import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.ui.login.SignInAgain;
+import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
+import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.util.TagOrder;
@@ -612,11 +615,20 @@ public class MyDevicesListActivity extends AppCompatActivity {
         menu.getMenu().findItem(R.id.action_fetch_from_account)
                 .setVisible(!Boolean.TRUE.equals(this.accountIsLinked));
 
+        // The mirror of the item above: one of the two is what somebody wants, never both. Link
+        // while it is not linked, refresh once it is.
+        menu.getMenu().findItem(R.id.action_refresh_from_account)
+                .setVisible(Boolean.TRUE.equals(this.accountIsLinked));
+
         menu.setOnMenuItemClickListener(item -> {
             final int id = item.getItemId();
 
             if (id == R.id.action_fetch_from_account) {
                 this.openTheAccountFetch();
+                return true;
+            }
+            if (id == R.id.action_refresh_from_account) {
+                this.refreshFromTheAccount();
                 return true;
             }
             if (id == R.id.action_import_from_file) {
@@ -627,6 +639,53 @@ public class MyDevicesListActivity extends AppCompatActivity {
         });
 
         menu.show();
+    }
+
+    /**
+     * Read the account now, because somebody asked.
+     *
+     * <p><b>Asked for, so it answers - which is what separates it from the automatic reads.</b>
+     * The periodic and on-resume reads are silent by design: nobody requested them, so there is
+     * nothing to report and a screen appearing out of a background job is its own bug. This one
+     * has a person watching it, and a tap that does nothing visible is indistinguishable from a
+     * broken button.
+     *
+     * <p>So a refused sign-in sends them to sign in again here, where the same failure in the
+     * background only writes a log line. See AGENTS.md rule 15 - the line is who asked.
+     */
+    private void refreshFromTheAccount() {
+        var async = new AccountRefresher(
+                new KeychainMembershipRepository(
+                        UserAuthDataStore.getInstance(this.getApplicationContext()),
+                        new AppCryptographyUtil()),
+                this.beaconRepo)
+                .refresh()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        held -> {
+                            Log.i(TAG, "Read " + held.size() + " tag(s) from the account");
+                            // **Rebuilt rather than appended to**, the same way an iCloud
+                            // import result is. This screen accumulates into `beaconInfo` on
+                            // load, so re-reading without a rebuild lists everything twice - and
+                            // a renamed tag only shows its new name because the rows underneath
+                            // were rewritten.
+                            this.devicesListChanged = true;
+                            this.recreate();
+                            Toast.makeText(this, R.string.refresh_from_account_done,
+                                    LENGTH_LONG).show();
+                        },
+                        error -> {
+                            if (ICloudFailures.meansSignInAgain(error)) {
+                                Log.w(TAG, "Apple refused the stored credentials during a"
+                                        + " refresh the user asked for", error);
+                                SignInAgain.from(this);
+                                return;
+                            }
+
+                            Log.w(TAG, "Could not refresh from the account", error);
+                            Toast.makeText(this, R.string.refresh_from_account_failed,
+                                    LENGTH_LONG).show();
+                        });
     }
 
     private void rememberWhetherTheAccountIsLinked() {
