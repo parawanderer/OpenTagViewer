@@ -19,6 +19,7 @@ import re
 import pytest
 
 import main
+from findmy.keys import KeyPairType
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 BEACON_PLISTS = sorted(RESOURCES.glob("*/OwnedBeacons/*.plist"))
@@ -203,6 +204,114 @@ def test_current_mac_addresses_returns_none_on_garbage():
 def test_current_mac_addresses_refuses_an_unknown_accessory_type():
     assert main.currentMacAddresses(
         json.dumps({"type": "something_from_the_future"})) is None
+
+
+# --------------------------------------------------------------------------
+# recordAccessorySeen
+#
+# What keeps a wide currentMacAddresses margin from being paid for on every scan: a match
+# against a *primary* key realigns the stored index, in either direction. A secondary key's
+# index is only a lower bound and must not be trusted the same way.
+# --------------------------------------------------------------------------
+
+_ALIGNMENT_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def _paired_accessory(alignment_index: int) -> dict:
+    """A `FindMyAccessory` mapping with fixed, deterministic key material.
+
+    Real master/session keys, so the derived MACs below are the actual ones a scan would see -
+    not a fake fixture standing in for them. Alignment is planted away from index 0 so a
+    correction has somewhere to move both above and below.
+    """
+    from findmy import FindMyAccessory
+
+    accessory = FindMyAccessory(
+        master_key=b"\x11" * 28,
+        skn=b"\x22" * 32,
+        sks=b"\x33" * 32,
+        paired_at=_ALIGNMENT_DATE,
+        name="Test tag",
+        alignment_date=_ALIGNMENT_DATE,
+        alignment_index=alignment_index,
+    )
+    return accessory.to_json()
+
+
+def _mac_at(accessoryJson: dict, index: int, key_type) -> str:
+    from findmy import FindMyAccessory
+
+    accessory = FindMyAccessory.from_json(accessoryJson)
+    for key in accessory.keys_at(index):
+        if key.key_type == key_type:
+            return key.mac_address
+    raise AssertionError(f"no {key_type} key at index {index}")
+
+
+def _ms(dt: datetime) -> int:
+    return int(dt.timestamp() * 1000)
+
+
+def test_recordAccessorySeen_realigns_downward_from_a_primary_match():
+    """The case the whole feature exists for: alignment drifted ahead of the truth."""
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850  # inside the 12h margin, below the stored (wrong) alignment
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    assert corrected is not None
+    parsed = json.loads(corrected)
+    assert parsed["alignment_index"] == true_index
+    assert parsed["alignment_date"] == _ALIGNMENT_DATE.isoformat()
+
+
+def test_recordAccessorySeen_realigns_upward_from_a_primary_match():
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2910  # inside the 12h margin, above the stored alignment
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    assert corrected is not None
+    assert json.loads(corrected)["alignment_index"] == true_index
+
+
+def test_recordAccessorySeen_is_a_noop_when_already_aligned():
+    """The common case, once alignment has healed: no write on every sighting thereafter."""
+    stored = _paired_accessory(alignment_index=2880)
+    mac = _mac_at(stored, 2880, KeyPairType.PRIMARY)
+
+    assert main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_ignores_a_secondary_match():
+    """A secondary key is shared by 96 primary indices - realigning to its first match could
+    move alignment in the wrong direction entirely, so only a primary match may correct it."""
+    stored = _paired_accessory(alignment_index=2880)
+    mac = _mac_at(stored, 2850, KeyPairType.SECONDARY)
+
+    assert main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_returns_none_for_an_unmatched_address():
+    stored = _paired_accessory(alignment_index=2880)
+
+    assert main.recordAccessorySeen(
+        json.dumps(stored), "00:00:00:00:00:00", _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_ignores_a_self_generated_tag():
+    """A fixed key set never rotates - update_alignment is a no-op for it too - so there is no
+    drift here for this to fix."""
+    macs = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert main.recordAccessorySeen(
+        json.dumps(_CUSTOM_ACCESSORY), next(iter(macs)), _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_returns_none_on_garbage():
+    assert main.recordAccessorySeen("not an accessory at all", "00:00:00:00:00:00", 0) is None
 
 
 def test_convertPlistToJson_returns_none_on_garbage():

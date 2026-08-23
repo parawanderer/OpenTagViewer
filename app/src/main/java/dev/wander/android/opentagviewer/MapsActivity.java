@@ -1460,12 +1460,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void keepWhatTheSightingProved(
             final String beaconId, final BleSoundTriggerUpdate update) {
         if (update.getPhase() != BleSoundTriggerPhase.DONE
-                || update.getResult().getMatchedKeyIndex() == null) {
+                || update.getResult().getMatchedMac() == null) {
             return;
         }
         this.beaconRepo.recordAccessorySighting(
                         beaconId,
-                        update.getResult().getMatchedKeyIndex(),
+                        update.getResult().getMatchedMac(),
                         System.currentTimeMillis())
                 .subscribe(() -> { }, error ->
                         Log.d(TAG, "Could not keep the alignment from a sighting", error));

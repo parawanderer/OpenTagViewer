@@ -10,6 +10,7 @@ import NSKeyedUnArchiver
 
 from findmy import FindMyAccessory, MobileMeDelegateError
 from findmy.accessory import FixedRollingKeyPairAccessory
+from findmy.keys import KeyPairType
 from findmy.reports import (
     RemoteAnisetteProvider,
     AppleAccount,
@@ -1061,30 +1062,72 @@ def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
         return None
 
 
-def recordAccessorySeen(
-        accessoryJson: str, keyIndex: int, seenAtUnixMs: int) -> str | None:
+def recordAccessorySeen(accessoryJson: str, mac: str, seenAtUnixMs: int) -> str | None:
     """
-    Tell an accessory it was seen advertising at `keyIndex`, and hand back its new state.
+    Tell an accessory it was seen advertising as `mac`, and hand back its new state.
 
-    **This is what stops the margin above being paid for twice.** A BLE sighting is an
-    observation of exactly the same kind a decrypted location report is, and
-    `update_alignment` is how FindMy.py is told about either. Without this the twelve-hour
+    **This is what stops the margin above being paid for twice.** A BLE sighting is worth
+    realigning to, the same as a decrypted location report is. Without this the twelve-hour
     range is re-derived on every scan; with it, the call after a hit collapses to the three
     keys of a single index.
 
-    The index for a *secondary* key is a lower bound - one covers 96 primary indices - which is
-    safe to pass on regardless, because `update_alignment` ignores anything below the alignment
-    it already holds.
+    **Takes the address rather than the index `currentMacAddresses` returned for it, and that
+    difference is load-bearing.** That index is only trustworthy when the address came from a
+    *primary* key: a primary index is unique, one key per index, so a match against it proves
+    the true index outright. A secondary key covers 96 consecutive primary indices - see
+    `_AccessoryKeyGenerator._secondary_keys_at` - so its index is only the first one the search
+    happened to reach, not the true one. Fed to `update_alignment` without checking, that index
+    can ratchet alignment past the true index in the wrong direction - measured on a real
+    accessory that drifted 114 indices (28.5 hours) ahead this way and then needed a multi-day
+    margin just to be found at all. The fix has to happen here rather than by filtering the map
+    `currentMacAddresses` returns, because an address derived from a secondary key is still
+    worth *scanning for* - only not worth *aligning to*.
+
+    **Does not go through `update_alignment`, and that is also deliberate.** It only ever moves
+    forward - correct for a fetch, where every index it sees came from searching ahead of where
+    alignment already believes it is, so "never seen a lower one" is a safe rule there. A BLE
+    match is not built that way: it comes from a wide, symmetric window, so a primary match can
+    legitimately land below the stored alignment - proof that alignment had already drifted too
+    far ahead, from an earlier secondary-key mistake or otherwise. Refusing to correct downward
+    would leave that drift permanent, which is the whole failure this function exists to undo.
+    So a primary match's index is written to the accessory's serialized state directly, in
+    either direction.
+
+    So this re-derives the key at `mac` itself, from scratch, and only accepts a match through
+    its primary key. A secondary-only match, or no match at all (the candidate set may have
+    moved on since the scan that found `mac`), records nothing.
 
     Returns the re-serialized accessory for Java to write back to `OwnedBeacon.accessory_json`,
     the same field and the same reason as `getLastReports`' `updatedAccessoryJson`. None on
-    failure, because a sighting that cannot be recorded is not worth failing a sound over.
+    failure or on nothing worth recording, because a sighting that cannot be recorded is not
+    worth failing a sound over.
     """
     try:
         accessory = accessoryFromJson(accessoryJson)
-        accessory.update_alignment(
-            datetime.fromtimestamp(seenAtUnixMs / 1000, tz=timezone.utc), keyIndex)
-        return json.dumps(accessory.to_json())
+        if not isinstance(accessory, FindMyAccessory):
+            # A self-generated accessory's keys don't rotate (update_alignment is a no-op for
+            # it) - there is no drift here for this to fix.
+            return None
+
+        seen_at = datetime.fromtimestamp(seenAtUnixMs / 1000, tz=timezone.utc)
+        mac = mac.upper()
+
+        matched_index = None
+        for key, index in accessory.current_keys(seen_at, margin=_MAC_CANDIDATE_MARGIN).items():
+            if key.key_type == KeyPairType.PRIMARY and key.mac_address == mac:
+                matched_index = index
+                break
+
+        if matched_index is None:
+            return None
+
+        mapping = json.loads(accessoryJson)
+        if mapping.get("alignment_index") == matched_index:
+            return None
+
+        mapping["alignment_index"] = matched_index
+        mapping["alignment_date"] = seen_at.isoformat()
+        return json.dumps(mapping)
     except Exception:
         print(f"recordAccessorySeen failed: {traceback.format_exc()}")
         return None

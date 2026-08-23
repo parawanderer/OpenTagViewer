@@ -49,7 +49,7 @@ public class BleAccessorySoundTriggerTest {
     private static final class FakeResolver implements AccessoryMacResolver {
         private final Map<String, Integer> candidates;
         private final AtomicInteger resolveCalls = new AtomicInteger();
-        private final List<Integer> sightings = new ArrayList<>();
+        private final List<String> sightings = new ArrayList<>();
 
         private FakeResolver(final Map<String, Integer> candidates) {
             this.candidates = candidates;
@@ -63,8 +63,8 @@ public class BleAccessorySoundTriggerTest {
 
         @Override
         public String recordSeen(
-                final String accessoryJson, final int keyIndex, final long seenAtUnixMs) {
-            this.sightings.add(keyIndex);
+                final String accessoryJson, final String mac, final long seenAtUnixMs) {
+            this.sightings.add(mac);
             return "{\"aligned\":true}";
         }
     }
@@ -148,21 +148,20 @@ public class BleAccessorySoundTriggerTest {
     }
 
     /**
-     * <b>A match reports the key index it matched at.</b>
+     * <b>A match reports the address that answered, not the index it was resolved with.</b>
      *
-     * <p>Which is the whole reason the resolver returns a map. The candidate set is derived with
-     * a twelve-hour margin either side of the believed alignment, and without feeding a hit back
-     * that range is re-derived on every scan - about a hundred keys where three would do, on
-     * every cycle of a continuous ping. The caller persists it; this only has to report it.
+     * <p>Only Python can tell a primary key's index from a secondary key's - see
+     * {@link AccessoryMacResolver#recordSeen} - so this package reports the raw address and
+     * leaves that judgment to the caller's next call across the bridge.
      */
     @Test
-    public void asuccessfulMatchReportsWhichKeyIndexAnswered() throws InterruptedException {
+    public void aSuccessfulMatchReportsWhichMacAnswered() throws InterruptedException {
         final String anotherMac = "11:22:33:44:55:66";
 
         final BleAccessorySoundTrigger<String> trigger = new BleAccessorySoundTrigger<>(
                 resolverReturning(List.of(A_MAC, anotherMac)),
                 context -> true,
-                // The *second* candidate answers, so a hardcoded first index cannot pass.
+                // The *second* candidate answers, so a hardcoded first address cannot pass.
                 (context, macs, timeout) -> Single.just(anotherMac),
                 (context, device) -> Observable.just(doneUpdate(BleSoundTriggerStatus.SUCCESS)),
                 s -> s,
@@ -172,16 +171,16 @@ public class BleAccessorySoundTriggerTest {
 
         final BleSoundTriggerUpdate done = items.get(items.size() - 1);
         assertEquals(BleSoundTriggerStatus.SUCCESS, done.getResult().getStatus());
-        assertEquals("the index of the candidate that actually answered",
-                Integer.valueOf(A_KEY_INDEX + 1), done.getResult().getMatchedKeyIndex());
+        assertEquals("the address of the candidate that actually answered",
+                anotherMac, done.getResult().getMatchedMac());
     }
 
     /**
      * <b>And it reports it even when the sound then failed.</b>
      *
      * <p>The tag was there - that is what the scan proved, and it stays true whether or not the
-     * GATT exchange worked. Dropping the index on failure would mean the case most likely to be
-     * retried is also the one that keeps paying for the wide search.
+     * GATT exchange worked. Dropping the address on failure would mean the case most likely to
+     * be retried is also the one that keeps paying for the wide search.
      */
     @Test
     public void afailedTriggerStillReportsThatTheTagWasSeen() throws InterruptedException {
@@ -198,12 +197,12 @@ public class BleAccessorySoundTriggerTest {
 
         final BleSoundTriggerUpdate done = items.get(items.size() - 1);
         assertEquals(BleSoundTriggerStatus.NO_SOUND_SERVICE, done.getResult().getStatus());
-        assertEquals(Integer.valueOf(A_KEY_INDEX), done.getResult().getMatchedKeyIndex());
+        assertEquals(A_MAC, done.getResult().getMatchedMac());
     }
 
     /** Nothing found means nothing to report - there is no sighting to record. */
     @Test
-    public void anunfoundTagReportsNoKeyIndex() throws InterruptedException {
+    public void anUnfoundTagReportsNoMac() throws InterruptedException {
         final BleAccessorySoundTrigger<String> trigger = new BleAccessorySoundTrigger<>(
                 resolverReturning(List.of(A_MAC)),
                 context -> true,
@@ -217,7 +216,7 @@ public class BleAccessorySoundTriggerTest {
 
         final BleSoundTriggerUpdate done = items.get(items.size() - 1);
         assertEquals(BleSoundTriggerStatus.NOT_NEARBY, done.getResult().getStatus());
-        assertNull(done.getResult().getMatchedKeyIndex());
+        assertNull(done.getResult().getMatchedMac());
     }
 
     @Test

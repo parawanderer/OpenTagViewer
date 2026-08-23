@@ -544,7 +544,7 @@ public class BeaconRepository {
      * successful ring into an error toast.
      */
     public Completable recordAccessorySighting(
-            final String beaconId, final int keyIndex, final long seenAtUnixMs) {
+            final String beaconId, final String mac, final long seenAtUnixMs) {
         return Completable.fromRunnable(() -> {
             final var dao = db.ownedBeaconDao();
             final OwnedBeacon row = dao.getById(beaconId);
@@ -555,16 +555,16 @@ public class BeaconRepository {
             }
 
             final String updated = AppDependencies.accessoryMacResolver()
-                    .recordSeen(row.accessoryJson, keyIndex, seenAtUnixMs);
+                    .recordSeen(row.accessoryJson, mac, seenAtUnixMs);
 
             if (updated == null) {
-                Log.d(TAG, "Could not record the sighting for beaconId=" + beaconId);
+                // Also the ordinary outcome of a secondary-key-only match, not just a failure -
+                // see AccessoryMacResolver#recordSeen. Nothing to log as a problem here.
                 return;
             }
 
             dao.updateAccessoryJson(beaconId, updated);
-            Log.d(TAG, "Aligned beaconId=" + beaconId + " to key index " + keyIndex
-                    + " from a Bluetooth sighting");
+            Log.d(TAG, "Aligned beaconId=" + beaconId + " from a Bluetooth sighting");
         }).subscribeOn(Schedulers.io());
     }
 
