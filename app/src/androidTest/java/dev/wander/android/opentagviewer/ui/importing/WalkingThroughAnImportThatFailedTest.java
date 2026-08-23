@@ -226,22 +226,32 @@ public class WalkingThroughAnImportThatFailedTest {
         // it is also the thing actually being claimed.
         host.onActivity(activity -> dialog[0] = ImportedButNotLocatedDialog.show(
                 activity, A_FETCH_CAUSE, settingsOpened::incrementAndGet));
-        Eventually.check(() -> assertTrue("the dialog never appeared", dialog[0].isShowing()));
 
-        // perform, not a bare pressBack: if the dialog has not taken focus yet the key reaches
-        // the activity instead and finishes it, and Espresso reports NoActivityResumedException
-        // from the same call that would have worked a moment later.
+        // **Focus, not isShowing().** `show()` makes isShowing() true immediately, before the
+        // dialog's window has taken focus - and a back press in that gap goes to the activity,
+        // finishes it, and throws NoActivityResumedException from the very call that would have
+        // worked a moment later. Waiting on isShowing() looked like the right guard and is not;
+        // it passed locally for hours and failed in CI, which is slower and loses the race more
+        // often.
+        Eventually.check(() -> assertTrue("the dialog never took focus", hasFocus(dialog[0])));
+
         Eventually.perform("back", () -> !dialog[0].isShowing(), Espresso::pressBack);
 
         host.onActivity(activity -> dialog[0] = ImportedButNotLocatedDialog.show(
                 activity, A_FETCH_CAUSE, settingsOpened::incrementAndGet));
-        Eventually.check(() -> assertTrue("the dialog never reappeared", dialog[0].isShowing()));
+        Eventually.check(() -> assertTrue("the dialog never reappeared", hasFocus(dialog[0])));
 
         onView(withText(context.getString(R.string.ok))).inRoot(isDialog()).perform(click());
         Eventually.check(() -> assertFalse("OK did not dismiss the dialog",
                 dialog[0].isShowing()));
 
         assertEquals("dismissing must not open settings", 0, settingsOpened.get());
+    }
+
+    /** Whether the dialog's own window is the one that would receive a key press. */
+    private static boolean hasFocus(final AlertDialog dialog) {
+        return dialog.getWindow() != null
+                && dialog.getWindow().getDecorView().hasWindowFocus();
     }
 
     /**
