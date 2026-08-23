@@ -333,4 +333,6 @@
     <string name="battery_short_low">부족</string>
     <string name="battery_short_very_low">위험</string>
     <string name="battery">배터리</string>
+    <string name="nearby_now_with_battery_and_signal">근처에 있음 (%2$s) · 배터리 %1$s</string>
+    <string name="live_battery_with_signal">%1$s · 신호 %2$s</string>
 </resources>
