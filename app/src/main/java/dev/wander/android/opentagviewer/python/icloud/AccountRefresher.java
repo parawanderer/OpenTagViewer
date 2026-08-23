@@ -95,18 +95,19 @@ public final class AccountRefresher {
                 ? ((ICloudException) error).getFailure() : ICloudFailure.UNKNOWN;
 
         if (ICloudFailures.meansSignInAgain(error)) {
-            // **Said once, loudly, rather than every six hours quietly.** Apple refused the
-            // stored password, so nothing here will ever succeed again until it is replaced -
-            // and this read is silent by design, which means without this the tag list simply
-            // stops matching Find My and nobody is ever told.
+            // **Reported, not decided.** Apple refused the stored password, so nothing here will
+            // ever succeed again until it is replaced - and what to do about that depends
+            // entirely on who asked. A refresh somebody pressed should send them to sign in; the
+            // six-hourly one should write a line and touch nothing. This class cannot tell those
+            // apart, and the first version of it swallowed the failure into an empty list, which
+            // made the difference impossible for the caller to act on: the manual refresh looked
+            // like a successful read of nothing.
             //
-            // Not acted on here, though: this runs in the background with no screen of its own,
-            // and clearing somebody's session out from under whatever they are doing is worse
-            // than waiting for the next thing that needs it. The screens that use the account
-            // recognise the same failure and offer to sign in again.
-            Log.w(TAG, "Apple refused the stored credentials. The account cannot be re-read"
-                    + " until the user signs in again; their stored tags are untouched.", error);
-            return Observable.just(List.of());
+            // So it goes up. See AGENTS.md rule 14 - the line is who asked, and only the caller
+            // knows.
+            Log.w(TAG, "Apple refused the stored credentials; the account cannot be re-read"
+                    + " until the user signs in again. Their stored tags are untouched.", error);
+            return Observable.error(error);
         }
 
         if (failure != ICloudFailure.MEMBERSHIP_UNUSABLE) {

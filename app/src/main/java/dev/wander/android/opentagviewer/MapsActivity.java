@@ -100,6 +100,7 @@ import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.LogRedactor;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
@@ -638,7 +639,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         held -> Log.i(TAG, "Background account read holds " + held.size() + " tags"),
-                        error -> Log.w(TAG, "Background account read failed", error));
+                        error -> {
+                            // **Logged and nothing else, even for a refused sign-in.** Nobody
+                            // asked for this read, so nothing may appear because of it - being
+                            // thrown onto a login screen the moment the app opens, before the
+                            // map has drawn and while locations may still be fetching perfectly
+                            // well, is its own bug. The screens somebody presses handle it.
+                            if (ICloudFailures.meansSignInAgain(error)) {
+                                Log.w(TAG, "The account cannot be re-read until the user signs"
+                                        + " in again; nothing is being changed from here", error);
+                                return;
+                            }
+                            Log.w(TAG, "Background account read failed", error);
+                        });
     }
 
     private void rememberWhetherAnAccountIsLinked() {
