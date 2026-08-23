@@ -230,10 +230,27 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * also decrypts every record on the account and queues behind the location fetches, so doing
      * it eagerly costs the user's own work rather than just bandwidth.
      */
-    private static final long WAIT_BEFORE_REREADING_ACCOUNT = 6L * 60 * 60 * 1000;
+    /**
+     * How often a running app re-reads the account.
+     *
+     * <p><b>Six hours, until somebody pointed out what that looks like.</b> An iPad picks up a
+     * renamed AirTag in seconds; this app showed the old name for the rest of the afternoon. The
+     * read is a CloudKit query for the account's accessories - and the location fetch beside it
+     * runs every <i>minute</i>, so four of these an hour is not the expensive thing here.
+     */
+    private static final long WAIT_BEFORE_REREADING_ACCOUNT = 15L * 60 * 1000;
 
-    private final AccountReadPolicy accountReadPolicy =
-            new AccountReadPolicy(WAIT_BEFORE_REREADING_ACCOUNT);
+    /**
+     * And the floor for the read on resume, which is the one that makes it feel immediate.
+     *
+     * <p>The moment a stale name is noticed is the moment the app is opened. Short enough that
+     * opening it after a rename shows the new one; long enough that flicking between two apps
+     * does not spend a Python call each time.
+     */
+    private static final long WAIT_BEFORE_REREADING_ON_RESUME = 60L * 1000;
+
+    private final AccountReadPolicy accountReadPolicy = new AccountReadPolicy(
+            WAIT_BEFORE_REREADING_ACCOUNT, WAIT_BEFORE_REREADING_ON_RESUME);
 
     /**
      * Whether an Apple account is linked, as of the last time this screen resumed.
@@ -529,6 +546,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.rememberWhetherAnAccountIsLinked();
         this.refreshIfAllowed();
+        // **The account too, not only the locations.** Resuming already refetched where the tags
+        // are and never asked what the tags *were* - so a tag renamed elsewhere kept its old name
+        // on this screen until the periodic read came round.
+        this.rereadTheAccountIfAllowed(true);
         this.reSchedulePeriodicTagLocationRefresher();
         
         // 调用高德地图的生命周期方法
@@ -555,7 +576,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.nextLocationRefreshTask = () -> {
             refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
             this.refreshIfAllowed();
-            this.rereadTheAccountIfAllowed();
+            this.rereadTheAccountIfAllowed(false);
         };
         refreshSchedulerHandler.postDelayed(this.nextLocationRefreshTask, WAIT_BEFORE_REFETCH);
     }
@@ -590,11 +611,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * <p>The device list is only rebuilt when something actually changed, because rebuilding it
      * moves rows under whoever is reading them.
      */
-    private void rereadTheAccountIfAllowed() {
+    private void rereadTheAccountIfAllowed(final boolean justResumed) {
         final long now = System.currentTimeMillis();
 
-        final AccountReadPolicy.Decision decision = this.accountReadPolicy.decide(
-                now, this.accountIsLinked, PythonAppleService.isBusy());
+        final AccountReadPolicy.Decision decision = justResumed
+                ? this.accountReadPolicy.decideOnResume(
+                        now, this.accountIsLinked, PythonAppleService.isBusy())
+                : this.accountReadPolicy.decide(
+                        now, this.accountIsLinked, PythonAppleService.isBusy());
 
         if (!decision.shouldRead()) {
             return;

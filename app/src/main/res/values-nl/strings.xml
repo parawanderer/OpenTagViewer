@@ -306,4 +306,7 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="error_report_body_export">De app kon van de gekozen tags geen bundel maken en kan niet zeggen waarom — het opnieuw proberen met dezelfde tags helpt dus niet.\n\nEr is niets verstuurd en er is niets veranderd op deze telefoon. Je tags staan er nog.</string>
     <string name="imported_from_x">Laatst geïmporteerd uit %1$s</string>
     <string name="imported_from_nothing">Geen tags uit een bestand geïmporteerd</string>
+    <string name="refresh_from_account">Vernieuwen vanaf Apple-account</string>
+    <string name="refresh_from_account_done">Bijgewerkt met je Apple-account</string>
+    <string name="refresh_from_account_failed">Je Apple-account was even niet bereikbaar. Je tags zijn ongewijzigd.</string>
 </resources>

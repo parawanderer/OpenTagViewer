@@ -306,4 +306,7 @@
     <string name="error_report_body_export">選んだタグからバンドルを作成できず、その理由も判別できませんでした。同じタグで再試行しても解決しません。\n\n何も送信されておらず、この端末側も変わっていません。タグはそのまま残っています。</string>
     <string name="imported_from_x">直近の取得元：%1$s</string>
     <string name="imported_from_nothing">ファイルから取得したタグはありません</string>
+    <string name="refresh_from_account">Apple アカウントから更新</string>
+    <string name="refresh_from_account_done">Apple アカウントと同じ状態になりました</string>
+    <string name="refresh_from_account_failed">いま Apple アカウントに接続できませんでした。タグはそのままです。</string>
 </resources>

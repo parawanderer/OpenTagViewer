@@ -306,4 +306,7 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="error_report_body_export">Die App konnte aus den gewählten Tags kein Bundle erstellen und kann nicht sagen, warum – ein erneuter Versuch mit denselben Tags hilft also nicht.\n\nEs wurde nichts verschickt und auf diesem Telefon hat sich nichts geändert. Deine Tags sind weiterhin da.</string>
     <string name="imported_from_x">Zuletzt importiert aus %1$s</string>
     <string name="imported_from_nothing">Keine Tags aus einer Datei importiert</string>
+    <string name="refresh_from_account">Vom Apple-Konto aktualisieren</string>
+    <string name="refresh_from_account_done">Auf dem Stand deines Apple-Kontos</string>
+    <string name="refresh_from_account_failed">Dein Apple-Konto war gerade nicht erreichbar. An deinen Tags hat sich nichts geändert.</string>
 </resources>

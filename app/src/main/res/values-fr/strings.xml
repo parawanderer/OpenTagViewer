@@ -306,4 +306,7 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="error_report_body_export">L’app n’a pas pu créer d’archive à partir des tags choisis et ne sait pas dire pourquoi : réessayer avec les mêmes tags n’y changera rien.\n\nRien n’a été envoyé et rien n’a changé sur ce téléphone. Vos tags sont toujours là.</string>
     <string name="imported_from_x">Dernier import depuis %1$s</string>
     <string name="imported_from_nothing">Aucun tag importé depuis un fichier</string>
+    <string name="refresh_from_account">Actualiser depuis le compte Apple</string>
+    <string name="refresh_from_account_done">À jour avec votre compte Apple</string>
+    <string name="refresh_from_account_failed">Impossible de joindre votre compte Apple pour le moment. Vos tags sont inchangés.</string>
 </resources>

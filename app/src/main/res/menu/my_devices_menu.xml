@@ -28,6 +28,16 @@
         android:id="@+id/action_fetch_from_account"
         android:title="@string/icloud_link_account_action" />
 
+    <!--
+        **The other half of the same row, and the one shown once linking is done.** The comment
+        above says re-reading on demand lives in Settings; it does, behind a button that opens the
+        whole iCloud flow. That is a lot of screen for "did the name I just changed arrive", and
+        this is the list where somebody would notice it had not.
+    -->
+    <item
+        android:id="@+id/action_refresh_from_account"
+        android:title="@string/refresh_from_account" />
+
     <item
         android:id="@+id/action_import_from_file"
         android:title="@string/icloud_import_from_file" />

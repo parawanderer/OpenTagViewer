@@ -306,4 +306,7 @@
     <string name="error_report_body_export">App 無法用你選取的標籤產生包，也說不出原因——用同樣的標籤重試沒有用。\n\n沒有傳送任何東西，這支手機上也沒有任何改變。你的標籤都還在。</string>
     <string name="imported_from_x">最近一次匯入自 %1$s</string>
     <string name="imported_from_nothing">沒有從檔案匯入的標籤</string>
+    <string name="refresh_from_account">從 Apple 帳戶重新整理</string>
+    <string name="refresh_from_account_done">已與你的 Apple 帳戶同步</string>
+    <string name="refresh_from_account_failed">此刻無法連線到你的 Apple 帳戶。標籤沒有變化。</string>
 </resources>

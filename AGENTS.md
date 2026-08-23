@@ -344,6 +344,46 @@ python -m venv .venv && .venv/bin/pip install -r app/src/test/python/requirement
 The same applies to every other shared dependency, not just FindMy.py: `PyYAML` is pinned in
 `app/build.gradle.kts` and `python/pyproject.toml` for exactly this reason.
 
+### 15. Every call to iCloud has to answer "is this session dead?"
+
+A failed call to Apple is one of two things, and they need opposite screens. Most are weather -
+a timeout, a bad afternoon at iCloud - and the answer is to try again later. **A refused sign-in
+is permanent**, and the only remedy is one the user has to perform.
+
+Getting it the wrong way round is not cosmetic. The retry screen for a dead session invites an
+action that fails identically every time and explains nothing; a forced sign-out for a transient
+failure costs somebody a working session for nothing.
+
+**So anything that reaches the account handles it, and through the shared decision rather than
+its own.** `ICloudFailures.meansSignInAgain(error)` is the question; `SignInAgain.from(activity)`
+is the answer. Three screens had written the judgement separately, and all three had it
+differently — the iCloud list said retry, a failed rename said "renaming failed" so people tried
+a shorter name, and the six-hourly account read logged a warning and carried on for another six
+hours.
+
+**Classify in `icloud_bridge._unexpected`, not at the call site.** Every method on that class
+ends in the same `except Exception`, and there are eight of them; naming a failure at one leaves
+the other seven reporting `UNKNOWN`, which is the retry screen again. Classifying centrally also
+covers whatever gets added next.
+
+**A 401 does not arrive as one type.** Apple refusing the password is
+`InvalidCredentialsError`; a session restored *without* a password raises a bare
+`ValueError("No username or password specified")` several frames earlier, before anything is
+sent. Both mean the same thing to a user. `UnauthorizedError` does **not** join them: `request_pet`
+raises it when a second factor is being demanded — which the app answers with a code, not a
+sign-out — while CloudKit raises the same type for a genuine 401. Same class, opposite remedies.
+
+**And the line is who asked.** A user-initiated call — opening the iCloud list, renaming a tag,
+pressing refresh — sends them to sign in again, because they are watching and a silent no-op is
+worse than a screen. An automatic one — the periodic read, a read on resume — says so in the log
+and touches nothing: deleting somebody's session out from under whatever they are doing, from a
+job nobody asked for, is its own bug.
+
+Every one of these is tested twice: `WhichFailuresNeedAFreshSignInTest` on the JVM for the
+decision, `EveryPathAsksForAFreshSignInTest` on a device for each caller honouring it. A shared
+predicate does not stop a fourth screen being written that never asks.
+
+
 ---
 
 ## Building and testing
