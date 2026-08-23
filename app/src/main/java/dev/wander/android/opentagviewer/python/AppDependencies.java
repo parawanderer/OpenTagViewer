@@ -75,6 +75,16 @@ public final class AppDependencies {
     private static HardwareDescriber hardwareDescriber = new ChaquopyHardwareDescriber();
 
     /**
+     * Strips personal identifiers out of a log before it is offered to anybody.
+     *
+     * <p>Here for the usual reason and one sharper one: the screen that offers a log is the error
+     * page, which exists <i>because</i> something already broke. A test of it has to be able to
+     * produce a working redactor and one that cannot run, and the second is the case that decides
+     * whether an unredacted log can escape.
+     */
+    private static LogRedactor logRedactor = new ChaquopyLogRedactor();
+
+    /**
      * Turns coordinates into something a person recognises.
      *
      * <p><b>Here because a screen with no geocoder does not look broken.</b> The card falls back
@@ -149,6 +159,10 @@ public final class AppDependencies {
         return hardwareDescriber;
     }
 
+    public static LogRedactor logRedactor() {
+        return logRedactor;
+    }
+
     public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
         return serverTesterFactory.apply(engine);
     }
@@ -174,6 +188,11 @@ public final class AppDependencies {
     }
 
     @VisibleForTesting
+    public static void replaceLogRedactor(final LogRedactor replacement) {
+        logRedactor = replacement;
+    }
+
+    @VisibleForTesting
     public static void replaceAnisette(final Function<UserSettings, AnisetteSource> replacement) {
         anisetteFactory = (context, settings, hasSession) -> replacement.apply(settings);
     }
@@ -185,6 +204,7 @@ public final class AppDependencies {
         anisetteFactory = LocalAnisette::new;
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
+        logRedactor = new ChaquopyLogRedactor();
         icloudFactory = AppDependencies::openRealICloud;
         geocoderFactory = (context, locale) ->
                 AddressLookup.through(new Geocoder(context, locale));

@@ -275,4 +275,27 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="icloud_results_next">Volgende</string>
     <string name="icloud_registered_serial_label">Serienummer: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
+    <string name="imported_from_x">Tags geïmporteerd uit %1$s</string>
+    <string name="imported_from_nothing">Geen tags uit een bestand geïmporteerd</string>
+    <string name="error_report_title">Dit is een bug</string>
+    <string name="error_report_body">Er kwam iets terug dat deze app niet kan lezen, dus opnieuw proberen helpt niet en er valt niets aan je instellingen te wijzigen.\n\nMeestal betekent dat dat Apple iets heeft veranderd. Een melding met het logbestand erbij maakt het oplosbaar — het log zegt bijna altijd welk deel.</string>
+    <string name="error_report_button">Dit melden</string>
+    <string name="error_report_needs_github">Opent GitHub, waar je eerst moet inloggen of een account moet aanmaken.</string>
+    <string name="error_report_share_log">Log ophalen</string>
+    <string name="error_report_log_cleaned">Het log wordt opgeschoond voordat het de app verlaat: %1$s</string>
+    <string name="error_report_log_unavailable">Het log kan nu niet gedeeld worden, omdat het onderdeel dat persoonlijke gegevens eruit haalt niet draait. Melden zonder log helpt nog steeds.</string>
+    <string name="error_report_what_failed">Wat er misging</string>
+    <string name="error_report_body_import">De app kon dat bestand niet lezen en kan niet zeggen wat eraan mankeert — het opnieuw proberen met hetzelfde bestand helpt dus niet.\n\nAls het uit de exporter komt, had het moeten werken, en juist daarom is het het melden waard. Het log zegt meestal waar het is blijven steken.</string>
+    <string name="imported_but_not_located_title">Je tags zijn geïmporteerd</string>
+    <string name="imported_but_not_located_body">Ze staan op deze telefoon en blijven daar. Wat niet lukte, was Apple vragen waar ze zijn:\n\n%1$s\n\nDat ligt meestal aan de Anisette-server waar je aanmelding langs gaat: als een publieke server uit de lucht is, komen er geen locaties meer binnen terwijl de rest er normaal uitziet. Aanmeldgegevens op dit toestel maken scheelt de afhankelijkheid van andermans server.\n\nDe app blijft het elke minuut proberen, dus een korte storing lost zichzelf op.</string>
+    <string name="imported_but_not_located_open_settings">Aanmeldgegevens</string>
+    <string name="error_report_close">Sluiten</string>
+    <string name="error_report_log_how">Hoe wil je het log hebben?</string>
+    <string name="error_report_log_copy">Kopiëren, om in het rapport te plakken</string>
+    <string name="error_report_log_save">Opslaan als bestand, om bij te voegen</string>
+    <string name="error_report_log_copied">Het log is gekopieerd</string>
+    <string name="export_logs_cannot_be_cleaned">Het log kon niet worden opgeslagen, omdat het onderdeel van de app dat persoonlijke gegevens eruit haalt niet draait. Er is niets weggeschreven — een ongeschoond log is het niet waard om te delen.</string>
+    <string name="export_logs_cleaned">Log opgeslagen. Het is eerst geschoond: %1$s</string>
+    <string name="exported_with">Geëxporteerd met</string>
+    <string name="exported_with_something_unrecorded">Niet vastgelegd — een oudere exporter</string>
 </resources>
