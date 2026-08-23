@@ -22,11 +22,11 @@ public final class NearbyTagSightings {
     /**
      * How long a sighting is worth showing.
      *
-     * <p>A separated accessory advertises every second or two, but
-     * {@code SCAN_MODE_LOW_POWER} only listens in short windows a few seconds apart, so gaps of
-     * several seconds are normal for a tag sitting right next to the phone. This is generous
-     * enough to ride those out and short enough that a tag carried away stops claiming to be
-     * here within about half a minute.
+     * <p>A separated accessory advertises every second or two, but even
+     * {@code SCAN_MODE_BALANCED} - see {@code NearbyTagWatcher} - still duty-cycles rather than
+     * listening continuously, so gaps of a few seconds between sightings are normal for a tag
+     * sitting right next to the phone. This is generous enough to ride those out and short
+     * enough that a tag carried away stops claiming to be here within about half a minute.
      */
     static final long FRESH_FOR_MS = TimeUnit.SECONDS.toMillis(30);
 
