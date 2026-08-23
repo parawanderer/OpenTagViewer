@@ -294,6 +294,19 @@ def test_recordAccessorySeen_ignores_a_secondary_match():
     assert main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE)) is None
 
 
+def test_recordAccessorySeen_refuses_a_sighting_dated_before_the_stored_alignment():
+    """The backward-time guard update_alignment has, kept when bypassing it: a rolled-back
+    device clock must not persist a (past date, current index) pair - the index extrapolated
+    from that past date would overshoot once the clock corrects."""
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    an_hour_before_alignment = _ALIGNMENT_DATE - timedelta(hours=1)
+    assert main.recordAccessorySeen(
+        json.dumps(stored), mac, _ms(an_hour_before_alignment)) is None
+
+
 def test_recordAccessorySeen_returns_none_for_an_unmatched_address():
     stored = _paired_accessory(alignment_index=2880)
 

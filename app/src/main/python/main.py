@@ -1125,6 +1125,14 @@ def recordAccessorySeen(accessoryJson: str, mac: str, seenAtUnixMs: int) -> str 
         if mapping.get("alignment_index") == matched_index:
             return None
 
+        # Bypassing update_alignment for the downward index move must not also bypass its
+        # backward-time guard: a device clock rolled back (manual change, bad carrier time)
+        # would otherwise persist a (past date, current index) pair, and once the clock
+        # corrects, the index extrapolated from that past date overshoots the true one.
+        stored_date = mapping.get("alignment_date")
+        if stored_date is not None and seen_at < datetime.fromisoformat(stored_date):
+            return None
+
         mapping["alignment_index"] = matched_index
         mapping["alignment_date"] = seen_at.isoformat()
         return json.dumps(mapping)
