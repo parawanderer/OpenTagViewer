@@ -564,3 +564,31 @@ class TestWhereToReportSomethingUnfixable:
 
         assert cli.main([]) == 1
         assert GITHUB_ISSUES_LINK not in capsys.readouterr().err
+
+    def test_the_template_it_links_to_exists(self):
+        """
+        The link names a file in `.github/ISSUE_TEMPLATE/`, and a rename breaks it in silence.
+
+        GitHub does not error on an unknown `?template=`; it drops the reporter on a blank issue
+        with none of the questions and none of the labels. So the failure is a slightly worse bug
+        report, months later, and nothing anywhere says why.
+        """
+        name = GITHUB_ISSUES_LINK.partition("template=")[2]
+        assert name, "the issues link no longer names a template"
+
+        template = Path(__file__).resolve().parents[2] / ".github" / "ISSUE_TEMPLATE" / name
+        assert template.is_file(), f"{GITHUB_ISSUES_LINK} points at a template that is not there"
+
+    def test_the_template_carries_the_labels_itself(self):
+        # Rather than the URL carrying them. GitHub applies `?labels=` only for somebody with
+        # permission to label, which a person reporting a bug generally is not - so a URL that
+        # looks like it labels things would quietly not.
+        import yaml  # noqa: PLC0415 - only this test needs it
+
+        name = GITHUB_ISSUES_LINK.partition("template=")[2]
+        template = Path(__file__).resolve().parents[2] / ".github" / "ISSUE_TEMPLATE" / name
+        front = yaml.safe_load(template.read_text(encoding="utf-8"))
+
+        assert "bug" in front["labels"]
+        assert "@exporter-tool" in front["labels"]
+        assert "labels=" not in GITHUB_ISSUES_LINK
