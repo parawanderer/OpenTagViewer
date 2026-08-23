@@ -73,6 +73,8 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.HardwareDescriber;
 import dev.wander.android.opentagviewer.python.icloud.AccessoryRenamer;
+import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
+import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
@@ -466,6 +468,17 @@ public class DeviceInfoActivity extends AppCompatActivity {
                             redraw.run();
                         },
                         error -> {
+                            if (ICloudFailures.meansSignInAgain(error)) {
+                                // **The same wall as the iCloud list and the background read.**
+                                // A rename writes to the account, so a refused password stops it
+                                // for the same reason - and "renaming failed" would send somebody
+                                // to try a different name for a session that cannot write at all.
+                                Log.w(TAG, "Apple refused the stored credentials during a rename;"
+                                        + " asking for a fresh sign-in", error);
+                                SignInAgain.from(this);
+                                return;
+                            }
+
                             Log.e(TAG, "Could not rename " + this.beaconId + " in iCloud", error);
                             this.showRenameInProgress(false);
                             this.sayTheRenameDidNotHappen();
