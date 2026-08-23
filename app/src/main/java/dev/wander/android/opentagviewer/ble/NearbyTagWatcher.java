@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
@@ -13,6 +14,7 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
@@ -190,18 +193,62 @@ public class NearbyTagWatcher {
                 }
             };
 
-            scanner.startScan(null,
-                    new ScanSettings.Builder()
-                            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-                            .build(),
-                    callback);
+            // Filtered in hardware, not only in software. An unfiltered scan delivered every
+            // BLE frame of every device in earshot to the callback - tens per second in an
+            // ordinary flat, nearly all of them discarded by sightingFrom. The controller can
+            // do that discarding itself: Apple's company ID plus the offline-finding type byte
+            // is exactly the check FindMyAdvertisement.parse starts with, so nothing that would
+            // have matched is lost, and the callback now fires only for Find My frames.
+            final List<ScanFilter> findMyFramesOnly = List.of(new ScanFilter.Builder()
+                    .setManufacturerData(FindMyAdvertisement.APPLE_COMPANY_ID,
+                            new byte[]{FindMyAdvertisement.TYPE_OFFLINE_FINDING},
+                            new byte[]{(byte) 0xFF})
+                    .build());
+            final ScanSettings settings = new ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                    .build();
+
+            scanner.startScan(findMyFramesOnly, settings, callback);
+
+            // Restarted well before the platform's 30 minute mark: Android silently downgrades
+            // any scan running longer than that to SCAN_MODE_OPPORTUNISTIC, which only delivers
+            // results while some other app happens to be scanning - a screen left open for half
+            // an hour would go quietly deaf, the same presentation as every other failure this
+            // class has had to chase. One stop/start pair per 20 minutes is far inside the
+            // 5-starts-per-30-seconds budget.
+            final Disposable scanRefresh = Observable
+                    .interval(SCAN_RESTART_INTERVAL_MS, SCAN_RESTART_INTERVAL_MS,
+                            TimeUnit.MILLISECONDS, Schedulers.io())
+                    .subscribe(tick -> {
+                        try {
+                            scanner.stopScan(callback);
+                            scanner.startScan(findMyFramesOnly, settings, callback);
+                            Log.d(TAG, "Restarted the nearby scan before the platform's "
+                                    + "long-scan downgrade");
+                        } catch (final Exception e) {
+                            // Bluetooth went away between the stop and the start. Complete, so
+                            // the caller's ordinary retry takes over rather than this looking
+                            // like a scan that is still running.
+                            Log.w(TAG, "Could not restart the nearby scan", e);
+                            if (!emitter.isDisposed()) {
+                                emitter.onComplete();
+                            }
+                        }
+                    });
 
             emitter.setCancellable(() -> {
                 Log.d(TAG, "Stopped watching for nearby tags");
+                scanRefresh.dispose();
                 scanner.stopScan(callback);
             });
         }).subscribeOn(Schedulers.io());
     }
+
+    /**
+     * How often the running scan is stopped and started again - under Android's 30 minute
+     * limit, past which a continuous scan is silently downgraded to opportunistic delivery.
+     */
+    static final long SCAN_RESTART_INTERVAL_MS = TimeUnit.MINUTES.toMillis(20);
 
     /**
      * Rebuilds the index in the background once it has gone stale, mid-subscription.

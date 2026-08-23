@@ -30,8 +30,10 @@ public final class FindMyAdvertisement {
     /** Apple's Bluetooth SIG company identifier. */
     public static final int APPLE_COMPANY_ID = 0x004C;
 
-    /** Apple's "offline finding" advertisement type, the first payload byte. */
-    private static final byte TYPE_OFFLINE_FINDING = 0x12;
+    /** Apple's "offline finding" advertisement type, the first payload byte. Package-visible
+     * so {@link NearbyTagWatcher} can hand it to the hardware scan filter - the filter and this
+     * parser must agree on what a Find My frame is, so there is one constant, not two. */
+    static final byte TYPE_OFFLINE_FINDING = 0x12;
 
     /** Payload length of the full beacon an accessory sends once separated from its owner. */
     private static final byte LEN_SEPARATED = 0x19;
