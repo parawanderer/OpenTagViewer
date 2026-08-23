@@ -359,17 +359,15 @@ You can set this up now, or any time later from Settings.</string>
     <string name="ring_status_success">Ringing!</string>
     <string name="nearby_now">Nearby</string>
     <string name="nearby_now_with_battery">Nearby · Battery %1$s</string>
-    <string name="nearby_now_with_battery_and_distance">Nearby (~%2$s) · Battery %1$s</string>
+    <string name="nearby_now_with_battery_and_signal">Nearby (%2$s signal) · Battery %1$s</string>
     <string name="battery_from_tag_itself">Read from the tag over Bluetooth just now, not from iCloud.</string>
     <string name="battery_short_full">full</string>
     <string name="battery_short_medium">medium</string>
     <string name="battery_short_low">low</string>
     <string name="battery_short_very_low">critical</string>
     <string name="battery">Battery</string>
-    <string name="live_battery_with_distance">%1$s · ~%2$s away</string>
-    <!-- No tilde baked in - see nearby_now_with_battery_and_distance and
-         live_battery_with_distance, which both add their own, since a distance estimate is
-         always approximate. -->
-    <string name="distance_metres">%1$d m</string>
-    <string name="distance_feet">%1$d ft</string>
+    <string name="live_battery_with_signal">%1$s · %2$s signal</string>
+    <string name="signal_strength_strong">strong</string>
+    <string name="signal_strength_medium">medium</string>
+    <string name="signal_strength_weak">weak</string>
 </resources>

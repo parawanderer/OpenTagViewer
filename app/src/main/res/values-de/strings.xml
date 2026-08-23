@@ -327,13 +327,15 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="ring_status_success">Klingelt!</string>
     <string name="nearby_now">In der Nähe</string>
     <string name="nearby_now_with_battery">In der Nähe · Akku %1$s</string>
-    <string name="nearby_now_with_battery_and_distance">In der Nähe (~%2$s) · Akku %1$s</string>
+    <string name="nearby_now_with_battery_and_signal">In der Nähe (Signal %2$s) · Akku %1$s</string>
     <string name="battery_from_tag_itself">Gerade per Bluetooth vom Tag selbst gelesen, nicht aus iCloud.</string>
     <string name="battery_short_full">voll</string>
     <string name="battery_short_medium">mittel</string>
     <string name="battery_short_low">niedrig</string>
     <string name="battery_short_very_low">kritisch</string>
     <string name="battery">Akku</string>
-    <string name="live_battery_with_distance">%1$s · ~%2$s entfernt</string>
-    <string name="distance_metres">%1$d m</string>
+    <string name="live_battery_with_signal">%1$s · Signal %2$s</string>
+    <string name="signal_strength_strong">stark</string>
+    <string name="signal_strength_medium">mittel</string>
+    <string name="signal_strength_weak">schwach</string>
 </resources>
