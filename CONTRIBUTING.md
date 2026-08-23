@@ -729,6 +729,19 @@ The instrumented job needs KVM on the runner; the workflow enables it first. It 
 `:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
 emulator definition in CI to keep in step with `app/build.gradle.kts`.
 
+### A PR stacked on another PR gets no checks at all
+
+Every workflow above filters on `pull_request: branches: ["main"]`, and that filter matches the
+**base** of the PR, not the branch the changes are on. So a PR opened against another PR's branch
+runs nothing — no translation check, no tests, no build.
+
+It does not look like a problem. The checks section is simply absent rather than red or pending,
+which reads as "nothing to run here" and not as "nothing ran". Merge the base, retarget the child
+at `main`, and the whole suite appears.
+
+Stacking is still often the right shape for a chain of dependent work. Just know that the second
+PR is unverified until it points at `main`, and do not read its empty checks list as a pass.
+
 ---
 
 ## Releasing the exporter
