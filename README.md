@@ -68,8 +68,23 @@ trackers that advertise "Works with Apple Find My" use the same network and the 
 
 1. An Android phone with [the `OpenTagViewer` app installed](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Install-App)
 2. A (free) [Apple Account](https://account.apple.com/) with 2FA enabled to be via either `SMS` or `Trusted Device`
-3. One or more **AirTags** — or any other tracker that appears under *Items* in Apple's `FindMy` app (see [what it works with](#what-it-works-with-)) — already registered to an Apple account you own
-4. Any computer to run the exporter on — Windows, Linux or a Mac (only needed once/initially). See [the export guide](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags#prerequisites)
+3. One or more **AirTags** — or any other tracker that appears under *Items* in Apple's `FindMy` app (see [what it works with](#what-it-works-with-))
+
+**And then one of two routes**, which is the thing most worth knowing before you start:
+
+| | What it needs |
+| --- | --- |
+| **Read them from iCloud, in the app** | the Apple account the tags are **registered to**, and the screen-lock passcode of one Apple device on it. No computer at all |
+| **Export a zip on a computer, import it** | any computer once — Windows, Linux or a Mac. The app can then be signed in to **any** Apple account, which need not be the owner |
+
+**Those are two different sign-ins and they are easy to confuse.** Reading the tags out of an
+account happens once and must be done as the owner — by the app on the iCloud route, or by the
+exporter on the zip route. *Locating* them afterwards only needs some signed-in account, which is
+why a zip somebody else exported for you works on an account of your own, and why self-made
+[OpenHaystack](https://github.com/seemoo-lab/openhaystack) tags — which have no owning account at
+all — work too.
+
+👉 [Which route should I use?](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Get-AirTags-into-App)
 
 
 ### How to view my AirTag on my Android Phone?!
