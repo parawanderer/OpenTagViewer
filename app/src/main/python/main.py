@@ -1597,3 +1597,135 @@ def isOwnDeviceHardware(plistXml: str) -> str | None:
     except Exception:
         print(f"isOwnDeviceHardware failed, carrying on without it: {traceback.format_exc()}")
         return None
+
+
+def buildExportBundle(
+    accessoriesJson: str,
+    via: str,
+    sourceUser: str,
+    exportedAtMs: int,
+) -> str:
+    """
+    Build the files of an export bundle, for the app to zip.
+
+    **The app is the third producer of this format**, beside the desktop wizard and its CLI, and
+    it writes through the same `opentagviewer_export.build_export` they do. One implementation of
+    the format is most of why that package exists: a second one in Java would drift, and the
+    symptom of drift is a bundle that imports into one version of this app and not another.
+
+    **It returns the files rather than a zip, deliberately.** `zipsink.write_zip` needs
+    `pyzipper` for an encrypted archive, which is not in Chaquopy's pip list and pulls a native
+    crypto dependency; the app already carries zip4j for *reading* locked bundles, and zip4j
+    writes them too. So Python owns the format and Java owns the container, which is the split
+    that costs nothing.
+
+    Base64 over JSON because these are bytes crossing a language boundary. A plist is not UTF-8
+    and must not be round-tripped through a string - `OwnedBeacons` records carry raw key
+    material, and a lossy decode there produces a bundle that imports and then cannot locate
+    anything, which is the worst kind of failure this could have.
+
+    :param accessoriesJson: A JSON list of objects with `ownedBeaconPlist` and
+        `namingRecordPlist`, each an XML plist as the app stores it, and optionally
+        `alignmentPlist`. The naming record is **not** optional: the importer inner-joins the two
+        and silently drops an accessory it cannot pair with one.
+    :param via: `OpenTagViewer.android:<versionName>`. Passed from Java rather than built here,
+        because `build_export` refuses to invent it and the version lives in `BuildConfig`.
+    :param sourceUser: What the recipient sees as "exported by". A label, never an Apple ID.
+    :param exportedAtMs: Milliseconds since the epoch, passed rather than read from the clock.
+    :returns: JSON. On success, `entries` maps each path in the zip to its base64 content, and
+        `warning` is present if something optional had to be left out. On failure, `error` carries
+        a sentence to show the user.
+    """
+    import base64
+    import plistlib
+
+    from opentagviewer_export import AccessoryExport, ExportError, build_export
+
+    try:
+        accessories = []
+        for item in json.loads(accessoriesJson):
+            alignment = item.get("alignmentPlist")
+            accessories.append(
+                AccessoryExport(
+                    owned_beacon=plistlib.loads(item["ownedBeaconPlist"].encode("utf-8")),
+                    naming_record=plistlib.loads(item["namingRecordPlist"].encode("utf-8")),
+                    # Absence is normal - not every accessory has one - but passing it whenever
+                    # there is one is what stops the recipient's first fetch searching the tag's
+                    # entire key history. See rule 6.
+                    key_alignment_record=(
+                        plistlib.loads(alignment.encode("utf-8")) if alignment else None
+                    ),
+                ),
+            )
+    except Exception:
+        print(f"Could not read the accessories to export: {traceback.format_exc()}")
+        return json.dumps({"error": "The bundle could not be built."})
+
+    try:
+        bundle = build_export(
+            accessories, via=via, source_user=sourceUser, exported_at_ms=exportedAtMs,
+        )
+        warning = None
+    except ExportError as refused:
+        bundle, warning = _withoutTheAlignmentRecords(
+            accessories, refused, via, sourceUser, exportedAtMs,
+        )
+        if bundle is None:
+            # Handed back rather than raised: the caller shows it, and a Chaquopy traceback is
+            # not a sentence anybody can act on.
+            return json.dumps({"error": warning})
+    except Exception:
+        print(f"Failed to build an export bundle: {traceback.format_exc()}")
+        return json.dumps({"error": "The bundle could not be built."})
+
+    answer: dict[str, Any] = {
+        "entries": {
+            name: base64.b64encode(content).decode("ascii")
+            for name, content in bundle.entries.items()
+        },
+    }
+    if warning:
+        answer["warning"] = warning
+
+    return json.dumps(answer)
+
+
+def _withoutTheAlignmentRecords(accessories, refused, via, sourceUser, exportedAtMs):
+    """
+    Try again with the optional half dropped, because the alternative is exporting nothing.
+
+    **The format layer's own error asks for this.** It says "pass no alignment record at all
+    rather than an unreadable one: the import is then slow, not broken" - and it is right, so the
+    caller should act on it rather than relay it. An alignment record is an optimisation: without
+    one the recipient's first fetch searches the tag's whole key history, which is slow and looks
+    like abuse of the account, but it works. Refusing the whole export because an optional record
+    is malformed trades something that works badly for nothing at all.
+
+    Only worth attempting when there was one to drop. Otherwise the refusal is about the
+    accessories themselves - no key material, a missing naming record - and retrying changes
+    nothing.
+
+    :returns: `(bundle, warning)` on success, or `(None, message)` when it still cannot be built.
+    """
+    from dataclasses import replace
+
+    from opentagviewer_export import ExportError, build_export
+
+    if not any(a.key_alignment_record is not None for a in accessories):
+        return None, str(refused)
+
+    try:
+        bundle = build_export(
+            [replace(a, key_alignment_record=None) for a in accessories],
+            via=via,
+            source_user=sourceUser,
+            exported_at_ms=exportedAtMs,
+        )
+    except ExportError:
+        # Not the alignment records after all. Report the first refusal, which is the one that
+        # describes what is actually wrong.
+        return None, str(refused)
+
+    print(f"Exporting without the key alignment records, which were unusable: {refused}")
+
+    return bundle, str(refused)
