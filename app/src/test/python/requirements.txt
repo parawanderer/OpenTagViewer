@@ -9,7 +9,7 @@
 # `FindMy==0.9.8` here for as long as the app built the fork, so every bridge test
 # ran against a library the app does not ship - which is not a small difference:
 # the fork's Anisette providers take `serial=` and PyPI's do not.
-git+https://github.com/parawanderer/FindMy.py@4f940158c437b17ae61a8e90af084d658750629c
+git+https://github.com/parawanderer/FindMy.py@ddc7f2342fc9f32ebe315b85c22a4554ce419f6d
 NSKeyedUnArchiver==1.5
 PyYAML==6.0.2
 

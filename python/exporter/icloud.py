@@ -132,6 +132,34 @@ class Fetched:
     candidates: list[Candidate]
     skipped: list[Skipped]
 
+    undecryptable: int = 0
+    """
+    How many records in the zone did not decrypt at all.
+
+    **Counted separately from `skipped`, and not as a failure.** `skipped` is per accessory and
+    names one: something was read, understood, and set aside for a stated reason. These were never
+    read - they have no beacon id to name, because the id is inside what would not open.
+
+    **A non-zero count is not necessarily wrong.** A zone legitimately holds records belonging to
+    other parties, which this account has no key for and never should. So it is reported as a
+    number and a caveat rather than as an error, and the only thing that would make it alarming is
+    it being close to the number of tags somebody expected.
+
+    It exists because it was invisible: FindMy.py counted these, logged the tally and dropped it,
+    and `fetch` builds its `skipped` list by walking what came back - so anything lost here was
+    absent from both lists at once. "Fewer tags than expected" and "some of those were never tags"
+    look identical from outside, which is the same sentence the per-accessory list exists for.
+    """
+
+    first_miss: str | None = None
+    """
+    The first "no key held", in full, when there was one.
+
+    The count alone cannot tell the two causes apart: records that genuinely belong to somebody
+    else, and this client comparing keys in the wrong encoding. Those lead in opposite directions,
+    and only the message says which.
+    """
+
 
 @dataclass(frozen=True)
 class ClientIdentity:
@@ -550,7 +578,21 @@ async def fetch(client: AsyncFindMyClient) -> Fetched:
 
         candidates.append(_candidate(group.beacon, group.naming, group.alignment))
 
-    return Fetched(candidates=candidates, skipped=skipped)
+    if decrypted.skipped_total:
+        # Reported, not raised. See `Fetched.undecryptable` for why a count here is not
+        # automatically wrong - and why it still must not be silent.
+        logger.info(
+            "%d record(s) in the zone did not decrypt: %s",
+            decrypted.skipped_total,
+            ", ".join(f"{reason} x{count}" for reason, count in decrypted.skipped.items()),
+        )
+
+    return Fetched(
+        candidates=candidates,
+        skipped=skipped,
+        undecryptable=decrypted.skipped_total,
+        first_miss=decrypted.first_miss,
+    )
 
 
 def _why_not_locatable(beacon: DecryptedRecord) -> str:
