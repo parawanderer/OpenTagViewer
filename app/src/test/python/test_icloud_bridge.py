@@ -24,6 +24,8 @@ from typing import Any
 
 import pytest
 
+from findmy.errors import InvalidCredentialsError, UnauthorizedError
+
 import icloud_bridge
 from exporter import icloud
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -937,3 +939,84 @@ class TestRenamingAnAccessory:
         answer = json.loads(made.rename("beacon-1", anAccessoryPlist(), "Keys", ""))
 
         assert answer["reason"] == icloud_bridge.REASON_NOT_SIGNED_IN
+
+
+class TestASignInThatNoLongerWorks:
+    """
+    Every shape of "Apple will not accept this session", and the one that is not that.
+
+    **Classified in `_unexpected`, so all eight entry points get it.** Naming it at one call site
+    is how the retry screen kept appearing from the other seven - the screen says the service is
+    having a bad day, and it is not: the same rejected password goes out on every attempt.
+    """
+
+    def test_apple_refusing_the_password_is_named(self):
+        try:
+            raise InvalidCredentialsError(
+                "Password authentication failed: Enter the correct password for this Apple"
+                " Account.")
+        except InvalidCredentialsError:
+            answer = json.loads(icloud_bridge._unexpected("opening the Find My client"))
+
+        assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_a_session_restored_without_a_password_is_the_same_situation(self):
+        """
+        **A bare ValueError, several frames earlier, before anything is sent.**
+
+        `_gsa_authenticate` raises it when there is nothing to authenticate with - and the app
+        restores sessions constantly, so this is not the rare half. Untreated it arrives as
+        UNKNOWN and earns a retry that cannot work.
+        """
+        try:
+            raise ValueError("No username or password specified")
+        except ValueError:
+            answer = json.loads(icloud_bridge._unexpected("reading the account's accessories"))
+
+        assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_it_is_found_underneath_a_wrapper(self):
+        # These come back through run_until_complete and FindMy.py's own layers, so the
+        # interesting error is rarely the outermost one.
+        try:
+            try:
+                raise InvalidCredentialsError("refused")
+            except InvalidCredentialsError as inner:
+                raise RuntimeError("while opening the client") from inner
+        except RuntimeError:
+            answer = json.loads(icloud_bridge._unexpected("opening the Find My client"))
+
+        assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_an_unrelated_value_error_is_not_a_dead_session(self):
+        """The message is checked, not just the type - ValueError is far too common a shape."""
+        try:
+            raise ValueError("that is not a valid serial")
+        except ValueError:
+            answer = json.loads(icloud_bridge._unexpected("unlocking the keychain"))
+
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
+
+    def test_an_unauthorized_error_is_deliberately_left_alone(self):
+        """
+        **Two meanings, so it stays unclassified until they can be told apart.**
+
+        `request_pet` raises this when a second factor is being demanded, which the app answers by
+        asking for a code rather than signing out; CloudKit raises the same type for a genuine
+        401. Treating a 2FA prompt as a dead session would cost somebody a sign-in they did not
+        need - the opposite mistake to the one this whole change fixes, and just as annoying.
+        """
+        try:
+            raise UnauthorizedError("Re-authentication ended in state REQUIRE_2FA")
+        except UnauthorizedError:
+            answer = json.loads(icloud_bridge._unexpected("opening the Find My client"))
+
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
+
+    def test_something_ordinary_is_still_unknown(self):
+        try:
+            raise TimeoutError()
+        except TimeoutError:
+            answer = json.loads(icloud_bridge._unexpected("reading the account's accessories"))
+
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN

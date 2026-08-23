@@ -173,7 +173,7 @@ def _unexpected(what: str) -> str:
     # rejected credentials at one of those and not the others is how the retry screen keeps
     # turning up for a session that can never work. Doing it here also covers whatever is added
     # next, which the per-site version would not.
-    if _isCausedBy(sys.exc_info()[1], InvalidCredentialsError):
+    if _needsAFreshSignIn(sys.exc_info()[1]):
         return _failure(REASON_CREDENTIALS_REJECTED, _lastLineOf(detail) or what + " was refused")
 
     # `str(e)` is empty for several of these - TimeoutError most of all - so the last line of
@@ -187,6 +187,45 @@ def _unexpected(what: str) -> str:
 
 def _lastLineOf(detail: str) -> str:
     return detail.strip().splitlines()[-1] if detail.strip() else ""
+
+
+def _needsAFreshSignIn(error: BaseException | None) -> bool:
+    """
+    Whether this failure means the stored sign-in has to be replaced.
+
+    **Two shapes, one situation, and they arrive from different code.** Apple refusing the
+    password raises `InvalidCredentialsError`. A session restored *without* one raises a bare
+    `ValueError` from the same function, several frames earlier, before anything is sent - and
+    the app restores sessions constantly, so that is not the rare half.
+
+    Matching a `ValueError` on its message is unpleasant and is done anyway: the alternative is
+    the app's most ordinary auth failure arriving as `UNKNOWN` and being offered a retry that
+    cannot work. The string is checked narrowly, and `account.py` raises it in exactly one place.
+
+    **`UnauthorizedError` is deliberately not here.** It means two different things depending on
+    where it came from - `request_pet` raises it when a second factor is being demanded, which the
+    app answers by asking for a code rather than signing out, while CloudKit raises the same type
+    for a genuine 401. Treating a 2FA prompt as a dead session would cost somebody a sign-in they
+    did not need, so it stays unclassified until the two can be told apart.
+    """
+    if _isCausedBy(error, InvalidCredentialsError):
+        return True
+
+    # `not self._username or not self._password` in `_gsa_authenticate`, which is reached by
+    # anything that tries to re-authenticate a restored session.
+    return _isCausedBy(error, ValueError) and _saysAnyOf(
+        error, ("No username or password specified",))
+
+
+def _saysAnyOf(error: BaseException | None, phrases: tuple[str, ...]) -> bool:
+    """Whether any exception in the chain carries one of these messages."""
+    seen = set()
+    while error is not None and id(error) not in seen:
+        if any(phrase in str(error) for phrase in phrases):
+            return True
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return False
 
 
 def _isCausedBy(error: BaseException | None, wanted: type[BaseException]) -> bool:
