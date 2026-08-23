@@ -35,10 +35,15 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * it needs to run when nobody is watching, and a locally-sourced position is a different claim
  * from one Apple's network made, which the location history has no way to express today.
  *
- * <p>{@code SCAN_MODE_LOW_POWER} rather than the low-latency mode
- * {@link NearbyAccessoryScanner} uses. That one runs for a few seconds after an explicit tap and
- * wants an answer now; this one runs for as long as a screen is open and only needs to notice a
- * tag within a few seconds.
+ * <p>{@code SCAN_MODE_BALANCED} - a middle ground between the low-latency mode
+ * {@link NearbyAccessoryScanner} uses and this class's own original {@code SCAN_MODE_LOW_POWER}.
+ * Low-power's short scan window and multi-second sleep between them meant several of a tag's
+ * own advertisements arrived in a burst whenever a window happened to line up, then nothing for
+ * several seconds until the next one - honest about what low-power scanning actually looks
+ * like, but a person watching this screen is specifically looking for a tag right now, the same
+ * reason {@link NearbyAccessoryScanner} justifies its own higher power draw. Still not
+ * low-latency: this runs for as long as a screen stays open rather than for a few bounded
+ * seconds after a tap, so it keeps some of the duty cycle low-latency forgoes entirely.
  */
 public class NearbyTagWatcher {
     private static final String TAG = NearbyTagWatcher.class.getSimpleName();
@@ -175,7 +180,7 @@ public class NearbyTagWatcher {
 
             scanner.startScan(null,
                     new ScanSettings.Builder()
-                            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+                            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
                             .build(),
                     callback);
 
