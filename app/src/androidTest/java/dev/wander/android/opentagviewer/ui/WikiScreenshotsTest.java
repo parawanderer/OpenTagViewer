@@ -126,11 +126,28 @@ public class WikiScreenshotsTest {
         }
     }
 
+    /**
+     * Every tag, not only the ones this class wrote.
+     *
+     * <p><b>A screenshot needs a screen nobody else has touched.</b> Deleting by id is right for
+     * a test, which cares about its own rows; it is not enough here. A run abandoned half way -
+     * and several were, while this was being built - leaves another fixture's tags behind, and
+     * the next capture then finds two tags called "Bike" and dies with
+     * AmbiguousViewMatcherException, or worse photographs a list with somebody else's leftovers
+     * in it.
+     *
+     * <p><b>Safe because of what this is.</b> A documentation tool, run by hand against a
+     * throwaway emulator that {@code connectedDebugAndroidTest} uninstalls the app from anyway.
+     * It is emphatically not safe on a device holding real imported tags, which is why it lives
+     * here rather than in a shared helper an ordinary test might reach for.
+     */
     private void forgetEverything() {
         AccountBeaconsForTests.forgetThemAll();
-        for (final String id : new String[] {A_TAG, ANOTHER_TAG}) {
-            this.db.ownedBeaconDao().delete(OwnedBeacon.builder().id(id).build());
-            this.db.beaconNamingRecordDao().delete(BeaconNamingRecord.builder().id(id).build());
+
+        for (final OwnedBeacon leftover : this.db.ownedBeaconDao().getAll()) {
+            this.db.ownedBeaconDao().delete(OwnedBeacon.builder().id(leftover.id).build());
+            this.db.beaconNamingRecordDao()
+                    .delete(BeaconNamingRecord.builder().id(leftover.id).build());
         }
         for (final Import stale : this.db.importDao().getImportsFromUser(A_TEST_USER)) {
             this.db.importDao().delete(stale);

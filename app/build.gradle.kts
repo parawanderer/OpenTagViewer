@@ -554,3 +554,28 @@ dependencies {
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 }
+
+/**
+ * **Stop a locked results directory failing the run before it starts.**
+ *
+ * Gradle hashes this task's outputs for up-to-date checks, and on Windows Android Studio holds
+ * `app/build/outputs/androidTest-results/connected/` open - so the hash fails and the build dies
+ * with `Cannot access output property 'resultsDir' ... Failed to create MD5 hash for file
+ * content`, or a `FileSystemException` naming a logcat file. Neither message mentions the real
+ * cause, and deleting the directory appears to succeed while silently leaving the locked file
+ * behind. It cost three runs here before Studio was identified as the holder.
+ *
+ * Nothing is lost by not tracking it: an instrumented run is never up to date anyway - it has to
+ * talk to a device - so the caching this disables was never doing anything. Gradle's own error
+ * suggests exactly this.
+ *
+ * The managed-device task is untouched, because `managedDevice/` is not the directory Studio
+ * watches.
+ */
+tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }
+    .configureEach {
+        doNotTrackState(
+            "Android Studio holds the connected results directory open on Windows, and an" +
+                " instrumented run is never up to date regardless.",
+        )
+    }
