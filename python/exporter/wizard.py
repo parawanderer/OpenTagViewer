@@ -65,9 +65,12 @@ from exporter.version import (
     describe_build,
 )
 from opentagviewer_export import (
+    ExportBundle,
     ExportError,
     KeyFileError,
     build_export,
+    format_passcode,
+    generate_passcode,
     parse_key_file,
     write_zip,
 )
@@ -240,6 +243,22 @@ class WizardApp(tk.Tk):
         )
         self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
         self.confirm_button.grid(row=0, column=4)
+
+        # **On by default, and the default is the whole point.** A bundle holds key material that
+        # cannot be revoked - the only way to withdraw an exported accessory is to unpair it - and
+        # it then travels through a mail account or a chat app and outlives the conversation by
+        # years, sitting in a backup long after everyone has forgotten it is there. Whoever most
+        # needs the lock is whoever would never go looking for a checkbox to turn it on.
+        #
+        # The opt-out exists for one real case, the same one behind the CLI's --no-password: an
+        # app older than 1.1.0 cannot decrypt anything at all, so a recipient running one cannot
+        # open a locked bundle, and they did not choose the exporter's version.
+        self.lock_bundle = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            buttons,
+            text="Lock with a code",
+            variable=self.lock_bundle,
+        ).grid(row=1, column=4, sticky="e", pady=(6, 0))
 
     def _save_logs(self) -> None:
         """
@@ -682,26 +701,51 @@ class WizardApp(tk.Tk):
             messagebox.showerror("That selection cannot be exported", str(e))
             return
 
-        # **No password yet, and the reason is release ordering rather than a missing feature.**
-        # The app on `main` imports locked bundles - zip4j is in `app/build.gradle.kts` and
-        # `AppleZipImporterUtil` uses it - but no *released* APK does: the newest is 1.0.5, from
-        # before that work, and `versionName` has not moved past it.
-        #
-        # So locking bundles now would produce files that nobody's installed app can open, and the
-        # people worst affected would be recipients, who did not choose the exporter's version and
-        # cannot fix it from their side.
-        #
-        # **What unblocks this is an Android release containing zip4j, not a change here.** Once
-        # one exists, this becomes a decision about how long to keep supporting the versions before
-        # it. See the CLI's --no-password, and docs/android-import-handover.md.
-        write_zip(bundle, path, password=None)
+        if self._write_it(bundle, path, len(exports)):
+            self.destroy()
 
-        messagebox.showinfo(
-            "Exported",
-            f"{len(exports)} accessory(s) written to:\n{path}\n\n"
-            "Anyone who has this file can locate them, and that cannot be undone.",
-        )
-        self.destroy()
+    def _write_it(self, bundle: ExportBundle, path: str, count: int) -> bool:
+        """
+        Write the zip, lock it unless told otherwise, and say what happened.
+
+        **Locked by default, which it was not until app 1.1.0 existed.** What blocked it was
+        release ordering rather than a missing feature: before zip4j the app could not decrypt
+        anything at all, so a locked bundle was a file nobody\'s installed app could open, and the
+        people worst affected were recipients, who did not choose the exporter\'s version and
+        could not fix it from their side.
+
+        1.1.0 reads them, so the default flips. The checkbox stays for the versions before it.
+
+        :returns: whether the window should close. False leaves it open on a failure, so the
+            export can be retried without starting over.
+        """
+        passcode = generate_passcode() if self.lock_bundle.get() else None
+
+        try:
+            write_zip(bundle, path, password=passcode)
+        except RuntimeError as e:
+            # A missing pyzipper is the only way this raises, and it is worth saying plainly
+            # rather than as a traceback: no file was written, and the fix is an install.
+            messagebox.showerror("That bundle could not be locked", str(e))
+            return False
+        except OSError as e:
+            # A full disk, a path that went away, a removable drive pulled mid-write. The
+            # selection is still on screen, so leaving the window up costs nothing and saves
+            # reading the account again.
+            messagebox.showerror("That bundle could not be written", str(e))
+            return False
+
+        if passcode is None:
+            messagebox.showinfo(
+                "Exported",
+                f"{count} accessory(s) written to:\n{path}\n\n"
+                "This bundle is not locked. Anyone who has the file can locate these tags, and"
+                " that cannot be undone.",
+            )
+        else:
+            _show_the_code(self, path, count, passcode)
+
+        return True
 
     def _confirm_devices(self, chosen: list[Candidate]) -> list[Candidate] | None:
         """
@@ -1259,6 +1303,109 @@ def configure_logging() -> None:
         logger.error("Unhandled: %s", "".join(traceback.format_exception(exc_type, value, tb)))
 
     sys.excepthook = _report
+
+
+def _build_the_code_window(parent: tk.Misc, path: str, count: int, passcode: str) -> tk.Toplevel:
+    """
+    The one moment this code exists in a form a person can read.
+
+    **It is not stored anywhere and cannot be recovered.** Nothing in the bundle, the log or this
+    program keeps it - the zip holds only what AES needs to check it, and a lost code means
+    exporting again. So this dialog is modal and has to be dismissed deliberately: a toast, or a
+    message box that the window destroys itself behind, would let somebody close the program with
+    the only copy on screen.
+
+    **Selectable rather than only displayed, and a Copy button as well.** A code nobody can copy
+    gets transcribed by hand, and this alphabet exists because hand transcription goes wrong -
+    Crockford's base32 drops I, L, O and U precisely because they are misread. Reading twelve
+    characters off a screen into a chat window is the case the whole alphabet is designed around,
+    so the program should do it instead.
+
+    The advice about sending it separately is not boilerplate. A code pasted into the same chat as
+    the bundle is in the same backup as the bundle, and the file cannot be un-shared once it is
+    out: the only way to withdraw an exported accessory is to unpair it.
+    """
+    window = tk.Toplevel(parent)
+    window.title("Exported, and locked")
+    window.resizable(False, False)
+    window.transient(parent.winfo_toplevel())
+
+    frame = ttk.Frame(window, padding=20)
+    frame.grid(sticky="nsew")
+
+    ttk.Label(
+        frame,
+        text=f"{count} accessory(s) written to:",
+        wraplength=460,
+    ).grid(row=0, column=0, sticky="w")
+
+    ttk.Label(frame, text=path, wraplength=460, foreground="#555").grid(
+        row=1, column=0, sticky="w", pady=(2, 14),
+    )
+
+    ttk.Label(
+        frame,
+        text="The code to open it is:",
+        wraplength=460,
+    ).grid(row=2, column=0, sticky="w")
+
+    # An Entry rather than a Label so the text can be selected with a mouse. Read-only rather
+    # than disabled: disabled greys it out and blocks selection, which is the one thing it is for.
+    shown = tk.Entry(frame, font=("TkFixedFont", 16), justify="center", width=18)
+    shown.insert(0, format_passcode(passcode))
+    shown.configure(state="readonly")
+    shown.grid(row=3, column=0, sticky="w", pady=(4, 10))
+
+    def _copy() -> None:
+        window.clipboard_clear()
+        # The grouped form, because that is what the person on the other end will be typing into
+        # three boxes. The importer folds spaces, hyphens and the confusable letters back out.
+        window.clipboard_append(format_passcode(passcode))
+        copied.configure(text="Copied.")
+
+    buttons = ttk.Frame(frame)
+    buttons.grid(row=4, column=0, sticky="w")
+    ttk.Button(buttons, text="Copy the code", command=_copy).grid(row=0, column=0)
+    copied = ttk.Label(buttons, text="", foreground="#177245")
+    copied.grid(row=0, column=1, padx=(10, 0))
+
+    ttk.Label(
+        frame,
+        text=(
+            "Write it down now — it is not stored anywhere and cannot be recovered.\n\n"
+            "Send it to the recipient separately from the file. A code sent in the same message "
+            "as the bundle is in the same backup as the bundle, and anyone who has both can "
+            "locate these tags for as long as they stay paired."
+        ),
+        wraplength=460,
+        justify="left",
+        foreground="#555",
+    ).grid(row=5, column=0, sticky="w", pady=(14, 14))
+
+    ttk.Button(frame, text="Done", command=window.destroy).grid(row=6, column=0, sticky="e")
+
+    window.protocol("WM_DELETE_WINDOW", window.destroy)
+    shown.focus_set()
+
+    return window
+
+
+def _show_the_code(parent: tk.Misc, path: str, count: int, passcode: str) -> None:
+    """
+    Put the window up and wait for it.
+
+    **Split from building it so the dialog itself can be tested.** `wait_window` blocks until the
+    user closes it, so a test that called this would hang - and mocking the whole thing out, which
+    is what the first version of the tests did, leaves the only place the code is ever displayed
+    with no coverage at all. A dialog that renders the wrong string, or copies nothing, would have
+    passed.
+
+    Modal, and closable only on purpose. The parent destroys itself the moment this returns, so a
+    non-modal dialog would be a window explaining a code belonging to a program that has gone.
+    """
+    window = _build_the_code_window(parent, path, count, passcode)
+    window.grab_set()
+    parent.wait_window(window)
 
 
 def self_test() -> int:
