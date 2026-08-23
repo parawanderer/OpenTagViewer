@@ -90,6 +90,8 @@ public class WikiScreenshotsFromTheMapTest {
 
     @Before
     public void openTheMap() {
+        OnlyWhenCapturing.wasAskedFor();
+
         Intents.init();
 
         // **Everything except the two screens this actually walks into.** The test this was
