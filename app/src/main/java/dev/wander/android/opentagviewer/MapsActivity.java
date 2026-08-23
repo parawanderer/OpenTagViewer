@@ -132,7 +132,9 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerStatus;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyDistanceLabel;
 import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.RssiDistance;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
@@ -151,6 +153,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final int RING_PERMISSION_REQUEST_CODE = 2;
+    private static final int NEARBY_PERMISSION_REQUEST_CODE = 3;
 
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
@@ -646,6 +649,17 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             return;
         }
 
+        // Asked for here rather than left to the ring button: this scan is what feeds the
+        // battery/audible badge on every card, so it wants to be running as soon as the screen
+        // opens, not only once somebody has separately triggered a ring. Silently doing nothing
+        // without permission, as NearbyTagWatcher itself does, would just look like every tag
+        // is permanently out of range.
+        if (!BlePermissions.granted(this)) {
+            Log.d(TAG, "Requesting BLE permission(s) to watch for nearby tags");
+            ActivityCompat.requestPermissions(this, BlePermissions.required(), NEARBY_PERMISSION_REQUEST_CODE);
+            return;
+        }
+
         this.nearbyWatchDisposable = new NearbyTagWatcher(AppDependencies.accessoryMacResolver())
                 .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
                 .observeOn(AndroidSchedulers.mainThread())
@@ -691,8 +705,20 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private void showNearbyStatusOn(final FrameLayout card, final NearbyTagSighting sighting) {
         final TextView line = card.findViewById(R.id.device_last_update);
-        line.setText(this.getString(R.string.nearby_now_with_battery,
-                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel()))));
+        line.setText(this.getString(R.string.nearby_now_with_battery_and_distance,
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
+                this.distanceStringFor(sighting)));
+    }
+
+    /**
+     * A rough "~5 m"/"~16 ft" for how far away a sighting's signal strength puts the tag - see
+     * {@link RssiDistance} for why this is an estimate and not a measurement.
+     */
+    private String distanceStringFor(final NearbyTagSighting sighting) {
+        final Locale locale = this.getResources().getConfiguration().getLocales().get(0);
+        final double metres = RssiDistance.estimateMetres(sighting.getRssi());
+        return this.getString(NearbyDistanceLabel.unitStringFor(locale),
+                NearbyDistanceLabel.roundedValueFor(metres, locale));
     }
 
     @Override
@@ -2203,6 +2229,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
         LinearLayout cardsContainer = this.findViewById(R.id.tags_scroll_container);
 
+        // Read once, not per card: it does not change between cards, and BlePermissions.granted
+        // is a real permission check, not a field read.
+        final boolean canRing = BlePermissions.granted(this);
+
         // remove all beacons that had cards that are now gone
         for (var beaconId : this.dynamicCardsForTag.keySet()) {
             if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.isDrawable(beaconId)) {
@@ -2271,6 +2301,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             params.height = ViewGroup.LayoutParams.MATCH_PARENT;
 
             v.setLayoutParams(params);
+
+            // The ring button toggles a Bluetooth scan, so it has no honest job to do without
+            // the permission that scan needs - showing it only to have every tap re-ask for
+            // permission would be a worse experience than not showing it. Re-applied on every
+            // redraw rather than once, so a permission grant or revocation while the screen is
+            // open is reflected without needing anything else to notice.
+            final View ringButtonContainer = v.findViewById(R.id.device_ring_button_container);
+            ringButtonContainer.setVisibility(canRing ? VISIBLE : GONE);
 
             // the title
             TextView deviceNameView = v.findViewById(R.id.device_name);
@@ -2651,6 +2689,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 Log.i(TAG, "BLE permission refused; not starting continuous ping");
                 Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
             }
+            return;
+        }
+
+        if (requestCode == NEARBY_PERMISSION_REQUEST_CODE) {
+            // Re-checked against BlePermissions.granted for the same reason as above: one place
+            // decides what "enough" means.
+            if (BlePermissions.granted(this)) {
+                Log.i(TAG, "BLE permission granted; starting the nearby tag watch");
+                this.startWatchingForNearbyTags();
+            } else {
+                Log.i(TAG, "BLE permission refused; not watching for nearby tags");
+            }
+            // The ring button on every card was hidden while this was undecided - see
+            // updateBeaconCards - and needs to be shown or stay hidden depending on the answer.
+            this.updateBeaconCards();
             return;
         }
 

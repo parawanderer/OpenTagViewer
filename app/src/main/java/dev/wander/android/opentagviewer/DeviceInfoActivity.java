@@ -55,7 +55,9 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyDistanceLabel;
 import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.RssiDistance;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -661,8 +663,14 @@ public class DeviceInfoActivity extends AppCompatActivity
      * value, with its caveat.
      */
     private void showLiveBattery(final NearbyTagSighting sighting) {
-        this.binding.setLiveBatteryLevel(this.getString(
-                NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+        final Locale locale = this.getResources().getConfiguration().getLocales().get(0);
+        final double metres = RssiDistance.estimateMetres(sighting.getRssi());
+        final String distance = this.getString(NearbyDistanceLabel.unitStringFor(locale),
+                NearbyDistanceLabel.roundedValueFor(metres, locale));
+
+        this.binding.setLiveBatteryLevel(this.getString(R.string.live_battery_with_distance,
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
+                distance));
         this.findViewById(R.id.device_settings_live_battery).setVisibility(VISIBLE);
     }
 
