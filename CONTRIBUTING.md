@@ -279,6 +279,23 @@ The device is defined in `testOptions { managedDevices { ... } }` in `app/build.
 and uses an `aosp-atd` image, which has **no Play Services** — a test that needs Maps would
 need a `google` image.
 
+**If a run sits in `:app:testEmulatorDebugAndroidTest` and never starts a test**, check the lock
+count before anything else:
+
+```bash
+cat ~/.android/avd/gradle-managed/active_gradle_devices    # "MDLockCount 4" with nothing running
+```
+
+AGP counts its in-flight managed devices there, and a run that is killed rather than finished
+never gives its slot back — so the count creeps up and eventually every run waits for a slot
+nothing will release. It boots no emulator and says nothing, which is why it reads as a slow
+start. Stop the daemons, delete the file, run again:
+
+```bash
+./gradlew --stop
+rm ~/.android/avd/gradle-managed/active_gradle_devices
+```
+
 > [!WARNING]
 > `connectedDebugAndroidTest` **uninstalls the app afterwards**, taking its session, settings
 > and every imported beacon with it. `allowBackup` is false, so on a real device that is gone

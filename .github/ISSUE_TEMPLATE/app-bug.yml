@@ -8,8 +8,9 @@ body:
       value: |
         For the **Android app**.
 
-        The most useful thing you can attach is the log. The app can write one for you — see the
-        box near the bottom, which explains where the button is and how to make it appear.
+        The most useful thing you can attach is the log. The app writes one for you and takes
+        the personal details out of it first — see the box near the bottom for where the button
+        is.
 
   - type: input
     id: version
@@ -66,9 +67,9 @@ body:
     attributes:
       label: Which exporter made the zip?
       description: >-
-        Only if this is about importing or about missing locations. If the ⋮ menu →
-        **Information** lists what your tags were imported from, copy it from there; otherwise
-        whichever version you remember downloading, or leave it blank.
+        Only if this is about importing or about missing locations. The ⋮ menu →
+        **Information** prints it under the version, and the app's error page prints it too —
+        copy it from either.
         **Do not open the zip to find out.** It holds the keys to your tags, newer ones are
         password-protected on purpose, and unpacking it to read a version line is not worth the
         risk of what you might then attach.
@@ -81,8 +82,9 @@ body:
       description: |
         There are two ways to get one, and the first is easier if it is offered:
 
-        **If the app showed you an error page with an Export logs button**, use that button. It is
-        the same log, without any of the setting-up below.
+        **If the app showed you a page saying "This one is a bug"**, use its **Get the log**
+        button. It offers to copy the log for pasting into the box below, or to save it as a file
+        to attach — and it needs none of the setting-up below.
 
         **Otherwise** the button is hidden, because most people never need it:
 
@@ -97,10 +99,11 @@ body:
         keys to your tags: anybody who has it can locate them, and it cannot be un-posted. Nothing
         that gets asked here needs it.
 
-        **This is a raw Android log and nothing is removed from it.** Read it before posting and
-        take out anything you would not put on a public page: your Apple ID, device names, serial
-        numbers, anything a notification happened to say. Unlike the desktop exporter's Save logs
-        button, this one does not redact.
+        **Both routes clean the log first**, and tell you what they took out — Apple IDs, device
+        names, serial numbers, coordinates, place names and bundle passwords, replaced by
+        placeholders that stay consistent so the log still reads. It is best effort, not a
+        guarantee: it removes what has a recognisable shape, and something unusual on your
+        account may not. Worth a glance before you post, not a line-by-line audit.
 
         Never paste your Apple ID password, a verification code, or a device passcode. No answer
         requires them.
@@ -111,7 +114,7 @@ body:
     attributes:
       label: Before you post
       options:
-        - label: If I attached a log, I have read it and taken out anything personal I did not want public.
+        - label: If I attached a log, I have had a look at it and taken out anything personal the app missed.
           required: true
 
   - type: markdown
