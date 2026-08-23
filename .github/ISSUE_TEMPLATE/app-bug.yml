@@ -66,14 +66,23 @@ body:
     id: exporter
     attributes:
       label: Which exporter made the zip?
-      description: >-
-        Only if this is about importing or about missing locations. The ⋮ menu →
-        **Information** prints it under the version, and the app's error page prints it too —
-        copy it from either.
+      description: |
+        Only if this is about importing or about missing locations.
+
+        **It is per tag, not per app** — you can have tags from several exports, and from your
+        Apple account, all in one list. So open the tags this is about, one at a time, and read
+        the **Exported with** row on each. Three things you might see:
+
+        - `OpenTagViewer.wizard:1.3.0`, or `.cli`, or `.android` — that is the answer, paste it
+        - **Not recorded — an older exporter** — the export predates the app writing this down,
+          which is itself useful: it dates the bundle
+        - **no such row at all**, and Source says *Read from your Apple account* — that tag never
+          came from a file, so no exporter was involved and there is nothing to paste
+
         **Do not open the zip to find out.** It holds the keys to your tags, newer ones are
         password-protected on purpose, and unpacking it to read a version line is not worth the
         risk of what you might then attach.
-      placeholder: "OpenTagViewer.wizard:1.3.0 — or 1.3.0, or whenever I downloaded it"
+      placeholder: "Bike: OpenTagViewer.wizard:1.3.0, Keys: from my Apple account"
 
   - type: textarea
     id: log

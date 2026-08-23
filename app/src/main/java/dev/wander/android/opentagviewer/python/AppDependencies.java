@@ -85,6 +85,16 @@ public final class AppDependencies {
     private static LogRedactor logRedactor = new ChaquopyLogRedactor();
 
     /**
+     * Builds an export bundle's files.
+     *
+     * <p><b>Here because the failure path is the one that matters and cannot be reached on
+     * demand.</b> An export that throws leaves somebody with no file and no explanation, having
+     * just decided to share the keys to their tags - and producing that state for real means
+     * breaking the interpreter. A fake produces it in a line.
+     */
+    private static BundleBuilder bundleBuilder = new ChaquopyBundleBuilder();
+
+    /**
      * Turns coordinates into something a person recognises.
      *
      * <p><b>Here because a screen with no geocoder does not look broken.</b> The card falls back
@@ -163,6 +173,10 @@ public final class AppDependencies {
         return logRedactor;
     }
 
+    public static BundleBuilder bundleBuilder() {
+        return bundleBuilder;
+    }
+
     public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
         return serverTesterFactory.apply(engine);
     }
@@ -190,6 +204,11 @@ public final class AppDependencies {
     @VisibleForTesting
     public static void replaceLogRedactor(final LogRedactor replacement) {
         logRedactor = replacement;
+    }
+
+    @VisibleForTesting
+    public static void replaceBundleBuilder(final BundleBuilder replacement) {
+        bundleBuilder = replacement;
     }
 
     @VisibleForTesting
@@ -205,6 +224,7 @@ public final class AppDependencies {
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         logRedactor = new ChaquopyLogRedactor();
+        bundleBuilder = new ChaquopyBundleBuilder();
         icloudFactory = AppDependencies::openRealICloud;
         geocoderFactory = (context, locale) ->
                 AddressLookup.through(new Geocoder(context, locale));
