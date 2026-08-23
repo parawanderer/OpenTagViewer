@@ -32,10 +32,11 @@ body:
     attributes:
       label: Version, or commit
       description: >-
-        From a downloaded release: the window's title bar says it. From source: paste
-        `git rev-parse --short HEAD` instead — the version in the source is whatever the last
-        release set, so on a checkout it does not say where you actually are.
-      placeholder: "1.3.0   —   or   4713711"
+        **The first line of the log says this**, so if you are attaching one you can copy it from
+        there. Otherwise: from a downloaded release, the window's title bar. From source, paste
+        `git rev-parse --short HEAD` — the version in the source is whatever the last release set,
+        so on a checkout it does not say where you actually are.
+      placeholder: "1.3.0   —   or   1.3.0 (from source, 4713711)"
     validations:
       required: true
 
