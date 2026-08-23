@@ -68,6 +68,26 @@ if (requestedAbis != null) {
     }
 }
 
+/**
+ * The short commit this is being built from, or null when that cannot be known.
+ *
+ * **For log headers only.** It must never reach `versionName`: the app stamps
+ * `via: OpenTagViewer.android:<versionName>` into every bundle it exports, and rule 9 is that
+ * nothing patches a version at build time, because two artifacts built from one commit would
+ * then disagree about what produced them. A build description is a different question from a
+ * product version, and only the first one wants a commit in it.
+ *
+ * Null rather than a guess when git is absent or this is not a checkout - a source zip off a
+ * release tag has no commit to name, and inventing one is worse than saying nothing.
+ */
+val gitCommit: String? by lazy {
+    runCatching {
+        providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+        }.standardOutput.asText.get().trim().ifEmpty { null }
+    }.getOrNull()
+}
+
 android {
     namespace = "dev.wander.android.opentagviewer"
     compileSdk = 35
@@ -78,6 +98,11 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "1.0.5"
+
+        // Null unless a build type sets it - see the debug block. A release is built from a tag
+        // and its versionName is exactly right, so there is nothing a commit would add; the
+        // field exists in both variants so code reading it compiles in both.
+        buildConfigField("String", "BUILD_COMMIT", "null")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -187,6 +212,17 @@ android {
             // SHA-1) to the key's restrictions if you need maps to render in debug builds.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+
+            // **`-debug` says this is not a release; it does not say which build.**
+            // `versionName` is a committed literal, so every commit after 1.0.5 reports 1.0.5
+            // perfectly confidently - and `build-debug.yml` publishes a debug APK artifact, so
+            // somebody can be running a build whose version string is months stale. The commit
+            // is the only thing that identifies such a build, which is exactly the distinction
+            // the exporter's `describe_build()` draws between a frozen download and a checkout.
+            buildConfigField(
+                "String",
+                "BUILD_COMMIT",
+                gitCommit?.let { "\"$it\"" } ?: "null")
 
             // Distinct launcher name, otherwise a debug install sits next to a real one
             // with an identical icon and label and there is no way to tell them apart.
@@ -422,6 +458,15 @@ chaquopy {
                 // desktop rather than reimplemented because what is displayed is what gets
                 // agreed to, and two renderers would eventually show two different documents.
                 "exporter/terms.py",
+                // Strips personal identifiers out of a log before anybody sends it. Pure stdlib -
+                // re, Counter, dataclass - and nothing else in exporter/.
+                //
+                // Shared for the same reason as terms.py, and more sharply: the wizard's Save
+                // logs button already runs these rules, and a second set in Java would mean two
+                // answers to "is my Apple ID in this file". The rules are patterns, so they need
+                // adding to as new identifiers turn up, and the one that gets forgotten is the
+                // copy nobody is looking at.
+                "exporter/redact.py",
             )
             // The package's own test suite is not part of the app. It imports pytest, which is
             // not in the APK, so it is dead weight that would fail if anything ever touched it.

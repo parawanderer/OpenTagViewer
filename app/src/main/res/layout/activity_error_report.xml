@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The screen for a failure nobody here can fix.
+
+  **Shown only when the app cannot name the cause** - an UnhandledProtocolError, or anything that
+  reaches REASON_UNKNOWN. Never for a rejected passcode, an account with no tags, a network that
+  is down or a session wanting a verification code: those all have screens that tell somebody what
+  to do, and this one would be strictly worse than the advice they already give. A page that
+  appears for ordinary mistakes teaches people to dismiss it, and then it is worth nothing on the
+  day it is right.
+
+  The two buttons are the whole point: a link that lands on the form with the questions already in
+  it, and a log that has been through the redactor first.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/error_report_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!--
+          **colorPrimary, not colorError.** The red one read as an alert - something the user had
+          done, or something now at risk - and neither is what this page is for. Their tags are
+          fine and there is nothing to undo; the page exists to ask for a report. Tinted to match
+          the app mark on the Information page, which is the same colour and the same gesture:
+          this is the app talking about itself.
+        -->
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="48dp"
+            android:contentDescription="@null"
+            android:src="@drawable/warning_24px_fill"
+            app:tint="?attr/colorPrimary" />
+
+        <TextView
+            android:id="@+id/error_report_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:fontFamily="@font/nunito_bold"
+            android:gravity="center_horizontal"
+            android:text="@string/error_report_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/error_report_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingExtra="3dp"
+            android:text="@string/error_report_body"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp" />
+
+        <!--
+          What the report form asks for first, on screen so nobody has to go and find it - and in
+          particular so nobody opens their export zip to read a version line out of it.
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/layout_rounded"
+            android:backgroundTint="?attr/colorSurfaceContainerLow"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/error_report_build"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                tools:text="OpenTagViewer app 1.1.0 (25e1679)" />
+
+            <TextView
+                android:id="@+id/error_report_imported_from"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                tools:text="Tags imported from OpenTagViewer.wizard:1.3.0" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/error_report_what_failed"
+                android:textColor="?attr/colorOutline"
+                android:textSize="11sp" />
+
+            <!--
+              What the failure actually was, verbatim. Not translated and not tidied: it is for
+              pasting into a report, and a translated cause is one a maintainer cannot search for.
+              Labelled above, because an unexplained monospace line in a box is not self-evident.
+            -->
+            <TextView
+                android:id="@+id/error_report_cause"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="monospace"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                tools:text="KeychainSessionError: No keychain keys are held" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/error_report_button"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/error_report_button" />
+
+        <TextView
+            android:id="@+id/error_report_needs_github"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/error_report_needs_github"
+            android:textColor="?attr/colorOutline"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/error_report_share_log"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/error_report_share_log" />
+
+        <!--
+          Says what the redactor took out, or why there is no log to take. Both are answers; the
+          second is why the button above may be gone.
+        -->
+        <TextView
+            android:id="@+id/error_report_log_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="?attr/colorOutline"
+            android:textSize="12sp"
+            tools:text="The log is cleaned before it leaves the app: 3 email addresses, 1 serial" />
+
+        <!--
+          **A way out that is on the screen.**
+
+          The action bar is hidden here, so before this existed the only way off the page was the
+          system back gesture - no arrow, no X, nothing to press. That is fine for anybody who
+          knows it and a dead end for anybody who does not, on a page somebody reaches at the
+          moment they are already stuck.
+
+          Last and quiet, because the two buttons above are what the page is for; this one is
+          only the exit.
+        -->
+        <Button
+            android:id="@+id/error_report_close"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="24dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/error_report_close" />
+
+    </LinearLayout>
+
+</ScrollView>

@@ -177,12 +177,27 @@ public class DeviceInfoActivity extends AppCompatActivity {
         // about where somebody's data came from, made on the strength of a missing join.
         if (this.importData == null) {
             findViewById(R.id.device_settings_exported_by).setVisibility(View.GONE);
+            findViewById(R.id.device_settings_exported_with).setVisibility(View.GONE);
             findViewById(R.id.device_settings_exported_at).setVisibility(View.GONE);
             findViewById(R.id.device_settings_imported_at).setVisibility(View.GONE);
         } else {
             binding.setExportedAt(timestampFormat.format(new Date(this.importData.exportedAt)));
             binding.setImportedAt(timestampFormat.format(new Date(this.importData.importedAt)));
             binding.setExportedBy(this.importData.sourceUser);
+
+            // **Per tag, which the Information screen cannot be.** That one lists every producer
+            // on the install; this one says which produced *this* tag, and when a report is about
+            // one tag misbehaving that is the fact that decides what to expect of it. The row
+            // this sits next to already read from the same `Import`, so the value was here and
+            // simply unused.
+            //
+            // Said rather than hidden when there is no value: an export predating `via:` is
+            // itself information - it dates the bundle - and a missing row would read as this
+            // screen having a gap.
+            binding.setExportedWith(
+                    this.importData.exportedVia == null || this.importData.exportedVia.isBlank()
+                            ? this.getString(R.string.exported_with_something_unrecorded)
+                            : this.importData.exportedVia);
         }
 
         if (this.beaconInformation.isFromAccount()) {

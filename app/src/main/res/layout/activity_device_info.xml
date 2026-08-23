@@ -38,6 +38,10 @@
             type="String" />
 
         <variable
+            name="exportedWith"
+            type="String" />
+
+        <variable
             name="exportedAt"
             type="String" />
 
@@ -313,6 +317,14 @@
                         app:onClick="@{clickItemHandler}"
                         app:sectionSubtitle="@{exportedBy}"
                         app:title="@{@string/exported_by}" />
+
+                    <include
+                        android:id="@+id/device_settings_exported_with"
+                        layout="@layout/settings_item_noicon_clickable"
+                        app:clickable="@{true}"
+                        app:onClick="@{clickItemHandler}"
+                        app:sectionSubtitle="@{exportedWith}"
+                        app:title="@{@string/exported_with}" />
 
                     <include
                         android:id="@+id/device_settings_exported_at"

@@ -98,6 +98,63 @@ RULES: tuple[Rule, ...] = (
 
     # Record and beacon identifiers. Not secret, but unique to one account's accessories.
     Rule("uuid", re.compile(r"\b[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\b")),
+
+    # ------------------------------------------------------------------ only the app produces these
+    #
+    # The exporter never sees a location or a bundle password, so none of the rules below will
+    # ever fire on a wizard log. They live here anyway, because the alternative is a second
+    # redactor with its own answer to "is my data in this file", and the one thing worse than a
+    # rule that never matches is two sets of rules that disagree.
+
+    # **A location is the most personal thing this app handles**, and four decimal places is
+    # about eleven metres - somebody's home, not a neighbourhood. Labelled first, so the
+    # placeholder keeps the label's meaning.
+    Rule("coordinate", re.compile(r"(?i)\b(?:lat|lon|lng|latitude|longitude)\s*[=:]\s*(-?\d+\.\d+)"), group=1),
+
+    # And unlabelled, as a pair - which is how the app actually writes them:
+    # `String.format("%.4f,%.4f", …)` for a geocoding cache key, and `point=(lat, lon)` for a
+    # tapped marker.
+    #
+    # **Three decimals minimum, and both halves must have them.** Without that this eats version
+    # numbers, durations and byte counts. With it, the shape is specific enough that a false
+    # positive is a pair of precise decimals next to each other, which in a log of this app is
+    # very likely a coordinate anyway.
+    Rule("coordinate", re.compile(r"-?\b\d{1,3}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}\b")),
+
+    # A reverse-geocoded place name: a street, a town, whatever Google or AMap resolved a
+    # coordinate to.
+    #
+    # **Labelled only, because prose has no shape.** "221B Baker St, London NW1 6XE" cannot be
+    # told from any other sentence by regex, and a rule loose enough to catch it would redact
+    # half the log. So this catches it where it is announced as an address and no further -
+    # which is worth having precisely because nothing logs one *today*: the day somebody adds
+    # `Log.d(TAG, "resolved to " + address)`, this is already in place, and nobody has to
+    # remember to come back here.
+    Rule(
+        "place",
+        re.compile(
+            r"(?i)\b(?:address|addressLine|locality|thoroughfare|place|placeName"
+            r"|geocoded(?:\s*to)?)\s*[=:]\s*(.+?)(?=$|[;|]|\s{2,})",
+            re.MULTILINE,
+        ),
+        group=1,
+    ),
+
+    # The code that unlocks an export bundle, as `format_passcode` writes it: three groups of
+    # four from Crockford's base32.
+    #
+    # Grouped form only. The bare twelve characters are indistinguishable from a hash fragment or
+    # half a serial, and redacting every twelve-character uppercase run would take out things the
+    # log is read for. The grouped form is what a person copies, types and pastes.
+    #
+    # **A password in a log is not the same risk as an identifier.** Whoever holds an export and
+    # this can locate the tags in it indefinitely, and unpairing is the only way to withdraw that.
+    Rule("passcode", re.compile(r"\b[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}\b")),
+
+    # The number Apple offers to text a code to, which `main.py` prints when it lists the second
+    # factor methods: `Option: SMS (+44 7700 900123)`. Partly masked by Apple already, and the
+    # unmasked digits are still somebody's phone number.
+    Rule("phone", re.compile(r"(?i)\bSMS\s*\(([^)]+)\)"), group=1),
 )
 
 
