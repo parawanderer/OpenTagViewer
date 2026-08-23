@@ -22,6 +22,7 @@ import androidx.core.view.WindowCompat;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.location.Address;
 import android.location.Geocoder;
 import android.net.Uri;
@@ -62,6 +63,7 @@ import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
 import com.google.android.libraries.places.api.Places;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.BufferedWriter;
@@ -713,26 +715,47 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     /**
-     * Replaces a card's "last updated" line while its tag is audible.
+     * How recently a sighting has to have arrived for {@link #showNearbyStatusOn} to light the
+     * pulse dot rather than dim it.
      *
-     * <p>The two say different things and the newer one wins: "last updated two hours ago"
-     * describes when Apple's network last reported it, while a sighting means this phone can
-     * hear it right now. Showing both would need a taller card, and the row is already measured
-     * to the pixel - see {@code TagCardLayoutTest}.
+     * <p>Under the one-to-three-second gap between advertisements a tag in range genuinely
+     * produces, so the dot visibly lights and dims once per sighting instead of just staying lit
+     * - which is the live-activity read this is for, in place of a number that either sat at
+     * "0s" permanently (driven only by sightings) or needed a second ticker to mean anything.
+     */
+    private static final long PULSE_WINDOW_MS = 1_000L;
+
+    /**
+     * Replaces a card's "last updated" line while its tag is audible, and lights the pulse dot
+     * beside it if a sighting arrived within {@link #PULSE_WINDOW_MS}.
      *
-     * <p>The line goes back to the timestamp on its own once the sighting ages out, because
-     * nothing announces that a tag has left; we simply stop hearing it.
+     * <p>The line says something different from "last updated two hours ago", which describes
+     * when Apple's network last reported it: a sighting means this phone can hear it right now.
+     * Showing both would need a taller card, and the row is already measured to the pixel - see
+     * {@code TagCardLayoutTest}.
+     *
+     * <p>The line - and the dot with it - go back to the timestamp on their own once the
+     * sighting ages out, because nothing announces that a tag has left; we simply stop hearing
+     * it. See the {@code else} branch in {@code updateBeaconCards} that calls this only when a
+     * fresh sighting exists.
      */
     private void showNearbyStatusOn(
             final FrameLayout card, final NearbyTagSighting sighting, final long nowMs) {
         final TextView line = card.findViewById(R.id.device_last_update);
-        // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
-        // callback, before the clock the caller reads has ticked past it.
-        final long secondsAgo = Math.max(0, (nowMs - sighting.getSeenAtMs()) / 1000);
         line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                NearbyTagLabel.signalStrengthBars(sighting.getRssi()),
-                secondsAgo));
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+
+        // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
+        // callback, before the clock the caller reads has ticked past it.
+        final long msSinceSighting = Math.max(0, nowMs - sighting.getSeenAtMs());
+        final boolean pulsing = msSinceSighting < PULSE_WINDOW_MS;
+
+        final ImageView pulse = card.findViewById(R.id.device_nearby_pulse);
+        pulse.setVisibility(VISIBLE);
+        pulse.setImageTintList(ColorStateList.valueOf(MaterialColors.getColor(card, pulsing
+                ? com.google.android.material.R.attr.colorPrimary
+                : com.google.android.material.R.attr.colorOutlineVariant)));
     }
 
     @Override
@@ -2368,6 +2391,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         DateUtils.MINUTE_IN_MILLIS
                 ).toString();
                 deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+                // Nothing live to pulse for once the sighting has aged out.
+                ((ImageView) v.findViewById(R.id.device_nearby_pulse)).setVisibility(GONE);
             }
 
             // **Put an existing card where it now belongs.** Cards are created once and reused,

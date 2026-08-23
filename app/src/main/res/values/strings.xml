@@ -359,7 +359,7 @@ You can set this up now, or any time later from Settings.</string>
     <string name="ring_status_success">Ringing!</string>
     <string name="nearby_now">Nearby</string>
     <string name="nearby_now_with_battery">Nearby · Battery %1$s</string>
-    <string name="nearby_now_with_battery_and_signal">Nearby (%2$s · %3$ds) · Battery %1$s</string>
+    <string name="nearby_now_with_battery_and_signal">Nearby (%2$s) · Battery %1$s</string>
     <string name="battery_from_tag_itself">Read from the tag over Bluetooth just now, not from iCloud.</string>
     <string name="battery_short_full">full</string>
     <string name="battery_short_medium">medium</string>
