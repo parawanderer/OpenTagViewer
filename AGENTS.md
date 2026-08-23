@@ -166,6 +166,7 @@ Skills carry the longer version of a workflow, so this file can stay short:
 | `.claude/skills/add-strings/` | any user-facing string — adding, rewording, removing, checking |
 | `.claude/skills/device-screenshots/` | rendering the UI on the managed device and reading it cheaply |
 | `.claude/skills/watch-pr/` | watching a pushed PR's checks through to a verdict, and acting on it |
+| `.claude/skills/watch-gradle-tests/` | watching a backgrounded emulator suite to a verdict, and telling the silent hangs apart |
 
 The test for whether it belongs here rather than in a comment: would somebody hit it *before*
 reading the code that explains it? Anisette's machine-identity binding is the example — it
@@ -323,6 +324,45 @@ has nothing to do with the code. Recovering from that needs *both* an emulator r
 `./gradlew --stop`, because restarting only the emulator leaves the daemon holding the dead
 bridge. A managed device is created fresh per run, so nothing survives to go stale. It is
 also the only form of this that CI can run unattended.
+
+#### The run sits in `testEmulatorDebugAndroidTest` and never starts a test
+
+**Check the lock count first.** It is a one-line fix and it looks like four other things:
+
+```bash
+cat ~/.android/avd/gradle-managed/active_gradle_devices    # e.g. "MDLockCount 4"
+adb devices                                                # no managed AVD listed
+```
+
+If the count is above zero with no run in flight, that is the fault. Stop the daemons, delete
+the file, run again — AGP recreates it and there is nothing in it worth keeping:
+
+```bash
+./gradlew --stop
+rm ~/.android/avd/gradle-managed/active_gradle_devices
+```
+
+**Why it happens:** AGP counts the managed devices it has in flight in that file, and a run that
+is interrupted rather than finished never gives its slot back. Each `Ctrl-C`, each killed
+background job, each IDE stop button adds one. Once the count reaches the concurrency limit the
+next run waits for a slot that nothing will ever release.
+
+**Why it is worth a heading:** it boots *no emulator at all* and prints nothing while waiting, so
+for the first ten minutes it is indistinguishable from a device starting slowly, and after that
+from every other reason a run can hang. Three runs were abandoned here diagnosing it as port
+contention with a hand-started emulator — which it was not, and `adb devices` said so the whole
+time by listing no managed AVD.
+
+**So prefer letting a run finish over killing it**, and when you do kill one, clear the count in
+the same breath rather than meeting it on the next run.
+
+Two other hangs with the same symptom, so rule them in or out by what they leave behind:
+
+| What you see | What it is |
+| --- | --- |
+| No managed AVD in `adb devices`, no test output | the leaked lock above |
+| A managed AVD is up, tests ran and then stopped mid-suite | the device died — check `adb logcat -b crash`; the emulator's Bluetooth stack aborting has done this here |
+| `connectedDebugAndroidTest` fails to install, or hangs immediately | stale ADB bridge in the daemon — needs *both* an emulator restart and `./gradlew --stop` |
 
 Three consequences worth knowing:
 

@@ -72,6 +72,91 @@ class TestWhatItRemoves:
         assert "725A989D" not in clean("Record 725A989D-D871-49A7-B2FE-948C24F356AB carries a field")
 
 
+class TestTheThingsOnlyTheAppProduces:
+    """
+    Locations, place names, bundle passwords and the number Apple texts a code to.
+
+    None of these appear in a wizard log - the exporter never sees a coordinate or a password.
+    They are here rather than in a second redactor because two sets of rules mean two answers to
+    "is my data in this file", and only one of them would get maintained.
+    """
+
+    @pytest.mark.parametrize("line", [
+        "tapped, point=(51.5074, -0.1278)",
+        "Error reverse geocoding location: 51.5074, -0.1278",
+        "Got geocoding data for 51.5074,-0.1278 (rounded) from cache!",
+        "lat=51.5074 lon=-0.1278",
+        "latitude: 51.5074, longitude: -0.1278",
+    ])
+    def test_a_coordinate_is_somebodys_home(self, line):
+        # Four decimal places is about eleven metres. This is the most personal thing the app
+        # handles, and it is the one identifier that is not a name or a number but a place.
+        out = clean(line)
+
+        assert "51.5074" not in out
+        assert "0.1278" not in out
+
+    def test_the_line_is_still_readable_around_it(self):
+        out = clean("tapped, point=(51.5074, -0.1278)")
+
+        assert out.startswith("tapped, point=(")
+        assert out.endswith(")")
+
+    def test_a_resolved_place_name(self):
+        # Nothing logs one today. The rule is here so that the day somebody adds
+        # `Log.d(TAG, "resolved to " + address)`, nobody has to remember to come back here.
+        out = clean("resolved to address=221B Baker Street, London NW1 6XE")
+
+        assert "Baker Street" not in out
+        assert "NW1" not in out
+
+    def test_a_bundle_passcode(self):
+        # Whoever holds an export and its code can locate those tags indefinitely - unpairing is
+        # the only way to withdraw it. A password in a log is not the same risk as an identifier.
+        out = clean("Trying passcode 4RTZ-9KMX-P2W7 against the bundle")
+
+        assert "4RTZ" not in out
+        assert "P2W7" not in out
+
+    def test_the_number_apple_would_text(self):
+        assert "900123" not in clean("Option: SMS (+44 7700 900123)")
+
+
+class TestItDoesNotEatTheLogLookingForCoordinates:
+    """
+    A coordinate is two decimals side by side, and so is half of everything else in a log.
+
+    This is the rule most likely to over-match, and over-matching is not a cosmetic problem: a
+    redactor that removes the durations and version numbers is one people stop using, and then
+    they post the raw log instead.
+    """
+
+    @pytest.mark.parametrize("line", [
+        # **The one that actually exercises the boundary.** Two adjacent floats is the shape
+        # the rule keys on; what saves this line is that neither has three decimal places.
+        # Without a case like it the guard passes for the wrong reason - the first version of
+        # this list was floats with words between them, which the rule would never have matched
+        # however loose it was, and loosening it to \d+ left every test green.
+        "Render scale factors 1.25, 0.75 applied",
+        "Fetch took 1.25 seconds, parse took 0.5",
+        "FindMy 0.9.1, anisette 3.0",
+        "Key search window is 290 indices wide",
+        "Zone ProtectedCloudStorage fully synced after page 1",
+        "Reading the Manatee view with classA: 64 bytes",
+        "escrowed 2024-03-11",
+    ])
+    def test_what_is_not_a_coordinate(self, line):
+        assert clean(line) == line
+
+    @pytest.mark.parametrize("line", [
+        "Beacon ID F2LX9QABCDEF has 12 reports",
+        "SHA256 fingerprint check passed",
+        "version 1.1.0-beta",
+    ])
+    def test_what_is_not_a_passcode(self, line):
+        assert clean(line) == line
+
+
 class TestWhatItKeeps:
     """
     A log that cannot be read is not a safer log, it is a second round trip.

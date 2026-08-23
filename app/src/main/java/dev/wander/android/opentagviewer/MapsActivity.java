@@ -49,6 +49,8 @@ import com.google.android.gms.maps.model.LatLng;
 
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
+import dev.wander.android.opentagviewer.ui.importing.ImportOutcome;
+import dev.wander.android.opentagviewer.ui.importing.ImportedButNotLocatedDialog;
 import dev.wander.android.opentagviewer.ui.login.TwoFactorAgainOverlay;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.settings.ICloudSetupOfferDialog;
@@ -69,6 +71,8 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import dev.wander.android.opentagviewer.db.room.entity.Import;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import java.util.Locale;
 import java.util.HashMap;
@@ -97,6 +101,7 @@ import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.python.LogRedactor;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.python.PythonAccountLoginException;
@@ -827,25 +832,62 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void onImportFilePicked(Intent data, final String passcode) {
         Log.d(TAG, "File has been picked");
 
-        // combine them into the current list of beaconLocations & show this list
+        // **Two chains, not one, and the split is the whole point.**
+        //
+        // Reading the zip and committing the tags is the import. Going to Apple for their
+        // locations is a separate operation that happens to run next, and it fails for
+        // completely unrelated reasons - a network, a session, an Anisette server. Joined into
+        // one chain they shared an error handler, so every one of those reported "Error
+        // occurred while importing new devices. Try to restart the app and retry" for an import
+        // that had already succeeded and could be seen in the device list.
+        //
+        // Issues #19 and #26 are 34 comments of people working that out for themselves; three
+        // of them fixed their "import error" by changing their Anisette server, which is not
+        // consulted while reading a zip. A marker saying how far the chain got would fix the
+        // message, but decoupling makes the wrong message impossible to write.
         var async = this.extractImportedData(data, passcode)
             .flatMap(this.beaconRepo::addNewImport)
-            .doOnNext((importData) -> {
-                this.runOnUiThread(() -> {
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                importData -> {
                     Toast.makeText(
                             this,
                             this.getString(R.string.loading_location_data_for_x_new_imported_devices, importData.getOwnedBeacons().size()),
                             LENGTH_LONG).show();
+                    this.locateFreshlyImportedTags(importData);
+                },
+                error -> {
+                    // Nothing was stored, so this really is an import failure and can say so.
+                    // The fetch never runs, and the periodic refresh is still waiting on this.
+                    this.initialFetchComplete = true;
+                    this.onImportFailed(data, error);
                 });
-            })
-            /*
-             * Fetching and parsing still run concurrently, but they are merged rather than
-             * zipped: zip completed as soon as the single-emission parse branch did, which
-             * cancelled every accessory after the first. See RxFlows#allThen for the full
-             * account. The two doOnNext handlers write to different maps, so their order
-             * relative to each other does not matter.
-             */
-            .flatMapCompletable(storedBeacons -> RxFlows.allThen(
+    }
+
+    /**
+     * The first fetch for tags that are already on the phone.
+     *
+     * <p><b>Started by a successful import, and answerable for nothing about it.</b> Whatever
+     * happens here, the tags are stored and stay stored - so a failure is about locations, and
+     * the message says that rather than retracting an import that worked.
+     */
+    private void locateFreshlyImportedTags(final ImportData storedBeacons) {
+        /*
+         * Fetching and parsing still run concurrently, but they are merged rather than
+         * zipped: zip completed as soon as the single-emission parse branch did, which
+         * cancelled every accessory after the first. See RxFlows#allThen for the full
+         * account. The two doOnNext handlers write to different maps, so their order
+         * relative to each other does not matter.
+         */
+        // **Deferred, because this is now called from the main thread.**
+        //
+        // `subscribeOn` moves the *subscription*, not the construction - and building this
+        // expression is not free: `combine` streams every beacon into two maps and
+        // `plistFallbacks` walks them again, both evaluated as arguments before `allThen` is
+        // even entered. While this hung off the import chain it inherited that chain's IO
+        // thread; splitting the two handed it to whatever called it, which is the UI thread.
+        // Nothing here belongs there.
+        var async = Completable.defer(() -> RxFlows.allThen(
                     // A last pass once everything has landed, for anything the per-accessory
                     // passes below could not resolve.
                     this.updateBeaconGeocodings(),
@@ -871,6 +913,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     BeaconDataParser.parseAsync(BeaconCombinerUtil.combine(storedBeacons))
                             .doOnNext(this::addBeaconToCurrent)
             ))
+            // **Explicit now that this is its own chain.** It used to inherit whatever thread
+            // `addNewImport` emitted on; nothing here is safe to start on the main one.
+            .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             // An import is a first fetch too. Without this the periodic refresh stays disabled
             // for the rest of the session whenever the app started with nothing stored, which
@@ -879,23 +924,92 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             .subscribe(() -> {
                 this.showLastDeviceLocations();
                 Log.i(TAG, "Finished visualising new location reports!");
-            }, error -> {
-                Log.e(TAG, "Error occurred while importing new devices!", error);
+            }, error -> this.onFirstFetchAfterImportFailed(error));
+    }
 
-                final ZipImporterException.Reason reason = ZipImporterException.reasonOf(error);
-                if (reason == ZipImporterException.Reason.LOCKED
-                        || reason == ZipImporterException.Reason.WRONG_PASSCODE) {
-                    // A question, not a failure. The exporter locks bundles by default, so this
-                    // is the ordinary path rather than something having gone wrong.
-                    BundlePasscodeDialog.show(
-                            this,
-                            reason == ZipImporterException.Reason.WRONG_PASSCODE,
-                            code -> this.onImportFilePicked(data, code));
-                    return;
-                }
+    /**
+     * What to say when the zip could not be read, or the tags could not be stored.
+     *
+     * @param data the picked file, kept so a locked bundle can be retried with a code rather
+     *             than sending the user back to the picker
+     */
+    private void onImportFailed(final Intent data, final Throwable error) {
+        Log.e(TAG, "Error occurred while importing new devices!", error);
 
+        switch (ImportOutcome.of(error)) {
+            case ASK_FOR_THE_PASSCODE:
+                // A question, not a failure. The exporter locks bundles by default, so this is
+                // the ordinary path rather than something having gone wrong.
+                BundlePasscodeDialog.show(
+                        this,
+                        ZipImporterException.reasonOf(error)
+                                == ZipImporterException.Reason.WRONG_PASSCODE,
+                        code -> this.onImportFilePicked(data, code));
+                return;
+
+            case REPORT_THE_IMPORT:
+                // **An import nobody can explain goes to the report page, not to a toast.**
+                //
+                // Every named reason has advice worth giving - the wrong file, a damaged zip, a
+                // passcode. This one has none, and what it used to say was "try to restart the
+                // app and retry", which cannot help and asks somebody to repeat the thing that
+                // just failed.
+                Log.w(TAG, "Import failed for a reason nothing here can name", error);
+                this.startActivity(ErrorReportActivity.intentFor(
+                        this, describe(error), R.string.error_report_body_import));
+                return;
+
+            default:
                 Toast.makeText(this, importFailureMessage(error), LENGTH_LONG).show();
-            });
+        }
+    }
+
+    /**
+     * What to say when the tags are stored and Apple could not be asked where they are.
+     *
+     * <p><b>Never that the import failed.</b> It did not - the tags are in the database and in
+     * the device list, and telling somebody otherwise sends them to re-import a bundle that
+     * imported fine. That was the state of issues #19 and #26.
+     *
+     * <p>The two causes with real handling keep it: a session Apple has stopped accepting goes
+     * back to sign-in, and one wanting a code gets asked for one. What is left is overwhelmingly
+     * the Anisette server, which is why the dialog names it - it is the answer three reporters
+     * arrived at themselves, one of them 25 comments in.
+     *
+     * <p><b>And no report button, deliberately.</b> The bug page belongs to the zip half. This
+     * half fails for reasons that are somebody's server being down or their phone being on a
+     * train, it retries by itself every minute, and inviting a report each time it happens would
+     * fill the tracker with weather.
+     */
+    private void onFirstFetchAfterImportFailed(final Throwable error) {
+        Log.e(TAG, "Tags were imported, but their first location fetch failed", error);
+
+        if (isAccountRestoreFailure(error)) {
+            handleAccountRestoreFailureOnUiThread();
+            return;
+        }
+
+        // Self-handling and asynchronous: it asks Apple whether this session actually wants a
+        // code, and does nothing if it does not. Harmless to call alongside the dialog.
+        this.askForACodeIfTheSessionNeedsOne();
+
+        ImportedButNotLocatedDialog.show(
+                this, describe(error), this::showSettingsPage);
+    }
+
+    /**
+     * The failure in the words it arrived in, for pasting into a report.
+     *
+     * <p>Class name and message rather than a stack trace: the trace is in the log the page
+     * offers, and a screenful of frames is not something anybody reads off a phone.
+     */
+    private static String describe(final Throwable error) {
+        if (error == null) {
+            return "unknown";
+        }
+        return error.getMessage() == null
+                ? error.getClass().getSimpleName()
+                : error.getClass().getSimpleName() + ": " + error.getMessage();
     }
 
     /**
@@ -938,29 +1052,84 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             return;
         }
 
-        String logLines = LogCollectorUtil.getLastLogs();
+        // **Off the main thread, which it was not.** Four blocking things happen here - reading
+        // the database for the import provenance, spawning `logcat` and reading it out, running
+        // it through the redactor, and writing the file. All of them were on the UI thread. The
+        // database one would throw outright (Room refuses main-thread queries), and the rest
+        // were an ANR waiting for a slow enough device.
+        var async = Observable.fromCallable(() -> {
+                    final Import lastImport =
+                            OpenTagViewerDatabase.getInstance(this.getApplicationContext())
+                                    .importDao().getMostRecent();
 
-        try (OutputStream os = this.getContentResolver().openOutputStream(writeTarget)) {
-            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
-            bw.write(logLines);
-            bw.flush();
-            bw.close();
+                    final String logLines = LogCollectorUtil.getLastLogsWithHeader(
+                            BuildConfig.VERSION_NAME,
+                            BuildConfig.BUILD_COMMIT,
+                            lastImport == null ? null : lastImport.exportedVia);
 
-            Log.d(TAG, "Logs export to " + writeTarget + " complete!");
+                    // **Redacted here too, and not because this button is more dangerous than
+                    // the other one - because it is the same log.** This wrote a raw logcat
+                    // while the error page's copy went through the redactor, which is two
+                    // answers to "is my Apple ID in this file" from one app. The file from this
+                    // button is the one that historically got attached to issues.
+                    final LogRedactor.Redacted cleaned =
+                            AppDependencies.logRedactor().redact(logLines);
+                    if (cleaned == null) {
+                        // Nothing written, deliberately. A raw log cannot be un-posted, and
+                        // somebody exporting one is on their way to attaching it somewhere.
+                        return new ExportedLog(null, null);
+                    }
 
-            Toast.makeText(
-                    this,
-                    R.string.log_file_has_been_exported_successfully,
-                    LENGTH_LONG
-            ).show();
+                    try (OutputStream os =
+                                 this.getContentResolver().openOutputStream(writeTarget)) {
+                        final BufferedWriter bw =
+                                new BufferedWriter(new OutputStreamWriter(os));
+                        bw.write(cleaned.getText());
+                        bw.flush();
+                        bw.close();
+                    }
+                    return new ExportedLog(writeTarget, cleaned.getSummary());
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        written -> {
+                            if (written.target == null) {
+                                Log.w(TAG, "The log could not be cleaned, so none was written");
+                                Toast.makeText(
+                                        this,
+                                        R.string.export_logs_cannot_be_cleaned,
+                                        LENGTH_LONG
+                                ).show();
+                                return;
+                            }
 
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to save file", e);
-            Toast.makeText(
-                    this,
-                    R.string.failed_to_export_log_file,
-                    LENGTH_LONG
-            ).show();
+                            Log.d(TAG, "Logs export to " + written.target + " complete!");
+                            Toast.makeText(
+                                    this,
+                                    this.getString(
+                                            R.string.export_logs_cleaned, written.summary),
+                                    LENGTH_LONG
+                            ).show();
+                        },
+                        error -> {
+                            Log.e(TAG, "Failed to save file", error);
+                            Toast.makeText(
+                                    this,
+                                    R.string.failed_to_export_log_file,
+                                    LENGTH_LONG
+                            ).show();
+                        });
+    }
+
+    /** Where the log went and what came out of it, or a null target meaning nothing was written. */
+    private static final class ExportedLog {
+        private final Uri target;
+        private final String summary;
+
+        private ExportedLog(final Uri target, final String summary) {
+            this.target = target;
+            this.summary = summary;
         }
     }
 

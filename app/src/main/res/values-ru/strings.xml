@@ -275,4 +275,27 @@
     <string name="icloud_results_next">Далее</string>
     <string name="icloud_registered_serial_label">Серийный номер: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
+    <string name="imported_from_x">Метки импортированы из %1$s</string>
+    <string name="imported_from_nothing">Метки из файла не импортировались</string>
+    <string name="error_report_title">Это ошибка приложения</string>
+    <string name="error_report_body">Пришло что-то, что приложение не умеет читать, поэтому повторная попытка не поможет и менять настройки не нужно.\n\nОбычно это значит, что Apple что-то изменила. Отчёт с приложенным журналом делает ошибку исправимой — журнал почти всегда указывает, где именно.</string>
+    <string name="error_report_button">Сообщить об ошибке</string>
+    <string name="error_report_needs_github">Откроется GitHub — там сначала попросят войти или создать учётную запись.</string>
+    <string name="error_report_share_log">Получить журнал</string>
+    <string name="error_report_log_cleaned">Журнал очищается перед отправкой из приложения: %1$s</string>
+    <string name="error_report_log_unavailable">Сейчас журналом поделиться нельзя: часть приложения, которая удаляет из него личные данные, не работает. Сообщение без журнала всё равно поможет.</string>
+    <string name="error_report_what_failed">Что не удалось</string>
+    <string name="error_report_body_import">Приложение не смогло прочитать этот файл и не может сказать, что с ним не так, — повторная попытка с тем же файлом не поможет.\n\nЕсли он получен из экспортера, он должен был подойти, и именно поэтому об этом стоит сообщить. Журнал обычно указывает, на чём всё остановилось.</string>
+    <string name="imported_but_not_located_title">Метки импортированы</string>
+    <string name="imported_but_not_located_body">Они сохранены на этом телефоне и там останутся. Не удалось другое — запросить у Apple, где они находятся:\n\n%1$s\n\nОбычно дело в сервере Anisette, через который проходит вход: когда публичный сервер недоступен, местоположения перестают приходить, хотя всё остальное выглядит нормально. Если данные для входа создаются на самом устройстве, чужой сервер больше не нужен.\n\nПриложение повторяет попытку каждую минуту, так что кратковременный сбой пройдёт сам.</string>
+    <string name="imported_but_not_located_open_settings">Данные для входа</string>
+    <string name="error_report_close">Закрыть</string>
+    <string name="error_report_log_how">В каком виде нужен журнал?</string>
+    <string name="error_report_log_copy">Скопировать, чтобы вставить в отчёт</string>
+    <string name="error_report_log_save">Сохранить файлом, чтобы прикрепить</string>
+    <string name="error_report_log_copied">Журнал скопирован</string>
+    <string name="export_logs_cannot_be_cleaned">Журнал не удалось сохранить: часть приложения, которая удаляет из него личные данные, не работает. Ничего не записано — неочищенный журнал отдавать не стоит.</string>
+    <string name="export_logs_cleaned">Журнал сохранён. Перед этим он был очищен: %1$s</string>
+    <string name="exported_with">Экспортировано через</string>
+    <string name="exported_with_something_unrecorded">Не записано — более старый экспортер</string>
 </resources>

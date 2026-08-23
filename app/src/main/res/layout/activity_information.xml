@@ -76,6 +76,23 @@
                     android:textAlignment="center"
                     android:textSize="16sp" />
 
+                <!--
+                  **The two questions a bug report opens with, answered where somebody can read
+                  them off.** The version was already here; what it was missing is which exporter
+                  made the bundle - and the alternative was people opening an export zip to read
+                  a version line out of it, which is a file holding the private keys to their
+                  tags. The issue template says not to, and now it does not have to.
+                -->
+                <TextView
+                    android:id="@+id/appImportedFrom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textAlignment="center"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    tools:text="Tags imported from OpenTagViewer.wizard:1.3.0" />
+
                 <TextView
                     android:id="@+id/appAbout"
                     android:layout_width="match_parent"
