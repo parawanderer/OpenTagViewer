@@ -50,6 +50,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
@@ -57,6 +58,7 @@ import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
@@ -154,6 +156,23 @@ public class DeviceInfoActivity extends AppCompatActivity
      */
     private Disposable nearbyWatchDisposable;
 
+    /**
+     * Hides the live battery row once its last sighting is too old to stand behind - reset by
+     * every new sighting, so the row only ages out when the tag has genuinely gone quiet.
+     *
+     * <p>Without this the row never aged at all: once a tag had been heard, "read from the tag
+     * just now" stayed on screen for hours after the tag left earshot - exactly the staleness
+     * the row exists to be free of. Same clock as the map card's badge:
+     * {@link NearbyTagSightings#FRESH_FOR_MS}.
+     */
+    private Disposable liveBatteryExpiry;
+
+    /** The pending retry after the scan died mid-session - see {@link #onNearbyWatchEnded}. */
+    private Disposable nearbyWatchRetryDisposable;
+
+    /** The one place a Bluetooth sighting is persisted - see {@link AccessorySightingPersister}. */
+    private AccessorySightingPersister sightingPersister;
+
     private boolean hasNameChanges = false;
 
     @Override
@@ -177,6 +196,7 @@ public class DeviceInfoActivity extends AppCompatActivity
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
@@ -638,31 +658,27 @@ public class DeviceInfoActivity extends AppCompatActivity
         }
 
         this.nearbyWatchDisposable = new NearbyTagWatcher(
-                AppDependencies.accessoryMacResolver(), this::correctAlignmentFromSighting)
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting)
                 .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         this::showLiveBattery,
-                        error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error));
+                        error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error),
+                        this::onNearbyWatchEnded);
     }
 
     /**
-     * Feeds a passive sighting back into alignment self-correction, the same way the ring
-     * button's explicit scan already does - see {@code NearbyTagWatcher.SightingListener}.
-     *
-     * <p><b>Persists only - deliberately does not reread {@link #beaconData} or restart the
-     * watch afterward.</b> See {@code MapsActivity}'s copy of this method for why a first
-     * attempt at that was reverted: the broader version it shared code with reset every card's
-     * geocoding on the map screen. This screen only ever watches one tag, so the same reread
-     * here would likely have been safe on its own, but the two were built and tested together
-     * and are reverted together until the narrower fix lands for both.
+     * The scan died mid-session (Bluetooth off, or the platform refused the scan) rather than
+     * being stopped - disposal skips onComplete. Retried every 30 seconds so the live battery
+     * row comes back on its own when the radio does; see {@code MapsActivity}'s twin for the
+     * budget reasoning.
      */
-    private void correctAlignmentFromSighting(
-            final String beaconId, final String mac, final long seenAtMs) {
-        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
-                .subscribe(() -> { }, error -> Log.w(TAG,
-                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
-                        error));
+    private void onNearbyWatchEnded() {
+        Log.i(TAG, "Nearby watch ended mid-session for beaconId=" + this.beaconId
+                + "; retrying in 30s");
+        this.nearbyWatchRetryDisposable = Observable
+                .timer(30, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.startWatchingForThisTag());
     }
 
     private void stopWatchingForThisTag() {
@@ -670,6 +686,15 @@ public class DeviceInfoActivity extends AppCompatActivity
             this.nearbyWatchDisposable.dispose();
         }
         this.nearbyWatchDisposable = null;
+        if (this.liveBatteryExpiry != null && !this.liveBatteryExpiry.isDisposed()) {
+            this.liveBatteryExpiry.dispose();
+        }
+        this.liveBatteryExpiry = null;
+        if (this.nearbyWatchRetryDisposable != null
+                && !this.nearbyWatchRetryDisposable.isDisposed()) {
+            this.nearbyWatchRetryDisposable.dispose();
+        }
+        this.nearbyWatchRetryDisposable = null;
     }
 
     /**
@@ -685,6 +710,17 @@ public class DeviceInfoActivity extends AppCompatActivity
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
                 NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
         this.findViewById(R.id.device_settings_live_battery).setVisibility(VISIBLE);
+
+        // Every sighting restarts the expiry, so the row hides only once the tag has been
+        // quiet for the whole window - see the field doc.
+        if (this.liveBatteryExpiry != null && !this.liveBatteryExpiry.isDisposed()) {
+            this.liveBatteryExpiry.dispose();
+        }
+        this.liveBatteryExpiry = Observable
+                .timer(NearbyTagSightings.FRESH_FOR_MS, TimeUnit.MILLISECONDS,
+                        AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.findViewById(R.id.device_settings_live_battery)
+                        .setVisibility(GONE));
     }
 
     @Override
@@ -771,37 +807,13 @@ public class DeviceInfoActivity extends AppCompatActivity
      * {@link #showPlaySoundStatus}) or the terminal outcome.
      */
     private void handlePlaySoundUpdate(final BleSoundTriggerUpdate update) {
-        this.keepWhatTheSightingProved(update);
+        this.sightingPersister.keepWhatTheSightingProved(this.beaconId, update);
 
         if (update.getPhase() != BleSoundTriggerPhase.DONE) {
             this.showPlaySoundStatus(phaseMessageRes(update.getPhase()), LENGTH_SHORT);
             return;
         }
         this.showPlaySoundResult(update.getResult());
-    }
-
-    /**
-     * Keep the alignment a Bluetooth sighting proves, so the next scan is cheap.
-     *
-     * <p>Fire and forget: this runs after the sound has already played or failed, and the user
-     * asked for a noise rather than for a database write. See
-     * {@code BeaconRepository#recordAccessorySighting}.
-     */
-    private void keepWhatTheSightingProved(final BleSoundTriggerUpdate update) {
-        if (update.getPhase() != BleSoundTriggerPhase.DONE
-                || update.getResult().getMatchedMac() == null) {
-            return;
-        }
-        this.beaconRepo.recordAccessorySighting(
-                        this.beaconId,
-                        update.getResult().getMatchedMac(),
-                        System.currentTimeMillis(),
-                        // No hint: the ring path knows which address answered but not which
-                        // index it came from - see BleSoundTriggerResult. Python falls back to
-                        // checking the whole window, which is what it did before hints existed.
-                        null)
-                .subscribe(() -> { }, error ->
-                        Log.d(TAG, "Could not keep the alignment from a sighting", error));
     }
 
     private static int phaseMessageRes(final BleSoundTriggerPhase phase) {
