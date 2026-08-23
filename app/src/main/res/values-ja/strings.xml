@@ -325,4 +325,12 @@
     <string name="ring_status_connecting">接続中…</string>
     <string name="ring_status_triggering">送信中…</string>
     <string name="ring_status_success">鳴っています！</string>
+    <string name="nearby_now">近くにあります</string>
+    <string name="nearby_now_with_battery">近くにあります · バッテリー%1$s</string>
+    <string name="battery_from_tag_itself">たった今Bluetoothでタグ本体から読み取りました。iCloudの値ではありません。</string>
+    <string name="battery_short_full">十分</string>
+    <string name="battery_short_medium">中</string>
+    <string name="battery_short_low">少</string>
+    <string name="battery_short_very_low">危険</string>
+    <string name="battery">バッテリー</string>
 </resources>

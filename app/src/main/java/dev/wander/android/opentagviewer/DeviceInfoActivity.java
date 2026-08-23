@@ -47,6 +47,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -54,6 +55,9 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityDeviceInfoBinding;
@@ -139,6 +143,16 @@ public class DeviceInfoActivity extends AppCompatActivity
     /** Reused so each new status (searching/connecting/sending/result) replaces the last one
      * on screen instead of queuing behind it - see {@link #showPlaySoundStatus}. */
     private Toast playSoundStatusToast;
+
+    /**
+     * Listens for this one tag while the screen is open, to show a battery reading taken off the
+     * tag itself rather than out of the iCloud record.
+     *
+     * <p><b>Its own scan rather than one handed over from the map.</b> Opening this screen
+     * pauses {@code MapsActivity}, which stops that scan, so a sighting passed across would be
+     * stale on arrival - and this screen can also be reached without the map having run at all.
+     */
+    private Disposable nearbyWatchDisposable;
 
     private boolean hasNameChanges = false;
 
@@ -597,7 +611,64 @@ public class DeviceInfoActivity extends AppCompatActivity
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        this.startWatchingForThisTag();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        this.stopWatchingForThisTag();
+    }
+
+    /**
+     * Listen for this tag while the screen is open, to fill in the live battery row.
+     *
+     * <p>Silent when it cannot run - no permission, Bluetooth off, or an accessory JSON that has
+     * not been backfilled all simply leave the row hidden, which is what it looks like when the
+     * tag is out of earshot anyway.
+     */
+    private void startWatchingForThisTag() {
+        this.stopWatchingForThisTag();
+
+        final String accessoryJson = this.beaconData.getOwnedBeaconInfo().accessoryJson;
+        if (accessoryJson == null || accessoryJson.isEmpty()) {
+            return;
+        }
+
+        this.nearbyWatchDisposable = new NearbyTagWatcher(AppDependencies.accessoryMacResolver())
+                .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::showLiveBattery,
+                        error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error));
+    }
+
+    private void stopWatchingForThisTag() {
+        if (this.nearbyWatchDisposable != null && !this.nearbyWatchDisposable.isDisposed()) {
+            this.nearbyWatchDisposable.dispose();
+        }
+        this.nearbyWatchDisposable = null;
+    }
+
+    /**
+     * Shows the battery level the tag just reported over the air.
+     *
+     * <p>Appears only once the tag has actually been heard, and never falls back to the iCloud
+     * value: the whole reason this row is outside the debug panel is that it cannot be stale, so
+     * quietly filling it from the record that can would defeat it. The debug row keeps that
+     * value, with its caveat.
+     */
+    private void showLiveBattery(final NearbyTagSighting sighting) {
+        this.binding.setLiveBatteryLevel(this.getString(
+                NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+        this.findViewById(R.id.device_settings_live_battery).setVisibility(VISIBLE);
+    }
+
+    @Override
     protected void onDestroy() {
+        this.stopWatchingForThisTag();
         if (this.hardwareLookup != null && !this.hardwareLookup.isDisposed()) {
             this.hardwareLookup.dispose();
         }

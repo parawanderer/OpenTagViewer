@@ -132,6 +132,10 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerStatus;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
+import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -212,6 +216,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     /** Which tag's ring button asked for BLE permission, so the result callback - which carries
      * no context of its own - knows what to start once it is granted. */
     private String ringPermissionRequestBeaconId;
+
+    /**
+     * Tags this phone can hear right now, and how full their batteries say they are.
+     *
+     * <p>Fed by a scan that runs only while this screen is resumed, so it is a display of what
+     * is audible rather than any kind of tracking. Entries age out on their own - see
+     * {@link NearbyTagSightings}.
+     */
+    private final NearbyTagSightings nearbySightings = new NearbyTagSightings();
+
+    /** The in-flight nearby scan, disposed in {@link #onPause()} so the radio stops with the screen. */
+    private Disposable nearbyWatchDisposable;
 
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
@@ -519,6 +535,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     protected void onPause() {
         super.onPause();
 
+        this.stopWatchingForNearbyTags();
+
         if (this.mapProvider != null) {
             IMapProvider.CameraPosition pos = this.mapProvider.getCameraPosition();
             if (pos != null) {
@@ -570,7 +588,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // on this screen until the periodic read came round.
         this.rereadTheAccountIfAllowed(true);
         this.reSchedulePeriodicTagLocationRefresher();
-        
+        this.startWatchingForNearbyTags();
+
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onResume();
@@ -599,6 +618,81 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     protected void onStop() {
         super.onStop();
         this.stopContinuousPing();
+    }
+
+    /**
+     * Listen for the user's own tags for as long as this screen is in front of somebody.
+     *
+     * <p><b>Tied to the screen rather than to a service, deliberately.</b> Nothing here runs in
+     * the background: this starts in {@code onResume} and is disposed in {@code onPause}, so the
+     * radio is on only while a person is looking at the result. That keeps it a display feature
+     * rather than a tracking one, and a scan next to a lit screen costs little beside the screen.
+     *
+     * <p>Silent when it cannot run. No permission, Bluetooth off, or no tags with usable
+     * accessory JSON all mean no sightings, which renders as no badges - the same as hearing
+     * nothing. None of those is worth interrupting somebody looking at a map for.
+     */
+    private void startWatchingForNearbyTags() {
+        this.stopWatchingForNearbyTags();
+
+        final Map<String, String> accessoryJsonByBeaconId = new HashMap<>();
+        for (final var entry : this.beacons.entrySet()) {
+            final String accessoryJson = entry.getValue().getInfo().getOwnedBeaconAccessoryJson();
+            if (accessoryJson != null && !accessoryJson.isEmpty()) {
+                accessoryJsonByBeaconId.put(entry.getKey(), accessoryJson);
+            }
+        }
+        if (accessoryJsonByBeaconId.isEmpty()) {
+            return;
+        }
+
+        this.nearbyWatchDisposable = new NearbyTagWatcher(AppDependencies.accessoryMacResolver())
+                .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::onTagHeardNearby,
+                        error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error));
+    }
+
+    private void stopWatchingForNearbyTags() {
+        if (this.nearbyWatchDisposable != null && !this.nearbyWatchDisposable.isDisposed()) {
+            this.nearbyWatchDisposable.dispose();
+        }
+        this.nearbyWatchDisposable = null;
+        // Nothing on screen may go on claiming a tag is here once we have stopped listening.
+        this.nearbySightings.clear();
+    }
+
+    /**
+     * Redraws one card when its tag is heard.
+     *
+     * <p>Only that card, and only when it exists: a sighting arrives per advertisement, which is
+     * every second or two per tag, and redrawing the whole row that often would be visible.
+     */
+    private void onTagHeardNearby(final NearbyTagSighting sighting) {
+        this.nearbySightings.record(sighting);
+
+        final FrameLayout card = this.dynamicCardsForTag.get(sighting.getBeaconId());
+        if (card != null) {
+            this.showNearbyStatusOn(card, sighting);
+        }
+    }
+
+    /**
+     * Replaces a card's "last updated" line while its tag is audible.
+     *
+     * <p>The two say different things and the newer one wins: "last updated two hours ago"
+     * describes when Apple's network last reported it, while a sighting means this phone can
+     * hear it right now. Showing both would need a taller card, and the row is already measured
+     * to the pixel - see {@code TagCardLayoutTest}.
+     *
+     * <p>The line goes back to the timestamp on its own once the sighting ages out, because
+     * nothing announces that a tag has left; we simply stop hearing it.
+     */
+    private void showNearbyStatusOn(final FrameLayout card, final NearbyTagSighting sighting) {
+        final TextView line = card.findViewById(R.id.device_last_update);
+        line.setText(this.getString(R.string.nearby_now_with_battery,
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel()))));
     }
 
     @Override
@@ -2208,14 +2302,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 deviceLocation.setText(geoLocation.getAddressLine(0));
             }
 
-            // the last updated time
+            // the last updated time - unless the tag is audible right now, which is both newer
+            // and more useful than when Apple's network last reported it. See
+            // showNearbyStatusOn; a sighting ages out on its own, so this line comes back.
             TextView deviceLastUpdate = v.findViewById(R.id.device_last_update);
-            final var timeAgo = DateUtils.getRelativeTimeSpanString(
-                    lastLocation.getTimestamp(),
-                    now,
-                    DateUtils.MINUTE_IN_MILLIS
-            ).toString();
-            deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+            final NearbyTagSighting heardNow = this.nearbySightings.freshFor(beaconId, now);
+            if (heardNow != null) {
+                this.showNearbyStatusOn(v, heardNow);
+            } else {
+                final var timeAgo = DateUtils.getRelativeTimeSpanString(
+                        lastLocation.getTimestamp(),
+                        now,
+                        DateUtils.MINUTE_IN_MILLIS
+                ).toString();
+                deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+            }
 
             // **Put an existing card where it now belongs.** Cards are created once and reused,
             // so a card added before the user rearranged anything keeps its original slot

@@ -102,6 +102,12 @@
             name="batteryLevel"
             type="String" />
 
+        <!-- The reading taken off the tag itself over Bluetooth, as opposed to batteryLevel
+             above, which comes from the iCloud record and may be years old. -->
+        <variable
+            name="liveBatteryLevel"
+            type="String" />
+
         <variable
             name="deviceModel"
             type="String" />
@@ -384,6 +390,27 @@
                         app:onClick="@{clickItemHandler}"
                         app:sectionSubtitle="@{deviceType}"
                         app:title="@{@string/type}" />
+
+                    <!--
+                        Battery, but only the reading this phone just took off the tag itself
+                        over Bluetooth.
+
+                        The debug panel below has a battery row too, and it stays there: that one
+                        comes from the iCloud record, which only Apple devices ever refresh, so
+                        for a tag imported from a file it is whatever was true when the export
+                        was made. This one is worth showing plainly precisely because it does not
+                        have that problem - and it is GONE whenever the tag is not audible,
+                        rather than falling back to the stale value, since a number with no way
+                        to tell which kind it is would be worse than no number.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_live_battery"
+                        layout="@layout/settings_item_noicon_clickable"
+                        android:visibility="gone"
+                        app:clickable="@{false}"
+                        app:sectionSubtitle="@{liveBatteryLevel}"
+                        app:title="@{@string/battery}"
+                        tools:visibility="visible" />
 
                     <!--
                         Shown only when Type could not be resolved to a name and the record still

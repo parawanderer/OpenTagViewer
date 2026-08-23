@@ -325,4 +325,12 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="ring_status_connecting">Verbinden…</string>
     <string name="ring_status_triggering">Versturen…</string>
     <string name="ring_status_success">Rinkelt!</string>
+    <string name="nearby_now">In de buurt</string>
+    <string name="nearby_now_with_battery">In de buurt · Batterij %1$s</string>
+    <string name="battery_from_tag_itself">Zojuist via Bluetooth van de tag zelf gelezen, niet uit iCloud.</string>
+    <string name="battery_short_full">vol</string>
+    <string name="battery_short_medium">half</string>
+    <string name="battery_short_low">laag</string>
+    <string name="battery_short_very_low">kritiek</string>
+    <string name="battery">Batterij</string>
 </resources>
