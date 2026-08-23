@@ -175,6 +175,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
         WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+        // The last row is the debug switch, and the navigation bar was sitting on top of it.
+        WindowPaddingUtil.insertUIBottomPadding(this.findViewById(R.id.settings_scroll_area));
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
         this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);
