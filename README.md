@@ -23,7 +23,7 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 <br>
 
 > [!WARNING]
-> This project is not afilliated with Apple Inc. or Android/Google LLC in any capacity
+> This project is not affiliated with Apple Inc. or Android/Google LLC in any capacity
 
 
 |Video Demo|Demo: ☀️ Light Mode|Demo: 🌑 Dark Mode|
@@ -96,9 +96,9 @@ This started as a "hackathony" thing thrown together ASAP and made presentable f
 
 To get started with the repo, see:
 
-📋 **[CONTRIBUTING.md](./CONTRIBUTING.md)** covers getting set up (the JDK, the SDK, the Maps API key, the git hook) and how to run every test suite, as well as the CI setup.
+📋 **[CONTRIBUTING.md](./CONTRIBUTING.md)**: covers getting set up (the JDK, the SDK, the Maps API key, the git hook) and how to run every test suite, as well as the CI setup.
 
-📐 **[AGENTS.md](./AGENTS.md)** is the rules a change has to satisfy migrations, Anisette, API keys, attribution. Written for automated contributors, but contains useful information for people too (best queried via a coding assistant rather than read directly).
+📐 **[AGENTS.md](./AGENTS.md)**: the rules a change has to satisfy migrations, Anisette, API keys, attribution. Written for automated contributors, but contains useful information for people too (best queried via a coding assistant rather than read directly).
 
 ### Credits
 
