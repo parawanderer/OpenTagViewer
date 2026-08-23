@@ -1,6 +1,5 @@
 package dev.wander.android.opentagviewer.anisette;
 
-import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -8,12 +7,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -44,7 +40,6 @@ import java.util.zip.ZipOutputStream;
  * weekly workflow exists. The two are complements: that one watches the file, this one watches
  * the reader.
  */
-@RunWith(AndroidJUnit4.class)
 public class PullingLibrariesOutOfAnApkTest {
 
     private static final String ABI = "arm64-v8a";
@@ -59,9 +54,7 @@ public class PullingLibrariesOutOfAnApkTest {
 
     @Before
     public void makeSomewhereToDownloadTo() throws IOException {
-        this.destination = new File(
-                getInstrumentation().getTargetContext().getCacheDir(),
-                "adi-fetch-test-" + System.nanoTime());
+        this.destination = Files.createTempDirectory("adi-fetch-test").toFile();
     }
 
     @After

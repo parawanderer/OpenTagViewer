@@ -1,7 +1,5 @@
 package dev.wander.android.opentagviewer.anisette;
 
-import android.util.Log;
-
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,8 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * offset.
  */
 public final class FakeApkServer implements Closeable {
-
-    private static final String TAG = "FakeApkServer";
 
     private final ServerSocket socket;
     private final byte[] body;
@@ -93,7 +89,10 @@ public final class FakeApkServer implements Closeable {
                 this.answer(client);
             } catch (final IOException e) {
                 if (!this.stopped.get()) {
-                    Log.w(TAG, "failed to answer a request", e);
+                    // Printed rather than swallowed: this runs on its own thread, so an
+                    // exception here surfaces as the test timing out on a socket read with
+                    // nothing to say why.
+                    System.err.println("FakeApkServer: failed to answer a request: " + e);
                 }
                 return;
             }
