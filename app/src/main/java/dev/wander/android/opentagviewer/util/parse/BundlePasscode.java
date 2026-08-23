@@ -1,5 +1,6 @@
 package dev.wander.android.opentagviewer.util.parse;
 
+import java.security.SecureRandom;
 import java.util.Locale;
 
 /**
@@ -31,7 +32,57 @@ public final class BundlePasscode {
     /** Anything a person might put between groups, including what a paste can drag in. */
     private static final String SEPARATORS = " -_\t\r\n";
 
+    /** How the code is broken up for reading. Display only - the password has no hyphens. */
+    private static final int GROUP = 4;
+
     private BundlePasscode() {}
+
+    /**
+     * A new code, for a bundle this app is about to write.
+     *
+     * <p><b>{@link SecureRandom}, and it is not a formality.</b> The zip format derives its key
+     * with PBKDF2-HMAC-SHA1 at 1000 iterations, which is fixed by the format and cannot be
+     * raised - so the code itself is the whole of the security, and twelve characters of this
+     * alphabet is about sixty bits. A predictable generator would reduce that to the seed, and
+     * an exported accessory cannot be revoked except by unpairing it.
+     *
+     * <p>Matches {@code generate_passcode} in {@code opentagviewer_export/passcode.py}: same
+     * alphabet, same length. It has to, because either program's bundle is opened by this app.
+     */
+    public static String generate() {
+        final SecureRandom random = new SecureRandom();
+        final StringBuilder code = new StringBuilder(LENGTH);
+
+        for (int i = 0; i < LENGTH; i++) {
+            code.append(ALPHABET.charAt(random.nextInt(ALPHABET.length())));
+        }
+
+        return code.toString();
+    }
+
+    /**
+     * The code as a person should see it: {@code H4K2-9WMR-7TQX}.
+     *
+     * <p><b>Grouping is for reading and typing, and nothing else.</b> The password is the
+     * undelimited string - {@link #normalise} folds these hyphens straight back out, which is
+     * what lets somebody paste either form into the import dialog.
+     *
+     * <p>Twelve unbroken characters is what people mis-transcribe; the alphabet already drops the
+     * letters that get misread, and grouping handles the rest of the problem, which is losing
+     * your place.
+     */
+    public static String format(final String code) {
+        final StringBuilder grouped = new StringBuilder(code.length() + code.length() / GROUP);
+
+        for (int i = 0; i < code.length(); i++) {
+            if (i > 0 && i % GROUP == 0) {
+                grouped.append('-');
+            }
+            grouped.append(code.charAt(i));
+        }
+
+        return grouped.toString();
+    }
 
     /**
      * The exact string the bundle was encrypted with.
