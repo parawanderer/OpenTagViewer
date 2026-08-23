@@ -80,6 +80,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -229,6 +230,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     /** The in-flight nearby scan, disposed in {@link #onPause()} so the radio stops with the screen. */
     private Disposable nearbyWatchDisposable;
+
+    /**
+     * Redraws the cards once a second while the nearby scan is running, so a nearby card's
+     * "heard N seconds ago" keeps counting up between sightings instead of only changing when
+     * one arrives.
+     *
+     * <p>A separate ticker rather than something {@link #onTagHeardNearby} drives, because a
+     * sighting fires roughly every one to three seconds while a tag is genuinely in range - so
+     * driving the redraw from sightings alone would repaint the line back to "0s" almost as
+     * often as it changed, and never show the gap growing in between.
+     */
+    private Disposable nearbyStatusTickerDisposable;
 
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
@@ -664,6 +677,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .subscribe(
                         this::onTagHeardNearby,
                         error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error));
+
+        this.nearbyStatusTickerDisposable = Observable
+                .interval(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.updateBeaconCards());
     }
 
     private void stopWatchingForNearbyTags() {
@@ -671,6 +688,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.nearbyWatchDisposable.dispose();
         }
         this.nearbyWatchDisposable = null;
+        if (this.nearbyStatusTickerDisposable != null
+                && !this.nearbyStatusTickerDisposable.isDisposed()) {
+            this.nearbyStatusTickerDisposable.dispose();
+        }
+        this.nearbyStatusTickerDisposable = null;
         // Nothing on screen may go on claiming a tag is here once we have stopped listening.
         this.nearbySightings.clear();
     }
