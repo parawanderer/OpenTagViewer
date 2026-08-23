@@ -3,7 +3,7 @@ from typing import Any, NamedTuple, cast
 import json
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import base64
 import NSKeyedUnArchiver
@@ -1017,9 +1017,25 @@ def accessoryFromJson(accessoryJson: str) -> StoredAccessory:
     return accessoryType.from_json(cast(Any, mapping))
 
 
-def currentMacAddresses(accessoryJson: str) -> list[str] | None:
+#: How far either side of the believed alignment to look for the accessory's current key.
+#
+# **Not zero, which is what a bare call would use.** Without a margin the search starts at the
+# alignment index, so an accessory whose true index has drifted *below* where alignment believes
+# it is can never be matched - it is simply absent from its own candidate set, with nothing
+# raising anywhere. FindMy.py's own `NearbyOfflineFindingDevice.is_from` takes the same
+# precaution with the same twelve hours, and its docstring records the failure being observed on
+# real hardware advertising a metre from the scanner.
+#
+# The cost is bounded because the app keeps alignment fresh: `getLastReports` writes
+# `updatedAccessoryJson` back after every fetch, aligned or empty. Twelve hours off a fresh
+# alignment is on the order of a hundred keys; the pathological cases in FindMy.py's own notes
+# are accessories that have *never* been aligned, which this app does not produce.
+_MAC_CANDIDATE_MARGIN = timedelta(hours=12)
+
+
+def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
     """
-    The BLE MAC address(es) this accessory might currently be advertising.
+    The BLE MAC address(es) this accessory might currently be advertising, each with its index.
 
     Lets Java recognise an owned accessory's own advertisement in a BLE scan, so it can be
     triggered directly (playing a sound) without going through Apple's Find My network - the
@@ -1030,14 +1046,47 @@ def currentMacAddresses(accessoryJson: str) -> list[str] | None:
     range for *now* rather than a single index, to account for rollover uncertainty since the
     last observed alignment.
 
+    **Each address maps to the key index it came from**, so a caller that matches one can hand
+    it straight to `recordAccessorySeen` - which is what keeps the next call cheap. Returning a
+    bare list would throw that away.
+
     Returns None on failure so Java can decide how to recover - a missing or unreadable
-    accessory is worth telling apart from "no keys", which would be an empty list.
+    accessory is worth telling apart from "no keys", which would be an empty mapping.
     """
     try:
         accessory = accessoryFromJson(accessoryJson)
-        return sorted(accessory.current_mac_addresses())
+        return accessory.current_mac_addresses(margin=_MAC_CANDIDATE_MARGIN)
     except Exception:
         print(f"currentMacAddresses failed: {traceback.format_exc()}")
+        return None
+
+
+def recordAccessorySeen(
+        accessoryJson: str, keyIndex: int, seenAtUnixMs: int) -> str | None:
+    """
+    Tell an accessory it was seen advertising at `keyIndex`, and hand back its new state.
+
+    **This is what stops the margin above being paid for twice.** A BLE sighting is an
+    observation of exactly the same kind a decrypted location report is, and
+    `update_alignment` is how FindMy.py is told about either. Without this the twelve-hour
+    range is re-derived on every scan; with it, the call after a hit collapses to the three
+    keys of a single index.
+
+    The index for a *secondary* key is a lower bound - one covers 96 primary indices - which is
+    safe to pass on regardless, because `update_alignment` ignores anything below the alignment
+    it already holds.
+
+    Returns the re-serialized accessory for Java to write back to `OwnedBeacon.accessory_json`,
+    the same field and the same reason as `getLastReports`' `updatedAccessoryJson`. None on
+    failure, because a sighting that cannot be recorded is not worth failing a sound over.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+        accessory.update_alignment(
+            datetime.fromtimestamp(seenAtUnixMs / 1000, tz=timezone.utc), keyIndex)
+        return json.dumps(accessory.to_json())
+    except Exception:
+        print(f"recordAccessorySeen failed: {traceback.format_exc()}")
         return None
 
 

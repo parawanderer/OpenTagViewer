@@ -21,6 +21,18 @@ through [FindMy.py](https://github.com/malmeloo/FindMy.py).
 `app/src/main/python/` is packaged into the APK by Chaquopy. Nothing in it may import
 Android or Java types — that is what makes it testable on plain CPython.
 
+### It ships as an APK, and there is no Play Store listing
+
+There is no listing and none is planned. Releases are GitHub releases; people sideload them.
+
+**So "Play Store policy requires it" is never a reason for anything here**, and an argument
+leaning on it has nothing behind it. That cuts in a direction people find surprising: the
+manifest's declarations, the permission flags and the data-safety claims in comments still have
+to be *true* — because Android acts on them and because people read this source — not because a
+reviewer will check. Nobody is going to check. That is the point.
+
+Do not build for a listing that does not exist.
+
 ---
 
 ## Rules

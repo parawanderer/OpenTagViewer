@@ -577,15 +577,33 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
     }
 
+    /**
+     * <b>Continuous ping stops when the screen does, not when the activity is destroyed.</b>
+     *
+     * <p>Pressing Home does not destroy an activity, so disposing in {@code onDestroy} left the
+     * loop scanning and connecting over Bluetooth with the app in the background - burning the
+     * radio for a sound the user is no longer in a position to hear, and with no way to stop it
+     * short of coming back to this screen. {@code onDestroy} may not run for a long time, or at
+     * all before the process is killed.
+     *
+     * <p><b>{@code onStop} rather than {@code onPause}</b>, which is a different question: pause
+     * fires for a dialog or the notification shade, and someone walking towards a tag by ear
+     * should not lose the ping to a passing notification. Stop means the screen is genuinely
+     * gone.
+     *
+     * <p>Through {@link #stopContinuousPing()} rather than disposing directly, so the card's
+     * button and spinner are reset too - otherwise returning to a stopped loop finds a card
+     * still captioned "Stop" with a spinner that will never move again.
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        this.stopContinuousPing();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        // Otherwise continuous ping keeps scanning/connecting in the background with no card
-        // left to show it is running, or a way to stop it short of force-closing the app.
-        if (this.continuousPingDisposable != null && !this.continuousPingDisposable.isDisposed()) {
-            this.continuousPingDisposable.dispose();
-        }
 
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
@@ -1377,6 +1395,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Continuous ping update for beaconId=" + beaconId + ": " + update.getPhase()
                 + (update.getResult() == null ? "" : " (" + update.getResult().getStatus() + ")"));
 
+        this.keepWhatTheSightingProved(beaconId, update);
+
         // A card for a beaconId other than the one this loop is for stopped existing (e.g. the
         // tag left the visible list) or continuous ping was stopped/switched to another tag
         // since this update was emitted - either way, there is nothing left to show it on.
@@ -1428,6 +1448,27 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // alone ("Scanning...", "Connecting...") can sit on screen for several seconds with
         // nothing else moving, which reads as stuck rather than as work in progress.
         TagCardHelper.setRingLoading(container, update.getPhase() != BleSoundTriggerPhase.DONE);
+    }
+
+    /**
+     * Keep the alignment a Bluetooth sighting proves, so the next cycle's scan is cheap.
+     *
+     * <p>Continuous ping rescans every few seconds, so this is the difference between deriving a
+     * twelve-hour range over and over and deriving three keys. Fire and forget - see
+     * {@code BeaconRepository#recordAccessorySighting}.
+     */
+    private void keepWhatTheSightingProved(
+            final String beaconId, final BleSoundTriggerUpdate update) {
+        if (update.getPhase() != BleSoundTriggerPhase.DONE
+                || update.getResult().getMatchedKeyIndex() == null) {
+            return;
+        }
+        this.beaconRepo.recordAccessorySighting(
+                        beaconId,
+                        update.getResult().getMatchedKeyIndex(),
+                        System.currentTimeMillis())
+                .subscribe(() -> { }, error ->
+                        Log.d(TAG, "Could not keep the alignment from a sighting", error));
     }
 
     private void stopContinuousPing() {

@@ -26,4 +26,20 @@ public class BleSoundTriggerUpdate {
     public static BleSoundTriggerUpdate done(final BleSoundTriggerResult result) {
         return new BleSoundTriggerUpdate(BleSoundTriggerPhase.DONE, result);
     }
+
+    /**
+     * The same update with the index the scan matched at, if this is the terminal one.
+     *
+     * <p>Applied after the fact because the sighting happens at the end of the scan and the
+     * outcome only exists at the end of the GATT exchange - which may be several retries later,
+     * and may fail. Attaching it here means every DONE that followed a real sighting carries it,
+     * without the retry logic having to know the index exists.
+     */
+    public BleSoundTriggerUpdate withMatchedKeyIndex(final Integer keyIndex) {
+        if (this.phase != BleSoundTriggerPhase.DONE || keyIndex == null) {
+            return this;
+        }
+        return done(new BleSoundTriggerResult(this.result.getStatus(), this.result.getProtocol(),
+                this.result.getMessage(), keyIndex));
+    }
 }

@@ -25,6 +25,7 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
 import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
@@ -524,6 +525,46 @@ public class BeaconRepository {
                 }
             }
             return out;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Record that a tag was seen advertising at {@code keyIndex}, and keep the alignment it
+     * proves.
+     *
+     * <p><b>A BLE sighting is worth the same as a decrypted location report</b>, and is persisted
+     * the same way: FindMy.py's {@code update_alignment} is how it is told about either, and
+     * {@code accessory_json} is where the result lives. Without this the twelve-hour candidate
+     * range that found the tag is re-derived from scratch on the next scan; with it, the next
+     * scan derives three keys.
+     *
+     * <p><b>Failure is swallowed on purpose.</b> This runs after a sound has already played (or
+     * failed to), and nothing the user asked for depends on it - the cost of losing it is a
+     * wider search next time, not a broken feature. It is emphatically not worth turning a
+     * successful ring into an error toast.
+     */
+    public Completable recordAccessorySighting(
+            final String beaconId, final int keyIndex, final long seenAtUnixMs) {
+        return Completable.fromRunnable(() -> {
+            final var dao = db.ownedBeaconDao();
+            final OwnedBeacon row = dao.getById(beaconId);
+
+            if (row == null || row.accessoryJson == null) {
+                Log.d(TAG, "Nothing to align for beaconId=" + beaconId + " - no accessory_json");
+                return;
+            }
+
+            final String updated = AppDependencies.accessoryMacResolver()
+                    .recordSeen(row.accessoryJson, keyIndex, seenAtUnixMs);
+
+            if (updated == null) {
+                Log.d(TAG, "Could not record the sighting for beaconId=" + beaconId);
+                return;
+            }
+
+            dao.updateAccessoryJson(beaconId, updated);
+            Log.d(TAG, "Aligned beaconId=" + beaconId + " to key index " + keyIndex
+                    + " from a Bluetooth sighting");
         }).subscribeOn(Schedulers.io());
     }
 
