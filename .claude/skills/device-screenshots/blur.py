@@ -24,9 +24,16 @@ except ImportError:
     sys.exit("needs Pillow: py -3 -m pip install pillow")
 
 
-def blur_band(image, top, bottom, radius):
-    """Blur one horizontal strip, given as fractions of the height."""
-    box = (0, int(image.height * top), image.width, int(image.height * bottom))
+def blur_band(image, top, bottom, radius, left=0.0, right=1.0):
+    """Blur one strip, given as fractions of the height (and optionally the width).
+
+    Bounding it horizontally matters more than it sounds. A band across the full width of a
+    screenshot of a *dialog* also blurs the dimmed page behind it, and the result is a pale
+    rectangle running off both sides of the dialog - which reads as a rendering fault rather
+    than as a redaction.
+    """
+    box = (int(image.width * left), int(image.height * top),
+           int(image.width * right), int(image.height * bottom))
     region = image.crop(box)
 
     # Downscale and back up before blurring. A Gaussian blur alone leaves text legible to
@@ -45,15 +52,21 @@ def main():
     parser.add_argument("image")
     parser.add_argument("--band", nargs=2, type=float, action="append", metavar=("TOP", "BOTTOM"),
                         required=True, help="fractions of image height, e.g. --band 0.42 0.55")
+    parser.add_argument("--x", nargs=2, type=float, metavar=("LEFT", "RIGHT"), default=[0.0, 1.0],
+                        help="fractions of the width to bound every band to, e.g. --x 0.1 0.9")
     parser.add_argument("--radius", type=float, default=6.0)
     parser.add_argument("--out", help="defaults to overwriting the input")
     args = parser.parse_args()
+
+    left, right = args.x
+    if not 0.0 <= left < right <= 1.0:
+        sys.exit(f"--x {left} {right} is not a fraction of the width, low to high")
 
     image = Image.open(args.image).convert("RGB")
     for top, bottom in args.band:
         if not 0.0 <= top < bottom <= 1.0:
             sys.exit(f"band {top}-{bottom} is not a fraction of the height, low to high")
-        blur_band(image, top, bottom, args.radius)
+        blur_band(image, top, bottom, args.radius, left, right)
 
     out = args.out or args.image
     image.save(out)
