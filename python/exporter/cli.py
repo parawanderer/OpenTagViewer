@@ -49,7 +49,7 @@ from exporter.custom_tags import (
     suggested_name,
 )
 from exporter.icloud import Candidate, ExportSourceError
-from exporter.version import EXPORT_VIA_CLI, VERSION
+from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION
 from opentagviewer_export import (
     ExportError,
     KeyFileError,
@@ -938,6 +938,12 @@ def _run_and_return(arguments: argparse.Namespace) -> int:
                   file=sys.stderr)
             print("it prints about you, and it is worth reading before pasting it anywhere.",
                   file=sys.stderr)
+
+        # **And where.** Asking somebody to report something without saying where to put it leaves
+        # them holding output and no destination - which is not a hint they should have to take.
+        # The window has said this for as long as it has had an error dialog; this one asked for a
+        # report and named nowhere.
+        print(f"\nReport it at: {GITHUB_ISSUES_LINK}", file=sys.stderr)
 
         return 1
     except KeyboardInterrupt:
