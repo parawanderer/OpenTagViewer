@@ -275,8 +275,6 @@
     <string name="icloud_results_next">Далее</string>
     <string name="icloud_registered_serial_label">Серийный номер: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
-    <string name="imported_from_x">Метки импортированы из %1$s</string>
-    <string name="imported_from_nothing">Метки из файла не импортировались</string>
     <string name="error_report_title">Это ошибка приложения</string>
     <string name="error_report_body">Пришло что-то, что приложение не умеет читать, поэтому повторная попытка не поможет и менять настройки не нужно.\n\nОбычно это значит, что Apple что-то изменила. Отчёт с приложенным журналом делает ошибку исправимой — журнал почти всегда указывает, где именно.</string>
     <string name="error_report_button">Сообщить об ошибке</string>
@@ -306,4 +304,6 @@
     <string name="export_tags_nothing_to_export">«%1$s» нельзя экспортировать: у приложения нет соответствующей записи имени, а пакет без неё не импортирует ничего. Метки из вашей учётной записи Apple передаются через «Локатор», а не файлом.</string>
     <string name="export_tags_could_not_write">Файл не удалось записать. Ничего не сохранено.</string>
     <string name="error_report_body_export">Приложение не смогло собрать пакет из выбранных меток и не может сказать почему, — повторная попытка с теми же метками не поможет.\n\nНичего не отправлено, и на телефоне ничего не изменилось. Ваши метки на месте.</string>
+    <string name="imported_from_x">Последний импорт из %1$s</string>
+    <string name="imported_from_nothing">Метки из файла не импортировались</string>
 </resources>

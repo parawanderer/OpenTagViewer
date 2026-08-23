@@ -275,8 +275,6 @@
     <string name="icloud_results_next">下一步</string>
     <string name="icloud_registered_serial_label">序列号：^1</string>
     <string name="icloud_registered_model_and_os">%1$s（%2$s）</string>
-    <string name="imported_from_x">标签导入自 %1$s</string>
-    <string name="imported_from_nothing">没有从文件导入的标签</string>
     <string name="error_report_title">这是一个程序缺陷</string>
     <string name="error_report_body">返回了本应用无法解读的内容，因此重试没有用，你的设置也不需要改动。\n\n这通常意味着 Apple 改动了什么。附上日志的报告才能让它被修复——日志几乎总能指出是哪一部分。</string>
     <string name="error_report_button">报告问题</string>
@@ -306,4 +304,6 @@
     <string name="export_tags_nothing_to_export">无法导出“%1$s”：应用没有它的命名记录，缺少这项的包导入后什么都没有。从 Apple 账户读取的标签请通过“查找”共享，而不是文件。</string>
     <string name="export_tags_could_not_write">文件写入失败，什么都没有保存。</string>
     <string name="error_report_body_export">应用无法用你选中的标签生成包，也说不出原因——用同样的标签重试没有用。\n\n没有发送任何东西，这台手机上也没有任何改变。你的标签都还在。</string>
+    <string name="imported_from_x">最近一次导入自 %1$s</string>
+    <string name="imported_from_nothing">没有从文件导入的标签</string>
 </resources>

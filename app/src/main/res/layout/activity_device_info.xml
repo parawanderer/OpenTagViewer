@@ -143,9 +143,18 @@
                 app:onClickMenu="@{handleClickMenu}"
                 app:pageTitle="@{pageTitle}" />
 
+            <!--
+              **Padded at the bottom, and clipToPadding=false so it is scrolled into rather than
+              wasted.** The last row here - Vendor Id, under Debug information - ended level with
+              the gesture bar, which on a phone means it is half under the reader's thumb and
+              looks cut off. The padding is inside the scrolling area, so nothing is lost above:
+              it is simply somewhere to scroll to.
+            -->
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="32dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"

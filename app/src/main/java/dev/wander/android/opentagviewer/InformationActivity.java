@@ -27,14 +27,10 @@ import java.io.InputStream;
 import java.util.List;
 
 import dev.wander.android.opentagviewer.databinding.ActivityInformationBinding;
-import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.widget.FlowLayout;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class InformationActivity extends AppCompatActivity {
     private static final String TAG = InformationActivity.class.getSimpleName();
@@ -68,7 +64,6 @@ public class InformationActivity extends AppCompatActivity {
             throw new RuntimeException(e);
         }
 
-        this.showWhereTheTagsCameFrom();
         this.showContributors();
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
@@ -76,48 +71,6 @@ public class InformationActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-    }
-
-    /**
-     * Says which exporter produced the bundle these tags were imported from.
-     *
-     * <p><b>Because the issue template asks, and the honest alternative was worse.</b> The
-     * {@code via:} line is inside {@code OPENTAGVIEWER.yml} in the export zip - a file holding
-     * the private keys to somebody's tags, which the template tells them in bold not to open.
-     * Asking a question whose answer is in a file you have told people not to open is asking
-     * them to ignore you.
-     *
-     * <p><b>All of them, not the most recent one.</b> Importing twice is ordinary, and naming
-     * only the newest bundle would state one producer as though it accounted for every tag on
-     * the phone. Where a report says 1.3.0 and half the tags came out of 1.1.0, whoever reads it
-     * goes looking in the wrong place - which is the same failure as the import error that named
-     * the wrong phase, one level up.
-     *
-     * <p>Off the main thread: Room refuses a query on it, so doing this inline would not be slow,
-     * it would throw.
-     */
-    private void showWhereTheTagsCameFrom() {
-        final TextView importedFrom = this.findViewById(R.id.appImportedFrom);
-        if (importedFrom == null) {
-            return;
-        }
-
-        var async = Observable.fromCallable(() -> OpenTagViewerDatabase
-                        .getInstance(this.getApplicationContext())
-                        .importDao().getDistinctProducers())
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        producers -> importedFrom.setText(producers.isEmpty()
-                                ? this.getString(R.string.imported_from_nothing)
-                                : this.getString(R.string.imported_from_x,
-                                        String.join(", ", producers))),
-                        error -> {
-                            // A line that cannot be read is not worth a broken screen; the
-                            // version above it is still the more important half.
-                            Log.w(TAG, "Could not read where the tags were imported from", error);
-                            importedFrom.setVisibility(View.GONE);
-                        });
     }
 
     /**

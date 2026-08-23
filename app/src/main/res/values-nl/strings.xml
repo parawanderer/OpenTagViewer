@@ -275,8 +275,6 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="icloud_results_next">Volgende</string>
     <string name="icloud_registered_serial_label">Serienummer: ^1</string>
     <string name="icloud_registered_model_and_os">%1$s (%2$s)</string>
-    <string name="imported_from_x">Tags geïmporteerd uit %1$s</string>
-    <string name="imported_from_nothing">Geen tags uit een bestand geïmporteerd</string>
     <string name="error_report_title">Dit is een bug</string>
     <string name="error_report_body">Er kwam iets terug dat deze app niet kan lezen, dus opnieuw proberen helpt niet en er valt niets aan je instellingen te wijzigen.\n\nMeestal betekent dat dat Apple iets heeft veranderd. Een melding met het logbestand erbij maakt het oplosbaar — het log zegt bijna altijd welk deel.</string>
     <string name="error_report_button">Dit melden</string>
@@ -306,4 +304,6 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="export_tags_nothing_to_export">‘%1$s’ kan niet worden geëxporteerd: de app heeft er geen naamrecord voor, en een bundel zonder dat importeert niets. Tags uit je Apple-account deel je via Zoek mijn, niet via een bestand.</string>
     <string name="export_tags_could_not_write">Het bestand kon niet worden weggeschreven. Er is niets opgeslagen.</string>
     <string name="error_report_body_export">De app kon van de gekozen tags geen bundel maken en kan niet zeggen waarom — het opnieuw proberen met dezelfde tags helpt dus niet.\n\nEr is niets verstuurd en er is niets veranderd op deze telefoon. Je tags staan er nog.</string>
+    <string name="imported_from_x">Laatst geïmporteerd uit %1$s</string>
+    <string name="imported_from_nothing">Geen tags uit een bestand geïmporteerd</string>
 </resources>
