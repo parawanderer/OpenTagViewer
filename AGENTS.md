@@ -299,6 +299,51 @@ Two things follow:
   repository and the whole Python bridge are instrumented. Rule 12 is about what genuinely needs
   a device; this rule is about not sending it things that do not.
 
+### 14. A Python dependency is pinned in four places, and they all move together
+
+There is no single manifest. `opentagviewer_export` is shared code that runs under **both**
+interpreters — Chaquopy packages it into the APK, and the desktop exporter runs the same files
+from source — so every Python dependency is declared once per consumer:
+
+| Where | What it feeds | How to change it |
+| --- | --- | --- |
+| `app/build.gradle.kts` — the `install(…)` lines in the Chaquopy block | **what ships in the APK** | by hand |
+| `app/src/test/python/requirements.txt` | the Chaquopy bridge tests | by hand |
+| `python/pyproject.toml` | the desktop exporter and its tests | by hand |
+| `python/uv.lock` | what `uv sync --frozen` actually installs | `cd python && uv lock` — never by hand |
+
+**Miss one and the two halves ship different libraries.** That is not version skew: FindMy.py is
+pinned by commit off a fork, and its API moves between commits (rule 3), so one consumer gets
+methods the other does not. It has happened — `requirements.txt` said `FindMy==0.9.8` from PyPI
+while the app built the fork, and both lines were individually true for months.
+
+Two tests in `app/src/test/python/test_main.py` enforce it, and they are worth knowing by name
+because they fail in a place that looks unrelated:
+
+- `test_the_whole_repository_pins_one_findmy`
+- `test_pinned_versions_match_the_app_build` — every install, including the `git+…` ones, which
+  is the shape that was invisible to it before
+
+They run in the **Chaquopy bridge tests** step of `build-debug.yml`, which is *before* the APK is
+built. So a missed pin presents as **"the APK build failed"** with the APK steps merely skipped,
+and the actual assertion is several steps up the log. Read the step list before believing the
+build broke:
+
+```bash
+gh api repos/parawanderer/OpenTagViewer/actions/jobs/<job-id> \
+  --jq '.steps[] | "\(.conclusion // .status)\t\(.name)"'
+```
+
+Run them before pushing — they need no device and take under a second:
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r app/src/test/python/requirements.txt
+.venv/bin/python -m pytest app/src/test/python -q
+```
+
+The same applies to every other shared dependency, not just FindMy.py: `PyYAML` is pinned in
+`app/build.gradle.kts` and `python/pyproject.toml` for exactly this reason.
+
 ---
 
 ## Building and testing
