@@ -102,6 +102,8 @@ public class WikiScreenshotsTest {
 
     @Before
     public void cleanSlate() {
+        OnlyWhenCapturing.wasAskedFor();
+
         final Context context = getInstrumentation().getTargetContext();
         this.db = OpenTagViewerDatabase.getInstance(context);
         this.written = new File(context.getCacheDir(), "wiki-shot.zip");

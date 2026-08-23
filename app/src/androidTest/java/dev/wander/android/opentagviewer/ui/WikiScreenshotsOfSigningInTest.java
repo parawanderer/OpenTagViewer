@@ -70,6 +70,8 @@ public class WikiScreenshotsOfSigningInTest {
 
     @Before
     public void replaceApple() {
+        OnlyWhenCapturing.wasAskedFor();
+
         AccountBeaconsForTests.forgetThemAll();
         signOutFirst();
 
