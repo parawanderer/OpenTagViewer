@@ -4,10 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 /**
  * When the app re-reads the Apple account on its own.
@@ -15,15 +12,26 @@ import org.junit.runner.RunWith;
  * <p>Pure bookkeeping, so it is tested by handing it clock values rather than by waiting. What it
  * decides is invisible either way: reading too often queues in front of the user's own work,
  * reading too rarely means a tag added in Find My never turns up, and neither throws.
+ *
+ * <p><b>On the JVM, where it always belonged.</b> This ran on the emulator for arithmetic and
+ * three booleans - see AGENTS.md rule 13. Moving it also made the change below visible: adding a
+ * parameter to the constructor broke nothing in the JVM suite, because the only test of this
+ * class was somewhere the JVM suite does not look.
  */
-@RunWith(AndroidJUnit4.class)
 public class AccountReadPolicyTest {
 
     private static final long SIX_HOURS = 6L * 60 * 60 * 1000;
+    private static final long FIFTEEN_MINUTES = 15L * 60 * 1000;
+    private static final long A_MINUTE = 60L * 1000;
     private static final long NOON = 1_700_000_000_000L;
 
     private AccountReadPolicy aPolicy() {
-        return new AccountReadPolicy(SIX_HOURS);
+        return new AccountReadPolicy(SIX_HOURS, A_MINUTE);
+    }
+
+    /** What the app actually ships now: fifteen minutes on the timer, one on resume. */
+    private AccountReadPolicy theRealOne() {
+        return new AccountReadPolicy(FIFTEEN_MINUTES, A_MINUTE);
     }
 
     /** Nothing to read, and nothing to say about it. */
@@ -128,5 +136,75 @@ public class AccountReadPolicyTest {
         for (final AccountReadPolicy.Decision decision : AccountReadPolicy.Decision.values()) {
             assertFalse(decision + " has nothing to say", decision.reason().isBlank());
         }
+    }
+
+    /**
+     * <b>Resuming reads sooner than the timer would, and that difference is the feature.</b>
+     *
+     * <p>Six hours was the old interval, and an iPad picks up a renamed AirTag in seconds - so a
+     * tag renamed on somebody's own iPad kept its old name here for the rest of the afternoon.
+     * The moment that is noticed is the moment the app is opened, which is why resuming has a
+     * floor of its own rather than sharing the timer's.
+     *
+     * <p>Asserted as the difference rather than as two numbers: at five minutes one goes and the
+     * other does not, and swapping the intervals flips exactly this.
+     */
+    @Test
+    public void resumingReadsSoonerThanTheTimerWould() {
+        final AccountReadPolicy policy = theRealOne();
+        policy.markRead(NOON);
+
+        final long fiveMinutesLater = NOON + 5L * 60 * 1000;
+
+        assertFalse("the timer should still be waiting at five minutes",
+                policy.decide(fiveMinutesLater, true, false).shouldRead());
+        assertTrue("opening the app at five minutes should read",
+                policy.decideOnResume(fiveMinutesLater, true, false).shouldRead());
+    }
+
+    /** But resuming still has a floor, or flicking between two apps costs a Python call each. */
+    @Test
+    public void resumingTwiceInAMomentOnlyReadsOnce() {
+        final AccountReadPolicy policy = theRealOne();
+        policy.markRead(NOON);
+
+        assertEquals(AccountReadPolicy.Decision.TOO_SOON,
+                policy.decideOnResume(NOON + 30_000L, true, false));
+        assertTrue("and it opens up again once the floor has passed",
+                policy.decideOnResume(NOON + A_MINUTE + 1, true, false).shouldRead());
+    }
+
+    /** The timer does come round, and fifteen minutes is when. */
+    @Test
+    public void thetimerReadsAgainAfterFifteenMinutes() {
+        final AccountReadPolicy policy = theRealOne();
+        policy.markRead(NOON);
+
+        assertFalse(policy.decide(NOON + FIFTEEN_MINUTES - 1, true, false).shouldRead());
+        assertTrue(policy.decide(NOON + FIFTEEN_MINUTES, true, false).shouldRead());
+    }
+
+    /** Resuming is subject to the same two guards as the timer, not a way round them. */
+    @Test
+    public void resumingObeysBusyAndUnlinkedToo() {
+        assertEquals(AccountReadPolicy.Decision.NOT_LINKED,
+                theRealOne().decideOnResume(NOON, false, false));
+        assertEquals(AccountReadPolicy.Decision.BUSY,
+                theRealOne().decideOnResume(NOON, true, true));
+    }
+
+    /**
+     * And zero really is "never read" rather than "read in 1970".
+     *
+     * <p>{@code hasEverRead()} is {@code lastReadAt > 0}, so marking a read at the epoch marks
+     * nothing - which is worth pinning, because a test that does it by accident passes every
+     * interval check and looks like the policy is broken.
+     */
+    @Test
+    public void markingAReadAtTheEpochMarksNothing() {
+        final AccountReadPolicy policy = theRealOne();
+        policy.markRead(0L);
+
+        assertTrue(policy.decide(1L, true, false).shouldRead());
     }
 }
