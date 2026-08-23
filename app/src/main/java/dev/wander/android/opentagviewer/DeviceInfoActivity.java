@@ -649,30 +649,20 @@ public class DeviceInfoActivity extends AppCompatActivity
     /**
      * Feeds a passive sighting back into alignment self-correction, the same way the ring
      * button's explicit scan already does - see {@code NearbyTagWatcher.SightingListener}.
-     */
-    /**
-     * Feeds a passive sighting back into alignment self-correction - see
-     * {@code NearbyTagWatcher.SightingListener} - and, if it changed anything, rereads {@link
-     * #beaconData} and restarts the watch from it.
      *
-     * <p>The reread is what makes the correction worth anything this session - see
-     * {@code MapsActivity}'s copy of this method for why: {@code recordAccessorySighting}
-     * writes straight to Room and never touches {@link #beaconData} on its own.
+     * <p><b>Persists only - deliberately does not reread {@link #beaconData} or restart the
+     * watch afterward.</b> See {@code MapsActivity}'s copy of this method for why a first
+     * attempt at that was reverted: the broader version it shared code with reset every card's
+     * geocoding on the map screen. This screen only ever watches one tag, so the same reread
+     * here would likely have been safe on its own, but the two were built and tested together
+     * and are reverted together until the narrower fix lands for both.
      */
     private void correctAlignmentFromSighting(
             final String beaconId, final String mac, final long seenAtMs) {
         this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
-                .andThen(this.beaconRepo.getById(beaconId).firstOrError())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        reread -> {
-                            this.beaconData = reread;
-                            this.beaconInformation = BeaconDataParser.parse(List.of(reread)).get(0);
-                            this.startWatchingForThisTag();
-                        },
-                        error -> Log.w(TAG,
-                                "Failed to persist a self-corrected alignment for beaconId="
-                                        + beaconId, error));
+                .subscribe(() -> { }, error -> Log.w(TAG,
+                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
+                        error));
     }
 
     private void stopWatchingForThisTag() {
