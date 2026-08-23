@@ -246,6 +246,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private Disposable nearbyStatusTickerDisposable;
 
+    /**
+     * Whether this activity has already asked for the BLE permission the nearby watch needs.
+     *
+     * <p>Never reset for the life of the activity: the system dialog pauses this activity, so
+     * asking again from every {@code onResume} re-prompted the moment the user denied - an
+     * inescapable loop on Android 10 and below, and a silent auto-denied request burned on
+     * every resume above that. Granting from the dialog still takes effect immediately through
+     * {@code onRequestPermissionsResult}; a user who denied can still enable it later through
+     * the system settings, which resumes this activity and passes the granted check directly.
+     */
+    private boolean nearbyBlePermissionRequested;
+
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
 
@@ -652,6 +664,26 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void startWatchingForNearbyTags() {
         this.stopWatchingForNearbyTags();
 
+        // Asked for here rather than left to the ring button: this scan is what feeds the
+        // battery/audible badge on every card, so it wants to be running as soon as the screen
+        // opens, not only once somebody has separately triggered a ring. Silently doing nothing
+        // without permission, as NearbyTagWatcher itself does, would just look like every tag
+        // is permanently out of range.
+        //
+        // Before the empty-list check, so a first launch - where the beacons have not loaded
+        // yet - still asks. And at most once per activity: the system dialog pauses this
+        // activity, so a request fired from every onResume re-prompted the instant the user
+        // denied, a loop with no way out on Android 10 and below.
+        if (!BlePermissions.granted(this)) {
+            if (!this.nearbyBlePermissionRequested) {
+                this.nearbyBlePermissionRequested = true;
+                Log.d(TAG, "Requesting BLE permission(s) to watch for nearby tags");
+                ActivityCompat.requestPermissions(
+                        this, BlePermissions.required(), NEARBY_PERMISSION_REQUEST_CODE);
+            }
+            return;
+        }
+
         final Map<String, String> accessoryJsonByBeaconId = new HashMap<>();
         for (final var entry : this.beacons.entrySet()) {
             final String accessoryJson = entry.getValue().getInfo().getOwnedBeaconAccessoryJson();
@@ -660,17 +692,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             }
         }
         if (accessoryJsonByBeaconId.isEmpty()) {
-            return;
-        }
-
-        // Asked for here rather than left to the ring button: this scan is what feeds the
-        // battery/audible badge on every card, so it wants to be running as soon as the screen
-        // opens, not only once somebody has separately triggered a ring. Silently doing nothing
-        // without permission, as NearbyTagWatcher itself does, would just look like every tag
-        // is permanently out of range.
-        if (!BlePermissions.granted(this)) {
-            Log.d(TAG, "Requesting BLE permission(s) to watch for nearby tags");
-            ActivityCompat.requestPermissions(this, BlePermissions.required(), NEARBY_PERMISSION_REQUEST_CODE);
+            // Ordinary on a cold start: the beacons load asynchronously and are not here yet.
+            // addBeaconToCurrent starts the watch once they arrive - see there.
             return;
         }
 
@@ -2101,6 +2124,24 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             }
             this.beacons.put(beaconId, new BeaconData(beacon, Collections.emptyList()));
         });
+
+        // The nearby watch could not start from onResume on a cold launch: it reads
+        // this.beacons, which was still empty because this load runs asynchronously, and
+        // nothing retried once the tags arrived - so the whole session had no pulse, no
+        // Nearby line, and no passive alignment correction until the app was backgrounded
+        // and reopened. Started here, once, when there is finally something to watch for.
+        // Guarded on the disposable so the periodic account refresh, which also lands here,
+        // does not bounce a running scan - Android silently blocks an app that starts scans
+        // too often.
+        if (!newBeaconInformation.isEmpty() && this.nearbyWatchDisposable == null) {
+            // Re-checked on the main thread: this load finishes on a background thread, and by
+            // the time the post runs, onResume may have started the watch already.
+            this.runOnUiThread(() -> {
+                if (this.nearbyWatchDisposable == null && !this.isFinishing()) {
+                    this.startWatchingForNearbyTags();
+                }
+            });
+        }
     }
 
     private synchronized void addBeaconLocationsToCurrent(final Map<String, List<BeaconLocationReport>> newItems) {
