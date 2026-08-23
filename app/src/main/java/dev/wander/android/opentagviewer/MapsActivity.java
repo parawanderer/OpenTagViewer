@@ -258,6 +258,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private boolean nearbyBlePermissionRequested;
 
+    /** The pending retry after the scan died mid-session - see {@link #onNearbyWatchEnded}. */
+    private Disposable nearbyWatchRetryDisposable;
+
+    /** The one place a Bluetooth sighting is persisted - see {@link AccessorySightingPersister}. */
+    private AccessorySightingPersister sightingPersister;
+
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
 
@@ -490,6 +496,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -698,12 +705,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         this.nearbyWatchDisposable = new NearbyTagWatcher(
-                AppDependencies.accessoryMacResolver(), this::correctAlignmentFromSighting)
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting)
                 .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         this::onTagHeardNearby,
-                        error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error));
+                        error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error),
+                        this::onNearbyWatchEnded);
 
         this.nearbyStatusTickerDisposable = Observable
                 .interval(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
@@ -711,31 +719,26 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     /**
-     * Feeds a passive sighting back into alignment self-correction, the same way the ring
-     * button's explicit scan already does - see {@code NearbyTagWatcher.SightingListener}.
+     * The scan died mid-session rather than being stopped: Bluetooth toggled off, or the
+     * platform refused the scan (e.g. too many scan starts in a short window).
      *
-     * <p>Without this, a tag nobody has rung recently only gets a chance to correct its
-     * alignment when the periodic Apple-network fetch runs, and can silently drift out of
-     * {@code currentMacAddresses}' margin in between - which reads as "stopped being found
-     * nearby" for no visible reason, on a tag sitting right next to the phone.
-     *
-     * <p><b>Persists only - deliberately does not reread {@link #beacons} or restart the watch
-     * afterward.</b> A first attempt at that called {@link #addBeaconToCurrent}, which replaces
-     * every beacon's entry wholesale and reset every card's already-computed geocoding back to
-     * empty on every correction - up to once a minute per tag - with nothing to refill it, so
-     * cards fell back to raw coordinates and stayed there. This session's watch keeps matching
-     * against the alignment it started with until the next {@code loadEverything} or periodic
-     * fetch picks the correction up on its own; a tag whose alignment just healed can still read
-     * as out of range until then. Narrower plumbing - patching just this one beacon's cached
-     * entry, and nudging only its BLE candidate set rather than restarting the whole scan and
-     * losing every card's live badge with it - is still open.
+     * <p>Cancellation does not come through here - disposing skips onComplete - so this only
+     * runs for genuine mid-session death. Two things then must not keep happening: the
+     * once-per-second ticker redrawing every card for a scan that can no longer produce
+     * sightings, and the badges claiming tags are here based on a radio nobody is listening
+     * to. And one thing must: a retry, or the nearby feature stays dead for the rest of the
+     * session even after Bluetooth comes back. One attempt per 30 seconds is far under the
+     * platform's scan-start budget, and each failed attempt completes again and reschedules,
+     * so it self-heals whenever the radio returns.
      */
-    private void correctAlignmentFromSighting(
-            final String beaconId, final String mac, final long seenAtMs) {
-        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
-                .subscribe(() -> { }, error -> Log.w(TAG,
-                        "Failed to persist a self-corrected alignment for beaconId=" + beaconId,
-                        error));
+    private void onNearbyWatchEnded() {
+        Log.i(TAG, "The nearby tag watch ended mid-session; retrying in 30s");
+        this.stopWatchingForNearbyTags();
+        this.updateBeaconCards();
+
+        this.nearbyWatchRetryDisposable = Observable
+                .timer(30, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.startWatchingForNearbyTags());
     }
 
     private void stopWatchingForNearbyTags() {
@@ -748,6 +751,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.nearbyStatusTickerDisposable.dispose();
         }
         this.nearbyStatusTickerDisposable = null;
+        if (this.nearbyWatchRetryDisposable != null
+                && !this.nearbyWatchRetryDisposable.isDisposed()) {
+            this.nearbyWatchRetryDisposable.dispose();
+        }
+        this.nearbyWatchRetryDisposable = null;
         // Nothing on screen may go on claiming a tag is here once we have stopped listening.
         this.nearbySightings.clear();
     }
@@ -1605,7 +1613,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Continuous ping update for beaconId=" + beaconId + ": " + update.getPhase()
                 + (update.getResult() == null ? "" : " (" + update.getResult().getStatus() + ")"));
 
-        this.keepWhatTheSightingProved(beaconId, update);
+        this.sightingPersister.keepWhatTheSightingProved(beaconId, update);
 
         // A card for a beaconId other than the one this loop is for stopped existing (e.g. the
         // tag left the visible list) or continuous ping was stopped/switched to another tag
@@ -1658,31 +1666,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // alone ("Scanning...", "Connecting...") can sit on screen for several seconds with
         // nothing else moving, which reads as stuck rather than as work in progress.
         TagCardHelper.setRingLoading(container, update.getPhase() != BleSoundTriggerPhase.DONE);
-    }
-
-    /**
-     * Keep the alignment a Bluetooth sighting proves, so the next cycle's scan is cheap.
-     *
-     * <p>Continuous ping rescans every few seconds, so this is the difference between deriving a
-     * twelve-hour range over and over and deriving three keys. Fire and forget - see
-     * {@code BeaconRepository#recordAccessorySighting}.
-     */
-    private void keepWhatTheSightingProved(
-            final String beaconId, final BleSoundTriggerUpdate update) {
-        if (update.getPhase() != BleSoundTriggerPhase.DONE
-                || update.getResult().getMatchedMac() == null) {
-            return;
-        }
-        this.beaconRepo.recordAccessorySighting(
-                        beaconId,
-                        update.getResult().getMatchedMac(),
-                        System.currentTimeMillis(),
-                        // No hint: the ring path knows which address answered but not which
-                        // index it came from - see BleSoundTriggerResult. Python falls back to
-                        // checking the whole window, which is what it did before hints existed.
-                        null)
-                .subscribe(() -> { }, error ->
-                        Log.d(TAG, "Could not keep the alignment from a sighting", error));
     }
 
     private void stopContinuousPing() {
@@ -2810,6 +2793,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 this.startWatchingForNearbyTags();
             } else {
                 Log.i(TAG, "BLE permission refused; not watching for nearby tags");
+                // Said out loud because the refusal also keeps the ring button hidden (see
+                // updateBeaconCards), and the request fires only once per activity - so with
+                // no toast, someone who taps Deny is left with no visible trace that nearby
+                // and ringing exist, and no in-app path back to them short of the system
+                // settings.
+                Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
             }
             // The ring button on every card was hidden while this was undecided - see
             // updateBeaconCards - and needs to be shown or stay hidden depending on the answer.

@@ -27,8 +27,12 @@ public final class NearbyTagSightings {
      * listening continuously, so gaps of a few seconds between sightings are normal for a tag
      * sitting right next to the phone. This is generous enough to ride those out and short
      * enough that a tag carried away stops claiming to be here within about half a minute.
+     *
+     * <p>Public because it is the one answer to "how long may a sighting be presented as
+     * current", wherever that presentation happens - the device info screen's live battery row
+     * ages out on the same clock rather than inventing a second one.
      */
-    static final long FRESH_FOR_MS = TimeUnit.SECONDS.toMillis(30);
+    public static final long FRESH_FOR_MS = TimeUnit.SECONDS.toMillis(30);
 
     private final Map<String, NearbyTagSighting> latestByBeaconId = new ConcurrentHashMap<>();
 
