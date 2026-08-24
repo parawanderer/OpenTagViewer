@@ -10,12 +10,14 @@ import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import dev.wander.android.opentagviewer.db.room.dao.BeaconNamingRecordDao;
+import dev.wander.android.opentagviewer.db.room.dao.LastBleSightingDao;
 import dev.wander.android.opentagviewer.db.room.dao.DailyHistoryFetchRecordDao;
 import dev.wander.android.opentagviewer.db.room.dao.ImportDao;
 import dev.wander.android.opentagviewer.db.room.dao.LocationReportDao;
 import dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao;
 import dev.wander.android.opentagviewer.db.room.dao.UserBeaconOptionsDao;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.opentagviewer.db.room.entity.LastBleSighting;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
@@ -29,9 +31,10 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         OwnedBeacon.class,
         LocationReport.class,
         DailyHistoryFetchRecord.class,
-        UserBeaconOptions.class
+        UserBeaconOptions.class,
+        LastBleSighting.class
     },
-    version = 6
+    version = 7
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -130,6 +133,35 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v6 → v7: adds {@code LastBleSighting}, the last thing this phone heard each tag say over
+     * Bluetooth - today its battery level, and whatever else a sighting turns out to be worth
+     * keeping later.
+     *
+     * <p>A new table rather than a column, for the reasons on {@link LastBleSighting} - briefly,
+     * neither of the tables that already hold something per beacon is a place a measurement taken
+     * by this phone belongs.
+     *
+     * <p>Creating an empty table changes nothing for an existing install: every tag simply has no
+     * sighting until the next time its advertisement is actually heard, which is the honest
+     * state. Nothing is backfilled, and in particular the accessory record's own battery field is
+     * not copied in - that value is Apple's, is stale or unset for exactly the users this table
+     * is for, and would arrive here presented as something this phone had heard.
+     */
+    public static final Migration MIGRATION_6_7 = new Migration(6, 7) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS `LastBleSighting` ("
+                    + "`beacon_id` TEXT NOT NULL, "
+                    + "`heard_at` INTEGER NOT NULL, "
+                    + "`battery_level` TEXT NOT NULL, "
+                    + "`status_byte` INTEGER NOT NULL, "
+                    + "PRIMARY KEY(`beacon_id`), "
+                    + "FOREIGN KEY(`beacon_id`) REFERENCES `OwnedBeacons`(`id`)"
+                    + " ON UPDATE CASCADE ON DELETE CASCADE )");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -145,7 +177,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     OpenTagViewerDatabase.class,
                     DATABASE_NAME)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                            MIGRATION_5_6)
+                            MIGRATION_5_6, MIGRATION_6_7)
                     .build();
         }
 
@@ -158,4 +190,5 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     public abstract LocationReportDao locationReportDao();
     public abstract DailyHistoryFetchRecordDao dailyHistoryFetchRecordDao();
     public abstract UserBeaconOptionsDao userBeaconOptionsDao();
+    public abstract LastBleSightingDao lastBleSightingDao();
 }

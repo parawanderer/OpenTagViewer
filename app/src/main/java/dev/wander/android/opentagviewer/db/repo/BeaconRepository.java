@@ -13,11 +13,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.ble.FindMyAdvertisement;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
+import dev.wander.android.opentagviewer.db.repo.model.LastSightingData;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.opentagviewer.db.room.entity.LastBleSighting;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
@@ -566,6 +569,68 @@ public class BeaconRepository {
 
             dao.updateAccessoryJson(beaconId, updated);
             Log.d(TAG, "Aligned beaconId=" + beaconId + " from a Bluetooth sighting");
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Keep what a tag just told this phone directly, replacing whatever it last said.
+     *
+     * <p><b>Why it outlives the sighting that produced it.</b> The reading is shown live while the
+     * tag is audible and then ages out, because a signal strength or a "nearby" badge stops being
+     * true the moment the tag is carried off. A battery level does not: a tag that read "low" an
+     * hour ago is still low, and for a user with no Apple device there is no other source that
+     * will ever say so - see {@link LastBleSighting}. So the live display expires and what it
+     * said is kept.
+     *
+     * <p>Takes the fields of a sighting rather than a sighting object, because the one it would
+     * take lives in the {@code ble} package and carries a live RSSI this deliberately does not
+     * store. A parameter list is the honest signature for "these are the parts worth keeping".
+     *
+     * <p><b>Failure is swallowed, like every other write on this path.</b> Losing a reading costs
+     * a screen one row until the tag is next heard, and this runs behind a passive scan the user
+     * did not ask for. Nothing they did may fail because of it.
+     */
+    public Completable storeLastSighting(
+            final String beaconId,
+            final FindMyAdvertisement.BatteryLevel batteryLevel,
+            final int statusByte,
+            final long heardAtUnixMs) {
+        return Completable.fromRunnable(() -> {
+            db.lastBleSightingDao().insert(LastBleSighting.builder()
+                    .beaconId(beaconId)
+                    .heardAt(heardAtUnixMs)
+                    .batteryLevel(batteryLevel.name())
+                    .statusByte(statusByte)
+                    .build());
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The last thing heard from this tag over Bluetooth, or empty if it never has been.
+     *
+     * <p><b>Empty is also the answer for a battery level this version does not recognise.</b> A
+     * row written by a later build that knows a fifth state would otherwise have to be mapped
+     * onto one of the four here, and every choice available is a wrong reading presented as a
+     * right one. Showing nothing is the only honest option, and the raw byte is still in the row
+     * for anyone debugging it.
+     */
+    public Observable<Optional<LastSightingData>> getLastSighting(final String beaconId) {
+        return Observable.fromCallable(() -> {
+            final LastBleSighting row = db.lastBleSightingDao().getById(beaconId);
+            if (row == null) {
+                return Optional.<LastSightingData>empty();
+            }
+
+            try {
+                return Optional.of(new LastSightingData(
+                        row.heardAt,
+                        FindMyAdvertisement.BatteryLevel.valueOf(row.batteryLevel),
+                        row.statusByte));
+            } catch (final IllegalArgumentException e) {
+                Log.w(TAG, "Ignoring an unrecognised stored battery level '" + row.batteryLevel
+                        + "' for beaconId=" + beaconId);
+                return Optional.<LastSightingData>empty();
+            }
         }).subscribeOn(Schedulers.io());
     }
 
