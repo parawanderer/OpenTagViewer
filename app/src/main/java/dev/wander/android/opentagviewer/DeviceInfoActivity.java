@@ -819,10 +819,28 @@ public class DeviceInfoActivity extends AppCompatActivity
                         + this.beaconId, error));
     }
 
-    /** Writes the "Last seen" row, e.g. "3 minutes ago", from a wall-clock timestamp. */
+    /**
+     * Writes the "Last seen" row, e.g. "3 minutes ago", from a wall-clock timestamp.
+     *
+     * <p><b>Under a minute it says "just now" rather than what the formatter returns</b>, which
+     * is "0 minutes ago". That is the reading for the first half-minute after a tag goes quiet -
+     * the live window is thirty seconds - so it is not a rare corner, it is what everybody sees
+     * on the way from hearing the tag to not hearing it. "0 minutes ago" is also not really
+     * English. Asking the formatter for second resolution instead would say "43 seconds ago",
+     * which is a precision this row cannot keep: it redraws once a minute.
+     *
+     * <p>The same words as the live row, and that is honest - the tag really was heard just now.
+     * What separates the two states on screen is the signal row, which is there only while the
+     * reading is live.
+     */
     private void showAgeOfLastSighting(final long heardAtMs) {
-        this.binding.setBleLastSeen(DateUtils.getRelativeTimeSpanString(
-                heardAtMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString());
+        final long ageMs = System.currentTimeMillis() - heardAtMs;
+
+        this.binding.setBleLastSeen(ageMs < DateUtils.MINUTE_IN_MILLIS
+                ? this.getString(R.string.seen_just_now)
+                : DateUtils.getRelativeTimeSpanString(
+                        heardAtMs, System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS).toString());
     }
 
     /** The section with every row, for a tag being heard right now. */
