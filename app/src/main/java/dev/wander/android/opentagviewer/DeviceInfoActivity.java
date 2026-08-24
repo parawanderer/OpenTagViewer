@@ -71,6 +71,7 @@ import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
+import dev.wander.android.opentagviewer.db.repo.model.LastSightingData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
@@ -99,6 +100,15 @@ public class DeviceInfoActivity extends AppCompatActivity
     private static final String TAG = DeviceInfoActivity.class.getSimpleName();
 
     private static final int PERMISSION_REQUEST_PLAY_SOUND_NEARBY = 1001;
+
+    /**
+     * How often the "Last seen" row is redrawn while the tag is quiet.
+     *
+     * <p>Matched to the coarsest unit {@code DateUtils} is asked for here, a minute: redrawing
+     * faster changes nothing on screen, and redrawing slower would leave the row a minute behind
+     * for someone watching it.
+     */
+    private static final long LAST_SEEN_REFRESH_MS = TimeUnit.MINUTES.toMillis(1);
 
     private static final double DEFAULT_LONGITUDE = 0d;
     private static final double DEFAULT_LATITUDE = 0d;
@@ -169,6 +179,17 @@ public class DeviceInfoActivity extends AppCompatActivity
 
     /** The pending retry after the scan died mid-session - see {@link #onNearbyWatchEnded}. */
     private Disposable nearbyWatchRetryDisposable;
+
+    /** The in-flight read of the stored sighting - see {@link #showWhatWasHeardOverBluetooth}. */
+    private Disposable lastSightingLookup;
+
+    /**
+     * Redraws the "Last seen" row while the tag is quiet, so its age keeps up with the clock.
+     *
+     * <p>Only runs in that state. While the tag is audible the row reads "just now" and every
+     * advertisement rewrites it anyway; once there is nothing stored the row is not on screen.
+     */
+    private Disposable lastSeenTicker;
 
     /** The one place a Bluetooth sighting is persisted - see {@link AccessorySightingPersister}. */
     private AccessorySightingPersister sightingPersister;
@@ -634,6 +655,7 @@ public class DeviceInfoActivity extends AppCompatActivity
     protected void onResume() {
         super.onResume();
         this.startWatchingForThisTag();
+        this.showWhatWasHeardOverBluetooth();
     }
 
     @Override
@@ -662,7 +684,7 @@ public class DeviceInfoActivity extends AppCompatActivity
                 .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        this::showLiveBattery,
+                        this::showLiveSighting,
                         error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error),
                         this::onNearbyWatchEnded);
     }
@@ -690,6 +712,14 @@ public class DeviceInfoActivity extends AppCompatActivity
             this.liveBatteryExpiry.dispose();
         }
         this.liveBatteryExpiry = null;
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+        this.lastSightingLookup = null;
+        if (this.lastSeenTicker != null && !this.lastSeenTicker.isDisposed()) {
+            this.lastSeenTicker.dispose();
+        }
+        this.lastSeenTicker = null;
         if (this.nearbyWatchRetryDisposable != null
                 && !this.nearbyWatchRetryDisposable.isDisposed()) {
             this.nearbyWatchRetryDisposable.dispose();
@@ -698,29 +728,125 @@ public class DeviceInfoActivity extends AppCompatActivity
     }
 
     /**
-     * Shows the battery level the tag just reported over the air.
+     * Shows what the tag is saying right now: heard just now, this strong, this much battery.
      *
-     * <p>Appears only once the tag has actually been heard, and never falls back to the iCloud
-     * value: the whole reason this row is outside the debug panel is that it cannot be stale, so
-     * quietly filling it from the record that can would defeat it. The debug row keeps that
-     * value, with its caveat.
+     * <p>Never falls back to the iCloud value for the battery row, and never merges with it. The
+     * whole reason this section is outside the record's own fields is that it says where its
+     * numbers came from; quietly filling one of them from the other source would defeat that.
+     * The debug row keeps the record's value, with its caveat.
      */
-    private void showLiveBattery(final NearbyTagSighting sighting) {
-        this.binding.setLiveBatteryLevel(this.getString(R.string.live_battery_with_signal,
-                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
-        this.findViewById(R.id.device_settings_live_battery).setVisibility(VISIBLE);
+    private void showLiveSighting(final NearbyTagSighting sighting) {
+        // A stored reading on its way back from the database would land on top of this one and
+        // relabel a tag we can hear right now as last heard some minutes ago. The live value
+        // always wins, so the read that was going to contradict it is dropped rather than raced.
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+        if (this.lastSeenTicker != null && !this.lastSeenTicker.isDisposed()) {
+            this.lastSeenTicker.dispose();
+        }
 
-        // Every sighting restarts the expiry, so the row hides only once the tag has been
-        // quiet for the whole window - see the field doc.
+        this.binding.setBleLastSeen(this.getString(R.string.seen_just_now));
+        this.binding.setBleSignalStrength(NearbyTagLabel.signalStrengthBars(sighting.getRssi()));
+        this.binding.setBleBatteryLevel(
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+
+        this.showBluetoothSection(true);
+
+        // Every sighting restarts the expiry, so the section only stops claiming to be current
+        // once the tag has been quiet for the whole window - see the field doc.
         if (this.liveBatteryExpiry != null && !this.liveBatteryExpiry.isDisposed()) {
             this.liveBatteryExpiry.dispose();
         }
         this.liveBatteryExpiry = Observable
                 .timer(NearbyTagSightings.FRESH_FOR_MS, TimeUnit.MILLISECONDS,
                         AndroidSchedulers.mainThread())
-                .subscribe(tick -> this.findViewById(R.id.device_settings_live_battery)
-                        .setVisibility(GONE));
+                .subscribe(tick -> this.showWhatWasHeardOverBluetooth());
+    }
+
+    /**
+     * Falls back to what the tag last said, with its age, once it has gone quiet.
+     *
+     * <p><b>What the section says when the tag is out of earshot.</b> The live reading expires
+     * because a tag carried away stops being here - see {@link NearbyTagSightings} - but the
+     * battery it reported on the way out is still the best answer anybody has, and for a user
+     * with no Apple device it is the only one: the record's own field is updated by Apple's
+     * devices and stays at "not yet reported" forever otherwise. So the claim is weakened rather
+     * than withdrawn, from "this is the level" to "this is the level when it was last heard".
+     *
+     * <p><b>The signal row goes, the battery row stays.</b> That split is the point of splitting
+     * them. A battery level from an hour ago is still roughly the battery level; a signal
+     * strength from an hour ago describes a distance to a tag that is no longer there, and there
+     * is no wording that makes it useful. So it is withdrawn rather than dated.
+     *
+     * <p>The age on "Last seen" is not decoration either. Without it this is the same trap as the
+     * debug panel's iCloud value: a battery word with no date reads as current, and "full" from a
+     * tag last heard in March is worse than an empty row.
+     *
+     * <p>Hides the whole section when there is nothing stored, which is a tag this phone has
+     * never heard - a new install, or one whose tags have only ever been seen over the network.
+     */
+    private void showWhatWasHeardOverBluetooth() {
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+
+        this.lastSightingLookup = this.beaconRepo.getLastSighting(this.beaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(stored -> {
+                    if (stored.isEmpty()) {
+                        this.showBluetoothSection(false);
+                        return;
+                    }
+
+                    final LastSightingData sighting = stored.get();
+                    this.binding.setBleBatteryLevel(this.getString(
+                            NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+                    this.showAgeOfLastSighting(sighting.getHeardAtMs());
+                    this.showBluetoothSection(true, false);
+
+                    // "3 minutes ago" is only true for a minute. Nothing else on this screen
+                    // redraws while it sits open, so without a tick the row would freeze at
+                    // whatever it said when the tag went quiet and keep saying it for as long as
+                    // somebody watched - which is precisely the staleness this row exists to
+                    // report rather than commit.
+                    this.lastSeenTicker = Observable
+                            .interval(LAST_SEEN_REFRESH_MS, LAST_SEEN_REFRESH_MS,
+                                    TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+                            .subscribe(tick -> this.showAgeOfLastSighting(
+                                    sighting.getHeardAtMs()));
+                }, error -> Log.w(TAG, "Could not read the last sighting for beaconId="
+                        + this.beaconId, error));
+    }
+
+    /** Writes the "Last seen" row, e.g. "3 minutes ago", from a wall-clock timestamp. */
+    private void showAgeOfLastSighting(final long heardAtMs) {
+        this.binding.setBleLastSeen(DateUtils.getRelativeTimeSpanString(
+                heardAtMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString());
+    }
+
+    /** The section with every row, for a tag being heard right now. */
+    private void showBluetoothSection(final boolean visible) {
+        this.showBluetoothSection(visible, visible);
+    }
+
+    /**
+     * Shows or hides the "Over Bluetooth" section - its divider, its heading and its rows
+     * together, so it never appears as a heading with nothing under it.
+     *
+     * @param signalToo whether the signal row is among them. False once the tag has gone quiet:
+     *                  see {@link #showWhatWasHeardOverBluetooth} for why that one row is
+     *                  withdrawn while the others are merely dated.
+     */
+    private void showBluetoothSection(final boolean visible, final boolean signalToo) {
+        final int visibility = visible ? VISIBLE : GONE;
+
+        this.findViewById(R.id.device_ble_divider).setVisibility(visibility);
+        this.findViewById(R.id.device_ble_header).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_last_seen).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_battery).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_signal)
+                .setVisibility(signalToo ? VISIBLE : GONE);
     }
 
     @Override

@@ -366,5 +366,8 @@ You can set this up now, or any time later from Settings.</string>
     <string name="battery_short_low">low</string>
     <string name="battery_short_very_low">critical</string>
     <string name="battery">Battery</string>
-    <string name="live_battery_with_signal">%1$s · signal %2$s</string>
+    <string name="heard_over_bluetooth">Over Bluetooth</string>
+    <string name="last_seen">Last seen</string>
+    <string name="signal">Signal</string>
+    <string name="seen_just_now">just now</string>
 </resources>

@@ -334,5 +334,8 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="battery_short_very_low">kritiek</string>
     <string name="battery">Batterij</string>
     <string name="nearby_now_with_battery_and_signal">In de buurt (%2$s) · Batterij %1$s</string>
-    <string name="live_battery_with_signal">%1$s · signaal %2$s</string>
+    <string name="heard_over_bluetooth">Via bluetooth</string>
+    <string name="last_seen">Laatst gehoord</string>
+    <string name="signal">Signaal</string>
+    <string name="seen_just_now">zojuist</string>
 </resources>

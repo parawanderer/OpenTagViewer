@@ -334,5 +334,8 @@
     <string name="battery_short_very_low">危険</string>
     <string name="battery">バッテリー</string>
     <string name="nearby_now_with_battery_and_signal">近くにあります（%2$s）· 電池 %1$s</string>
-    <string name="live_battery_with_signal">%1$s · 信号 %2$s</string>
+    <string name="heard_over_bluetooth">Bluetooth 経由</string>
+    <string name="last_seen">最後の受信</string>
+    <string name="signal">信号強度</string>
+    <string name="seen_just_now">たった今</string>
 </resources>

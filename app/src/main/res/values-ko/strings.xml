@@ -334,5 +334,8 @@
     <string name="battery_short_very_low">위험</string>
     <string name="battery">배터리</string>
     <string name="nearby_now_with_battery_and_signal">근처에 있음 (%2$s) · 배터리 %1$s</string>
-    <string name="live_battery_with_signal">%1$s · 신호 %2$s</string>
+    <string name="heard_over_bluetooth">블루투스로 수신</string>
+    <string name="last_seen">마지막 수신</string>
+    <string name="signal">신호 세기</string>
+    <string name="seen_just_now">방금</string>
 </resources>
