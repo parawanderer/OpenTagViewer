@@ -457,12 +457,12 @@ public class OpenTagViewerDatabaseMigrationTest {
      * <b>The path an actual user takes, which is never one version at a time.</b>
      *
      * <p>People skip releases, so the upgrade that has to work is v1 straight to the current
-     * version - five migrations in a row over rows written by a schema none of them were tested
+     * version - six migrations in a row over rows written by a schema none of them were tested
      * against individually. Everything the user owns has to still be there at the end: their
      * beacons, their location history, and the nicknames they set.
      */
     @Test
-    public void migrate1To6_directUpgradePreservesEverything() throws IOException {
+    public void migrate1To7_directUpgradePreservesEverything() throws IOException {
         try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
             insertImport(db, 1L);
             insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
@@ -472,30 +472,115 @@ public class OpenTagViewerDatabaseMigrationTest {
         }
 
         SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
-                TEST_DB, 6, true,
+                TEST_DB, 7, true,
                 OpenTagViewerDatabase.MIGRATION_1_2,
                 OpenTagViewerDatabase.MIGRATION_2_3,
                 OpenTagViewerDatabase.MIGRATION_3_4,
                 OpenTagViewerDatabase.MIGRATION_4_5,
-                OpenTagViewerDatabase.MIGRATION_5_6);
+                OpenTagViewerDatabase.MIGRATION_5_6,
+                OpenTagViewerDatabase.MIGRATION_6_7);
 
         try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
             assertTrue(cursor.moveToFirst());
-            assertEquals("beacons lost on a direct v1 to v6 upgrade", 2, cursor.getInt(0));
+            assertEquals("beacons lost on a direct v1 to v7 upgrade", 2, cursor.getInt(0));
         }
 
         try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
             assertTrue(cursor.moveToFirst());
-            assertEquals("location history lost on a direct v1 to v6 upgrade", 1, cursor.getInt(0));
+            assertEquals("location history lost on a direct v1 to v7 upgrade", 1, cursor.getInt(0));
         }
 
         try (Cursor cursor = db.query(
                 "SELECT ui_name, ui_order FROM UserBeaconOptions WHERE beacon_id = ?",
                 new Object[] {"beacon-a"})) {
 
-            assertTrue("the user's nickname did not survive five migrations", cursor.moveToFirst());
+            assertTrue("the user's nickname did not survive six migrations", cursor.moveToFirst());
             assertEquals("Wallet", cursor.getString(0));
             assertTrue("nothing may arrive already arranged", cursor.isNull(1));
+        }
+    }
+
+    /**
+     * v6 to v7 adds an empty table and touches nothing else.
+     *
+     * <p>What it holds is heard by this phone's own radio, so there is nothing to backfill: a tag
+     * has no sighting until the next time it is actually heard. In particular the accessory
+     * record's own battery field is not copied across - that value is Apple's, is stale or unset
+     * for exactly the people this table exists for, and would land here dressed up as something
+     * this phone had heard.
+     */
+    @Test
+    public void migrate6To7_addsAnEmptyTableAndBackfillsNothing() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+            insertUserBeaconOptions(db, BEACON_ID, "Keys", null);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LastBleSighting")) {
+            assertTrue("the new table is missing after the upgrade", cursor.moveToFirst());
+            assertEquals("an upgrade must not invent a sighting nobody heard", 0, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query(
+                "SELECT content FROM OwnedBeacons WHERE id = ?", new Object[] {BEACON_ID})) {
+            assertTrue("the beacon did not survive v6 to v7", cursor.moveToFirst());
+            assertEquals(BEACON_PLIST, cursor.getString(0));
+        }
+
+        try (Cursor cursor = db.query(
+                "SELECT ui_name FROM UserBeaconOptions WHERE beacon_id = ?",
+                new Object[] {BEACON_ID})) {
+            assertTrue("the user's nickname did not survive v6 to v7", cursor.moveToFirst());
+            assertEquals("Keys", cursor.getString(0));
+        }
+    }
+
+    /**
+     * A sighting written straight after the upgrade reads back, so the table the migration built
+     * is really the one the app expects - {@code runMigrationsAndValidate} compares the schema,
+     * and this checks it actually works.
+     */
+    @Test
+    public void migrate6To7_theNewTableAcceptsASighting() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+
+        db.execSQL("INSERT INTO LastBleSighting"
+                        + " (beacon_id, heard_at, battery_level, status_byte) VALUES (?, ?, ?, ?)",
+                new Object[] {BEACON_ID, 1700000000000L, "MEDIUM", 0b0100_0000});
+
+        try (Cursor cursor = db.query(
+                "SELECT heard_at, battery_level, status_byte FROM LastBleSighting"
+                        + " WHERE beacon_id = ?", new Object[] {BEACON_ID})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(1700000000000L, cursor.getLong(0));
+            assertEquals("MEDIUM", cursor.getString(1));
+            assertEquals(0b0100_0000, cursor.getInt(2));
+        }
+    }
+
+    @Test
+    public void migrate6To7_handlesEmptyDatabase() throws IOException {
+        helper.createDatabase(TEST_DB, 5).close();
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LastBleSighting")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(0, cursor.getInt(0));
         }
     }
 
