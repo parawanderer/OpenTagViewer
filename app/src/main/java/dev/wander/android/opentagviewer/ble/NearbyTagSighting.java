@@ -30,6 +30,17 @@ public final class NearbyTagSighting {
 
     private final FindMyAdvertisement.BatteryLevel batteryLevel;
 
+    /**
+     * The status byte {@link #batteryLevel} was decoded from.
+     *
+     * <p>Carried alongside the reading rather than discarded once it has been decoded, because
+     * the reading is two bits of it interpreted against a table only partly confirmed outside
+     * Apple - see {@link dev.wander.android.opentagviewer.util.parse.LocationReportFields}. It
+     * is what gets persisted with a stored reading, so a disputed one can be re-derived from
+     * what was actually received.
+     */
+    private final int statusByte;
+
     /** Whether the beacon said it was separated from its owner. See {@link FindMyAdvertisement}. */
     private final FindMyAdvertisement.State state;
 

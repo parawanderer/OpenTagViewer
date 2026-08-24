@@ -4,11 +4,12 @@ import android.util.Log;
 
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 
 /**
- * The one place a Bluetooth sighting is fed back into alignment self-correction, for both
- * screens and both kinds of sighting.
+ * The one place a Bluetooth sighting is written down, for both screens and both kinds of
+ * sighting: the alignment it proves, and the battery level it reported.
  *
  * <p><b>One class because the policy used to live in four hand-copied methods</b> - a
  * {@code correctAlignmentFromSighting} and a {@code keepWhatTheSightingProved} in each of
@@ -37,9 +38,16 @@ final class AccessorySightingPersister {
     /**
      * A passive sighting from a {@code NearbyTagWatcher} - shaped to be used directly as its
      * {@code SightingListener}.
+     *
+     * <p>Two writes from the one advertisement, and they answer different questions. The address
+     * says which key the tag is broadcasting, which corrects alignment; the status byte says what
+     * its battery was, which is worth keeping long after the tag has gone quiet, because for a
+     * user with no Apple device nothing else will ever report it - see
+     * {@code BeaconRepository#storeLastSighting}.
      */
-    void onSighting(final String beaconId, final String mac, final long seenAtMs) {
-        this.persist(beaconId, mac, seenAtMs);
+    void onSighting(final NearbyTagSighting sighting, final String mac) {
+        this.persist(sighting.getBeaconId(), mac, sighting.getSeenAtMs());
+        this.persistLastSighting(sighting);
     }
 
     /**
@@ -58,5 +66,16 @@ final class AccessorySightingPersister {
         this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
                 .subscribe(() -> { }, error -> Log.w(TAG,
                         "Failed to persist a sighting for beaconId=" + beaconId, error));
+    }
+
+    private void persistLastSighting(final NearbyTagSighting sighting) {
+        this.beaconRepo.storeLastSighting(
+                        sighting.getBeaconId(),
+                        sighting.getBatteryLevel(),
+                        sighting.getStatusByte(),
+                        sighting.getSeenAtMs())
+                .subscribe(() -> { }, error -> Log.w(TAG,
+                        "Failed to persist a sighting reading for beaconId="
+                                + sighting.getBeaconId(), error));
     }
 }
