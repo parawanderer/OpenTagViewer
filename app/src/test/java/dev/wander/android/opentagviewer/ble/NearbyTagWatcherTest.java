@@ -33,9 +33,23 @@ public class NearbyTagWatcherTest {
         return json -> Map.of();
     }
 
+    /** A sighting as the scan callback would have built one, for a tag reporting a full battery. */
+    private static NearbyTagSighting sightingOf(final String beaconId) {
+        return sightingOf(beaconId, FindMyAdvertisement.BatteryLevel.FULL, 0b0000_0000);
+    }
+
+    private static NearbyTagSighting sightingOf(
+            final String beaconId,
+            final FindMyAdvertisement.BatteryLevel level,
+            final int statusByte) {
+        return new NearbyTagSighting(beaconId, -60, level, statusByte,
+                FindMyAdvertisement.State.SEPARATED, 1_700_000_000_000L);
+    }
+
     /** Records each call and counts down a latch, so a test can wait for the async dispatch. */
     private static final class RecordingListener implements NearbyTagWatcher.SightingListener {
         final List<String> calls = new CopyOnWriteArrayList<>();
+        final List<NearbyTagSighting> sightings = new CopyOnWriteArrayList<>();
         private final CountDownLatch latch;
 
         RecordingListener(final int expectedCalls) {
@@ -43,8 +57,9 @@ public class NearbyTagWatcherTest {
         }
 
         @Override
-        public void onSighting(final String beaconId, final String mac, final long seenAtMs) {
-            this.calls.add(beaconId);
+        public void onSighting(final NearbyTagSighting sighting, final String mac) {
+            this.calls.add(sighting.getBeaconId());
+            this.sightings.add(sighting);
             this.latch.countDown();
         }
 
@@ -69,7 +84,7 @@ public class NearbyTagWatcherTest {
         final long[] clock = {0L};
         final NearbyTagWatcher watcher = watcherWith(listener, clock);
 
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
 
         listener.awaitThenSettle();
         assertEquals(1, listener.calls.size());
@@ -81,9 +96,9 @@ public class NearbyTagWatcherTest {
         final long[] clock = {0L};
         final NearbyTagWatcher watcher = watcherWith(listener, clock);
 
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
         clock[0] = NearbyTagWatcher.SIGHTING_LISTENER_INTERVAL_MS - 1;
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
 
         listener.awaitThenSettle();
         assertEquals("the second call landed inside the throttle window", 1, listener.calls.size());
@@ -95,9 +110,9 @@ public class NearbyTagWatcherTest {
         final long[] clock = {0L};
         final NearbyTagWatcher watcher = watcherWith(listener, clock);
 
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
         clock[0] = NearbyTagWatcher.SIGHTING_LISTENER_INTERVAL_MS;
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
 
         listener.awaitThenSettle();
         assertEquals(2, listener.calls.size());
@@ -109,7 +124,32 @@ public class NearbyTagWatcherTest {
                 anyResolver(), null, new NearbyTagIndex(), () -> 0L);
 
         // Must not throw.
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
+    }
+
+    /**
+     * The listener is handed the whole sighting, because the same advertisement feeds two
+     * different writes: the address corrects key alignment, and the battery level is kept for
+     * long after the tag has gone quiet. A listener given only an address could not do the
+     * second, and a second listener for it would fire on its own schedule rather than this
+     * one's throttle.
+     */
+    @Test
+    public void handsOverWhatTheAdvertisementSaidNotJustWhereItCameFrom()
+            throws InterruptedException {
+        final RecordingListener listener = new RecordingListener(1);
+        final long[] clock = {0L};
+        final NearbyTagWatcher watcher = watcherWith(listener, clock);
+
+        watcher.maybeNotifySightingListener(
+                sightingOf(BEACON_ID, FindMyAdvertisement.BatteryLevel.LOW, 0b1000_0000), MAC);
+
+        listener.awaitThenSettle();
+        assertEquals(1, listener.sightings.size());
+        assertEquals(FindMyAdvertisement.BatteryLevel.LOW,
+                listener.sightings.get(0).getBatteryLevel());
+        assertEquals("the raw status byte must survive the hand-over too",
+                0b1000_0000, listener.sightings.get(0).getStatusByte());
     }
 
     @Test
@@ -118,8 +158,8 @@ public class NearbyTagWatcherTest {
         final long[] clock = {0L};
         final NearbyTagWatcher watcher = watcherWith(listener, clock);
 
-        watcher.maybeNotifySightingListener(BEACON_ID, MAC);
-        watcher.maybeNotifySightingListener("bike-beacon-id", "11:22:33:44:55:66");
+        watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);
+        watcher.maybeNotifySightingListener(sightingOf("bike-beacon-id"), "11:22:33:44:55:66");
 
         listener.awaitThenSettle();
         assertTrue("a busy tag must not starve another tag's correction",

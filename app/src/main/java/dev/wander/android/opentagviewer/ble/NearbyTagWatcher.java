@@ -67,9 +67,16 @@ public class NearbyTagWatcher {
      * stored alignment that has drifted since the last fetch. It stays inside
      * {@code currentMacAddresses}' 12 hour margin for a while and then, once the drift exceeds
      * that, simply stops being found - with nothing failing anywhere to say why.
+     *
+     * <p><b>Handed the whole sighting, not just the address it was heard at.</b> Alignment only
+     * needs the address, but the same advertisement also carries the tag's battery level, and
+     * that is worth keeping past the moment it was heard - see
+     * {@code BeaconRepository#storeLastSighting}. Both writes belong to the same event and are
+     * throttled by the same rule, so there is one callback carrying everything the advertisement
+     * said rather than a second listener firing on its own schedule.
      */
     public interface SightingListener {
-        void onSighting(String beaconId, String mac, long seenAtMs);
+        void onSighting(NearbyTagSighting sighting, String mac);
     }
 
     /**
@@ -178,8 +185,7 @@ public class NearbyTagWatcher {
                     if (!emitter.isDisposed()) {
                         emitter.onNext(sighting);
                     }
-                    maybeNotifySightingListener(
-                            sighting.getBeaconId(), result.getDevice().getAddress());
+                    maybeNotifySightingListener(sighting, result.getDevice().getAddress());
                 }
 
                 @Override
@@ -311,7 +317,7 @@ public class NearbyTagWatcher {
         }
 
         return new NearbyTagSighting(beaconId, result.getRssi(), advertisement.getBatteryLevel(),
-                advertisement.getState(), this.clock.nowMs());
+                advertisement.getStatusByte(), advertisement.getState(), this.clock.nowMs());
     }
 
     /**
@@ -320,18 +326,17 @@ public class NearbyTagWatcher {
      * <p>Off-thread because the real listener persists to Room through a Python call - see the
      * interface doc - and this runs from {@code onScanResult}, which must not block.
      */
-    void maybeNotifySightingListener(final String beaconId, final String mac) {
+    void maybeNotifySightingListener(final NearbyTagSighting sighting, final String mac) {
         if (this.sightingListener == null) {
             return;
         }
         final long nowMs = this.clock.nowMs();
-        final Long lastCallMs = this.lastListenerCallMs.get(beaconId);
+        final Long lastCallMs = this.lastListenerCallMs.get(sighting.getBeaconId());
         if (lastCallMs != null && nowMs - lastCallMs < SIGHTING_LISTENER_INTERVAL_MS) {
             return;
         }
-        this.lastListenerCallMs.put(beaconId, nowMs);
+        this.lastListenerCallMs.put(sighting.getBeaconId(), nowMs);
 
-        Schedulers.io().scheduleDirect(
-                () -> this.sightingListener.onSighting(beaconId, mac, nowMs));
+        Schedulers.io().scheduleDirect(() -> this.sightingListener.onSighting(sighting, mac));
     }
 }
