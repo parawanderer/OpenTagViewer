@@ -334,5 +334,8 @@
     <string name="battery_short_very_low">極低</string>
     <string name="battery">電量</string>
     <string name="nearby_now_with_battery_and_signal">在附近（%2$s）· 電量%1$s</string>
-    <string name="live_battery_with_signal">%1$s · 訊號%2$s</string>
+    <string name="heard_over_bluetooth">透過藍牙</string>
+    <string name="last_seen">最後收到</string>
+    <string name="signal">訊號強度</string>
+    <string name="seen_just_now">剛剛</string>
 </resources>

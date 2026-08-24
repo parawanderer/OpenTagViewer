@@ -102,10 +102,25 @@
             name="batteryLevel"
             type="String" />
 
-        <!-- The reading taken off the tag itself over Bluetooth, as opposed to batteryLevel
-             above, which comes from the iCloud record and may be years old. -->
+        <!--
+            The three rows of the "Over Bluetooth" section: what this phone's own radio heard
+            from the tag, as opposed to batteryLevel above, which comes from the iCloud record
+            and may be years old.
+
+            Separate variables rather than one line, because they are three different
+            measurements and only some of them survive the tag going quiet - see the section
+            itself for which, and why signal strength is not among them.
+        -->
         <variable
-            name="liveBatteryLevel"
+            name="bleLastSeen"
+            type="String" />
+
+        <variable
+            name="bleSignalStrength"
+            type="String" />
+
+        <variable
+            name="bleBatteryLevel"
             type="String" />
 
         <variable
@@ -391,26 +406,6 @@
                         app:sectionSubtitle="@{deviceType}"
                         app:title="@{@string/type}" />
 
-                    <!--
-                        Battery, but only the reading this phone just took off the tag itself
-                        over Bluetooth.
-
-                        The debug panel below has a battery row too, and it stays there: that one
-                        comes from the iCloud record, which only Apple devices ever refresh, so
-                        for a tag imported from a file it is whatever was true when the export
-                        was made. This one is worth showing plainly precisely because it does not
-                        have that problem - and it is GONE whenever the tag is not audible,
-                        rather than falling back to the stale value, since a number with no way
-                        to tell which kind it is would be worse than no number.
-                    -->
-                    <include
-                        android:id="@+id/device_settings_live_battery"
-                        layout="@layout/settings_item_noicon_clickable"
-                        android:visibility="gone"
-                        app:clickable="@{false}"
-                        app:sectionSubtitle="@{liveBatteryLevel}"
-                        app:title="@{@string/battery}"
-                        tools:visibility="visible" />
 
                     <!--
                         Shown only when Type could not be resolved to a name and the record still
@@ -430,6 +425,102 @@
                         android:textSize="13sp"
                         android:visibility="gone"
                         tools:text="Vendor 0x0ABC is a Bluetooth SIG company identifier. Tap to look up who makes this."
+                        tools:visibility="visible" />
+
+                    <!--
+                        What this phone's own radio heard from the tag, in its own section.
+
+                        **Its own section because it is a different source, not a different
+                        field.** Everything above comes from the accessory record - Apple's copy,
+                        refreshed from the account or frozen into an export - and the section
+                        above says so on its "Source" row. These rows come from the tag itself,
+                        over the air, measured here. Sitting them among the record's fields made
+                        a reading this phone took a minute ago look like one more thing iCloud
+                        had said, and put a signal strength under a heading that reads "Battery".
+
+                        The debug panel below has a battery row too, and it stays there: that one
+                        is the record's field, which only Apple devices ever refresh, so for a
+                        tag imported from a file it is whatever was true when the export was
+                        made. The two are never merged, and neither ever falls back to the other.
+
+                        The whole section is GONE until the tag has actually been heard - see
+                        DeviceInfoActivity#showWhatWasHeardOverBluetooth - because a tag this
+                        phone has never met has nothing to report here, and empty rows would
+                        read as "nothing detected", which is a claim nobody can make.
+                    -->
+                    <com.google.android.material.divider.MaterialDivider
+                        android:id="@+id/device_ble_divider"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="10dp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <LinearLayout
+                        android:id="@+id/device_ble_header"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginBottom="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_bold"
+                            android:paddingLeft="22dp"
+                            android:paddingTop="8dp"
+                            android:text="@string/heard_over_bluetooth"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
+
+                    <!--
+                        When the tag was last heard: "just now" for as long as it is still being
+                        heard, then how long ago. This row is what makes the other two readable,
+                        since neither says anything about its own age.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_ble_last_seen"
+                        layout="@layout/settings_item_noicon_clickable"
+                        android:visibility="gone"
+                        app:clickable="@{false}"
+                        app:sectionSubtitle="@{bleLastSeen}"
+                        app:title="@{@string/last_seen}"
+                        tools:visibility="visible" />
+
+                    <!--
+                        Signal strength, and **the one row here that is not kept**. It describes
+                        how strongly the tag was heard at one instant, which is a statement about
+                        a distance that no longer exists once the tag has gone quiet - so this
+                        row disappears with the live reading while the battery row stays. See
+                        NearbyTagLabel for why even a live one is dots rather than a distance.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_ble_signal"
+                        layout="@layout/settings_item_noicon_clickable"
+                        android:visibility="gone"
+                        app:clickable="@{false}"
+                        app:sectionSubtitle="@{bleSignalStrength}"
+                        app:title="@{@string/signal}"
+                        tools:visibility="visible" />
+
+                    <!--
+                        Battery, which unlike the signal is worth keeping: a tag that read "low"
+                        an hour ago is still low, and for somebody with no Apple device this is
+                        the only battery figure that will ever exist. Stays visible with the
+                        "Last seen" row above it carrying its age.
+                    -->
+                    <include
+                        android:id="@+id/device_settings_ble_battery"
+                        layout="@layout/settings_item_noicon_clickable"
+                        android:visibility="gone"
+                        app:clickable="@{false}"
+                        app:sectionSubtitle="@{bleBatteryLevel}"
+                        app:title="@{@string/battery}"
                         tools:visibility="visible" />
 
                     <LinearLayout

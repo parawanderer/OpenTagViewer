@@ -334,5 +334,8 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="battery_short_low">niedrig</string>
     <string name="battery_short_very_low">kritisch</string>
     <string name="battery">Akku</string>
-    <string name="live_battery_with_signal">%1$s · Signal %2$s</string>
+    <string name="heard_over_bluetooth">Über Bluetooth</string>
+    <string name="last_seen">Zuletzt gehört</string>
+    <string name="signal">Signal</string>
+    <string name="seen_just_now">gerade eben</string>
 </resources>
