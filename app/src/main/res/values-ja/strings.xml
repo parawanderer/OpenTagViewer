@@ -309,4 +309,5 @@
     <string name="refresh_from_account">Apple アカウントから更新</string>
     <string name="refresh_from_account_done">Apple アカウントと同じ状態になりました</string>
     <string name="refresh_from_account_failed">いま Apple アカウントに接続できませんでした。タグはそのままです。</string>
+    <string name="error_report_log_too_big_to_copy">このログはコピーするには大きすぎます。代わりにファイルとして保存して添付してください。</string>
 </resources>

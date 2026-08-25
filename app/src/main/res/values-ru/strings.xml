@@ -309,4 +309,5 @@
     <string name="refresh_from_account">Обновить из учётной записи Apple</string>
     <string name="refresh_from_account_done">Данные соответствуют учётной записи Apple</string>
     <string name="refresh_from_account_failed">Сейчас не удалось связаться с учётной записью Apple. Метки не изменились.</string>
+    <string name="error_report_log_too_big_to_copy">Этот журнал слишком велик для копирования. Сохраните его в файл и приложите его.</string>
 </resources>

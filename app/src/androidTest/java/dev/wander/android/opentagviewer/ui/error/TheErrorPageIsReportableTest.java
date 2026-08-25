@@ -3,6 +3,7 @@ package dev.wander.android.opentagviewer.ui.error;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
@@ -158,10 +159,13 @@ public class TheErrorPageIsReportableTest {
      */
     @Test
     public void thecopiedLogIsTheRedactedOne() {
+        // **A bounded stand-in rather than the real log with a marker on the end.** Copy is only
+        // offered for a log that fits on the clipboard, and the real capture is however chatty
+        // the emulator happened to be - so passing it through would make whether this test can
+        // reach the Copy item depend on the device's logcat volume. The two assertions below are
+        // about which text travels, not how much of it.
         AppDependencies.replaceLogRedactor(log ->
-                new LogRedactor.Redacted(
-                        log.replace(SOMETHING_PERSONAL, "<email>") + REDACTED_MARKER,
-                        "1 email address"));
+                new LogRedactor.Redacted("<email> was here" + REDACTED_MARKER, "1 email address"));
         this.open();
 
         this.chooseFromTheLogMenu(R.string.error_report_log_copy);
@@ -277,13 +281,85 @@ public class TheErrorPageIsReportableTest {
         AppDependencies.replaceLogRedactor(log -> null);
         this.open();
 
-        Eventually.check(() -> onView(withId(R.id.error_report_log_note))
-                .check(matches(isDisplayed())));
+        // **Waiting on the text, not on the view being displayed.** The note is in the layout
+        // with no android:text, so it measures a line high and is "displayed" from the first
+        // frame - the wait returned instantly and the assertion below it read an empty view.
+        // It passed only because reading the log was fast enough to win the race, and stopped
+        // passing the moment the app started capturing ten times as much of it.
+        Eventually.check(() -> onView(withId(R.id.error_report_log_note)).check(matches(
+                withText(getInstrumentation().getTargetContext()
+                        .getString(R.string.error_report_log_unavailable)))));
 
         onView(withId(R.id.error_report_share_log)).check(matches(not(isDisplayed())));
-        onView(withId(R.id.error_report_log_note)).check(matches(
-                withText(getInstrumentation().getTargetContext()
-                        .getString(R.string.error_report_log_unavailable))));
+    }
+
+    /**
+     * <b>A log too large for the clipboard is not offered to it.</b>
+     *
+     * <p>{@code setPrimaryClip} is a Binder call, Binder caps a transaction at about a megabyte
+     * across the process, and a string parcels as UTF-16. Raising the captured log to 5000 lines
+     * made that parcel 1,055,848 bytes, and Copy killed this activity with
+     * {@code TransactionTooLargeException} - the app crashing while somebody reported a crash.
+     *
+     * <p>Trimming to fit was the other option and is worse: it hands over something that looks
+     * complete, and what goes missing is the oldest part, which is the import and start-up lines.
+     * So the offer changes instead, and this asserts the reason is on screen rather than the
+     * option merely vanishing.
+     *
+     * <p><b>The fake's output is unrelated to its input on purpose.</b> Redaction replaces a
+     * captured group with a {@code <name-N>} placeholder that is often longer than what it
+     * replaced, so a redacted log can be bigger than the raw one - and the decision has to be
+     * made on what actually goes to the clipboard. A fake that returned its input would not tell
+     * the two apart.
+     */
+    @Test
+    public void alogTooBigToCopyOffersSavingAndSaysWhy() {
+        AppDependencies.replaceLogRedactor(
+                log -> new LogRedactor.Redacted(aLogOf(600_000), "1 email address"));
+        this.open();
+
+        Eventually.check(() -> onView(withId(R.id.error_report_share_log))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.error_report_share_log)).perform(scrollTo(), click());
+
+        final var context = getInstrumentation().getTargetContext();
+
+        Eventually.check(() -> onView(withText(context.getString(
+                R.string.error_report_log_too_big_to_copy))).inRoot(isDialog())
+                .check(matches(isDisplayed())));
+
+        onView(withText(context.getString(R.string.error_report_log_save))).inRoot(isDialog())
+                .check(matches(isDisplayed()));
+        onView(withText(context.getString(R.string.error_report_log_copy)))
+                .check(doesNotExist());
+    }
+
+    /**
+     * And saving it still works, which is the whole point of still offering something.
+     *
+     * <p>An option that is present and does nothing would pass the test above.
+     */
+    @Test
+    public void alogTooBigToCopyCanStillBeSaved() {
+        AppDependencies.replaceLogRedactor(
+                log -> new LogRedactor.Redacted(aLogOf(600_000), "1 email address"));
+        this.open();
+
+        this.chooseFromTheLogMenu(R.string.error_report_log_save);
+
+        intended(allOf(
+                hasAction(Intent.ACTION_CREATE_DOCUMENT),
+                hasType("text/plain"),
+                hasExtra(Intent.EXTRA_TITLE, "opentagviewer-log.txt")));
+    }
+
+    /** A redacted log of a given size, in lines, so it looks like what it stands in for. */
+    private static String aLogOf(final int chars) {
+        final StringBuilder sb = new StringBuilder(chars + 64);
+        while (sb.length() < chars) {
+            sb.append("08-25 17:37:55.257 21244 26234 I python.stdout: a line of it\n");
+        }
+        return sb.toString();
     }
 
     /**
