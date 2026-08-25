@@ -184,9 +184,9 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
      * v8 → v9: adds {@code alert_on_separation} to {@code UserBeaconOptions}, the per-tag answer
      * to whether being left behind is worth a noise.
      *
-     * <p>Additive and nullable rather than defaulted, and null reads as yes - see
+     * <p>Additive and nullable rather than defaulted, and null reads as no - see
      * {@link UserBeaconOptions#alertOnSeparation}. Every existing row is null, which is correct:
-     * nobody has turned an alert off for a tag that could not alert yet.
+     * nobody has asked for an alert on a tag that could not alert yet.
      */
     public static final Migration MIGRATION_8_9 = new Migration(8, 9) {
         @Override

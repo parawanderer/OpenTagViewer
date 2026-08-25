@@ -155,13 +155,13 @@ public class NearbyScanService extends Service {
     private Map<String, String> namesByBeaconId = Map.of();
 
     /**
-     * The tags their owner has told us not to warn about, read when the watch starts.
+     * The tags their owner has asked to be warned about, read when the watch starts.
      *
-     * <p>Held as the exceptions because undecided means yes - see
-     * {@code UserBeaconOptions.alertOnSeparation}. They are still scanned for and still recorded;
-     * only the noise is off.
+     * <p>Held as the permissions because undecided means no - see
+     * {@code UserBeaconOptions.alertOnSeparation}. Every other tag is still scanned for and still
+     * recorded; only the noise is off, and it stays off until somebody asks for it by name.
      */
-    private Set<String> alertsOff = Set.of();
+    private Set<String> alertsOn = Set.of();
     private AccessorySightingPersister sightingPersister;
     private PhoneLocation phoneLocation;
 
@@ -255,7 +255,7 @@ public class NearbyScanService extends Service {
                 .subscribeOn(Schedulers.io())
                 .subscribe(beacons -> {
                     this.namesByBeaconId = readNames(beacons);
-                    this.alertsOff = this.beaconRepo.getBeaconsWithAlertsOff().blockingFirst();
+                    this.alertsOn = this.beaconRepo.getBeaconsWithAlertsOn().blockingFirst();
                     this.watchThese(keyMaterialOf(beacons));
                 }, error -> Log.w(TAG, "Could not read the tags to watch for", error));
     }
@@ -395,10 +395,10 @@ public class NearbyScanService extends Service {
             // the only other moment the position is worth reading.
             known.gone = true;
 
-            if (this.alertsOff.contains(entry.getKey())) {
-                // Still scanned for, still recorded - the owner has only said this one is not
-                // worth waking them for. Skipping the verification scan too, since nothing would
-                // be done with the answer.
+            if (!this.alertsOn.contains(entry.getKey())) {
+                // Still scanned for, still recorded - the owner has just not asked to be woken
+                // for this one, which is the default. Skipping the verification scan too, since
+                // nothing would be done with the answer.
                 continue;
             }
 

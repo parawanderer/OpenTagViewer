@@ -661,12 +661,16 @@ public class DeviceInfoActivity extends AppCompatActivity
         super.onResume();
         this.startWatchingForThisTag();
         this.showWhatWasHeardOverBluetooth();
+        this.showLeftBehindSwitch();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         this.stopWatchingForThisTag();
+        if (this.leftBehindLookup != null && !this.leftBehindLookup.isDisposed()) {
+            this.leftBehindLookup.dispose();
+        }
     }
 
     /**
@@ -851,7 +855,7 @@ public class DeviceInfoActivity extends AppCompatActivity
     /**
      * Shows and wires the per-tag left-behind switch.
      *
-     * <p>Undecided reads as on, so a tag nobody has answered for still raises the alarm - see
+     * <p>Undecided reads as off, so a tag nobody has answered for stays silent - see
      * {@code UserBeaconOptions.alertOnSeparation}. The switch is only revealed once the answer
      * has been read, so it cannot flick from a default to the stored value in front of somebody.
      */
