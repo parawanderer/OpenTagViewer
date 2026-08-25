@@ -1,9 +1,10 @@
 package dev.wander.android.opentagviewer.ble;
 
+import android.util.Log;
+
 import androidx.annotation.Nullable;
 
 import java.util.HashMap;
-import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +37,8 @@ import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
  * it would drop matches, which presents as "the tag is never nearby".
  */
 public final class NearbyTagIndex {
+    private static final String TAG = NearbyTagIndex.class.getSimpleName();
+
 
     /**
      * How long a built index is trusted.
@@ -59,9 +62,10 @@ public final class NearbyTagIndex {
      *
      * <p>Blocking, once per tag. Call it off the main thread.
      *
-     * @param accessoryJsonByBeaconId the persisted accessory JSON per beacon. An entry whose
-     *                                JSON is null or unreadable is skipped rather than failing
-     *                                the rebuild: a tag that has not been backfilled yet should
+     * @param accessoryJsonByBeaconId the persisted accessory JSON per beacon. An entry the
+     *                                resolver cannot answer for - unreadable JSON, or a
+     *                                candidate window too wide to be worth deriving - is
+     *                                skipped rather than failing the rebuild: such a tag should
      *                                cost only its own sightings, not everyone else's.
      */
     public void rebuild(
@@ -73,8 +77,22 @@ public final class NearbyTagIndex {
         for (final Map.Entry<String, String> entry : accessoryJsonByBeaconId.entrySet()) {
             // Only the address is wanted here; the key index each maps to is not this class's
             // business - see AccessoryMacResolver#recordSeen on why only Python may act on it.
-            final Set<String> macs = resolver.currentMacAddresses(entry.getValue()).keySet();
-            for (final String mac : macs) {
+            final Map<String, Integer> candidates = resolver.currentMacAddresses(entry.getValue());
+
+            // **Null is a documented answer, not a broken one, and it must not stop the loop.**
+            // The resolver returns it for an accessory it cannot read, and for one whose
+            // candidate window is too wide to derive - which is what an owner's own Apple
+            // device looks like, since a phone has no rolling-key alignment. Dereferencing it
+            // threw, and the throw left this whole watch dead: one entry cost every other
+            // entry its sightings, which is exactly what the parameter note below forbids. It
+            // presents as no tag ever being nearby, with nothing failing anywhere to say why.
+            if (candidates == null) {
+                Log.d(TAG, "No candidate addresses for beaconId=" + entry.getKey()
+                        + "; leaving it out of the index rather than dropping the rest");
+                continue;
+            }
+
+            for (final String mac : candidates.keySet()) {
                 if (mac != null) {
                     // Upper-cased on the way in so lookups need no normalisation per scan
                     // result, which is the hot path. Android reports uppercase and FindMy.py
