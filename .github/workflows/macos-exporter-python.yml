@@ -143,6 +143,22 @@ jobs:
           - runner: ubuntu-22.04
             os: linux
             arch: x64
+          # The same glibc reasoning applies here, so this is 22.04 rather than the newest ARM
+          # image. Linux is the platform that genuinely needed this: an ARM machine - a Pi, an
+          # ARM cloud instance - has no x64 fallback of any kind, and the CLI is a plausible
+          # thing to schedule on one.
+          - runner: ubuntu-22.04-arm
+            os: linux
+            arch: arm64
+
+          # **There is no windows-11-arm entry, and adding one will not work.** unicorn publishes
+          # no win_arm64 wheel, so uv falls back to its sdist - which fails to compile, because
+          # the QEMU core assembles setjmp-wrapper-win32.asm with MASM and MASM does not exist
+          # for ARM64. That needs fixing upstream in unicorn's build, not here.
+          #
+          # Nobody is excluded meanwhile: Windows ARM runs the x64 binary under emulation. And
+          # unicorn is not optional - it emulates Apple's ADI library, which is what lets sign-in
+          # work without a third-party Anisette server.
 
     runs-on: ${{ matrix.runner }}
 
