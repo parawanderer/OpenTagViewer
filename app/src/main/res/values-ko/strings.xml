@@ -309,4 +309,5 @@
     <string name="refresh_from_account">Apple 계정에서 새로 고침</string>
     <string name="refresh_from_account_done">Apple 계정과 동기화되었습니다</string>
     <string name="refresh_from_account_failed">지금은 Apple 계정에 연결하지 못했습니다. 태그는 그대로입니다.</string>
+    <string name="error_report_log_too_big_to_copy">이 로그는 너무 커서 복사할 수 없습니다. 대신 파일로 저장한 뒤 첨부하세요.</string>
 </resources>

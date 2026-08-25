@@ -100,6 +100,37 @@ public class LogCollectorUtil {
     }
 
     /**
+     * The most text this app will put on the clipboard.
+     *
+     * <p><b>Above roughly a megabyte, {@code setPrimaryClip} throws and the app dies.</b> The
+     * clipboard is a Binder call, Binder caps a transaction at about 1 MB shared across the
+     * process, and a string is parcelled as UTF-16 - so two bytes per character, before the
+     * ClipData around it. Copying a 5000-line log produced a 1,055,848-byte parcel and a
+     * {@code TransactionTooLargeException}, on the one screen in this app whose entire purpose
+     * is reporting that something already crashed.
+     *
+     * <p>200,000 characters is about 400 KB parcelled, which leaves the rest of the budget for
+     * whatever else the process has in flight. It is not a precise limit and does not need to be:
+     * the point is to be far enough below the ceiling that nothing else in the transaction can
+     * push it over.
+     *
+     * <p><b>Deliberately a limit on offering the clipboard, not on what goes to it.</b> Trimming
+     * would hand somebody a log that looks complete and is not, and the part that goes missing is
+     * the oldest - the import and start-up lines. Saving to a file has no such ceiling, so the
+     * honest answer for a large log is to offer only that.
+     */
+    static final int CLIPBOARD_LIMIT_CHARS = 200_000;
+
+    /**
+     * Whether this log can go on the clipboard at all.
+     *
+     * @param log the redacted log, or null if there is none.
+     */
+    public static boolean fitsOnTheClipboard(final String log) {
+        return log != null && log.length() <= CLIPBOARD_LIMIT_CHARS;
+    }
+
+    /**
      * Lines in a block of text, counting a final line that has no newline after it.
      *
      * <p>Split out because getting it wrong is off-by-one in a number somebody uses to decide
