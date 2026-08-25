@@ -129,6 +129,11 @@
             name="bleStatusByte"
             type="String" />
 
+        <!-- Whether this tag is worth an alarm when it is left behind. -->
+        <variable
+            name="warnIfLeftBehind"
+            type="boolean" />
+
         <variable
             name="deviceModel"
             type="String" />
@@ -520,6 +525,55 @@
                         the only battery figure that will ever exist. Stays visible with the
                         "Last seen" row above it carrying its age.
                     -->
+                    <!--
+                        Whether this tag is worth a noise when it is left behind.
+
+                        In this section rather than the app-wide settings because the answer
+                        genuinely differs per tag: keys and a wallet are worth an alarm, a tag
+                        that lives in a car is not, and a single switch for all of them gets
+                        turned off by the first one that cries wolf. It sits with the rest of
+                        what the radio does, which is what it depends on.
+
+                        Visible whether or not background listening is on - the explainer says
+                        it is needed - so somebody setting up a new tag can answer the question
+                        once rather than being sent to two screens in a particular order.
+                    -->
+                    <LinearLayout
+                        android:id="@+id/device_warn_left_behind_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingLeft="22dp"
+                        android:paddingTop="8dp"
+                        android:paddingRight="22dp"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/device_warn_left_behind"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:checked="@{warnIfLeftBehind}"
+                            android:fontFamily="@font/nunito_medium"
+                            android:text="@string/warn_if_left_behind"
+                            android:textSize="16sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/device_warn_left_behind_explainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="22dp"
+                        android:layout_marginEnd="22dp"
+                        android:layout_marginBottom="8dp"
+                        android:fontFamily="@font/nunito_medium"
+                        android:text="@string/warn_if_left_behind_explainer"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
                     <include
                         android:id="@+id/device_settings_ble_battery"
                         layout="@layout/settings_item_noicon_clickable"

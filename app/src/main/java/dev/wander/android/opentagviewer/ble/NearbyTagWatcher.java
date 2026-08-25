@@ -34,10 +34,18 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * continuously when the user turns background scanning on, which is a recording feature and is
  * why it is opt-in and carries a permanent notification.
  *
- * <p>The difference reaches this class as {@link #scanMode}: a screen wants results promptly,
- * a service running all day wants the cheapest duty cycle the platform offers.
+ * <p>The difference reaches this class as {@link #scanMode}, and the two callers sit at
+ * opposite ends of it. A screen is open because somebody is looking for a tag right now, so it
+ * scans at {@code SCAN_MODE_LOW_LATENCY} - the radio listening continuously, which is what makes
+ * the signal meter move as you walk toward something. That is affordable precisely because a
+ * screen is open for minutes, not days.
  *
- * <p>The screen's {@code SCAN_MODE_BALANCED} - a middle ground between the low-latency mode
+ * <p>The service takes {@code SCAN_MODE_BALANCED} instead: a quarter of the radio time, running
+ * all day. Cheaper still exists, and was tried - low power left gaps of over a minute with a tag
+ * in a pocket, which the left-behind rule then has to see through, and every gap it cannot costs
+ * a full-power verification burst of its own.
+ *
+ * <p>{@code SCAN_MODE_BALANCED} - a middle ground between the low-latency mode
  * {@link NearbyAccessoryScanner} uses and this class's own original {@code SCAN_MODE_LOW_POWER}.
  * Low-power's short scan window and multi-second sleep between them meant several of a tag's
  * own advertisements arrived in a burst whenever a window happened to line up, then nothing for

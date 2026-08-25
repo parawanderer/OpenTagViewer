@@ -348,4 +348,6 @@
     <string name="left_behind_channel_description">Предупреждает, когда метка перестала быть слышна, а вы от неё удалились.</string>
     <string name="left_behind_title">%1$s осталась на месте</string>
     <string name="left_behind_text">Последний сигнал там, где вы были %1$s. Нажмите, чтобы увидеть место.</string>
+    <string name="warn_if_left_behind">Предупреждать, если забыта</string>
+    <string name="warn_if_left_behind_explainer">Подаёт сигнал, когда метка перестала быть слышна, а вы ушли. Требует фонового приёма.</string>
 </resources>

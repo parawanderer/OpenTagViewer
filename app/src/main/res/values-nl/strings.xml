@@ -348,4 +348,6 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="left_behind_channel_description">Waarschuwt je als een tag niet meer te horen is en je ervandaan bent gelopen.</string>
     <string name="left_behind_title">%1$s is achtergebleven</string>
     <string name="left_behind_text">Laatst gehoord waar je %1$s was. Tik om de plek te zien.</string>
+    <string name="warn_if_left_behind">Waarschuwen bij achterlaten</string>
+    <string name="warn_if_left_behind_explainer">Slaat alarm als deze tag niet meer te horen is en je verder bent gelopen. Vereist luisteren op de achtergrond.</string>
 </resources>

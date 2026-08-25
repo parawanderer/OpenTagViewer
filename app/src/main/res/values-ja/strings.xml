@@ -348,4 +348,6 @@
     <string name="left_behind_channel_description">タグが受信できなくなり、その場所から離れたときに知らせます。</string>
     <string name="left_behind_title">%1$s が置き去りです</string>
     <string name="left_behind_text">%1$sにいた場所で最後に受信しました。タップして場所を表示します。</string>
+    <string name="warn_if_left_behind">置き忘れたら警告</string>
+    <string name="warn_if_left_behind_explainer">このタグが受信できなくなり、その場を離れたときにアラームを鳴らします。バックグラウンド受信が必要です。</string>
 </resources>

@@ -381,4 +381,6 @@ You can set this up now, or any time later from Settings.</string>
     <string name="left_behind_channel_description">Alerts you when a tag stops being heard and you have moved away from it.</string>
     <string name="left_behind_title">%1$s stayed behind</string>
     <string name="left_behind_text">Last heard where you were %1$s. Tap to see the place.</string>
+    <string name="warn_if_left_behind">Warn if left behind</string>
+    <string name="warn_if_left_behind_explainer">Sounds an alarm when this tag stops being heard and you have moved on. Needs background listening to be on.</string>
 </resources>

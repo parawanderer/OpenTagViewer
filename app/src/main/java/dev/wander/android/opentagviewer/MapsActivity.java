@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 
 
+import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -707,7 +708,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         this.nearbyWatchDisposable = new NearbyTagWatcher(
-                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting)
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
+                ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
