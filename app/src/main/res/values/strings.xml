@@ -94,6 +94,7 @@
     <string name="type">Type</string>
     <string name="unknown">Unknown</string>
     <string name="debug_battery_level" translatable="false">Battery level</string>
+    <string name="debug_ble_status_byte" translatable="false">BLE status byte</string>
     <string name="debug_device_model" translatable="false">Device Model</string>
     <string name="debug_pairing_date" translatable="false">Pairing Date</string>
     <string name="debug_product_id" translatable="false">Product Id</string>

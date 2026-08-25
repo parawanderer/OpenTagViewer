@@ -123,6 +123,12 @@
             name="bleBatteryLevel"
             type="String" />
 
+        <!-- The raw status byte the battery reading above was decoded from, for the debug
+             panel. See the row itself for why it is worth showing next to the reading. -->
+        <variable
+            name="bleStatusByte"
+            type="String" />
+
         <variable
             name="deviceModel"
             type="String" />
@@ -642,6 +648,31 @@
                             app:onClick="@{clickItemHandler}"
                             app:sectionSubtitle="@{batteryLevel}"
                             app:title="@{@string/debug_battery_level}" />
+
+                        <!--
+                            The status byte this phone heard the tag broadcast, raw.
+
+                            **Here to be measured against, not to be read as a battery level.**
+                            The "Over Bluetooth" section above decodes bits 6-7 of it per Apple's
+                            Table 5-5, which is right for an MFi accessory and wrong for an
+                            AirTag: LocationReportFields records that an AirTag advertises 0x90,
+                            failing the same table's marker and reserved bits, and that decoding
+                            it anyway reads "low" for a tag whose own record says full.
+
+                            Rendered by LocationReportFields.status, so it carries decimal, hex
+                            and binary, and appends the Table 5-5 reading only to a byte that
+                            actually conforms - which is the comparison this row exists for.
+                            Hidden until the tag has been heard.
+                        -->
+                        <include
+                            android:id="@+id/settings_debug_ble_status_byte"
+                            layout="@layout/settings_item_noicon_clickable"
+                            android:visibility="gone"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{bleStatusByte}"
+                            app:title="@{@string/debug_ble_status_byte}"
+                            tools:visibility="visible" />
 
                         <include
                             android:id="@+id/settings_debug_naming_record_device_model"
