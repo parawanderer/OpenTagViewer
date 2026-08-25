@@ -309,4 +309,5 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="refresh_from_account">Actualiser depuis le compte Apple</string>
     <string name="refresh_from_account_done">À jour avec votre compte Apple</string>
     <string name="refresh_from_account_failed">Impossible de joindre votre compte Apple pour le moment. Vos tags sont inchangés.</string>
+    <string name="error_report_log_too_big_to_copy">Ce journal est trop volumineux pour être copié. Enregistrez-le plutôt sous forme de fichier et joignez celui-ci.</string>
 </resources>
