@@ -143,6 +143,13 @@ jobs:
           - runner: ubuntu-22.04
             os: linux
             arch: x64
+          - runner: windows-11-arm
+            os: windows
+            arch: arm64
+          - runner: ubuntu-22.04-arm
+            os: linux
+            arch: arm64
+
 
     runs-on: ${{ matrix.runner }}
 
