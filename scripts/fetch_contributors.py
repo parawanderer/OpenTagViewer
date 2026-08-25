@@ -36,6 +36,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import os
@@ -84,8 +85,20 @@ SECONDS_PER_WEEK = 7 * 24 * 60 * 60
 
 # GitHub computes contributor stats asynchronously and answers 202 with an empty body while
 # it does. It is expected on a cold cache, not an error.
-STATS_RETRIES = 6
-STATS_RETRY_DELAY_S = 3
+#
+# **Two minutes, because a cold cache is now the normal case rather than the rare one.** This
+# used to run only on a weekly schedule, by which time GitHub had long since computed the answer
+# and served it from cache. It now also runs the moment somebody's pull request is merged - and
+# merging pushes to the default branch, which is exactly what invalidates that cache. So the run
+# whose entire purpose is crediting the person who just contributed is the run most likely to
+# arrive while GitHub is still working the numbers out.
+#
+# Running out of retries is not loud: main() keeps the previous list and exits 0, because a
+# missing credits refresh is not worth failing over. That is the right behaviour and it is also
+# why the budget has to be generous - the failure mode is nobody being credited and nothing
+# saying so until the weekly run catches it.
+STATS_RETRIES = 20
+STATS_RETRY_DELAY_S = 6
 
 
 def _request(url: str, accept: str = "application/vnd.github+json"):
@@ -180,20 +193,67 @@ def is_creditable(author: dict, commits: int) -> bool:
     return True
 
 
-def main() -> int:
+def missing_from(contributors: list[dict], expected: str | None) -> bool:
+    """
+    Whether the person this run was fired for is absent from what it just wrote.
+
+    <b>Because the run that credits somebody is the one most likely to come back stale.</b>
+    `/stats/contributors` is computed asynchronously and cached, and merging invalidates that
+    cache - so a run triggered by a merge can be answered with either a 202 it waits out or a
+    cached 200 from before the merge, and the second is indistinguishable from success. Nothing
+    changes, no pull request opens, and the run is green.
+
+    So the merge-triggered run says who it expected to find. Absent means the weekly schedule is
+    what will actually credit them, and that is worth a failed run on the Actions tab rather than
+    a green one that did nothing.
+
+    An excluded login is not missing - it was never going to be there. Without this, merging a
+    pull request authored by one of the tool accounts in EXCLUDED_LOGINS would fail every time,
+    correctly by the letter and uselessly in practice.
+    """
+    if not expected or expected.lower() in EXCLUDED_LOGINS:
+        return False
+
+    return not any(c["login"].lower() == expected.lower() for c in contributors)
+
+
+def _keep_what_we_have(error: Exception) -> int:
+    """
+    What to do when the stats never arrived: nothing, and say so.
+
+    <b>Exits 0 on purpose.</b> The credits page being a week out of date is not worth failing a
+    build over, and the previously generated files are still correct - just older. Overwriting
+    them with an empty list because GitHub had a bad minute would be strictly worse.
+
+    The empty-manifest branch is for a checkout that has never generated one, where writing
+    nothing would leave the app with no file to read at all.
+    """
+    print(f"\nCould not get contributor stats ({error}).", file=sys.stderr)
+
+    if MANIFEST.is_file():
+        print("Keeping the previously generated contributor list.", file=sys.stderr)
+        return 0
+
+    print("No previously generated list exists; writing an empty one.", file=sys.stderr)
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    MANIFEST.write_text(json.dumps({"contributors": []}, indent=2) + "\n", encoding="utf-8")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--expect-contributor",
+        metavar="LOGIN",
+        help="fail if this login is absent from the generated list - see missing_from()")
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+
     print(f"Fetching contributors for {REPO} ...")
 
     try:
         stats = fetch_stats()
     except Exception as error:  # noqa: BLE001 - never fail the build over this
-        print(f"\nCould not reach GitHub ({error}).", file=sys.stderr)
-        if MANIFEST.is_file():
-            print("Keeping the previously generated contributor list.", file=sys.stderr)
-            return 0
-        print("No previously generated list exists; writing an empty one.", file=sys.stderr)
-        ASSETS.mkdir(parents=True, exist_ok=True)
-        MANIFEST.write_text(json.dumps({"contributors": []}, indent=2) + "\n", encoding="utf-8")
-        return 0
+        return _keep_what_we_have(error)
 
     now_s = time.time()
     ranked = []
@@ -241,6 +301,16 @@ def main() -> int:
 
     print(f"\nWrote {len(contributors)} contributor(s) to "
           f"{MANIFEST.relative_to(REPO_ROOT)}")
+
+    if missing_from(contributors, args.expect_contributor):
+        print(f"\n{args.expect_contributor} is not in the list this run generated.",
+              file=sys.stderr)
+        print("GitHub's contributor stats are computed asynchronously and cached, so a run "
+              "fired by a merge can be answered from before it. The weekly schedule will pick "
+              "them up; this is a failed run rather than a green one that credited nobody.",
+              file=sys.stderr)
+        return 1
+
     return 0
 
 
