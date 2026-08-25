@@ -19,6 +19,7 @@
         <variable name="currentMapProvider" type="String" />
         <variable name="isDebugDataEnabled" type="boolean" />
         <variable name="isShowAppleDevicesEnabled" type="boolean" />
+        <variable name="isScanInBackgroundEnabled" type="boolean" />
         <variable name="onClickAppleDevicesHelpLink" type="Runnable" />
         <variable name="isSystemColorsSupported" type="boolean" />
         <variable name="isSystemColorsEnabled" type="boolean" />
@@ -298,6 +299,50 @@
                 android:textColor="?attr/colorPrimary"
                 android:textSize="13sp"
                 android:onClick="@{() -> onClickAppleDevicesHelpLink.run()}" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="22dp"
+                android:paddingTop="8dp"
+                android:paddingRight="22dp"
+                android:paddingBottom="0dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    app:srcCompat="@drawable/my_location_24px" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/settings_scan_in_background"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22dp"
+                    android:checked="@{isScanInBackgroundEnabled}"
+                    android:enabled="true"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/scan_in_background"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!--
+                Indented to the switch's text like its neighbour above. Long on purpose: this is
+                the setting that turns a display feature into a recording one, and somebody
+                should be able to decide that from the sentence rather than by trying it.
+            -->
+            <TextView
+                android:id="@+id/settings_scan_in_background_explainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="72dp"
+                android:layout_marginEnd="22dp"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="@font/nunito_medium"
+                android:text="@string/scan_in_background_explainer"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp" />
 
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"

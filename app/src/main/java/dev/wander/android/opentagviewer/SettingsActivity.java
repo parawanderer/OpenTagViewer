@@ -1,5 +1,9 @@
 package dev.wander.android.opentagviewer;
 
+import androidx.core.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import android.content.pm.PackageManager;
+import android.Manifest;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.View.inflate;
@@ -52,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.service.NearbyScanService;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryImporter;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
@@ -192,6 +197,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
         this.binding.setIsShowAppleDevicesEnabled(this.currentSettings.shouldShowAppleDevices());
+        this.binding.setIsScanInBackgroundEnabled(this.currentSettings.shouldScanInBackground());
         this.binding.setOnClickAppleDevicesHelpLink(this::onClickAppleDevicesHelpLink);
         this.binding.setIsSystemColorsSupported(DynamicColors.isDynamicColorAvailable());
         this.binding.setIsSystemColorsEnabled(
@@ -206,6 +212,9 @@ public class SettingsActivity extends AppCompatActivity {
 
         MaterialSwitch appleDevices = this.findViewById(R.id.settings_show_apple_devices);
         appleDevices.setOnCheckedChangeListener(this::onShowAppleDevicesChange);
+
+        MaterialSwitch backgroundScan = this.findViewById(R.id.settings_scan_in_background);
+        backgroundScan.setOnCheckedChangeListener(this::onScanInBackgroundChange);
 
         MaterialSwitch systemColors = this.findViewById(R.id.settings_app_use_system_colors);
         systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
@@ -261,6 +270,95 @@ public class SettingsActivity extends AppCompatActivity {
 
         Log.i(TAG, "The owner's own Apple devices are now " + (isChecked ? "shown" : "hidden")
                 + "; they are " + (isChecked ? "also" : "no longer") + " searched for");
+    }
+
+    /**
+     * Starts or stops the background scan, and saves the choice.
+     *
+     * <p><b>Acted on immediately rather than at the next launch</b>, unlike its neighbour above.
+     * Somebody turning this on is asking for something to start happening, and somebody turning
+     * it off is asking for it to stop - most likely because they have just seen the notification
+     * and want it gone. Deferring either would read as the switch not working.
+     */
+    private void onScanInBackgroundChange(CompoundButton buttonView, boolean isChecked) {
+        if (this.currentSettings.shouldScanInBackground() == isChecked) {
+            return;
+        }
+
+        this.currentSettings.setScanInBackground(isChecked);
+        this.binding.setIsScanInBackgroundEnabled(isChecked);
+        this.saveSettings();
+
+        if (isChecked) {
+            this.askToShowTheNotification();
+            NearbyScanService.start(this);
+        } else {
+            NearbyScanService.stop(this);
+        }
+
+        Log.i(TAG, "Background scanning is now " + (isChecked ? "on" : "off"));
+    }
+
+    /**
+     * Asks for permission to show the service's notification, on the versions that require it.
+     *
+     * <p><b>The service runs either way, and that is the problem.</b> Android 13 made
+     * notifications a runtime permission, and a foreground service whose notification is
+     * suppressed still scans - so somebody who turned this on would get the battery cost and no
+     * sign that anything was happening, which is the one thing a permanent notification is for.
+     *
+     * <p>Asked at the moment it becomes relevant rather than at startup: a prompt at first
+     * launch, before anything wants to notify, is one people dismiss without reading. Nothing
+     * hangs on the answer - a refusal leaves the service running and invisible, which is the
+     * user's call to make.
+     */
+    private void askToShowTheNotification() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        ActivityCompat.requestPermissions(
+                this, new String[] {Manifest.permission.POST_NOTIFICATIONS},
+                NOTIFICATION_PERMISSION_REQUEST_CODE);
+    }
+
+    /** Request code for {@link #askToShowTheNotification()}. Nothing depends on the answer. */
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 2001;
+
+    /**
+     * Re-posts the service's notification once permission arrives.
+     *
+     * <p><b>Because the grant lands after the service has already started.</b> The dialog is
+     * asynchronous, so the service goes to the foreground while notifications are still denied,
+     * and the system drops the notification it posts. Nothing re-posts it afterwards, so the
+     * service scans invisibly for the rest of its life - permission granted, status bar empty,
+     * which is exactly the state this setting must not leave somebody in.
+     *
+     * <p>Starting an already-running service is cheap and safe: it re-enters
+     * {@code onStartCommand}, which posts the notification again and leaves the existing scan
+     * alone.
+     */
+    @Override
+    public void onRequestPermissionsResult(
+            final int requestCode, final String[] permissions, final int[] grantResults) {
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            return;
+        }
+
+        final boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+        if (granted && this.currentSettings.shouldScanInBackground()) {
+            Log.i(TAG, "Notification permission granted; re-posting the service notification");
+            NearbyScanService.start(this);
+        }
     }
 
     /**

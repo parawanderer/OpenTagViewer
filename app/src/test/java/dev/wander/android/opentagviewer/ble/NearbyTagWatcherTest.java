@@ -75,7 +75,7 @@ public class NearbyTagWatcherTest {
     private static NearbyTagWatcher watcherWith(
             final NearbyTagWatcher.SightingListener listener, final long[] clockMs) {
         return new NearbyTagWatcher(
-                anyResolver(), listener, new NearbyTagIndex(), () -> clockMs[0]);
+                anyResolver(), listener, 0, new NearbyTagIndex(), () -> clockMs[0]);
     }
 
     @Test
@@ -121,7 +121,7 @@ public class NearbyTagWatcherTest {
     @Test
     public void aNullListenerIsSimplySkipped() {
         final NearbyTagWatcher watcher = new NearbyTagWatcher(
-                anyResolver(), null, new NearbyTagIndex(), () -> 0L);
+                anyResolver(), null, 0, new NearbyTagIndex(), () -> 0L);
 
         // Must not throw.
         watcher.maybeNotifySightingListener(sightingOf(BEACON_ID), MAC);

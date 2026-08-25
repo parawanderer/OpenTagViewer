@@ -28,18 +28,16 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 /**
  * Reports the user's own tags as this phone hears them, for as long as somebody is subscribed.
  *
- * <p><b>Scanning is tied to a screen being open, not to a service.</b> Nothing here runs in the
- * background: the caller subscribes in {@code onResume} and disposes in {@code onPause}, so the
- * radio is only on while a person is actually looking at the result. That keeps this a display
- * feature rather than a tracking one - no foreground service, no ongoing notification, and a
- * scan alongside a lit screen costs little next to the screen itself.
+ * <p><b>Who runs it decides what it costs.</b> A screen subscribes in {@code onResume} and
+ * disposes in {@code onPause}, so the radio is on only while somebody is looking - that is the
+ * default, and it keeps the app a display feature. {@code NearbyScanService} runs the same class
+ * continuously when the user turns background scanning on, which is a recording feature and is
+ * why it is opt-in and carries a permanent notification.
  *
- * <p>Recording sightings for later, which is the other obvious thing to do with a scan, is
- * deliberately not this class's job. That is a different feature with different consequences:
- * it needs to run when nobody is watching, and a locally-sourced position is a different claim
- * from one Apple's network made, which the location history has no way to express today.
+ * <p>The difference reaches this class as {@link #scanMode}: a screen wants results promptly,
+ * a service running all day wants the cheapest duty cycle the platform offers.
  *
- * <p>{@code SCAN_MODE_BALANCED} - a middle ground between the low-latency mode
+ * <p>The screen's {@code SCAN_MODE_BALANCED} - a middle ground between the low-latency mode
  * {@link NearbyAccessoryScanner} uses and this class's own original {@code SCAN_MODE_LOW_POWER}.
  * Low-power's short scan window and multi-second sleep between them meant several of a tag's
  * own advertisements arrived in a burst whenever a window happened to line up, then nothing for
@@ -104,21 +102,40 @@ public class NearbyTagWatcher {
      * advertisement that arrives while the first is still running. */
     private final AtomicBoolean indexRebuildInFlight = new AtomicBoolean(false);
 
+    /**
+     * How hard the radio listens.
+     *
+     * <p>{@code SCAN_MODE_BALANCED} for a screen, {@code SCAN_MODE_LOW_POWER} for the service.
+     * The difference is the duty cycle: low power leaves longer gaps between listening windows,
+     * so a tag takes longer to be noticed - acceptable when nobody is watching the screen, and
+     * not acceptable when they are.
+     */
+    private final int scanMode;
+
     public NearbyTagWatcher(final AccessoryMacResolver macResolver) {
         this(macResolver, null);
     }
 
     public NearbyTagWatcher(
             final AccessoryMacResolver macResolver, @Nullable final SightingListener listener) {
-        this(macResolver, listener, new NearbyTagIndex(), System::currentTimeMillis);
+        this(macResolver, listener, ScanSettings.SCAN_MODE_BALANCED);
+    }
+
+    public NearbyTagWatcher(
+            final AccessoryMacResolver macResolver,
+            @Nullable final SightingListener listener,
+            final int scanMode) {
+        this(macResolver, listener, scanMode, new NearbyTagIndex(), System::currentTimeMillis);
     }
 
     NearbyTagWatcher(final AccessoryMacResolver macResolver,
                      @Nullable final SightingListener sightingListener,
+                     final int scanMode,
                      final NearbyTagIndex index,
                      final Clock clock) {
         this.macResolver = macResolver;
         this.sightingListener = sightingListener;
+        this.scanMode = scanMode;
         this.index = index;
         this.clock = clock;
     }
@@ -211,7 +228,7 @@ public class NearbyTagWatcher {
                             new byte[]{(byte) 0xFF})
                     .build());
             final ScanSettings settings = new ScanSettings.Builder()
-                    .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                    .setScanMode(this.scanMode)
                     .build();
 
             scanner.startScan(findMyFramesOnly, settings, callback);

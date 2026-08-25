@@ -338,4 +338,14 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="last_seen">Zuletzt gehört</string>
     <string name="signal">Signal</string>
     <string name="seen_just_now">gerade eben</string>
+    <string name="scan_in_background">Im Hintergrund weiter empfangen</string>
+    <string name="scan_in_background_explainer">Empfängt deine Tags auch bei geschlossener App und hält fest, wo sie gehört wurden. Braucht eine dauerhafte Benachrichtigung und mehr Akku. Standardmäßig aus.</string>
+    <string name="background_scan_channel">Hintergrund-Empfang</string>
+    <string name="background_scan_channel_description">Wird angezeigt, solange die App im Hintergrund auf deine Tags hört.</string>
+    <string name="background_scan_notification_title">Empfängt deine Tags</string>
+    <string name="background_scan_notification_text">Zum Öffnen der Karte tippen.</string>
+    <string name="left_behind_channel">Zurückgelassen</string>
+    <string name="left_behind_channel_description">Meldet sich, wenn ein Tag nicht mehr zu hören ist und du dich davon entfernt hast.</string>
+    <string name="left_behind_title">%1$s ist zurückgeblieben</string>
+    <string name="left_behind_text">Zuletzt dort gehört, wo du %1$s warst. Zum Anzeigen tippen.</string>
 </resources>

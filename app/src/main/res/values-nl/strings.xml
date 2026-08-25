@@ -338,4 +338,14 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="last_seen">Laatst gehoord</string>
     <string name="signal">Signaal</string>
     <string name="seen_just_now">zojuist</string>
+    <string name="scan_in_background">Op de achtergrond blijven luisteren</string>
+    <string name="scan_in_background_explainer">Luistert naar je tags ook als de app dicht is en legt vast waar ze gehoord zijn. Vereist een permanente melding en kost meer batterij. Standaard uit.</string>
+    <string name="background_scan_channel">Achtergrondscan</string>
+    <string name="background_scan_channel_description">Wordt getoond zolang de app op de achtergrond naar je tags luistert.</string>
+    <string name="background_scan_notification_title">Luistert naar je tags</string>
+    <string name="background_scan_notification_text">Tik om de kaart te openen.</string>
+    <string name="left_behind_channel">Achtergelaten</string>
+    <string name="left_behind_channel_description">Waarschuwt je als een tag niet meer te horen is en je ervandaan bent gelopen.</string>
+    <string name="left_behind_title">%1$s is achtergebleven</string>
+    <string name="left_behind_text">Laatst gehoord waar je %1$s was. Tik om de plek te zien.</string>
 </resources>

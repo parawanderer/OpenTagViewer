@@ -338,4 +338,14 @@
     <string name="last_seen">Последний сигнал</string>
     <string name="signal">Сигнал</string>
     <string name="seen_just_now">только что</string>
+    <string name="scan_in_background">Продолжать приём в фоне</string>
+    <string name="scan_in_background_explainer">Принимает сигналы меток даже при закрытом приложении и записывает, где они были услышаны. Требует постоянного уведомления и расходует больше заряда. По умолчанию выключено.</string>
+    <string name="background_scan_channel">Фоновый приём</string>
+    <string name="background_scan_channel_description">Отображается, пока приложение принимает сигналы меток в фоне.</string>
+    <string name="background_scan_notification_title">Приём сигналов меток</string>
+    <string name="background_scan_notification_text">Нажмите, чтобы открыть карту.</string>
+    <string name="left_behind_channel">Забыта</string>
+    <string name="left_behind_channel_description">Предупреждает, когда метка перестала быть слышна, а вы от неё удалились.</string>
+    <string name="left_behind_title">%1$s осталась на месте</string>
+    <string name="left_behind_text">Последний сигнал там, где вы были %1$s. Нажмите, чтобы увидеть место.</string>
 </resources>

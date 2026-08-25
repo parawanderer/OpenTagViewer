@@ -21,6 +21,32 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- 高德地图SDK所需权限 -->
+    <!--
+        For NearbyScanService, which is what makes background scanning possible at all: a scan
+        without a foreground service is throttled to the point of uselessness. The location type
+        is required from Android 14 and is accurate - the service reads the phone's own position
+        to attribute a sighting to a place. POST_NOTIFICATIONS because the permanent notification
+        is the price of the service, and on Android 13+ it is refused without it.
+    -->
+    <!--
+        So the background scan comes back after a restart. Without it the setting quietly stops
+        meaning anything: a service does not survive a reboot, and nothing else starts this app
+        on its own, so it would be off until somebody happened to open the app again - and being
+        on while nobody is looking is the entire point of it.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!--
+        The fallback type for starting at boot. Location is a foreground-only permission, so a
+        service of type "location" cannot start while the app has nothing visible - which is
+        exactly the situation after a restart. Scanning for a tag is a connected-device job by
+        any reading, and that type has no such restriction.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -78,6 +104,32 @@
             android:name=".service.AppNavigationService"
             android:foregroundServiceType="location">
         </service>
+
+        <!--
+            Listens for the owner's tags while the app is closed. Off unless the user turns it
+            on - see UserSettings.scanInBackground for why that is not merely caution.
+
+            Not exported: nothing outside the app has any business starting it, and it carries
+            no intent data that would make sense from elsewhere.
+        -->
+        <!--
+            Starts the scan again after a restart, if the user had it on. Exported so the system
+            can deliver BOOT_COMPLETED to it, which is what exported means here - no other app
+            can send it, because the broadcast is protected.
+        -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".service.NearbyScanService"
+            android:exported="false"
+            android:foregroundServiceType="location|connectedDevice" />
 
         <!-- Reached only when the app cannot name what went wrong - see the class doc. -->
         <activity
