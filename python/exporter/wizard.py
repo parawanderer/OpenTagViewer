@@ -245,21 +245,19 @@ class WizardApp(tk.Tk):
         self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
         self.confirm_button.grid(row=0, column=4)
 
-        # **Off until the app that can open one is released, then on.** A bundle holds key material
-        # that cannot be revoked - the only way to withdraw an exported accessory is to unpair it -
-        # and it then travels through a mail account or a chat app and outlives the conversation by
+        # **On by default, and the default is the whole point.** A bundle holds key material that
+        # cannot be revoked - the only way to withdraw an exported accessory is to unpair it - and
+        # it then travels through a mail account or a chat app and outlives the conversation by
         # years, sitting in a backup long after everyone has forgotten it is there. Whoever most
-        # needs the lock is whoever would never go looking for a checkbox to turn it on, so on is
-        # where this belongs and where it is going.
+        # needs the lock is whoever would never go looking for a checkbox to turn it on.
         #
-        # It is off today for one reason: **no released app can decrypt a locked bundle.** Anything
-        # older than 1.1.0 fails with a message about the zip rather than about a code, and the
-        # person who meets that failure is the recipient - who chose neither the exporter nor its
-        # version, and can do nothing about either.
+        # Off until app 1.1.0 was released, because nothing older can decrypt a locked bundle at
+        # all and the person who met that failure was the recipient. That app is out, so this is
+        # back on - see AGENTS.md rule 9 for why the two releases are ordered.
         #
-        # So the ordering is app first, exporter second - see AGENTS.md rule 9. Flip this to True in
-        # the same change that raises the minimum, not before, and not separately.
-        self.lock_bundle = tk.BooleanVar(value=False)
+        # The opt-out stays for the recipient still running something older, which is most of them
+        # on any given day after a release.
+        self.lock_bundle = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             buttons,
             text="Lock with a code",
