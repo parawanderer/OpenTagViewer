@@ -155,13 +155,19 @@ public class NearbyScanService extends Service {
     private Map<String, String> namesByBeaconId = Map.of();
 
     /**
-     * The tags their owner has asked to be warned about, read when the watch starts.
+     * The tags their owner has asked to be warned about, re-read on every check.
      *
      * <p>Held as the permissions because undecided means no - see
      * {@code UserBeaconOptions.alertOnSeparation}. Every other tag is still scanned for and still
      * recorded; only the noise is off, and it stays off until somebody asks for it by name.
+     *
+     * <p><b>Re-read rather than read once at startup.</b> The switch lives in the app and this
+     * runs in a service that outlives it, so a set read when the watch started is a snapshot of
+     * what the user wanted before they went to change it. Reading it once meant turning the
+     * switch on did nothing at all until the service happened to restart, which from the outside
+     * is indistinguishable from the feature being broken.
      */
-    private Set<String> alertsOn = Set.of();
+    private volatile Set<String> alertsOn = Set.of();
     private AccessorySightingPersister sightingPersister;
     private PhoneLocation phoneLocation;
 
@@ -255,7 +261,6 @@ public class NearbyScanService extends Service {
                 .subscribeOn(Schedulers.io())
                 .subscribe(beacons -> {
                     this.namesByBeaconId = readNames(beacons);
-                    this.alertsOn = this.beaconRepo.getBeaconsWithAlertsOn().blockingFirst();
                     this.watchThese(keyMaterialOf(beacons));
                 }, error -> Log.w(TAG, "Could not read the tags to watch for", error));
     }
@@ -383,6 +388,22 @@ public class NearbyScanService extends Service {
      */
     private void checkForLeftBehind() {
         final long now = System.currentTimeMillis();
+
+        // One small query against UserBeaconOptions per tick, on the IO scheduler this runs on.
+        // Kept cheap enough to do unconditionally rather than guessing when it might have moved.
+        // A failure keeps the previous answer: stale permissions beat none at all.
+        try {
+            final Set<String> wanted = this.beaconRepo.getBeaconsWithAlertsOn().blockingFirst();
+            if (!wanted.equals(this.alertsOn)) {
+                // Logged on change rather than every tick: this is the one place that says the
+                // switch in the app actually reached the service, which is exactly what is
+                // invisible when it does not.
+                Log.i(TAG, "Left-behind alerts are now wanted for " + wanted.size() + " tag(s)");
+                this.alertsOn = wanted;
+            }
+        } catch (final Exception couldNotRead) {
+            Log.w(TAG, "Could not re-read which tags want an alert", couldNotRead);
+        }
 
         for (final Map.Entry<String, Presence> entry : this.presence.entrySet()) {
             final Presence known = entry.getValue();
