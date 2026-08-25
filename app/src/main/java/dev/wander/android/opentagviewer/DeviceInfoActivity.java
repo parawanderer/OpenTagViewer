@@ -10,6 +10,7 @@ import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFa
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -40,6 +41,7 @@ import androidx.emoji2.emojipicker.EmojiPickerView;
 import androidx.emoji2.emojipicker.EmojiViewItem;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -683,7 +685,8 @@ public class DeviceInfoActivity extends AppCompatActivity
         }
 
         this.nearbyWatchDisposable = new NearbyTagWatcher(
-                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting)
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
+                ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
@@ -844,6 +847,43 @@ public class DeviceInfoActivity extends AppCompatActivity
         this.binding.setBleStatusByte(LocationReportFields.status(statusByte));
         this.findViewById(R.id.settings_debug_ble_status_byte).setVisibility(VISIBLE);
     }
+
+    /**
+     * Shows and wires the per-tag left-behind switch.
+     *
+     * <p>Undecided reads as on, so a tag nobody has answered for still raises the alarm - see
+     * {@code UserBeaconOptions.alertOnSeparation}. The switch is only revealed once the answer
+     * has been read, so it cannot flick from a default to the stored value in front of somebody.
+     */
+    private void showLeftBehindSwitch() {
+        if (this.leftBehindLookup != null && !this.leftBehindLookup.isDisposed()) {
+            this.leftBehindLookup.dispose();
+        }
+
+        this.leftBehindLookup = this.beaconRepo.getAlertOnSeparation(this.beaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(warn -> {
+                    this.binding.setWarnIfLeftBehind(warn);
+
+                    final MaterialSwitch toggle = this.findViewById(R.id.device_warn_left_behind);
+                    toggle.setChecked(warn);
+                    toggle.setOnCheckedChangeListener((button, isChecked) ->
+                            this.beaconRepo.storeAlertOnSeparation(this.beaconId, isChecked)
+                                    .subscribe(() -> Log.i(TAG, "Left-behind alerts for beaconId="
+                                                    + this.beaconId + " are now "
+                                                    + (isChecked ? "on" : "off")),
+                                            error -> Log.w(TAG,
+                                                    "Could not store the left-behind choice",
+                                                    error)));
+
+                    this.findViewById(R.id.device_warn_left_behind_row).setVisibility(VISIBLE);
+                    this.findViewById(R.id.device_warn_left_behind_explainer)
+                            .setVisibility(VISIBLE);
+                }, error -> Log.w(TAG, "Could not read the left-behind choice", error));
+    }
+
+    /** The in-flight read of the per-tag left-behind choice. */
+    private Disposable leftBehindLookup;
 
     /**
      * Writes the "Last seen" row, e.g. "3 minutes ago", from a wall-clock timestamp.

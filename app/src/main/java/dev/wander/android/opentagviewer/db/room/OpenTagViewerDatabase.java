@@ -34,7 +34,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         UserBeaconOptions.class,
         LastBleSighting.class
     },
-    version = 8
+    version = 9
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -181,6 +181,21 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v8 → v9: adds {@code alert_on_separation} to {@code UserBeaconOptions}, the per-tag answer
+     * to whether being left behind is worth a noise.
+     *
+     * <p>Additive and nullable rather than defaulted, and null reads as yes - see
+     * {@link UserBeaconOptions#alertOnSeparation}. Every existing row is null, which is correct:
+     * nobody has turned an alert off for a tag that could not alert yet.
+     */
+    public static final Migration MIGRATION_8_9 = new Migration(8, 9) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE UserBeaconOptions ADD COLUMN alert_on_separation INTEGER");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -196,7 +211,8 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     OpenTagViewerDatabase.class,
                     DATABASE_NAME)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+                            MIGRATION_8_9)
                     .build();
         }
 

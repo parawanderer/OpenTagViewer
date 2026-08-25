@@ -348,4 +348,6 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="left_behind_channel_description">Meldet sich, wenn ein Tag nicht mehr zu hören ist und du dich davon entfernt hast.</string>
     <string name="left_behind_title">%1$s ist zurückgeblieben</string>
     <string name="left_behind_text">Zuletzt dort gehört, wo du %1$s warst. Zum Anzeigen tippen.</string>
+    <string name="warn_if_left_behind">Warnen, wenn zurückgelassen</string>
+    <string name="warn_if_left_behind_explainer">Schlägt Alarm, wenn dieses Tag nicht mehr zu hören ist und du weitergegangen bist. Setzt den Hintergrund-Empfang voraus.</string>
 </resources>

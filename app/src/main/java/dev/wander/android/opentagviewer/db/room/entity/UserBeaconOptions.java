@@ -54,4 +54,22 @@ public class UserBeaconOptions {
      */
     @ColumnInfo(name = "ui_order")
     public Integer uiOrder;
+
+    /**
+     * Whether to warn when this tag is left behind, or null if the user has not decided.
+     *
+     * <p><b>Null means yes.</b> Turning background scanning on is already a deliberate act, and
+     * somebody who did it wants to be told - a feature that alerts for nothing until each tag is
+     * enabled separately looks broken on the day it is set up.
+     *
+     * <p>Per tag because the answer genuinely differs per tag. Keys and a wallet are worth a
+     * noise; a tag that lives in a car, or on something that is meant to stay behind, would
+     * alert every time its owner walks into the house. One switch for all of them would be
+     * turned off by the first tag that cried wolf, taking the useful ones with it.
+     *
+     * <p>Here rather than on {@code OwnedBeacons} for the reason this whole table exists: it is
+     * the user's decision, and an account refresh must not touch it.
+     */
+    @ColumnInfo(name = "alert_on_separation")
+    public Boolean alertOnSeparation;
 }

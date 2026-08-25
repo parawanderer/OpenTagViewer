@@ -8,6 +8,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -16,6 +18,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import java.util.Map;
+import java.util.Set;
 
 import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.R;
@@ -93,8 +96,15 @@ public class NearbyScanService extends Service {
      */
     private static final String ACTION_DISMISSED = "dev.wander.opentagviewer.SCAN_DISMISSED";
 
-    /** Channel for the left-behind alert, which is loud on purpose - see {@link #alertLeftBehind}. */
-    private static final String ALERT_CHANNEL_ID = "tag_left_behind";
+    /**
+     * Channel for the left-behind alert, which is loud on purpose - see {@link #alertLeftBehind}.
+     *
+     * <p><b>The suffix is not decoration.</b> A notification channel is immutable once created:
+     * changing the sound or the vibration in code does nothing for anybody who already has the
+     * old one, and there is no way to update it. The only way to change how an alert sounds is
+     * to publish a new channel, so the id carries a version.
+     */
+    private static final String ALERT_CHANNEL_ID = "tag_left_behind_alarm";
 
     /**
      * How often the left-behind rule is evaluated.
@@ -143,6 +153,15 @@ public class NearbyScanService extends Service {
      * them which, which is most of the message gone.
      */
     private Map<String, String> namesByBeaconId = Map.of();
+
+    /**
+     * The tags their owner has told us not to warn about, read when the watch starts.
+     *
+     * <p>Held as the exceptions because undecided means yes - see
+     * {@code UserBeaconOptions.alertOnSeparation}. They are still scanned for and still recorded;
+     * only the noise is off.
+     */
+    private Set<String> alertsOff = Set.of();
     private AccessorySightingPersister sightingPersister;
     private PhoneLocation phoneLocation;
 
@@ -236,6 +255,7 @@ public class NearbyScanService extends Service {
                 .subscribeOn(Schedulers.io())
                 .subscribe(beacons -> {
                     this.namesByBeaconId = readNames(beacons);
+                    this.alertsOff = this.beaconRepo.getBeaconsWithAlertsOff().blockingFirst();
                     this.watchThese(keyMaterialOf(beacons));
                 }, error -> Log.w(TAG, "Could not read the tags to watch for", error));
     }
@@ -375,6 +395,13 @@ public class NearbyScanService extends Service {
             // the only other moment the position is worth reading.
             known.gone = true;
 
+            if (this.alertsOff.contains(entry.getKey())) {
+                // Still scanned for, still recorded - the owner has only said this one is not
+                // worth waking them for. Skipping the verification scan too, since nothing would
+                // be done with the answer.
+                continue;
+            }
+
             // **A missing position must not swallow the alert.** It used to, left over from when
             // distance was half the rule; the verification scan decides now, and "your keys are
             // not with you" is worth saying whether or not the phone can say where. It also
@@ -497,7 +524,23 @@ public class NearbyScanService extends Service {
                     this.getString(R.string.left_behind_channel),
                     NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription(this.getString(R.string.left_behind_channel_description));
+
+            // **The alarm stream, not the notification one.** A notification chime is meant to
+            // be ignorable, and it plays at whatever the notification volume happens to be -
+            // which for a phone in a pocket is often nothing. This alert is only useful in the
+            // half minute while walking back is still easy, so it goes out the way an alarm
+            // clock does: alarm usage, alarm volume, and audible with the ringer down.
+            channel.setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                    new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build());
+
+            // Long enough to be felt through a coat, and unlike a message buzz.
             channel.enableVibration(true);
+            channel.setVibrationPattern(new long[] {0, 500, 250, 500, 250, 800});
+
             manager.createNotificationChannel(channel);
         }
 
@@ -516,8 +559,11 @@ public class NearbyScanService extends Service {
                         this.namesByBeaconId.getOrDefault(beaconId, beaconId)))
                 .setContentText(this.getString(R.string.left_behind_text, howLongAgo))
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                // An alarm rather than a reminder: it says to the system, and to anything
+                // summarising notifications, that this is time-critical rather than something
+                // to read later.
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setContentIntent(show)
                 .setAutoCancel(true)
                 .build();

@@ -348,4 +348,6 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="left_behind_channel_description">Vous alerte quand une balise n\'est plus entendue et que vous vous en êtes éloigné.</string>
     <string name="left_behind_title">%1$s est resté sur place</string>
     <string name="left_behind_text">Entendue pour la dernière fois là où vous étiez %1$s. Touchez pour voir l\'endroit.</string>
+    <string name="warn_if_left_behind">Avertir si oublié</string>
+    <string name="warn_if_left_behind_explainer">Déclenche une alarme quand cette balise n\'est plus entendue et que vous êtes parti. Nécessite l\'écoute en arrière-plan.</string>
 </resources>

@@ -702,6 +702,46 @@ public class BeaconRepository {
     public static final String LOCAL_REPORT_DESCRIPTION = "Heard over Bluetooth";
 
     /**
+     * The tags whose owner does not want to be warned when they are left behind.
+     *
+     * <p>Returned as the exceptions rather than the permissions because null - nobody has
+     * decided - means yes. Somebody who turned background scanning on wants to be told; the
+     * switch exists for the tag that is meant to stay behind.
+     */
+    public Observable<Set<String>> getBeaconsWithAlertsOff() {
+        return Observable.fromCallable(() -> {
+            final Set<String> off = new HashSet<>();
+
+            for (final UserBeaconOptions options : db.userBeaconOptionsDao().getAll()) {
+                if (options.alertOnSeparation != null && !options.alertOnSeparation) {
+                    off.add(options.beaconId);
+                }
+            }
+
+            return off;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /** Store whether being left behind is worth a noise for this tag. */
+    public Completable storeAlertOnSeparation(final String beaconId, final boolean alert) {
+        return Completable.fromRunnable(() ->
+                        db.userBeaconOptionsDao().storeAlertOnSeparation(
+                                beaconId, alert, System.currentTimeMillis()))
+                .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Whether being left behind is worth a noise for this tag. Null - undecided - reads as yes.
+     */
+    public Observable<Boolean> getAlertOnSeparation(final String beaconId) {
+        return Observable.fromCallable(() -> {
+            final UserBeaconOptions options = db.userBeaconOptionsDao().getById(beaconId);
+            return options == null || options.alertOnSeparation == null
+                    || options.alertOnSeparation;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
      * The key material for every tag worth listening for, keyed by beacon.
      *
      * <p>For {@code NearbyScanService}, which has no screen to inherit a loaded model from and

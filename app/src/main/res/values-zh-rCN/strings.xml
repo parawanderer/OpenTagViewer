@@ -348,4 +348,6 @@
     <string name="left_behind_channel_description">当标签不再被接收且你已离开时提醒你。</string>
     <string name="left_behind_title">%1$s 被落下了</string>
     <string name="left_behind_text">在你%1$s所在的位置最后一次接收到。点按查看地点。</string>
+    <string name="warn_if_left_behind">遗落时提醒</string>
+    <string name="warn_if_left_behind_explainer">当此标签不再被接收且你已离开时发出提示音。需要开启后台接收。</string>
 </resources>
