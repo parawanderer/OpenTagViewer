@@ -80,12 +80,14 @@ public final class NearbyTagIndex {
             final Map<String, Integer> candidates = resolver.currentMacAddresses(entry.getValue());
 
             // **Null is a documented answer, not a broken one, and it must not stop the loop.**
-            // The resolver returns it for an accessory it cannot read, and for one whose
-            // candidate window is too wide to derive - which is what an owner's own Apple
-            // device looks like, since a phone has no rolling-key alignment. Dereferencing it
-            // threw, and the throw left this whole watch dead: one entry cost every other
-            // entry its sightings, which is exactly what the parameter note below forbids. It
-            // presents as no tag ever being nearby, with nothing failing anywhere to say why.
+            // The interface permits it for an accessory the resolver cannot read, and for one
+            // whose candidate window is too wide to derive - which is what an owner's own Apple
+            // device looks like, since a phone has no rolling-key alignment.
+            //
+            // Latent rather than observed: the Chaquopy implementation maps Python's None to an
+            // empty map, so no build has actually thrown here. A different implementation, or a
+            // test double, may return null as the signature allows - and then one entry would
+            // cost every other entry its sightings, which is what the parameter note forbids.
             if (candidates == null) {
                 Log.d(TAG, "No candidate addresses for beaconId=" + entry.getKey()
                         + "; leaving it out of the index rather than dropping the rest");
