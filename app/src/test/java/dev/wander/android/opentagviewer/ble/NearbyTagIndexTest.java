@@ -53,9 +53,9 @@ public class NearbyTagIndexTest {
         index.rebuild(twoTags(), resolverFor(answers), 0L);
 
         assertEquals(3, index.size());
-        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:01"));
-        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:02"));
-        assertEquals(BIKE, index.beaconIdFor("BB:BB:BB:BB:BB:01"));
+        assertEquals(KEYS, index.matchFor("AA:AA:AA:AA:AA:01").getBeaconId());
+        assertEquals(KEYS, index.matchFor("AA:AA:AA:AA:AA:02").getBeaconId());
+        assertEquals(BIKE, index.matchFor("BB:BB:BB:BB:BB:01").getBeaconId());
     }
 
     @Test
@@ -63,8 +63,8 @@ public class NearbyTagIndexTest {
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(twoTags(), resolverFor(Map.of()), 0L);
 
-        assertNull(index.beaconIdFor("CC:CC:CC:CC:CC:CC"));
-        assertNull(index.beaconIdFor(null));
+        assertNull(index.matchFor("CC:CC:CC:CC:CC:CC"));
+        assertNull(index.matchFor(null));
     }
 
     /** Neither side promises a casing forever, and a casing mismatch would present as
@@ -74,8 +74,8 @@ public class NearbyTagIndexTest {
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", macs("aa:bb:cc:dd:ee:ff"))), 0L);
 
-        assertEquals(KEYS, index.beaconIdFor("AA:BB:CC:DD:EE:FF"));
-        assertEquals(KEYS, index.beaconIdFor("aa:bb:cc:dd:ee:ff"));
+        assertEquals(KEYS, index.matchFor("AA:BB:CC:DD:EE:FF").getBeaconId());
+        assertEquals(KEYS, index.matchFor("aa:bb:cc:dd:ee:ff").getBeaconId());
     }
 
     // --- expiry -------------------------------------------------------------------------------
@@ -111,8 +111,8 @@ public class NearbyTagIndexTest {
         index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", macs("AA:AA:AA:AA:AA:99"))), 1L);
 
         assertEquals(1, index.size());
-        assertNull("a rolled-past address must stop matching", index.beaconIdFor("AA:AA:AA:AA:AA:01"));
-        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:99"));
+        assertNull("a rolled-past address must stop matching", index.matchFor("AA:AA:AA:AA:AA:01"));
+        assertEquals(KEYS, index.matchFor("AA:AA:AA:AA:AA:99").getBeaconId());
     }
 
     /**
@@ -128,7 +128,7 @@ public class NearbyTagIndexTest {
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(tags, resolverFor(Map.of("good", macs("AA:AA:AA:AA:AA:01"))), 0L);
 
-        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:01"));
+        assertEquals(KEYS, index.matchFor("AA:AA:AA:AA:AA:01").getBeaconId());
         assertEquals(1, index.size());
     }
 
@@ -153,7 +153,7 @@ public class NearbyTagIndexTest {
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(tags, refusesOne, 0L);
 
-        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:01"));
+        assertEquals(KEYS, index.matchFor("AA:AA:AA:AA:AA:01").getBeaconId());
         assertEquals(1, index.size());
     }
 
@@ -167,6 +167,27 @@ public class NearbyTagIndexTest {
         assertEquals(0, index.size());
         assertFalse("a rebuild that ran must count as built, or it repeats every scan result",
                 index.isStale(5_000L));
+    }
+
+    /**
+     * The index the address was derived at is carried, not discarded.
+     *
+     * <p>It is the hint that lets the alignment correction check one index instead of
+     * re-deriving a 48-hour window - three key derivations against about 1150. Dropping it here
+     * is what made that correction expensive enough to get the app killed for not answering
+     * input, and nothing would have failed to say so.
+     */
+    @Test
+    public void eachAddressRemembersTheIndexItWasDerivedAt() {
+        final Map<String, Integer> byMac = new HashMap<>();
+        byMac.put("AA:AA:AA:AA:AA:01", 6221);
+        byMac.put("AA:AA:AA:AA:AA:02", 6222);
+
+        final NearbyTagIndex index = new NearbyTagIndex();
+        index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", byMac)), 0L);
+
+        assertEquals(6221, index.matchFor("AA:AA:AA:AA:AA:01").getKeyIndex());
+        assertEquals(6222, index.matchFor("AA:AA:AA:AA:AA:02").getKeyIndex());
     }
 
     @Test

@@ -16,7 +16,7 @@ public class NearbyTagSightingsTest {
     private static final String BIKE = "bike-beacon-id";
 
     private static NearbyTagSighting seen(final String beaconId, final long atMs) {
-        return new NearbyTagSighting(beaconId, -50, BatteryLevel.FULL, 0x00, State.SEPARATED, atMs);
+        return new NearbyTagSighting(beaconId, 4321, -50, BatteryLevel.FULL, 0x00, State.SEPARATED, atMs);
     }
 
     @Test
@@ -60,8 +60,8 @@ public class NearbyTagSightingsTest {
     @Test
     public void theLatestSightingWins() {
         final NearbyTagSightings sightings = new NearbyTagSightings();
-        sightings.record(new NearbyTagSighting(KEYS, -90, BatteryLevel.FULL, 0x00, State.SEPARATED, 0L));
-        sightings.record(new NearbyTagSighting(KEYS, -40, BatteryLevel.LOW, 0x80, State.SEPARATED, 100L));
+        sightings.record(new NearbyTagSighting(KEYS, 4321, -90, BatteryLevel.FULL, 0x00, State.SEPARATED, 0L));
+        sightings.record(new NearbyTagSighting(KEYS, 4321, -40, BatteryLevel.LOW, 0x80, State.SEPARATED, 100L));
 
         final NearbyTagSighting fresh = sightings.freshFor(KEYS, 100L);
         assertEquals(-40, fresh.getRssi());

@@ -25,6 +25,17 @@ public final class NearbyTagSighting {
 
     private final String beaconId;
 
+    /**
+     * The key index the matched address was derived at, as a hint for the alignment correction.
+     *
+     * <p><b>Carried, never acted on here.</b> Only Python can tell whether that index came from
+     * a primary or a secondary key, and that is what decides whether it may be trusted - see
+     * {@code AccessoryMacResolver#recordSeen}. Passing it along lets the correction verify one
+     * index instead of re-deriving a 48-hour window: three key derivations instead of about
+     * 1150.
+     */
+    private final int keyIndex;
+
     /** Signal strength in dBm. Negative; closer to zero is nearer. */
     private final int rssi;
 

@@ -2,6 +2,10 @@ package dev.wander.android.opentagviewer;
 
 import android.util.Log;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
@@ -55,9 +59,38 @@ final class AccessorySightingPersister {
      * {@code BeaconRepository#storeLastSighting}.
      */
     void onSighting(final NearbyTagSighting sighting, final String mac) {
-        this.persist(sighting.getBeaconId(), mac, sighting.getSeenAtMs());
+        this.maybeCorrectAlignment(sighting, mac);
         this.persistLastSighting(sighting);
         this.persistPosition(sighting);
+    }
+
+    /**
+     * How often one tag's alignment is worth re-deriving.
+     *
+     * <p><b>The keys only move every fifteen minutes, so correcting faster than that buys
+     * nothing</b> - the second call within one rotation re-derives the same answer and writes
+     * nothing. It is also the most expensive thing on this path by a wide margin: the candidate
+     * window spans 48 hours, which is around 1150 key derivations, measured at 1.15s on desktop
+     * and several times that under Chaquopy.
+     *
+     * <p>Running it on the sighting callback's own once-a-minute cadence put the app at 135% CPU
+     * with two tags in range, continuously, and Android eventually killed it for not answering
+     * input. Battery and position stay on the faster cadence: they cost a row each.
+     */
+    private static final long ALIGNMENT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(15);
+
+    /** When each tag's alignment was last re-derived. Written from the Rx io scheduler. */
+    private final Map<String, Long> lastAlignmentMs = new ConcurrentHashMap<>();
+
+    private void maybeCorrectAlignment(final NearbyTagSighting sighting, final String mac) {
+        final Long last = this.lastAlignmentMs.get(sighting.getBeaconId());
+        if (last != null && sighting.getSeenAtMs() - last < ALIGNMENT_INTERVAL_MS) {
+            return;
+        }
+        this.lastAlignmentMs.put(sighting.getBeaconId(), sighting.getSeenAtMs());
+
+        this.persist(sighting.getBeaconId(), mac, sighting.getSeenAtMs(),
+                sighting.getKeyIndex());
     }
 
     /**
@@ -69,11 +102,15 @@ final class AccessorySightingPersister {
                 || update.getResult().getMatchedMac() == null) {
             return;
         }
-        this.persist(beaconId, update.getResult().getMatchedMac(), System.currentTimeMillis());
+        // No hint from the ring path: BleSoundTriggerResult carries the address only, on
+        // purpose, and this runs once per button press rather than on a scan cadence.
+        this.persist(beaconId, update.getResult().getMatchedMac(), System.currentTimeMillis(),
+                null);
     }
 
-    private void persist(final String beaconId, final String mac, final long seenAtMs) {
-        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
+    private void persist(final String beaconId, final String mac, final long seenAtMs,
+                         final Integer hintIndex) {
+        this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs, hintIndex)
                 .subscribe(() -> { }, error -> Log.w(TAG,
                         "Failed to persist a sighting for beaconId=" + beaconId, error));
     }
