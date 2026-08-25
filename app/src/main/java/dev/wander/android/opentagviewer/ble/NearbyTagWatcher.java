@@ -311,13 +311,14 @@ public class NearbyTagWatcher {
         }
 
         // Most Find My advertisements in any scan belong to strangers; only ours resolve.
-        final String beaconId = this.index.beaconIdFor(result.getDevice().getAddress());
-        if (beaconId == null) {
+        final NearbyTagIndex.Match match = this.index.matchFor(result.getDevice().getAddress());
+        if (match == null) {
             return null;
         }
 
-        return new NearbyTagSighting(beaconId, result.getRssi(), advertisement.getBatteryLevel(),
-                advertisement.getStatusByte(), advertisement.getState(), this.clock.nowMs());
+        return new NearbyTagSighting(match.getBeaconId(), match.getKeyIndex(), result.getRssi(),
+                advertisement.getBatteryLevel(), advertisement.getStatusByte(),
+                advertisement.getState(), this.clock.nowMs());
     }
 
     /**

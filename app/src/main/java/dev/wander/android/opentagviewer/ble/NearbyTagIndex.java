@@ -30,7 +30,7 @@ import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
  * JVM test; the clock is a parameter for the same reason.
  *
  * <p><b>Written and read on different threads.</b> {@link #rebuild} runs on an Rx io thread
- * (it is blocking Python), while {@link #beaconIdFor} runs on the Bluetooth stack's scan
+ * (it is blocking Python), while {@link #matchFor} runs on the Bluetooth stack's scan
  * callback thread, once per advertisement of anything. Hence the volatile reference that is
  * swapped whole rather than a map mutated in place: a reader sees either the old index or the
  * new one, never a half-built or momentarily empty in-between - a race here would not crash,
@@ -49,7 +49,34 @@ public final class NearbyTagIndex {
      */
     static final long MAX_AGE_MS = TimeUnit.MINUTES.toMillis(10);
 
-    private volatile Map<String, String> beaconIdByMac = Map.of();
+    private volatile Map<String, Match> matchByMac = Map.of();
+
+    /**
+     * Which tag an address belongs to, and the index its key was derived at.
+     *
+     * <p><b>The index is carried, not acted on.</b> Only Python can tell a primary key from a
+     * secondary one, and that is what decides whether an index may be trusted - see
+     * {@code AccessoryMacResolver#recordSeen}. Passing it on as a hint lets the correction check
+     * one index instead of re-deriving a 48-hour window, which is the difference between three
+     * key derivations and around 1150.
+     */
+    public static final class Match {
+        private final String beaconId;
+        private final int keyIndex;
+
+        Match(final String beaconId, final int keyIndex) {
+            this.beaconId = beaconId;
+            this.keyIndex = keyIndex;
+        }
+
+        public String getBeaconId() {
+            return this.beaconId;
+        }
+
+        public int getKeyIndex() {
+            return this.keyIndex;
+        }
+    }
     private volatile long builtAtMs = Long.MIN_VALUE;
 
     /** True when this has never been built, or was built long enough ago to be doubted. */
@@ -72,7 +99,7 @@ public final class NearbyTagIndex {
             final Map<String, String> accessoryJsonByBeaconId,
             final AccessoryMacResolver resolver,
             final long nowMs) {
-        final Map<String, String> rebuilt = new HashMap<>();
+        final Map<String, Match> rebuilt = new HashMap<>();
 
         for (final Map.Entry<String, String> entry : accessoryJsonByBeaconId.entrySet()) {
             // Only the address is wanted here; the key index each maps to is not this class's
@@ -94,32 +121,33 @@ public final class NearbyTagIndex {
                 continue;
             }
 
-            for (final String mac : candidates.keySet()) {
-                if (mac != null) {
+            for (final Map.Entry<String, Integer> candidate : candidates.entrySet()) {
+                if (candidate.getKey() != null && candidate.getValue() != null) {
                     // Upper-cased on the way in so lookups need no normalisation per scan
                     // result, which is the hot path. Android reports uppercase and FindMy.py
                     // produces uppercase, but neither promises it forever.
-                    rebuilt.put(mac.toUpperCase(Locale.ROOT), entry.getKey());
+                    rebuilt.put(candidate.getKey().toUpperCase(Locale.ROOT),
+                            new Match(entry.getKey(), candidate.getValue()));
                 }
             }
         }
 
         // Swapped whole, not mutated in place - see the class doc on the reader thread.
-        this.beaconIdByMac = rebuilt;
+        this.matchByMac = rebuilt;
         this.builtAtMs = nowMs;
     }
 
-    /** The beacon this address belongs to, or null if it is not one of ours. */
+    /** The tag this address belongs to and the index it came from, or null if it is not ours. */
     @Nullable
-    public String beaconIdFor(@Nullable final String scannedAddress) {
+    public Match matchFor(@Nullable final String scannedAddress) {
         if (scannedAddress == null) {
             return null;
         }
-        return this.beaconIdByMac.get(scannedAddress.toUpperCase(Locale.ROOT));
+        return this.matchByMac.get(scannedAddress.toUpperCase(Locale.ROOT));
     }
 
     /** How many addresses are currently being watched for, across all tags. For logging. */
     public int size() {
-        return this.beaconIdByMac.size();
+        return this.matchByMac.size();
     }
 }

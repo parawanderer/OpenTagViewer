@@ -42,7 +42,7 @@ public class NearbyTagWatcherTest {
             final String beaconId,
             final FindMyAdvertisement.BatteryLevel level,
             final int statusByte) {
-        return new NearbyTagSighting(beaconId, -60, level, statusByte,
+        return new NearbyTagSighting(beaconId, 4321, -60, level, statusByte,
                 FindMyAdvertisement.State.SEPARATED, 1_700_000_000_000L);
     }
 
