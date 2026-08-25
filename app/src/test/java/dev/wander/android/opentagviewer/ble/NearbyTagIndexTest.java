@@ -132,6 +132,43 @@ public class NearbyTagIndexTest {
         assertEquals(1, index.size());
     }
 
+    /**
+     * The resolver's documented way of saying "not from me": null, not an empty map.
+     *
+     * <p><b>This is the one that got out.</b> Turning on "show my own Apple devices" put a
+     * phone in the list, and a phone has no rolling-key alignment, so the resolver refused it -
+     * correctly. The refusal was then dereferenced, the throw killed the whole rebuild, and the
+     * scan never started: every real tag stopped being seen, with nothing failing anywhere to
+     * say why. One entry may only ever cost its own sightings.
+     */
+    @Test
+    public void aTagTheResolverRefusesDoesNotCostTheOthers() {
+        final Map<String, String> tags = new HashMap<>();
+        tags.put(KEYS, "good");
+        tags.put(BIKE, "refused");
+
+        final AccessoryMacResolver refusesOne = json ->
+                "good".equals(json) ? macs("AA:AA:AA:AA:AA:01") : null;
+
+        final NearbyTagIndex index = new NearbyTagIndex();
+        index.rebuild(tags, refusesOne, 0L);
+
+        assertEquals(KEYS, index.beaconIdFor("AA:AA:AA:AA:AA:01"));
+        assertEquals(1, index.size());
+    }
+
+    /** And when every tag is refused, that is an empty index rather than a thrown rebuild. */
+    @Test
+    public void aResolverThatRefusesEverythingLeavesAnEmptyIndexRatherThanThrowing() {
+        final NearbyTagIndex index = new NearbyTagIndex();
+
+        index.rebuild(twoTags(), json -> null, 5_000L);
+
+        assertEquals(0, index.size());
+        assertFalse("a rebuild that ran must count as built, or it repeats every scan result",
+                index.isStale(5_000L));
+    }
+
     @Test
     public void resolvesEachTagExactlyOncePerRebuild() {
         final AtomicInteger calls = new AtomicInteger();
