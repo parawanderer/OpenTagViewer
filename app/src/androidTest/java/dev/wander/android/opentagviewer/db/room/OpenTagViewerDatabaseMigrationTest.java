@@ -457,12 +457,12 @@ public class OpenTagViewerDatabaseMigrationTest {
      * <b>The path an actual user takes, which is never one version at a time.</b>
      *
      * <p>People skip releases, so the upgrade that has to work is v1 straight to the current
-     * version - six migrations in a row over rows written by a schema none of them were tested
+     * version - seven migrations in a row over rows written by a schema none of them were tested
      * against individually. Everything the user owns has to still be there at the end: their
      * beacons, their location history, and the nicknames they set.
      */
     @Test
-    public void migrate1To7_directUpgradePreservesEverything() throws IOException {
+    public void migrate1To8_directUpgradePreservesEverything() throws IOException {
         try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
             insertImport(db, 1L);
             insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
@@ -472,29 +472,30 @@ public class OpenTagViewerDatabaseMigrationTest {
         }
 
         SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
-                TEST_DB, 7, true,
+                TEST_DB, 8, true,
                 OpenTagViewerDatabase.MIGRATION_1_2,
                 OpenTagViewerDatabase.MIGRATION_2_3,
                 OpenTagViewerDatabase.MIGRATION_3_4,
                 OpenTagViewerDatabase.MIGRATION_4_5,
                 OpenTagViewerDatabase.MIGRATION_5_6,
-                OpenTagViewerDatabase.MIGRATION_6_7);
+                OpenTagViewerDatabase.MIGRATION_6_7,
+                OpenTagViewerDatabase.MIGRATION_7_8);
 
         try (Cursor cursor = db.query("SELECT COUNT(*) FROM OwnedBeacons")) {
             assertTrue(cursor.moveToFirst());
-            assertEquals("beacons lost on a direct v1 to v7 upgrade", 2, cursor.getInt(0));
+            assertEquals("beacons lost on a direct v1 to v8 upgrade", 2, cursor.getInt(0));
         }
 
         try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
             assertTrue(cursor.moveToFirst());
-            assertEquals("location history lost on a direct v1 to v7 upgrade", 1, cursor.getInt(0));
+            assertEquals("location history lost on a direct v1 to v8 upgrade", 1, cursor.getInt(0));
         }
 
         try (Cursor cursor = db.query(
                 "SELECT ui_name, ui_order FROM UserBeaconOptions WHERE beacon_id = ?",
                 new Object[] {"beacon-a"})) {
 
-            assertTrue("the user's nickname did not survive six migrations", cursor.moveToFirst());
+            assertTrue("the user's nickname did not survive seven migrations", cursor.moveToFirst());
             assertEquals("Wallet", cursor.getString(0));
             assertTrue("nothing may arrive already arranged", cursor.isNull(1));
         }
@@ -581,6 +582,64 @@ public class OpenTagViewerDatabaseMigrationTest {
         try (Cursor cursor = db.query("SELECT COUNT(*) FROM LastBleSighting")) {
             assertTrue(cursor.moveToFirst());
             assertEquals(0, cursor.getInt(0));
+        }
+    }
+
+    /**
+     * v7 to v8 marks every existing report as Apple's, which is what they all are.
+     *
+     * <p>Local rows could not exist before the column did, so the default is not a fallback but
+     * the truth. Getting it wrong in the other direction would be worse than it looks: the CSV
+     * export would hand somebody a file claiming their own phone had recorded positions it never
+     * took.
+     */
+    @Test
+    public void migrate7To8_marksExistingReportsAsComingFromApple() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+            insertLocationReport(db, "hash-1", BEACON_ID, 1700000000000L);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 8, true, OpenTagViewerDatabase.MIGRATION_7_8);
+
+        try (Cursor cursor = db.query(
+                "SELECT provenance FROM LocationReport WHERE hash_id = ?",
+                new Object[] {"hash-1"})) {
+            assertTrue("the report did not survive v7 to v8", cursor.moveToFirst());
+            assertEquals("apple", cursor.getString(0));
+        }
+    }
+
+    /** And a local row can be written straight after the upgrade. */
+    @Test
+    public void migrate7To8_theColumnAcceptsALocalRow() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 8, true, OpenTagViewerDatabase.MIGRATION_7_8);
+
+        db.execSQL("INSERT INTO LocationReport (hash_id, beacon_id, published_at, description,"
+                        + " timestamp, confidence, latitude, longitude, horizontal_accuracy,"
+                        + " status, last_update, provenance)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                new Object[] {"hash-local", BEACON_ID, 1700000000000L, "Heard over Bluetooth",
+                        1700000000000L, 0, 49.4767, 8.5622, 8, 32, 1700000000000L, "local"});
+
+        try (Cursor cursor = db.query(
+                "SELECT provenance, horizontal_accuracy FROM LocationReport WHERE hash_id = ?",
+                new Object[] {"hash-local"})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("local", cursor.getString(0));
+            assertEquals(8, cursor.getInt(1));
         }
     }
 

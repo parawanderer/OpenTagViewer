@@ -34,7 +34,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         UserBeaconOptions.class,
         LastBleSighting.class
     },
-    version = 7
+    version = 8
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -162,6 +162,25 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v7 → v8: adds {@code provenance} to {@code LocationReport}, saying whether a row came from
+     * Apple's network or from this phone hearing the tag itself.
+     *
+     * <p>Both kinds live in this table on purpose - everything that draws a tag reads from here -
+     * but they are not the same claim, and the history export hands somebody a file in which
+     * they would otherwise be indistinguishable. See {@link LocationReport#provenance}.
+     *
+     * <p>Additive, with a default of {@code apple}. That is not a fallback but the truth for
+     * every existing row: local rows could not exist before this column did.
+     */
+    public static final Migration MIGRATION_7_8 = new Migration(7, 8) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE LocationReport"
+                    + " ADD COLUMN provenance TEXT NOT NULL DEFAULT 'apple'");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -177,7 +196,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     OpenTagViewerDatabase.class,
                     DATABASE_NAME)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                            MIGRATION_5_6, MIGRATION_6_7)
+                            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build();
         }
 
