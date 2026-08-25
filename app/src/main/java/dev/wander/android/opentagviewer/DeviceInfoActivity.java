@@ -703,7 +703,11 @@ public class DeviceInfoActivity extends AppCompatActivity
         this.beaconRepo.recordAccessorySighting(
                         this.beaconId,
                         update.getResult().getMatchedMac(),
-                        System.currentTimeMillis())
+                        System.currentTimeMillis(),
+                        // No hint: the ring path knows which address answered but not which
+                        // index it came from - see BleSoundTriggerResult. Python falls back to
+                        // checking the whole window, which is what it did before hints existed.
+                        null)
                 .subscribe(() -> { }, error ->
                         Log.d(TAG, "Could not keep the alignment from a sighting", error));
     }

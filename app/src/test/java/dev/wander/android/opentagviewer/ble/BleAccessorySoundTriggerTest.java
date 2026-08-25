@@ -63,7 +63,8 @@ public class BleAccessorySoundTriggerTest {
 
         @Override
         public String recordSeen(
-                final String accessoryJson, final String mac, final long seenAtUnixMs) {
+                final String accessoryJson, final String mac, final long seenAtUnixMs,
+                final Integer hintIndex) {
             this.sightings.add(mac);
             return "{\"aligned\":true}";
         }
@@ -111,6 +112,32 @@ public class BleAccessorySoundTriggerTest {
     public void noCandidateMacsShortCircuitsBeforeScanning() throws InterruptedException {
         final BleAccessorySoundTrigger<String> trigger = new BleAccessorySoundTrigger<>(
                 resolverReturning(List.of()),
+                context -> true,
+                unreachableScanner(),
+                unreachableGattTrigger(),
+                s -> s,
+                3, 0L, 0L);
+
+        final List<BleSoundTriggerUpdate> items = playSoundBlocking(trigger);
+
+        assertEquals(1, items.size());
+        assertEquals(BleSoundTriggerStatus.NO_CANDIDATE_MACS, items.get(0).getResult().getStatus());
+    }
+
+    /**
+     * The resolver's other way of saying it has no addresses: null, not an empty map.
+     *
+     * <p>It answers that for an accessory it cannot read, and for one whose candidate window is
+     * too wide to be worth deriving - which is what an owner's own Apple device is, since a
+     * phone has no rolling-key alignment and reaches this code through "show my own Apple
+     * devices". Both mean the same thing to a ring attempt: there is nothing to scan for. Being
+     * dereferenced instead turned that into a thrown chain and an error toast.
+     */
+    @Test
+    public void aResolverThatRefusesIsTreatedAsNoCandidatesRatherThanThrowing()
+            throws InterruptedException {
+        final BleAccessorySoundTrigger<String> trigger = new BleAccessorySoundTrigger<>(
+                new FakeResolver(null),
                 context -> true,
                 unreachableScanner(),
                 unreachableGattTrigger(),

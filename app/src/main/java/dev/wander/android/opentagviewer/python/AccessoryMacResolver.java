@@ -39,11 +39,20 @@ public interface AccessoryMacResolver {
      * derives three keys instead of a twelve-hour range. Persisting it is the caller's job - see
      * {@code BeaconRepository#recordAccessorySighting}.
      *
-     * <p><b>The address, not the index {@code currentMacAddresses} paired it with.</b> That
-     * index is only trustworthy when {@code mac} came from a primary key - a secondary key's
-     * index is only a lower bound, not the true one - and this side of the bridge has no way to
-     * tell the two apart from the index alone. The real implementation re-derives the key at
-     * {@code mac} in Python, where the type is still known, and only accepts a primary match.
+     * <p><b>The address decides, the index is only a hint.</b> An index is trustworthy only
+     * when {@code mac} came from a primary key - a secondary key's index is a lower bound, not
+     * the true one - and this side of the bridge cannot tell the two apart. So Python re-derives
+     * the keys itself and reads the type there; {@code hintIndex} only says <i>where to look
+     * first</i>, and a wrong one costs nothing but the wide search that used to happen anyway.
+     *
+     * <p><b>The hint is what makes this affordable to call.</b> Checking one index is three key
+     * derivations; searching the whole candidate window is around 1150, measured at 1.15s on
+     * desktop and several times that under Chaquopy. Called on the sighting cadence without it,
+     * the app sat at 135% CPU with two tags in range until Android killed it for not answering
+     * input.
+     *
+     * @param hintIndex the index {@code currentMacAddresses} paired {@code mac} with, or null
+     *                  when the caller does not know - the search then runs as it did before.
      *
      * @return the re-serialized accessory, or null if there was nothing worth recording - no
      * match, only a secondary-key match, or a failure. Null is not worth failing a caller over:
@@ -54,7 +63,8 @@ public interface AccessoryMacResolver {
      * only ever care about the candidate set - keeps compiling. {@link ChaquopyAccessoryMacResolver}
      * overrides it for real.
      */
-    default String recordSeen(String accessoryJson, String mac, long seenAtUnixMs) {
+    default String recordSeen(
+            String accessoryJson, String mac, long seenAtUnixMs, Integer hintIndex) {
         return null;
     }
 }

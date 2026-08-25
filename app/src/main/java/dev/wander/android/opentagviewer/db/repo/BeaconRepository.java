@@ -544,7 +544,8 @@ public class BeaconRepository {
      * successful ring into an error toast.
      */
     public Completable recordAccessorySighting(
-            final String beaconId, final String mac, final long seenAtUnixMs) {
+            final String beaconId, final String mac, final long seenAtUnixMs,
+            final Integer hintIndex) {
         return Completable.fromRunnable(() -> {
             final var dao = db.ownedBeaconDao();
             final OwnedBeacon row = dao.getById(beaconId);
@@ -555,7 +556,7 @@ public class BeaconRepository {
             }
 
             final String updated = AppDependencies.accessoryMacResolver()
-                    .recordSeen(row.accessoryJson, mac, seenAtUnixMs);
+                    .recordSeen(row.accessoryJson, mac, seenAtUnixMs, hintIndex);
 
             if (updated == null) {
                 // Also the ordinary outcome of a secondary-key-only match, not just a failure -
