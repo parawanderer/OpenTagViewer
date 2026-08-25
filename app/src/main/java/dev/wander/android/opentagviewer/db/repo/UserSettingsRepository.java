@@ -9,6 +9,7 @@ import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStor
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ICLOUD_OFFER_MADE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.MAP_PROVIDER;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.SCAN_IN_BACKGROUND;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.SHOW_APPLE_DEVICES;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_DARK_THEME;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.USE_SYSTEM_COLORS;
@@ -43,6 +44,7 @@ public class UserSettingsRepository {
                 String anisetteApkUri = settings.get(ANISETTE_APK_URI);
                 Boolean anisetteUpgradeOffered = settings.get(ANISETTE_UPGRADE_OFFERED);
                 Boolean showAppleDevices = settings.get(SHOW_APPLE_DEVICES);
+                Boolean scanInBackground = settings.get(SCAN_IN_BACKGROUND);
                 Boolean icloudOfferMade = settings.get(ICLOUD_OFFER_MADE);
 
                 return UserSettings.builder()
@@ -57,6 +59,7 @@ public class UserSettingsRepository {
                         .anisetteApkUri(anisetteApkUri)
                         .anisetteUpgradeOffered(anisetteUpgradeOffered)
                         .showAppleDevices(showAppleDevices)
+                        .scanInBackground(scanInBackground)
                         .icloudOfferMade(icloudOfferMade)
                         .build();
 
@@ -107,6 +110,7 @@ public class UserSettingsRepository {
             // Null reads as off, which is the intended default - the app shows only what it can
             // actually keep up to date. See UserSettings.showAppleDevices.
             mutablePreferences.set(SHOW_APPLE_DEVICES, userSettings.shouldShowAppleDevices());
+            mutablePreferences.set(SCAN_IN_BACKGROUND, userSettings.shouldScanInBackground());
             // Once true this never goes back to false: somebody who dismissed the offer has
             // answered it, and asking again is how a prompt becomes something people close
             // without reading. See UserSettings.icloudOfferMade.

@@ -338,4 +338,14 @@
     <string name="last_seen">最後の受信</string>
     <string name="signal">信号強度</string>
     <string name="seen_just_now">たった今</string>
+    <string name="scan_in_background">バックグラウンドで受信を続ける</string>
+    <string name="scan_in_background_explainer">アプリを閉じていてもタグを受信し、聞こえた場所を記録します。常時通知が必要で、電池の消費が増えます。既定ではオフです。</string>
+    <string name="background_scan_channel">バックグラウンド受信</string>
+    <string name="background_scan_channel_description">アプリがバックグラウンドでタグを受信している間に表示されます。</string>
+    <string name="background_scan_notification_title">タグを受信中</string>
+    <string name="background_scan_notification_text">タップして地図を開きます。</string>
+    <string name="left_behind_channel">置き忘れ</string>
+    <string name="left_behind_channel_description">タグが受信できなくなり、その場所から離れたときに知らせます。</string>
+    <string name="left_behind_title">%1$s が置き去りです</string>
+    <string name="left_behind_text">%1$sにいた場所で最後に受信しました。タップして場所を表示します。</string>
 </resources>

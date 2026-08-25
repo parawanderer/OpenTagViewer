@@ -338,4 +338,14 @@
     <string name="last_seen">最后收到</string>
     <string name="signal">信号强度</string>
     <string name="seen_just_now">刚刚</string>
+    <string name="scan_in_background">在后台持续接收</string>
+    <string name="scan_in_background_explainer">即使应用已关闭也会接收标签，并记录听到的位置。需要常驻通知，耗电更多。默认关闭。</string>
+    <string name="background_scan_channel">后台接收</string>
+    <string name="background_scan_channel_description">应用在后台接收标签时显示。</string>
+    <string name="background_scan_notification_title">正在接收标签</string>
+    <string name="background_scan_notification_text">点按以打开地图。</string>
+    <string name="left_behind_channel">遗落提醒</string>
+    <string name="left_behind_channel_description">当标签不再被接收且你已离开时提醒你。</string>
+    <string name="left_behind_title">%1$s 被落下了</string>
+    <string name="left_behind_text">在你%1$s所在的位置最后一次接收到。点按查看地点。</string>
 </resources>

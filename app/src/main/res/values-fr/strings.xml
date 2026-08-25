@@ -338,4 +338,14 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="last_seen">Dernière détection</string>
     <string name="signal">Signal</string>
     <string name="seen_just_now">à l\'instant</string>
+    <string name="scan_in_background">Continuer l\'écoute en arrière-plan</string>
+    <string name="scan_in_background_explainer">Écoute vos balises même quand l\'application est fermée et note où elles ont été entendues. Nécessite une notification permanente et consomme plus de batterie. Désactivé par défaut.</string>
+    <string name="background_scan_channel">Écoute en arrière-plan</string>
+    <string name="background_scan_channel_description">Affichée tant que l\'application écoute vos balises en arrière-plan.</string>
+    <string name="background_scan_notification_title">Écoute de vos balises</string>
+    <string name="background_scan_notification_text">Touchez pour ouvrir la carte.</string>
+    <string name="left_behind_channel">Oublié</string>
+    <string name="left_behind_channel_description">Vous alerte quand une balise n\'est plus entendue et que vous vous en êtes éloigné.</string>
+    <string name="left_behind_title">%1$s est resté sur place</string>
+    <string name="left_behind_text">Entendue pour la dernière fois là où vous étiez %1$s. Touchez pour voir l\'endroit.</string>
 </resources>

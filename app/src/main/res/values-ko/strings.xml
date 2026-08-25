@@ -338,4 +338,14 @@
     <string name="last_seen">마지막 수신</string>
     <string name="signal">신호 세기</string>
     <string name="seen_just_now">방금</string>
+    <string name="scan_in_background">백그라운드에서 계속 수신</string>
+    <string name="scan_in_background_explainer">앱을 닫아도 태그를 수신하고 수신한 위치를 기록합니다. 상시 알림이 필요하며 배터리를 더 사용합니다. 기본값은 꺼짐입니다.</string>
+    <string name="background_scan_channel">백그라운드 수신</string>
+    <string name="background_scan_channel_description">앱이 백그라운드에서 태그를 수신하는 동안 표시됩니다.</string>
+    <string name="background_scan_notification_title">태그 수신 중</string>
+    <string name="background_scan_notification_text">탭하여 지도를 엽니다.</string>
+    <string name="left_behind_channel">두고 옴</string>
+    <string name="left_behind_channel_description">태그가 더 이상 수신되지 않고 그 자리에서 멀어졌을 때 알립니다.</string>
+    <string name="left_behind_title">%1$s을(를) 두고 왔습니다</string>
+    <string name="left_behind_text">%1$s에 있던 곳에서 마지막으로 수신했습니다. 탭하여 위치를 확인하세요.</string>
 </resources>

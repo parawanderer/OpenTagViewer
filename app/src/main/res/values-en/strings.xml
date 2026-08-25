@@ -338,4 +338,14 @@ You can set this up now, or any time later from Settings.</string>
     <string name="last_seen">Last seen</string>
     <string name="signal">Signal</string>
     <string name="seen_just_now">just now</string>
+    <string name="scan_in_background">Keep listening in the background</string>
+    <string name="scan_in_background_explainer">Listens for your tags even when the app is closed, and records where they were heard. Needs a permanent notification, and uses more battery. Off by default.</string>
+    <string name="background_scan_channel">Background scanning</string>
+    <string name="background_scan_channel_description">Shown while the app is listening for your tags in the background.</string>
+    <string name="background_scan_notification_title">Listening for your tags</string>
+    <string name="background_scan_notification_text">Tap to open the map.</string>
+    <string name="left_behind_channel">Left behind</string>
+    <string name="left_behind_channel_description">Alerts you when a tag stops being heard and you have moved away from it.</string>
+    <string name="left_behind_title">%1$s stayed behind</string>
+    <string name="left_behind_text">Last heard where you were %1$s. Tap to see the place.</string>
 </resources>

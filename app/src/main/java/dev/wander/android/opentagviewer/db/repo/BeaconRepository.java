@@ -702,6 +702,36 @@ public class BeaconRepository {
     public static final String LOCAL_REPORT_DESCRIPTION = "Heard over Bluetooth";
 
     /**
+     * The key material for every tag worth listening for, keyed by beacon.
+     *
+     * <p>For {@code NearbyScanService}, which has no screen to inherit a loaded model from and
+     * so has to ask. The screens build the same map out of what they already hold.
+     *
+     * <p><b>Retired tags are left out, given-up ones are not.</b> A retired tag is one that has
+     * left the account, so there is nothing to listen for. A tag the network gave up on is the
+     * opposite case: it stopped being findable over Apple's network, and hearing it directly is
+     * exactly what could still find it.
+     *
+     * <p>A tag with no {@code accessory_json} is skipped rather than passed on: without key
+     * material there is nothing to derive an address from, and the watcher would only discard it.
+     */
+    public Observable<Map<String, String>> getAccessoryJsonByBeaconId() {
+        return Observable.fromCallable(() -> {
+            final Map<String, String> byBeaconId = new HashMap<>();
+
+            for (final OwnedBeacon beacon : db.ownedBeaconDao().getAll()) {
+                if (beacon.isRemoved || beacon.accessoryJson == null
+                        || beacon.accessoryJson.isEmpty()) {
+                    continue;
+                }
+                byBeaconId.put(beacon.id, beacon.accessoryJson);
+            }
+
+            return byBeaconId;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
      * The last thing heard from this tag over Bluetooth, or empty if it never has been.
      *
      * <p><b>Empty is also the answer for a battery level this version does not recognise.</b> A

@@ -118,6 +118,23 @@ public class UserSettings {
      */
     private Boolean icloudOfferMade;
 
+    /**
+     * Whether to keep listening for the user's tags while the app is closed.
+     *
+     * <p><b>Off unless somebody turns it on, and this one changes what the app is.</b> Without
+     * it the radio only listens while a screen is open, which makes this a display feature: it
+     * tells you what is near you while you are looking. With it the app runs a foreground
+     * service with a permanent notification, listens continuously, and writes down where your
+     * tags were heard - which is a recording feature, and one this app's users have specific
+     * reasons to want to opt into rather than receive.
+     *
+     * <p>It is also what makes the local position history worth having: the case a history
+     * answers is "where did I leave it", and the app is shut at exactly that moment.
+     *
+     * <p>Null reads as off. See {@link #shouldScanInBackground()}.
+     */
+    private Boolean scanInBackground;
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
 
@@ -189,6 +206,14 @@ public class UserSettings {
      */
     public boolean shouldShowAppleDevices() {
         return this.showAppleDevices == Boolean.TRUE;
+    }
+
+    /**
+     * Whether to keep listening while the app is closed - see {@link #scanInBackground}. Null
+     * means nobody has turned it on, which is off.
+     */
+    public boolean shouldScanInBackground() {
+        return this.scanInBackground == Boolean.TRUE;
     }
 
     /**

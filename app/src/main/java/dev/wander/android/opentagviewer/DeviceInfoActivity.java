@@ -77,6 +77,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.util.android.CachedPhoneLocation;
 import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
@@ -219,8 +220,7 @@ public class DeviceInfoActivity extends AppCompatActivity
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
-        this.sightingPersister = new AccessorySightingPersister(
-                this.beaconRepo, new FusedPhoneLocation(this.getApplicationContext()));
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
