@@ -135,9 +135,9 @@ message about the zip rather than about a code. Publish an exporter that locks b
 that app is out, and every bundle written that day is unopenable by whoever receives it, and the
 recipient is the one person in that transaction who chose none of it and can fix none of it.
 
-**So the wizard's lock is currently defaulted off**, in `wizard.py`'s `lock_bundle`, and
-`test_wizard_bundle_locking.py` asserts that. Flip it in the same change that raises the minimum
-app version, not before and not separately.
+**The wizard's lock is defaulted on**, in `wizard.py`'s `lock_bundle`, and
+`test_wizard_bundle_locking.py` asserts that. It was off until app 1.1.0 was released, and was
+flipped in the same change that raised the minimum — which is the ordering this rule exists for.
 
 **A gate on the format must not hold back unrelated fixes.** This nearly happened: the fix for
 [#140](https://github.com/parawanderer/OpenTagViewer/issues/140) — where every share comes back
