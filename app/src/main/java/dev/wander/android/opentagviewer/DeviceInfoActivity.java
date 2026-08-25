@@ -81,6 +81,7 @@ import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
 import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
+import dev.wander.android.opentagviewer.util.parse.LocationReportFields;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
@@ -750,6 +751,7 @@ public class DeviceInfoActivity extends AppCompatActivity
         this.binding.setBleSignalStrength(NearbyTagLabel.signalStrengthBars(sighting.getRssi()));
         this.binding.setBleBatteryLevel(
                 this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+        this.showStatusByteForDebugging(sighting.getStatusByte());
 
         this.showBluetoothSection(true);
 
@@ -802,6 +804,7 @@ public class DeviceInfoActivity extends AppCompatActivity
                     final LastSightingData sighting = stored.get();
                     this.binding.setBleBatteryLevel(this.getString(
                             NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+                    this.showStatusByteForDebugging(sighting.getStatusByte());
                     this.showAgeOfLastSighting(sighting.getHeardAtMs());
                     this.showBluetoothSection(true, false);
 
@@ -817,6 +820,27 @@ public class DeviceInfoActivity extends AppCompatActivity
                                     sighting.getHeardAtMs()));
                 }, error -> Log.w(TAG, "Could not read the last sighting for beaconId="
                         + this.beaconId, error));
+    }
+
+    /**
+     * Puts the raw status byte the battery reading came out of into the debug panel.
+     *
+     * <p><b>To be measured against, not read as a battery level.</b> The section above decodes
+     * bits 6-7 of this byte per Apple's Table 5-5, which is right for an MFi accessory and wrong
+     * for an AirTag: {@link LocationReportFields} records one advertising {@code 0x90}, which
+     * fails that table's marker and reserved bits, and notes that decoding it anyway reads "low"
+     * for a tag whose own record says full. Every accessory this feature was built against is
+     * third-party, so the reading has never been checked against hardware that does not follow
+     * the specification.
+     *
+     * <p>Rendered by {@link LocationReportFields#status}, deliberately: it is the same rendering
+     * a network report's copy of this byte gets, so the two can be compared directly, and it
+     * appends a Table 5-5 reading only to a byte that actually conforms - which is the question
+     * this row exists to answer.
+     */
+    private void showStatusByteForDebugging(final int statusByte) {
+        this.binding.setBleStatusByte(LocationReportFields.status(statusByte));
+        this.findViewById(R.id.settings_debug_ble_status_byte).setVisibility(VISIBLE);
     }
 
     /**
