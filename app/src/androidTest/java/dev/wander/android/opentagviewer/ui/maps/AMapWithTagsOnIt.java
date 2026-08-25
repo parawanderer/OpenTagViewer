@@ -200,6 +200,7 @@ public final class AMapWithTagsOnIt {
                     .horizontalAccuracy(83)
                     .status(144)
                     .lastUpdate(reportedAt)
+                    .provenance(LocationReport.PROVENANCE_APPLE)
                     .build());
         }
 

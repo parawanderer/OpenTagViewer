@@ -35,6 +35,7 @@ import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.LocalFixWorthKeeping;
 import dev.wander.android.opentagviewer.util.parse.KeyAlignmentPlist;
 import dev.wander.android.opentagviewer.util.rx.ScanOrder;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
@@ -606,6 +607,101 @@ public class BeaconRepository {
     }
 
     /**
+     * Write down where this phone was when it heard the tag, as a location report of its own.
+     *
+     * <p><b>The same table as Apple's reports, on purpose.</b> The map marker, the "last
+     * updated" line, the navigate button, the history list and the CSV export all read from
+     * there; a separate table would mean teaching every one of them about a second source. The
+     * {@code provenance} column is what keeps the two distinguishable - see
+     * {@link LocationReport#provenance}.
+     *
+     * <p><b>It is the phone's position, not the tag's.</b> Hearing a Find My advertisement puts
+     * the tag within roughly ten metres, which is why {@code horizontal_accuracy} is filled from
+     * the fix's own accuracy rather than invented: for a reader, and for anything that compares
+     * two reports, that is the honest width of the claim. It is also usually an order of
+     * magnitude better than a network report, which describes where a stranger's iPhone thought
+     * <i>it</i> was.
+     *
+     * <p><b>Not every sighting earns a row.</b> {@link LocalFixWorthKeeping} decides, because
+     * sightings arrive far faster than positions are worth keeping - a tag beside somebody all
+     * evening would otherwise write hundreds of rows describing one spot, each reverse-geocoded
+     * when shown.
+     *
+     * <p>Failure is swallowed like every other write on the sighting path: this runs behind a
+     * passive scan nobody asked for, and nothing the user did may fail because of it.
+     *
+     * @return true when a row was written, so a caller can log or test the decision.
+     */
+    public Observable<Boolean> recordLocalSighting(
+            final String beaconId,
+            final double latitude,
+            final double longitude,
+            final long accuracyMetres,
+            final long statusByte,
+            final long heardAtUnixMs) {
+
+        return Observable.fromCallable(() -> {
+            final var dao = db.locationReportDao();
+            final LocationReport last = dao.getLastLocalFor(beaconId);
+
+            final boolean keep = LocalFixWorthKeeping.worthKeeping(
+                    last == null ? null : last.latitude,
+                    last == null ? null : last.longitude,
+                    last == null ? null : last.timestamp,
+                    latitude, longitude, heardAtUnixMs);
+
+            if (!keep) {
+                return false;
+            }
+
+            // Built as the shared model first so the id comes out of the same hasher the network
+            // path uses. It folds in the beacon, the timestamp, the coordinates, the status and
+            // the description, so two sightings of the same tag at the same moment and place
+            // collapse to one row instead of accumulating - and a local row can never collide
+            // with an Apple one, because no Apple report carries this description.
+            final BeaconLocationReport report = BeaconLocationReport.builder()
+                    .publishedAt(heardAtUnixMs)
+                    .description(LOCAL_REPORT_DESCRIPTION)
+                    .timestamp(heardAtUnixMs)
+                    // Apple's confidence byte is a number this app deliberately does not
+                    // interpret - see LocationReportFields. There is nothing honest to put here,
+                    // so it stays zero rather than borrowing a scale that means something else.
+                    .confidence(0)
+                    .latitude(latitude)
+                    .longitude(longitude)
+                    .horizontalAccuracy(accuracyMetres)
+                    .status(statusByte)
+                    .build();
+
+            dao.insertAll(LocationReport.builder()
+                    .hashId(BeaconLocationReportHasher.getSha256HashFor(beaconId, report))
+                    .beaconId(beaconId)
+                    .publishedAt(report.getPublishedAt())
+                    .description(report.getDescription())
+                    .timestamp(report.getTimestamp())
+                    .confidence(report.getConfidence())
+                    .latitude(report.getLatitude())
+                    .longitude(report.getLongitude())
+                    .horizontalAccuracy(report.getHorizontalAccuracy())
+                    .status(report.getStatus())
+                    .lastUpdate(System.currentTimeMillis())
+                    .provenance(LocationReport.PROVENANCE_LOCAL)
+                    .build());
+
+            Log.d(TAG, "Wrote a local position for beaconId=" + beaconId);
+            return true;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * What a locally heard report says in its description field.
+     *
+     * <p>Apple fills this with its own text, so a fixed string here both labels the row in the
+     * debug panel and guarantees the hash of a local row can never match an Apple one.
+     */
+    public static final String LOCAL_REPORT_DESCRIPTION = "Heard over Bluetooth";
+
+    /**
      * The last thing heard from this tag over Bluetooth, or empty if it never has been.
      *
      * <p><b>Empty is also the answer for a battery level this version does not recognise.</b> A
@@ -747,6 +843,10 @@ public class BeaconRepository {
                                     .horizontalAccuracy(locationReport.getHorizontalAccuracy())
                                     .status(locationReport.getStatus())
                                     .lastUpdate(now)
+                                    // Everything arriving here was decrypted from Apple's
+                                    // network. The local path writes its own rows and sets this
+                                    // itself - see recordLocalSighting.
+                                    .provenance(LocationReport.PROVENANCE_APPLE)
                                     .build()
                             ))
                             .toArray(LocationReport[]::new);

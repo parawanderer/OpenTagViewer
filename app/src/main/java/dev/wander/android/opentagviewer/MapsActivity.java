@@ -113,6 +113,7 @@ import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
+import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.util.TagOrder;
@@ -496,7 +497,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
-        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
+        this.sightingPersister = new AccessorySightingPersister(
+                this.beaconRepo, new FusedPhoneLocation(this.getApplicationContext()));
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 

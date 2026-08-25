@@ -124,6 +124,7 @@ public class TheDeviceListNoticesNewLocationsTest {
                 .horizontalAccuracy(83)
                 .status(144)
                 .lastUpdate(System.currentTimeMillis())
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build());
     }
 

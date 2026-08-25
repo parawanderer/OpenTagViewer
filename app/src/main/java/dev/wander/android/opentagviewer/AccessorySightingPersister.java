@@ -6,6 +6,7 @@ import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.util.android.PhoneLocation;
 
 /**
  * The one place a Bluetooth sighting is written down, for both screens and both kinds of
@@ -31,8 +32,16 @@ final class AccessorySightingPersister {
 
     private final BeaconRepository beaconRepo;
 
-    AccessorySightingPersister(final BeaconRepository beaconRepo) {
+    /**
+     * Where the phone was when a tag was heard, or null throughout when the caller has no
+     * business recording positions.
+     */
+    private final PhoneLocation phoneLocation;
+
+    AccessorySightingPersister(
+            final BeaconRepository beaconRepo, final PhoneLocation phoneLocation) {
         this.beaconRepo = beaconRepo;
+        this.phoneLocation = phoneLocation;
     }
 
     /**
@@ -48,6 +57,7 @@ final class AccessorySightingPersister {
     void onSighting(final NearbyTagSighting sighting, final String mac) {
         this.persist(sighting.getBeaconId(), mac, sighting.getSeenAtMs());
         this.persistLastSighting(sighting);
+        this.persistPosition(sighting);
     }
 
     /**
@@ -66,6 +76,36 @@ final class AccessorySightingPersister {
         this.beaconRepo.recordAccessorySighting(beaconId, mac, seenAtMs)
                 .subscribe(() -> { }, error -> Log.w(TAG,
                         "Failed to persist a sighting for beaconId=" + beaconId, error));
+    }
+
+    /**
+     * Records where the phone was as the tag's position, when there is a fix to record.
+     *
+     * <p>Hearing the tag puts it within Bluetooth range of here, which is a far tighter claim
+     * than a network report carries - see {@code BeaconRepository#recordLocalSighting}. Not
+     * every sighting earns a row; the repository decides, because sightings arrive far faster
+     * than positions are worth keeping.
+     *
+     * <p>No fix means no row, silently. Location may be off, the permission may have been
+     * declined, or the phone may not have one yet, and none of those is a failure of the
+     * sighting.
+     */
+    private void persistPosition(final NearbyTagSighting sighting) {
+        final PhoneLocation.Fix fix = this.phoneLocation.lastKnown();
+        if (fix == null) {
+            return;
+        }
+
+        this.beaconRepo.recordLocalSighting(
+                        sighting.getBeaconId(),
+                        fix.getLatitude(),
+                        fix.getLongitude(),
+                        fix.getAccuracyMetres(),
+                        sighting.getStatusByte(),
+                        sighting.getSeenAtMs())
+                .subscribe(written -> { }, error -> Log.w(TAG,
+                        "Failed to persist a position for beaconId=" + sighting.getBeaconId(),
+                        error));
     }
 
     private void persistLastSighting(final NearbyTagSighting sighting) {
