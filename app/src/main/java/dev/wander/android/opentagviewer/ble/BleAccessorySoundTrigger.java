@@ -159,7 +159,19 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             // only moves when the fifteen-minute key interval ticks.
             final Map<String, Integer> candidates =
                     this.macResolver.currentMacAddresses(accessoryJson);
-            if (candidates.isEmpty()) {
+
+            // **Null and empty mean the same thing here, and null must not be dereferenced.**
+            // The interface permits null for an accessory the resolver cannot read, and for
+            // one whose candidate window is too wide to be worth deriving - an owner's own
+            // Apple device reaches this code through "show my own Apple devices" and is exactly
+            // that, since a phone has no rolling-key alignment. Either way there is no address
+            // to scan for, which is what NO_CANDIDATE_MACS already says.
+            //
+            // Latent rather than observed: the Chaquopy implementation maps Python's None to an
+            // empty map, so no build has thrown here - but the signature permits null, and a
+            // throw inside this chain would surface as an error where "cannot resolve this one"
+            // is the honest answer.
+            if (candidates == null || candidates.isEmpty()) {
                 return Observable.just(BleSoundTriggerUpdate.done(new BleSoundTriggerResult(
                         BleSoundTriggerStatus.NO_CANDIDATE_MACS, null,
                         "Could not resolve a current MAC address for this accessory", null)));
