@@ -11,17 +11,57 @@ name: Update contributors
 
 on:
   schedule:
-    # Weekly. Contributor lists do not move fast enough to warrant more.
+    # Still weekly, and still worth keeping. It catches avatar changes, a merge this workflow
+    # was not running for yet, and any run below that found GitHub's stats cache stale.
     - cron: '0 4 * * 1'
   workflow_dispatch:
+
+  # **And immediately when somebody else's pull request is merged**, because a week is a long
+  # time to go uncredited after contributing to something. The gap was real: an author could
+  # merge, be thanked in the PR, and then not appear in the app for another six days.
+  #
+  # `pull_request_target` rather than `pull_request` because a fork's `pull_request` run gets a
+  # read-only token and no secrets, and this job has to push a branch and open a PR. That trade
+  # is the well-known footgun, so to be explicit about why it is safe here: this workflow is read
+  # from the base branch, `actions/checkout` below takes the base and is given no `ref`, and
+  # nothing here builds or executes anything out of the pull request. **Do not add a `ref:` that
+  # points at the PR's head** - that is the whole vulnerability, and it would hand a write token
+  # to code from an arbitrary fork.
+  pull_request_target:
+    types: [closed]
 
 permissions:
   contents: write
   pull-requests: write
 
+# Two merges close together would otherwise race for the same `chore/update-contributors` branch.
+# The later one is the one worth having - it sees both authors - so the earlier is cancelled.
+concurrency:
+  group: update-contributors
+  cancel-in-progress: true
+
 jobs:
   update:
     runs-on: ubuntu-latest
+
+    # Merged, by somebody who is not the owner, and not a bot.
+    #
+    # `!= github.repository_owner` is the point of the trigger: the owner's merges are most of
+    # them, they change nobody's standing in a list they already top, and a PR opened for every
+    # one would be noise that gets ignored - including on the day it matters.
+    #
+    # The bot check is not hypothetical either. This workflow's own PR is opened by
+    # github-actions[bot], which is not the owner, so without it merging one would trigger the
+    # next. That settles after a round with no diff, but "settles eventually" is a poor thing to
+    # rely on when the alternative is one expression.
+    #
+    # Schedule and manual runs are unconditional - hence the first line, which is what lets them
+    # through a condition written for pull requests.
+    if: |
+      github.event_name != 'pull_request_target'
+      || (github.event.pull_request.merged == true
+          && github.event.pull_request.user.login != github.repository_owner
+          && github.event.pull_request.user.type != 'Bot')
 
     steps:
       - uses: actions/checkout@v4
@@ -30,10 +70,33 @@ jobs:
         with:
           python-version: '3.12'
 
+      # `--expect-contributor` only on the merge trigger, and it is the honest part of this.
+      #
+      # GitHub computes `/stats/contributors` asynchronously and caches it. Merging invalidates
+      # that cache, so this run gets either a 202 it waits out or a cached 200 from before the
+      # merge - and the second looks exactly like success: no diff, no pull request, green tick.
+      # Naming who this run was fired for turns that into a failed run somebody can see.
+      #
+      # It is not a gate on anything, and a red run here means only "the weekly schedule will
+      # credit them instead". Failing loudly is the point; it is the difference between knowing
+      # this trigger works and assuming it does.
+      # **The login goes through `env:`, never interpolated into the command line.** It is a
+      # value an outside person chooses, this job runs with a write token, and `${{ }}` inside
+      # `run:` is textual substitution into the shell - which is the standard injection route
+      # into a `pull_request_target` workflow. GitHub restricts logins to letters, digits and
+      # hyphens, so this particular field is not exploitable today; the habit is what matters,
+      # because the next field somebody adds here might be a title or a branch name.
       - name: Regenerate the contributor list
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/fetch_contributors.py
+          EXPECT_CONTRIBUTOR: ${{ github.event_name == 'pull_request_target'
+                                  && github.event.pull_request.user.login || '' }}
+        run: |
+          if [ -n "$EXPECT_CONTRIBUTOR" ]; then
+            python scripts/fetch_contributors.py --expect-contributor "$EXPECT_CONTRIBUTOR"
+          else
+            python scripts/fetch_contributors.py
+          fi
 
       - name: Open a PR if anything changed
         uses: peter-evans/create-pull-request@v6
