@@ -142,12 +142,23 @@ So releasing is two steps, in this order:
 
 **And the app's release goes out before the exporter's, whenever the exporter's changes what a
 bundle is.** They are separate releases with separate tags, which makes them look independent;
-they are not. Exporter 1.4.0 locks bundles by default, and an app older than 1.1.0 cannot decrypt
-one at all — it fails with a message about the zip rather than about a code. Publish the exporter
-first and every bundle written that day is unopenable by whoever receives it, and the recipient is
-the one person in that transaction who chose none of it and can fix none of it.
+they are not. A locked bundle cannot be opened by an app older than 1.1.0 at all — it fails with a
+message about the zip rather than about a code. Publish an exporter that locks by default before
+that app is out, and every bundle written that day is unopenable by whoever receives it, and the
+recipient is the one person in that transaction who chose none of it and can fix none of it.
 
-Nothing enforces this — `release_version.py` checks a tag against a version, not one release
+**So the wizard's lock is currently defaulted off**, in `wizard.py`'s `lock_bundle`, and
+`test_wizard_bundle_locking.py` asserts that. Flip it in the same change that raises the minimum
+app version, not before and not separately.
+
+**A gate on the format must not hold back unrelated fixes.** This nearly happened: the fix for
+[#140](https://github.com/parawanderer/OpenTagViewer/issues/140) — where every share comes back
+unreadable and the export fails outright — sat unreleased behind this ordering because it happened
+to be on the same `main` as the locking change. Three people reported the same bug in the meantime.
+If a fix does not touch what a bundle *is*, it is not what this rule is about, and shipping it
+should not wait on an app release.
+
+Nothing enforces any of this — `release_version.py` checks a tag against a version, not one release
 against another — so it is a thing to remember, which is why it is written here.
 
 `scripts/release_version.py --kind exporter --tag <tag>` enforces it, and runs in `test-release-version`

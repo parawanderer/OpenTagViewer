@@ -309,6 +309,7 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="refresh_from_account">Vernieuwen vanaf Apple-account</string>
     <string name="refresh_from_account_done">Bijgewerkt met je Apple-account</string>
     <string name="refresh_from_account_failed">Je Apple-account was even niet bereikbaar. Je tags zijn ongewijzigd.</string>
+    <string name="error_report_log_too_big_to_copy">Dit logbestand is te groot om te kopiëren. Sla het op als bestand en voeg dat toe.</string>
     <string name="play_sound_nearby">In de buurt laten piepen</string>
     <string name="play_sound_searching">Zoeken in de buurt via Bluetooth…</string>
     <string name="play_sound_success">Geluid wordt nu afgespeeld.</string>

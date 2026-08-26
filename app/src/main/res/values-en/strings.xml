@@ -309,6 +309,7 @@ You can set this up now, or any time later from Settings.</string>
     <string name="refresh_from_account">Refresh from Apple account</string>
     <string name="refresh_from_account_done">Up to date with your Apple account</string>
     <string name="refresh_from_account_failed">Could not reach your Apple account just now. Your tags are unchanged.</string>
+    <string name="error_report_log_too_big_to_copy">This log is too large to copy. Save it as a file and attach that instead.</string>
     <string name="play_sound_nearby">Play Sound Nearby</string>
     <string name="play_sound_searching">Searching nearby over Bluetooth…</string>
     <string name="play_sound_success">Playing sound now.</string>

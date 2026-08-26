@@ -1,14 +1,16 @@
 """
-The wizard locks the bundles it writes, and shows the code once.
+The wizard can lock the bundles it writes, and shows the code once.
 
-**This default was blocked, not missing.** ``wizard.py`` hard-coded ``password=None`` with a
-comment saying so: before the Android app carried zip4j it could not decrypt anything at all, so
-a locked bundle was a file nobody's installed app could open - and the people worst affected were
-recipients, who did not choose the exporter's version and could not fix it from their side.
+**The default is off, and it is off for a reason that will expire.** A locked bundle can only be
+opened by app 1.1.0 or newer; anything older fails with a message about the zip rather than about
+a code. The person who meets that failure is the recipient, who chose neither the exporter nor its
+version - so until 1.1.0 is *released*, not merely built, locking by default would break exports
+for the one party who can do nothing about it.
 
-App 1.1.0 reads them. So the default flips, and these tests exist because nothing caught the old
-behaviour either: no test asserted ``password=None``, so the flip would have gone unnoticed in
-both directions.
+**These tests assert the default in both directions on purpose.** Nothing caught the previous flip
+in either direction, so the value has changed twice with no test noticing. When app 1.1.0 ships and
+the default goes back on, `test_the_checkbox_starts_unticked` is the test that should fail and be
+inverted - deliberately, in the same change, rather than discovered later.
 
 The code is the part with a permanent cost. It is not stored anywhere and cannot be recovered, so
 a bundle written without the user being shown its code is a bundle nobody can ever open.
@@ -63,12 +65,17 @@ def write(window, bundle, path, *, locked: bool):
 
 class TestTheDefault:
     """
-    A bundle holds key material that cannot be revoked, and travels through other people's
-    infrastructure. Whoever most needs the lock is whoever would never find a checkbox for it.
+    Off until an app that can open one is released - see the module docstring.
+
+    A bundle holds key material that cannot be revoked and travels through other people's
+    infrastructure, so on is where this belongs eventually. It is not there yet.
     """
 
-    def test_the_checkbox_starts_ticked(self, window):
-        assert window.lock_bundle.get() is True
+    def test_the_checkbox_starts_unticked(self, window):
+        assert window.lock_bundle.get() is False, (
+            "locking by default writes bundles that no released app can open. Flip this only in"
+            " the change that raises the minimum app version - see AGENTS.md rule 9"
+        )
 
     def test_a_bundle_is_written_with_a_code(self, window, bundle, tmp_path):
         write_zip, _shown, _info, _error, _closed = write(

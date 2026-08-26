@@ -527,7 +527,7 @@ python -m pytest scripts/test -v
 ```
 
 Most of `scripts/` is one-shot utilities where a failure is loud and immediate to whoever ran
-them, and tests would not earn their keep. These three are different, because each one guards
+them, and tests would not earn their keep. These are different, because each one guards
 something else and a bug in a guard reports green while protecting nothing:
 
 | Script | What it gates |
@@ -535,6 +535,15 @@ something else and a bug in a guard reports green while protecting nothing:
 | `add_strings.py` | CI's translation check |
 | `exporter_version.py` | whether a release tag may disagree with the version in the source |
 | `release_notes.py` | the notes of a *published* release, so a parsing mistake is visible to everyone |
+| `fetch_contributors.py` | whether a merge actually credited the contributor, or quietly did not |
+
+The last is the odd one, and worth a sentence. It fails nothing and gates nobody's build - it
+regenerates a credits page. What its tests protect is the *reporting*: GitHub computes
+`/stats/contributors` asynchronously and caches it, merging invalidates that cache, and a run
+answered from the stale cache writes no diff, opens no pull request and goes green having
+credited nobody. `--expect-contributor` turns that into a visible failure, and these tests are
+what keep it honest - including the case where the expected login is one of `EXCLUDED_LOGINS`
+and its absence is correct rather than a fault.
 
 ### Which Python each tree targets
 
@@ -756,7 +765,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
-| `update-contributors.yml` | weekly | Regenerates the contributor list on the Information page, opens a PR if it changed |
+| `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
