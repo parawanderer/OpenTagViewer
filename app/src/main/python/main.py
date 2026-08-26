@@ -1044,15 +1044,17 @@ def accessoryFromJson(accessoryJson: str) -> StoredAccessory:
 # secondary-key floor is what pulls alignment back up afterwards, so the full width is only
 # needed until the first sighting lands.
 #
-# Twenty-four hours off a fresh alignment is on the order of two hundred keys, which is nothing. The
+# Forty-eight hours off a fresh alignment is around 1150 key derivations - 1.15s on desktop
+# and several times that under Chaquopy, which is why `recordAccessorySeen` takes an index
+# hint rather than re-deriving the window on every sighting. The
 # cost is only bounded while the alignment *is* fresh, and this app does produce accessories
 # where it is not: enabling "show my own Apple devices" puts a phone in the list, and a phone
 # has no rolling-key alignment to be fresh. Measured on one that was switched off, the window
 # came to 39636 indices - over a year of keys, derived on a blocking call. See
-# `_MAC_CANDIDATE_MAX_INDICES`, which is what stops that being attempted.
+# `_MAC_CANDIDATE_MAX_INDICES`, which is what stops the whole of that being attempted.
 _MAC_CANDIDATE_MARGIN = timedelta(hours=48)
 
-#: How wide a candidate window may be before deriving it is refused outright.
+#: How much of a candidate window is derived when the whole of it is too wide.
 #
 # **This is a guard against one entry costing every other entry its scan.** Callers ask per
 # accessory, in a loop, and the derivation is blocking EC work with no interruption point. If
@@ -1074,14 +1076,17 @@ _MAC_CANDIDATE_MARGIN = timedelta(hours=48)
 # alignment and never gains one.
 #
 # A thousand is roughly a week of staleness: enough for a tag that has missed a few fetches,
-# and a couple of seconds at worst. An accessory past it is skipped rather than searched.
+# and a couple of seconds at worst.
 #
-# **The better fix is to bound the range instead of refusing it**, taking the newest N indices
-# rather than the whole span. A tag that is advertising right now has been running, so its true
-# index tracks the wall clock and sits at the top of the window; the bottom is only reachable by
-# a tag that was switched off for months, which is not advertising and so has nothing to match
-# anyway. That wants a `max_indices` on `current_mac_addresses` in the pinned FindMy.py rather
-# than a second key walk here, so it is deliberately not done in this commit.
+# **An accessory past it is bounded rather than refused**, deriving the newest N indices rather
+# than the whole span. A tag that is advertising right now has been running, so its true index
+# tracks the wall clock and sits at the top of the window; the bottom is only reachable by a
+# tag that was switched off for months, which is not advertising and so has nothing to match
+# anyway. Refusing outright was the earlier answer and was worse: it cost every never-aligned
+# tag its BLE matching entirely.
+#
+# Done here with a second key walk, because `current_mac_addresses` in the pinned FindMy.py
+# has no `max_indices` to ask for this. Worth sending upstream so the walk can go.
 _MAC_CANDIDATE_MAX_INDICES = 1000
 
 
@@ -1105,9 +1110,10 @@ def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
     Returns None on failure so Java can decide how to recover - a missing or unreadable
     accessory is worth telling apart from "no keys", which would be an empty mapping.
 
-    **An accessory whose window is absurdly wide is refused rather than derived**, and refused
-    here rather than in the caller, because by the time the caller could measure the answer the
-    work has already been done. See `_MAC_CANDIDATE_MAX_INDICES` for what that protects.
+    **An accessory whose window is absurdly wide has only its newest slice derived**, and that
+    is decided here rather than in the caller, because by the time the caller could measure the
+    answer the work has already been done. See `_MAC_CANDIDATE_MAX_INDICES` for what that
+    protects, and why the slice is the newest one.
     """
     try:
         accessory = accessoryFromJson(accessoryJson)
@@ -1247,11 +1253,15 @@ def recordAccessorySeen(accessoryJson: str, mac: str, seenAtUnixMs: int,
             matched_index = matched_primary
         elif matched_secondary is not None and (
                 stored_index is None or matched_secondary > stored_index):
-            # A floor, not a fix. The true index is somewhere in this secondary key's ~96-index
-            # span and the span cannot start below what the symmetric window reported, so moving
-            # alignment up to it can only ever undershoot the truth - never overshoot it, which
-            # is the direction that does damage. Raising the floor is what stops the lag growing
-            # without bound for a tag that only ever matches on its day key.
+            # A floor, not a fix. The true index is somewhere in this secondary key's 192-index
+            # span - `keys_at` offers each secondary at both `ind // 96 + 1` and `+ 2`, so one is
+            # reachable from two 96-blocks, which is the same 192 the margin above is derived
+            # from - and `keys_between` de-duplicates while walking indices upward, so the index
+            # paired with a key is the lowest in the searched range at which it is valid. It is
+            # therefore a lower bound, and moving alignment up to it can only ever undershoot
+            # the truth - never overshoot it, which is the direction that does damage. Raising
+            # the floor is what stops the lag growing without bound for a tag that only ever
+            # matches on its day key.
             matched_index = matched_secondary
         else:
             return None

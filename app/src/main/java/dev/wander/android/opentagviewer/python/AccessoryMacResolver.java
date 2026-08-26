@@ -55,7 +55,9 @@ public interface AccessoryMacResolver {
      *                  when the caller does not know - the search then runs as it did before.
      *
      * @return the re-serialized accessory, or null if there was nothing worth recording - no
-     * match, only a secondary-key match, or a failure. Null is not worth failing a caller over:
+     * match, a match that leaves alignment where it already is, or a failure. A secondary-key
+     * match does record, but only upward: it raises the alignment floor to a lower bound on the
+     * true index rather than setting the index itself, which only a primary match may do. Null is not worth failing a caller over:
      * the sighting is an optimisation, and the sound either played or it did not regardless.
      *
      * <p>Defaulted to "records nothing" rather than a second required method, so a
