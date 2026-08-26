@@ -309,6 +309,7 @@
     <string name="refresh_from_account">从 Apple 账户刷新</string>
     <string name="refresh_from_account_done">已与你的 Apple 账户同步</string>
     <string name="refresh_from_account_failed">此刻无法连接你的 Apple 账户。标签没有变化。</string>
+    <string name="error_report_log_too_big_to_copy">此日志太大，无法复制。请改为保存为文件并附上该文件。</string>
     <string name="play_sound_nearby">就近响铃</string>
     <string name="play_sound_searching">正在通过蓝牙搜索附近设备…</string>
     <string name="play_sound_success">正在播放声音。</string>

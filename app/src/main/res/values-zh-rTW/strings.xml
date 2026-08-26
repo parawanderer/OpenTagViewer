@@ -309,6 +309,7 @@
     <string name="refresh_from_account">從 Apple 帳戶重新整理</string>
     <string name="refresh_from_account_done">已與你的 Apple 帳戶同步</string>
     <string name="refresh_from_account_failed">此刻無法連線到你的 Apple 帳戶。標籤沒有變化。</string>
+    <string name="error_report_log_too_big_to_copy">此紀錄檔太大，無法複製。請改為儲存成檔案並附上該檔案。</string>
     <string name="play_sound_nearby">就近響鈴</string>
     <string name="play_sound_searching">正在透過藍牙搜尋附近裝置…</string>
     <string name="play_sound_success">正在播放聲音。</string>

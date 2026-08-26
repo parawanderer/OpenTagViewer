@@ -200,21 +200,46 @@ public class ErrorReportActivity extends AppCompatActivity {
      * {@code render: shell} box just wants the clipboard.
      */
     private void offerTheLog() {
-        new MaterialAlertDialogBuilder(this)
+        // **A log too big for the clipboard is not offered to it**, rather than trimmed to fit.
+        // setPrimaryClip is a Binder call with about a megabyte of budget, and a log over that
+        // killed this activity with TransactionTooLargeException - which is to say the app
+        // crashed while somebody was reporting a crash. Trimming was the other option and is
+        // worse: it hands over something that looks complete, missing its oldest lines, which
+        // are the import and start-up ones. Saving has no such ceiling.
+        //
+        // **Measured on the redacted text, which is not bounded by the raw log.** Each rule
+        // replaces only its captured group with a `<name-N>` placeholder, and a placeholder is
+        // routinely longer than what it replaced - `lat=-1.23` becomes `lat=<coordinate-1>`. So
+        // a log can come out of the redactor larger than it went in, and the string that goes
+        // on the clipboard is this one.
+        final boolean copyable = LogCollectorUtil.fitsOnTheClipboard(this.log.getText());
+
+        final var dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.error_report_log_how)
-                .setItems(
-                        new CharSequence[] {
-                                this.getString(R.string.error_report_log_copy),
-                                this.getString(R.string.error_report_log_save)},
-                        (dialog, which) -> {
-                            if (which == 0) {
-                                this.copyTheLog();
-                            } else {
-                                this.saveTheLog();
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                .setNegativeButton(R.string.cancel, null);
+
+        if (copyable) {
+            dialog.setItems(
+                    new CharSequence[] {
+                            this.getString(R.string.error_report_log_copy),
+                            this.getString(R.string.error_report_log_save)},
+                    (d, which) -> {
+                        if (which == 0) {
+                            this.copyTheLog();
+                        } else {
+                            this.saveTheLog();
+                        }
+                    });
+        } else {
+            // A message with one button, rather than a message above a one-item list: setMessage
+            // and setItems compete for the same content area in AlertController, and the list is
+            // what survives - so the explanation would simply not be on screen.
+            dialog.setMessage(R.string.error_report_log_too_big_to_copy)
+                    .setPositiveButton(R.string.error_report_log_save,
+                            (d, which) -> this.saveTheLog());
+        }
+
+        dialog.show();
     }
 
     /** Straight to the clipboard, for pasting into the form's log box. */

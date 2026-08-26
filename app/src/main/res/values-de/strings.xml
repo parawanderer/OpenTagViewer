@@ -309,6 +309,7 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="refresh_from_account">Vom Apple-Konto aktualisieren</string>
     <string name="refresh_from_account_done">Auf dem Stand deines Apple-Kontos</string>
     <string name="refresh_from_account_failed">Dein Apple-Konto war gerade nicht erreichbar. An deinen Tags hat sich nichts geändert.</string>
+    <string name="error_report_log_too_big_to_copy">Dieses Protokoll ist zu groß zum Kopieren. Speichere es stattdessen als Datei und hänge diese an.</string>
     <string name="play_sound_nearby">In der Nähe klingeln lassen</string>
     <string name="play_sound_searching">Suche in der Nähe per Bluetooth…</string>
     <string name="play_sound_success">Ton wird jetzt abgespielt.</string>
