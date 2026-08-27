@@ -344,6 +344,81 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp" />
 
+            <!--
+                How long a tag has to stay quiet before it is called left behind, and what the
+                alarm sounds like. Both sit under the background scan switch because neither does
+                anything without it: the check they configure only runs in that service.
+
+                A slider rather than a number field: the range is bounded at both ends by what
+                the check can actually honour, and a field invites typing a 5 that silently
+                becomes a 10.
+            -->
+            <LinearLayout
+                android:id="@+id/settings_left_behind_seconds_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="72dp"
+                android:paddingEnd="22dp">
+
+                <TextView
+                    android:id="@+id/settings_left_behind_seconds_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/nunito_medium"
+                    android:textSize="16sp"
+                    tools:text="Warn after 30 seconds" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/settings_left_behind_seconds"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stepSize="5"
+                    android:value="30"
+                    android:valueFrom="10"
+                    android:valueTo="300" />
+
+                <TextView
+                    android:id="@+id/settings_left_behind_seconds_explainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/left_behind_seconds_explainer"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settings_left_behind_sound_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="72dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="22dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/nunito_medium"
+                    android:text="@string/left_behind_sound"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/settings_left_behind_sound_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/nunito_medium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    tools:text="Default alarm sound" />
+            </LinearLayout>
+
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

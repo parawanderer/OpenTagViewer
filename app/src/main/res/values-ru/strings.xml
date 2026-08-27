@@ -350,4 +350,8 @@
     <string name="left_behind_text">Последний сигнал там, где вы были %1$s. Нажмите, чтобы увидеть место.</string>
     <string name="warn_if_left_behind">Предупреждать, если забыта</string>
     <string name="warn_if_left_behind_explainer">Подаёт сигнал, когда метка перестала быть слышна, а вы ушли. Требует фонового приёма.</string>
+    <string name="left_behind_seconds_label">Предупредить через %1$d сек.</string>
+    <string name="left_behind_seconds_explainer">Сколько метка должна молчать, прежде чем приложение проверит, не забыли ли вы её. Меньше — раньше предупреждение и чаще проверки.</string>
+    <string name="left_behind_sound">Звук будильника</string>
+    <string name="left_behind_sound_default">Стандартный звук будильника</string>
 </resources>

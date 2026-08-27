@@ -97,6 +97,17 @@ public class NearbyScanService extends Service {
     private static final String ACTION_DISMISSED = "dev.wander.opentagviewer.SCAN_DISMISSED";
 
     /**
+     * Swiping the left-behind alert away, which silences the sound and nothing else.
+     *
+     * <p>Deliberately not {@link #ACTION_DISMISSED}: that one is the permanent notification being
+     * swiped, and means "stop listening". Dismissing an alarm means "I have read it", and
+     * turning the whole feature off because somebody answered it would be the worst possible
+     * reading of that gesture.
+     */
+    private static final String ACTION_SILENCE_ALARM =
+            "dev.wander.opentagviewer.SILENCE_LEFT_BEHIND";
+
+    /**
      * Channel for the left-behind alert, which is loud on purpose - see {@link #alertLeftBehind}.
      *
      * <p><b>The suffix is not decoration.</b> A notification channel is immutable once created:
@@ -104,7 +115,11 @@ public class NearbyScanService extends Service {
      * old one, and there is no way to update it. The only way to change how an alert sounds is
      * to publish a new channel, so the id carries a version.
      */
-    private static final String ALERT_CHANNEL_ID = "tag_left_behind_alarm";
+    private static final String ALERT_CHANNEL_ID = "tag_left_behind_chosen_sound";
+
+    /** Earlier {@link #ALERT_CHANNEL_ID} values, deleted so they stop appearing in settings. */
+    private static final List<String> RETIRED_ALERT_CHANNEL_IDS =
+            List.of("tag_left_behind", "tag_left_behind_alarm");
 
     /**
      * How often the left-behind rule is evaluated.
@@ -113,8 +128,15 @@ public class NearbyScanService extends Service {
      * touches the radio only for one that has gone quiet - but whatever it is, it is added to
      * every alert. At a minute it was the largest single delay in the chain, longer than the
      * silence it was watching for.
+     *
+     * <p>Five seconds because the silence to wait for is now the user's to choose and goes as
+     * low as ten - see {@code UserSettings.LEFT_BEHIND_AFTER_SECONDS_MIN}. A tick coarser than
+     * the setting makes the setting a lie: at fifteen, asking for ten and asking for fifteen
+     * produced the same alert at the same moment. The two reads it costs are a query against a
+     * tiny table and an in-memory preferences lookup, next to a radio that is scanning
+     * continuously the whole time either way.
      */
-    private static final long CHECK_INTERVAL_MS = 15_000L;
+    private static final long CHECK_INTERVAL_MS = 5_000L;
 
     /** What is known about a tag right now: heard since when, and where it turned up. */
     private static final class Presence {
@@ -168,6 +190,29 @@ public class NearbyScanService extends Service {
      * is indistinguishable from the feature being broken.
      */
     private volatile Set<String> alertsOn = Set.of();
+
+    /**
+     * The silence a tag has to keep before it is worth checking, in milliseconds.
+     *
+     * <p>Re-read alongside {@link #alertsOn} and for the same reason: it is the user's to change
+     * from a screen that this service outlives.
+     */
+    private volatile long quietForMs = LeftBehind.QUIET_FOR_MS;
+
+    /** The user's chosen alarm sound, re-read with the rest. Empty means the system default. */
+    private volatile String alarmSoundUri = "";
+
+    /** Plays that sound, on repeat, until the alert is answered. */
+    private LeftBehindAlarm alarm;
+
+    /**
+     * Whether the settings have been read yet in this service's life.
+     *
+     * <p>Only so the first read is logged even when it agrees with the defaults. "Nothing
+     * changed" and "the check never ran" produce the same silence in a log otherwise, and
+     * telling those two apart was the whole difficulty the last time this was wrong.
+     */
+    private boolean haveReadSettings = false;
     private AccessorySightingPersister sightingPersister;
     private PhoneLocation phoneLocation;
 
@@ -205,6 +250,7 @@ public class NearbyScanService extends Service {
         this.phoneLocation = new CachedPhoneLocation(
                 new FusedPhoneLocation(this.getApplicationContext()));
         this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
+        this.alarm = new LeftBehindAlarm(this.getApplicationContext());
     }
 
     @Override
@@ -217,6 +263,13 @@ public class NearbyScanService extends Service {
         if (intent != null && ACTION_DISMISSED.equals(intent.getAction())) {
             this.turnBackgroundScanningOff();
             return START_NOT_STICKY;
+        }
+
+        if (intent != null && ACTION_SILENCE_ALARM.equals(intent.getAction())) {
+            this.alarm.stop();
+            // Falls through to goToForeground below rather than returning: the service is still
+            // meant to be listening, and returning here would leave it started without the
+            // notification the platform requires it to have.
         }
 
         this.goToForeground();
@@ -241,6 +294,11 @@ public class NearbyScanService extends Service {
             this.leftBehindCheck.dispose();
         }
         this.leftBehindCheck = null;
+        if (this.alarm != null) {
+            // Nothing else would: the player holds no reference to the service, so a sounding
+            // alarm would outlive the thing that started it.
+            this.alarm.stop();
+        }
         super.onDestroy();
     }
 
@@ -334,6 +392,8 @@ public class NearbyScanService extends Service {
                         error -> Log.w(TAG, "Background watch ended with an error", error),
                         () -> Log.i(TAG, "Background watch ended"));
 
+        Log.i(TAG, "Left-behind check starting, every " + (CHECK_INTERVAL_MS / 1000) + "s");
+
         this.leftBehindCheck = Observable
                 .interval(CHECK_INTERVAL_MS, CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS,
                         Schedulers.io())
@@ -376,6 +436,10 @@ public class NearbyScanService extends Service {
                                     + " turned up", error));
         }
 
+        // Answered by the tag itself: whatever the alert was about has resolved, and a siren
+        // going while the thing it is about is back in earshot is just wrong.
+        this.alarm.stop();
+
         Log.d(TAG, "beaconId=" + beaconId + " is in range again");
     }
 
@@ -394,21 +458,34 @@ public class NearbyScanService extends Service {
         // A failure keeps the previous answer: stale permissions beat none at all.
         try {
             final Set<String> wanted = this.beaconRepo.getBeaconsWithAlertsOn().blockingFirst();
-            if (!wanted.equals(this.alertsOn)) {
+            if (!wanted.equals(this.alertsOn) || !this.haveReadSettings) {
                 // Logged on change rather than every tick: this is the one place that says the
                 // switch in the app actually reached the service, which is exactly what is
                 // invisible when it does not.
                 Log.i(TAG, "Left-behind alerts are now wanted for " + wanted.size() + " tag(s)");
                 this.alertsOn = wanted;
             }
+
+            final UserSettings settings = new UserSettingsRepository(
+                    UserSettingsDataStore.getInstance(this)).getUserSettings();
+
+            final long configured = settings.resolveLeftBehindAfterSeconds() * 1000L;
+            if (configured != this.quietForMs || !this.haveReadSettings) {
+                Log.i(TAG, "Left-behind silence is now " + (configured / 1000) + "s");
+                this.quietForMs = configured;
+            }
+
+            this.alarmSoundUri = settings.getLeftBehindSoundUri() == null
+                    ? "" : settings.getLeftBehindSoundUri();
+            this.haveReadSettings = true;
         } catch (final Exception couldNotRead) {
-            Log.w(TAG, "Could not re-read which tags want an alert", couldNotRead);
+            Log.w(TAG, "Could not re-read the left-behind settings", couldNotRead);
         }
 
         for (final Map.Entry<String, Presence> entry : this.presence.entrySet()) {
             final Presence known = entry.getValue();
 
-            if (known.gone || now - known.lastHeardMs < LeftBehind.QUIET_FOR_MS) {
+            if (known.gone || now - known.lastHeardMs < this.quietForMs) {
                 continue;
             }
 
@@ -515,7 +592,7 @@ public class NearbyScanService extends Service {
         }
 
         final long couldBeAnywhereWithin = here.getAccuracyMetres()
-                + Math.round((LeftBehind.QUIET_FOR_MS / 1000.0) * WALKING_METRES_PER_SECOND);
+                + Math.round((this.quietForMs / 1000.0) * WALKING_METRES_PER_SECOND);
 
         this.beaconRepo.recordLocalSighting(beaconId, here.getLatitude(), here.getLongitude(),
                         couldBeAnywhereWithin, 0, nowMs)
@@ -546,17 +623,12 @@ public class NearbyScanService extends Service {
                     NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription(this.getString(R.string.left_behind_channel_description));
 
-            // **The alarm stream, not the notification one.** A notification chime is meant to
-            // be ignorable, and it plays at whatever the notification volume happens to be -
-            // which for a phone in a pocket is often nothing. This alert is only useful in the
-            // half minute while walking back is still easy, so it goes out the way an alarm
-            // clock does: alarm usage, alarm volume, and audible with the ringer down.
-            channel.setSound(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
-                    new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build());
+            // **Silent on purpose, and this is not the alert going quiet.** The sound is played
+            // by LeftBehindAlarm instead, on the alarm stream and on repeat. A channel's sound
+            // is fixed when the channel is created and cannot be changed afterwards, so a sound
+            // the user picks cannot live here; and a channel plays it once, which is a chime,
+            // and a chime from a pocket during a walk is the thing that gets missed.
+            channel.setSound(null, null);
 
             // Long enough to be felt through a coat, and unlike a message buzz.
             channel.enableVibration(true);
@@ -572,6 +644,11 @@ public class NearbyScanService extends Service {
                 this, beaconId.hashCode(), open,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
+        final Intent quiet = new Intent(this, NearbyScanService.class)
+                .setAction(ACTION_SILENCE_ALARM);
+        final PendingIntent silence = PendingIntent.getService(
+                this, 2, quiet, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
         final CharSequence howLongAgo = DateUtils.getRelativeTimeSpanString(
                 lastHeardMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
 
@@ -586,12 +663,22 @@ public class NearbyScanService extends Service {
                 // to read later.
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setContentIntent(show)
+                // Swiping it away is the answer to it, so that is where the sound stops.
+                .setDeleteIntent(silence)
                 .setAutoCancel(true)
                 .build();
 
         // One notification per tag rather than one that replaces the last: leaving two things
         // behind is two things to go back for.
         manager.notify(beaconId.hashCode(), alert);
+
+        this.alarm.start(this.alarmSoundUri);
+
+        if (this.alarm.isAlarmStreamSilent()) {
+            // Worth saying out loud rather than leaving as a mystery: the alert did everything
+            // it was asked to and still made no noise, and the reason is not in this app.
+            Log.w(TAG, "Alarm volume is at zero; the left-behind alert will be silent");
+        }
 
         Log.i(TAG, "Alerted that beaconId=" + beaconId + " looks left behind");
     }
@@ -637,6 +724,14 @@ public class NearbyScanService extends Service {
      */
     private void goToForeground() {
         final NotificationManager manager = this.getSystemService(NotificationManager.class);
+
+        // **Tidying up after our own versioning.** Each change to how the alert sounds had to
+        // publish a new channel, because a channel's settings are fixed once created. The old
+        // ones are unused but stay in the user's notification settings forever, so each retired
+        // id would leave another dead entry there under a name that still looks live.
+        for (final String retired : RETIRED_ALERT_CHANNEL_IDS) {
+            manager.deleteNotificationChannel(retired);
+        }
 
         if (manager.getNotificationChannel(CHANNEL_ID) == null) {
             final NotificationChannel channel = new NotificationChannel(

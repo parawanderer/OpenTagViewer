@@ -350,4 +350,8 @@ You can set this up now, or any time later from Settings.</string>
     <string name="left_behind_text">Last heard where you were %1$s. Tap to see the place.</string>
     <string name="warn_if_left_behind">Warn if left behind</string>
     <string name="warn_if_left_behind_explainer">Sounds an alarm when this tag stops being heard and you have moved on. Needs background listening to be on.</string>
+    <string name="left_behind_seconds_label">Warn after %1$d seconds</string>
+    <string name="left_behind_seconds_explainer">How long a tag has to go unheard before the app checks whether you have left it behind. Shorter catches you sooner and checks more often.</string>
+    <string name="left_behind_sound">Alarm sound</string>
+    <string name="left_behind_sound_default">Default alarm sound</string>
 </resources>

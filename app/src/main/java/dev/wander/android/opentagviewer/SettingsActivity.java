@@ -10,6 +10,8 @@ import static android.view.View.inflate;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,6 +26,7 @@ import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.google.android.material.slider.Slider;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -218,6 +221,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         MaterialSwitch systemColors = this.findViewById(R.id.settings_app_use_system_colors);
         systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
+
+        this.setupLeftBehindSettings();
 
         this.setupUserInfo();
 
@@ -1275,5 +1280,107 @@ public class SettingsActivity extends AppCompatActivity {
                 this.performTestButton.setText(R.string.test);
             }
         }
+    }
+
+    /**
+     * Wires the two left-behind settings: how long to wait, and what it sounds like.
+     *
+     * <p>Both are written straight through on change rather than on leaving the screen. The
+     * service re-reads them on its own schedule, so a value that is only in memory here is one
+     * the thing that uses it never sees.
+     */
+    private void setupLeftBehindSettings() {
+        final Slider seconds = this.findViewById(R.id.settings_left_behind_seconds);
+        final TextView label = this.findViewById(R.id.settings_left_behind_seconds_label);
+
+        final int configured = this.currentSettings.resolveLeftBehindAfterSeconds();
+        seconds.setValue(configured);
+        label.setText(this.getString(R.string.left_behind_seconds_label, configured));
+
+        seconds.addOnChangeListener((slider, value, fromUser) -> {
+            final int chosen = Math.round(value);
+            label.setText(this.getString(R.string.left_behind_seconds_label, chosen));
+
+            if (!fromUser) {
+                return;
+            }
+
+            this.currentSettings.setLeftBehindAfterSeconds(chosen);
+            this.persistCurrentSettings("left-behind delay");
+        });
+
+        this.showChosenAlarmSound();
+        this.findViewById(R.id.settings_left_behind_sound_row)
+                .setOnClickListener(v -> this.pickAlarmSound());
+    }
+
+    /** Writes the current sound's own name under the row, so the setting says what it does. */
+    private void showChosenAlarmSound() {
+        final TextView value = this.findViewById(R.id.settings_left_behind_sound_value);
+        final String stored = this.currentSettings.getLeftBehindSoundUri();
+
+        if (stored == null || stored.isEmpty()) {
+            value.setText(R.string.left_behind_sound_default);
+            return;
+        }
+
+        // A sound can be deleted, or live on a volume that is not mounted, long after it was
+        // chosen. Naming it "default" then is honest: that is what will actually play.
+        final Ringtone ringtone = RingtoneManager.getRingtone(this, Uri.parse(stored));
+        final String title = ringtone == null ? null : ringtone.getTitle(this);
+
+        value.setText(title == null || title.isEmpty()
+                ? this.getString(R.string.left_behind_sound_default) : title);
+    }
+
+    /** Opens the system ringtone picker, starting from whatever is set now. */
+    private void pickAlarmSound() {
+        final String stored = this.currentSettings.getLeftBehindSoundUri();
+
+        final Intent picker = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE,
+                        this.getString(R.string.left_behind_sound))
+                // Offering silence here would be a way to turn the alert off that leaves the
+                // switch reading as on, so the picker does not show it.
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                        stored == null || stored.isEmpty() ? null : Uri.parse(stored));
+
+        this.alarmSoundPicker.launch(picker);
+    }
+
+    /**
+     * The chosen alarm sound coming back from the system picker.
+     *
+     * <p>A null URI is the "Default" entry rather than a cancelled pick - the picker is launched
+     * without a silent option - and is stored as empty, which is what the service reads as "the
+     * system default alarm".
+     */
+    private final ActivityResultLauncher<Intent> alarmSoundPicker =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                            return;
+                        }
+
+                        final Uri picked = result.getData().getParcelableExtra(
+                                RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+
+                        this.currentSettings.setLeftBehindSoundUri(
+                                picked == null ? "" : picked.toString());
+                        this.persistCurrentSettings("alarm sound");
+                        this.showChosenAlarmSound();
+                    });
+
+    /** Stores the settings object as it stands, logging rather than interrupting on failure. */
+    private void persistCurrentSettings(final String what) {
+        this.settingsRepository.storeUserSettings(this.currentSettings)
+                .subscribeOn(Schedulers.io())
+                .subscribe(() -> Log.i(TAG, "Stored the " + what),
+                        error -> Log.w(TAG, "Could not store the " + what, error));
     }
 }
