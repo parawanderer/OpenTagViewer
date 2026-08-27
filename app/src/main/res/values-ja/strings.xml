@@ -350,4 +350,8 @@
     <string name="left_behind_text">%1$sにいた場所で最後に受信しました。タップして場所を表示します。</string>
     <string name="warn_if_left_behind">置き忘れたら警告</string>
     <string name="warn_if_left_behind_explainer">このタグが受信できなくなり、その場を離れたときにアラームを鳴らします。バックグラウンド受信が必要です。</string>
+    <string name="left_behind_seconds_label">%1$d 秒後に通知</string>
+    <string name="left_behind_seconds_explainer">タグの信号が途絶えてから、置き忘れを確認するまでの時間です。短いほど早く気づき、確認回数も増えます。</string>
+    <string name="left_behind_sound">アラーム音</string>
+    <string name="left_behind_sound_default">既定のアラーム音</string>
 </resources>

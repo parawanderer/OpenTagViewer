@@ -350,4 +350,8 @@
     <string name="left_behind_text">%1$s에 있던 곳에서 마지막으로 수신했습니다. 탭하여 위치를 확인하세요.</string>
     <string name="warn_if_left_behind">두고 오면 경고</string>
     <string name="warn_if_left_behind_explainer">이 태그가 더 이상 수신되지 않고 자리를 떠났을 때 알람을 울립니다. 백그라운드 수신이 필요합니다.</string>
+    <string name="left_behind_seconds_label">%1$d초 후 경고</string>
+    <string name="left_behind_seconds_explainer">태그 신호가 끊긴 뒤 물건을 두고 왔는지 확인하기까지의 시간입니다. 짧을수록 빨리 알아차리고 더 자주 확인합니다.</string>
+    <string name="left_behind_sound">알람음</string>
+    <string name="left_behind_sound_default">기본 알람음</string>
 </resources>

@@ -350,4 +350,8 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="left_behind_text">Laatst gehoord waar je %1$s was. Tik om de plek te zien.</string>
     <string name="warn_if_left_behind">Waarschuwen bij achterlaten</string>
     <string name="warn_if_left_behind_explainer">Slaat alarm als deze tag niet meer te horen is en je verder bent gelopen. Vereist luisteren op de achtergrond.</string>
+    <string name="left_behind_seconds_label">Waarschuwen na %1$d seconden</string>
+    <string name="left_behind_seconds_explainer">Hoe lang een tag onhoorbaar moet blijven voordat de app controleert of je hem hebt laten liggen. Korter waarschuwt eerder en controleert vaker.</string>
+    <string name="left_behind_sound">Alarmgeluid</string>
+    <string name="left_behind_sound_default">Standaard alarmgeluid</string>
 </resources>
