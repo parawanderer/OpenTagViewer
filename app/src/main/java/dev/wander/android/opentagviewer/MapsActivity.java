@@ -499,7 +499,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
-        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo,
+                new CachedPhoneLocation(new FusedPhoneLocation(this.getApplicationContext())),
+                this::onHeardHere);
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -2190,6 +2192,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private Observable<List<Address>> reverseGeocode(double latitude, double longitude) {
         return Observable.fromCallable(() -> this.geocoder.getFromLocation(latitude, longitude, 1))
             .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Puts a position this phone just heard onto the map, without waiting for a fetch.
+     *
+     * <p>The map draws from {@link #beaconLocations}, which until now only the network fetch
+     * filled. A tag heard over Bluetooth was therefore written to the database and left off the
+     * screen until the next scheduled refresh - so the map went on showing Apple's older answer
+     * for a tag that was audible in the same room. Merged through the same history object the
+     * fetch uses, so the newer of the two wins on its own and no special case is needed for
+     * which source a position came from.
+     */
+    private void onHeardHere(final String beaconId, final BeaconLocationReport report) {
+        this.beaconLocations.merge(beaconId, List.of(report));
+        this.runOnUiThread(this::showLastDeviceLocations);
     }
 
     private synchronized void showLastDeviceLocations() {
