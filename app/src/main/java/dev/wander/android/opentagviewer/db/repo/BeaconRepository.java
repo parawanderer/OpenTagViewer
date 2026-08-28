@@ -632,7 +632,7 @@ public class BeaconRepository {
      *
      * @return true when a row was written, so a caller can log or test the decision.
      */
-    public Observable<Boolean> recordLocalSighting(
+    public Observable<Optional<BeaconLocationReport>> recordLocalSighting(
             final String beaconId,
             final double latitude,
             final double longitude,
@@ -651,7 +651,7 @@ public class BeaconRepository {
                     latitude, longitude, heardAtUnixMs);
 
             if (!keep) {
-                return false;
+                return Optional.<BeaconLocationReport>empty();
             }
 
             // Built as the shared model first so the id comes out of the same hasher the network
@@ -689,7 +689,11 @@ public class BeaconRepository {
                     .build());
 
             Log.d(TAG, "Wrote a local position for beaconId=" + beaconId);
-            return true;
+
+            // Handed back rather than announced as a bare boolean so a caller that draws a map
+            // can put this on it without rebuilding the same report from the same inputs and
+            // risking a second, subtly different definition of what a local report looks like.
+            return Optional.of(report);
         }).subscribeOn(Schedulers.io());
     }
 

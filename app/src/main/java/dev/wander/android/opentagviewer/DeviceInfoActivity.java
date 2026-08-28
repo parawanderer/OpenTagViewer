@@ -222,7 +222,8 @@ public class DeviceInfoActivity extends AppCompatActivity
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
-        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo,
+                new CachedPhoneLocation(new FusedPhoneLocation(this.getApplicationContext())));
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);

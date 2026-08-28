@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer;
 
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -9,7 +11,9 @@ import java.util.concurrent.TimeUnit;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
 import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
 import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.util.android.PhoneLocation;
 
 /**
  * The one place a Bluetooth sighting is written down, for every caller and both kinds of
@@ -45,8 +49,57 @@ public final class AccessorySightingPersister {
 
     private final BeaconRepository beaconRepo;
 
+    /**
+     * Where the phone is, or null for a caller that records position some other way.
+     *
+     * <p><b>The screens pass one, {@code NearbyScanService} passes null.</b> Not an oversight:
+     * the service already writes a position on the two edges it cares about, arriving and going
+     * quiet, precisely so that it is not reading a location on every advertisement while nobody
+     * is looking. A screen is the opposite situation - somebody has the app open and is watching
+     * a tag be found - and the fix is cheap there because the app is in the foreground, which is
+     * the only state its location permission covers anyway.
+     *
+     * <p>Without this the map kept showing the last thing Apple's network said, while the same
+     * screen was reporting the tag as audible right now. Two answers to "where is it", and the
+     * worse one was the one being drawn.
+     */
+    @Nullable
+    private final PhoneLocation phoneLocation;
+
+    /**
+     * Told when a position was actually written, so a screen can show it without waiting.
+     *
+     * <p><b>Because a row nobody redraws is a row nobody sees.</b> The map draws from what the
+     * last network fetch handed it, so a position written between fetches sat in the database
+     * being correct and invisible, and the screen went on showing Apple's older answer for the
+     * same tag. Fired only for a write that happened - a sighting dropped by the 25 metre rule
+     * changes nothing on screen and is not worth a redraw.
+     *
+     * <p>Called on the Rx io thread. A listener that touches views has to get itself onto the
+     * main thread.
+     */
+    public interface LocalPositionListener {
+        void onWritten(String beaconId, BeaconLocationReport report);
+    }
+
+    @Nullable
+    private final LocalPositionListener localPositionListener;
+
     public AccessorySightingPersister(final BeaconRepository beaconRepo) {
+        this(beaconRepo, null, null);
+    }
+
+    public AccessorySightingPersister(final BeaconRepository beaconRepo,
+                                      @Nullable final PhoneLocation phoneLocation) {
+        this(beaconRepo, phoneLocation, null);
+    }
+
+    public AccessorySightingPersister(final BeaconRepository beaconRepo,
+                                      @Nullable final PhoneLocation phoneLocation,
+                                      @Nullable final LocalPositionListener localPositionListener) {
         this.beaconRepo = beaconRepo;
+        this.phoneLocation = phoneLocation;
+        this.localPositionListener = localPositionListener;
     }
 
     /**
@@ -62,6 +115,43 @@ public final class AccessorySightingPersister {
     public void onSighting(final NearbyTagSighting sighting, final String mac) {
         this.maybeCorrectAlignment(sighting, mac);
         this.persistLastSighting(sighting);
+        this.maybeRecordWhereItWasHeard(sighting);
+    }
+
+    /**
+     * Writes where this phone was when it heard the tag, if that is worth keeping.
+     *
+     * <p><b>Unthrottled here on purpose.</b> Two things already limit it: the fix comes from a
+     * cache that only asks the platform once a minute, and
+     * {@code BeaconRepository#recordLocalSighting} drops anything that has not moved 25 metres or
+     * waited a quarter of an hour. Adding a third rule here would only make the real one harder
+     * to find.
+     *
+     * <p>Silent when there is no fix. A phone indoors with no recent location has nothing to say
+     * about where the tag is, and a report at a guessed position is worse than no report.
+     */
+    private void maybeRecordWhereItWasHeard(final NearbyTagSighting sighting) {
+        if (this.phoneLocation == null) {
+            return;
+        }
+
+        final PhoneLocation.Fix fix = this.phoneLocation.lastKnown();
+        if (fix == null) {
+            return;
+        }
+
+        this.beaconRepo.recordLocalSighting(
+                        sighting.getBeaconId(), fix.getLatitude(), fix.getLongitude(),
+                        Math.round(fix.getAccuracyMetres()), sighting.getStatusByte(),
+                        sighting.getSeenAtMs())
+                .subscribe(written -> {
+                    if (written.isPresent() && this.localPositionListener != null) {
+                        this.localPositionListener.onWritten(
+                                sighting.getBeaconId(), written.get());
+                    }
+                }, error -> Log.w(TAG,
+                        "Could not record where beaconId=" + sighting.getBeaconId()
+                                + " was heard", error));
     }
 
     /**
