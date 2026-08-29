@@ -1090,6 +1090,23 @@ _MAC_CANDIDATE_MARGIN = timedelta(hours=48)
 _MAC_CANDIDATE_MAX_INDICES = 1000
 
 
+def _reportDerivationCost(width, derived, started):
+    """Says what deriving a candidate window actually cost, in indices and in seconds.
+
+    This is the one expensive call in the BLE path and the only one whose price scales with
+    how stale an alignment is, so how far a search can be widened before it stops being
+    affordable is a question about this number. It was answered with adjectives for a long
+    time - "several times slower under Chaquopy" - which is not a number anybody can size a
+    background task with. Printed per index rebuild rather than per sighting, which is rare
+    enough to be free and often enough to catch a device that is far slower than the desktop.
+    """
+    elapsed = time.perf_counter() - started
+    count = 0 if derived is None else len(derived)
+    per_thousand = (elapsed / width * 1000) if width else 0.0
+    print(f"Derived {count} candidate address(es) over {width} index/indices "
+          f"in {elapsed:.2f}s ({per_thousand:.2f}s per 1000)")
+
+
 def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
     """
     The BLE MAC address(es) this accessory might currently be advertising, each with its index.
@@ -1119,6 +1136,7 @@ def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
         accessory = accessoryFromJson(accessoryJson)
 
         now = datetime.now(timezone.utc)
+        started = time.perf_counter()
         width = _isAlignmentWide(
             accessory, now - _MAC_CANDIDATE_MARGIN, now + _MAC_CANDIDATE_MARGIN)
 
@@ -1134,12 +1152,16 @@ def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
             print(f"Candidate window is {width} indices wide; deriving only the newest "
                   f"{_MAC_CANDIDATE_MAX_INDICES} ({bottom}..{top}), which is what a running "
                   f"accessory can plausibly be advertising.")
-            return {
+            derived = {
                 key.mac_address: index
                 for index, key in accessory.keys_between(max(0, bottom), top)
             }
+            _reportDerivationCost(_MAC_CANDIDATE_MAX_INDICES, derived, started)
+            return derived
 
-        return accessory.current_mac_addresses(margin=_MAC_CANDIDATE_MARGIN)
+        derived = accessory.current_mac_addresses(margin=_MAC_CANDIDATE_MARGIN)
+        _reportDerivationCost(width, derived, started)
+        return derived
     except Exception:
         print(f"currentMacAddresses failed: {traceback.format_exc()}")
         return None
