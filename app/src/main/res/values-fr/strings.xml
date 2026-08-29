@@ -325,4 +325,8 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="ring_status_connecting">Connexion…</string>
     <string name="ring_status_triggering">Envoi…</string>
     <string name="ring_status_success">Sonne !</string>
+    <string name="icloud_membership_unreadable_title">Reconnectez votre compte Apple</string>
+    <string name="icloud_membership_unreadable_message">Cette application a une connexion à votre compte Apple enregistrée, mais ne parvient plus à la lire. Les clés nécessaires sont conservées dans le stockage sécurisé de cet appareil et ne peuvent pas être récupérées : la connexion doit donc être refaite.
+
+Vos tags et leur historique de position ne sont pas touchés, et rien n’a été supprimé de votre compte Apple.</string>
 </resources>
