@@ -329,4 +329,6 @@
     <string name="icloud_membership_unreadable_message">このアプリには Apple アカウントとの接続が保存されていますが、読み取れなくなりました。必要な鍵はこの端末の安全な保管領域にあり、復元できません。そのため接続をやり直す必要があります。
 
 タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
+    <string name="error_report_cause_membership_unreadable">保存された Apple アカウント接続を復号できませんでした。鍵は残っています</string>
+    <string name="error_report_body_membership">Apple アカウントへの接続はこの端末に保存されていて、それを開く鍵も残っているのに、開けなくなりました。本来ありえないことです。\n\nそのため、設定し直すだけでなく報告する価値があります。タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
 </resources>
