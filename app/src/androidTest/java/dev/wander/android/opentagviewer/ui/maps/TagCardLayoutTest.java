@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -474,6 +475,73 @@ public class TagCardLayoutTest {
      * <p>Ring is included alongside the other three - see
      * {@code dev.wander.android.opentagviewer.ble} for what is behind it now.
      */
+    /**
+     * <b>The four actions are evenly spaced across the row.</b>
+     *
+     * <p>They are laid out with {@code layout_weight="1"} apiece, which makes them equal in
+     * <i>width</i> and says nothing about where they sit: the margins between them are what puts
+     * them on an even pitch, and one container missing a pair of them shifts every gap around it
+     * without changing any width. Ring shipped without its 8dp margins, which pushed the first
+     * gap 8dp wider than the other two - visible on a phone as Location History sitting too far
+     * from Refresh, and invisible to
+     * {@link #everyActionOnTheCardStillHasRoomWithTheWorstContent}, which asks about sizes.
+     *
+     * <p>Measured between the centres of the icons rather than the containers, because the icon
+     * is the thing a person's eye lines up.
+     *
+     * <p><b>The tolerance is in dp, and it is the difference between a test and a nuisance.</b>
+     * Four weighted columns rarely divide a card width exactly, so neighbouring gaps land a
+     * pixel or two apart - measured at 243 and 245 here - and a 1px tolerance fails on that
+     * while proving nothing. A missing margin is 8dp, which is four times this threshold at any
+     * density, so the gap between "rounding" and "the bug" is wide and this sits in it.
+     */
+    @Test
+    public void theFourActionsAreEvenlySpacedAcrossTheRow() {
+        final int[] centres = new int[4];
+        final int[] iconIds = {
+                R.id.history_icon,
+                R.id.refresh_icon,
+                R.id.perform_ring_icon,
+                R.id.tag_more_icon,
+        };
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            final int width = cardWidthFor(SCREEN_WIDTH_PX);
+            card.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            card.layout(0, 0, width, card.getMeasuredHeight());
+
+            for (int i = 0; i < iconIds.length; i++) {
+                final View icon = card.findViewById(iconIds[i]);
+
+                // **Offsets within the card, not window coordinates.** This card is inflated
+                // with no parent and never attached, so getLocationInWindow has no window to
+                // answer about and reports positions that are all but identical - which came
+                // out as negative gaps rather than as an obvious "this measured nothing".
+                final Rect bounds = new Rect(0, 0, icon.getWidth(), icon.getHeight());
+                card.offsetDescendantRectToMyCoords(icon, bounds);
+                centres[i] = bounds.centerX();
+            }
+        });
+
+        final float density = this.context.getResources().getDisplayMetrics().density;
+        final int roundingSlackPx = Math.round(2 * density);
+
+        final int firstGap = centres[1] - centres[0];
+        for (int i = 1; i < centres.length - 1; i++) {
+            final int gap = centres[i + 1] - centres[i];
+            assertTrue("the gap between action " + i + " and " + (i + 1) + " is " + gap
+                            + "px, but the first gap is " + firstGap + "px - the row is not on an"
+                            + " even pitch, which usually means one container is missing the 8dp"
+                            + " margins the others have",
+                    Math.abs(gap - firstGap) <= roundingSlackPx);
+        }
+    }
+
     @Test
     public void everyActionOnTheCardStillHasRoomWithTheWorstContent() {
         final int[][] sizes = new int[4][2];
