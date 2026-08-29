@@ -1090,6 +1090,12 @@ _MAC_CANDIDATE_MARGIN = timedelta(hours=48)
 _MAC_CANDIDATE_MAX_INDICES = 1000
 
 
+#: What `addressesBetween` reports instead of an index it cannot vouch for. Not None, because
+#: the mapping crosses to Java as a plain map and a null value there is indistinguishable from
+#: an address that was never derived at all.
+_INDEX_UNKNOWN = -1
+
+
 def candidateWindow(accessoryJson: str):
     """The key index range worth scanning for this accessory right now, without deriving it.
 
@@ -1133,14 +1139,18 @@ def addressesBetween(accessoryJson: str, lo: int, hi: int):
     range into pieces and joining the results yields exactly the same set as asking for it
     whole, which is what lets a caller widen its search a piece at a time.
 
-    **The index attached to an address is not pure, and must not be treated as though it
-    were.** `keys_between` de-duplicates, and a secondary key covers 96 consecutive primary
-    indices, so it is reported at the first index the *call's own* range happens to reach:
-    ask for 19100..19160 and it comes back at 19100, ask for 19131..19160 and the same address
-    comes back at 19131. Primary keys occur at exactly one index and do not move. This costs
-    nothing downstream because a secondary match is already only a hint - `recordAccessorySeen`
-    verifies it and refuses to align on one - but a caller that stored the pair and later
-    trusted the index as exact would be trusting an artefact of where it started looking.
+    **A secondary key's index is reported as -1 rather than as a number that would be
+    believed.** `keys_between` de-duplicates, and a secondary key covers 96 consecutive primary
+    indices, so it comes back at the first index the *call's own* range happens to reach: ask
+    for 19100..19160 and it is 19100, ask for 19131..19160 and the same address is 19131. That
+    is an artefact of where the search started, not a fact about the tag, and a caller storing
+    it would later read it as exact. A primary key occurs at exactly one index and does not
+    move, so its index is given as it is.
+
+    That distinction is what lets an address kept from an earlier, wider derivation still repair
+    an alignment months out of step: the sighting arrives with an exact index, and
+    `recordAccessorySeen` confirms it with three derivations instead of searching a window that,
+    by definition, does not contain it.
 
     Deliberately takes the range rather than working it out. A caller widening its search a
     piece at a time needs to say which piece, and a function that decided for itself could not
@@ -1156,7 +1166,7 @@ def addressesBetween(accessoryJson: str, lo: int, hi: int):
 
         started = time.perf_counter()
         derived = {
-            key.mac_address: index
+            key.mac_address: (index if key.key_type == KeyPairType.PRIMARY else _INDEX_UNKNOWN)
             for index, key in accessory.keys_between(max(0, lo), hi)
         }
         _reportDerivationCost(hi - max(0, lo) + 1, derived, started)

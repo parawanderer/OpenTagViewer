@@ -62,14 +62,32 @@ public class DerivedAddressStoreTest {
                 held.getAddresses().keySet());
     }
 
+    /** A primary key sits at one index forever, so its hint survives the round trip. */
+    @Test
+    public void aKnownIndexComesBackExactly() {
+        final DerivedAddressStore store = this.store();
+
+        final Map<String, Integer> known = new HashMap<>();
+        known.put("AA:BB:CC:DD:EE:01", 7_412);
+        store.save(BEACON, 0, 10_000, known);
+
+        final DerivedAddressStore.Derived held = store.load(BEACON);
+
+        assertNotNull(held);
+        assertEquals(Integer.valueOf(7_412), held.getAddresses().get("AA:BB:CC:DD:EE:01"));
+    }
+
     /**
-     * The index is deliberately dropped, so it must read back as absent rather than as some
-     * plausible-looking number a caller might trust. See {@link DerivedAddressStore}.
+     * An index that meant nothing when it was written must read back as absent rather than as
+     * some plausible-looking number a caller might trust. See {@link DerivedAddressStore}.
      */
     @Test
-    public void theIndexIsNotKeptAndReadsBackAsUnknown() {
+    public void anUnknownIndexReadsBackAsNoHint() {
         final DerivedAddressStore store = this.store();
-        store.save(BEACON, 0, 10, addresses("AA:BB:CC:DD:EE:01"));
+
+        final Map<String, Integer> unknown = new HashMap<>();
+        unknown.put("AA:BB:CC:DD:EE:01", null);
+        store.save(BEACON, 0, 10, unknown);
 
         final DerivedAddressStore.Derived held = store.load(BEACON);
 

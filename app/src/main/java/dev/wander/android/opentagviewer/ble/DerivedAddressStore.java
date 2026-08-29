@@ -30,14 +30,15 @@ import java.util.Set;
  * itself, which is exactly when the index was being rebuilt. Paying it once per tag instead of
  * once per launch is what makes a range wide enough for a long-missing tag affordable at all.
  *
- * <p><b>What is deliberately not kept: the index each address was derived at.</b> That number is
- * not stable. A secondary key is reported at whatever index the deriving call's own range began
- * at, so the same address comes back against a different index depending on how the range
- * happened to be split. Storing it would preserve an artefact of how the work was divided rather
- * than a fact about the tag. The index is still useful as a hint, so it stays in memory for the
- * window derived this session and is simply absent for addresses recovered from the file. A
- * missing hint costs one wide check inside Python, which is what every check cost before hints
- * existed.
+ * <p><b>The index is kept for primary keys and dropped for secondary ones.</b> A primary key
+ * occurs at exactly one index and stays there, so it is worth keeping: an address recovered from
+ * this file arrives with an exact hint, and confirming an alignment then costs three key
+ * derivations rather than a search of a 48 hour window - measured at 0.02 seconds against about
+ * one. A secondary key is different. It covers 96 consecutive indices and is reported at whatever
+ * index the deriving call's own range began at, so the same address comes back against a
+ * different number depending on how the work was split. That is an artefact of the split rather
+ * than a fact about the tag, so it is stored as unknown and read back as no hint at all, which
+ * costs the wide check that every check cost before hints existed.
  *
  * <p>A cache in the file sense too: losing it costs time and never correctness, so it lives in
  * the app's files directory rather than in the database, and may be deleted at any point.
@@ -46,7 +47,16 @@ public final class DerivedAddressStore {
     private static final String TAG = DerivedAddressStore.class.getSimpleName();
 
     /** Bumped when the layout below changes, so an older file is discarded rather than misread. */
-    private static final int FORMAT_VERSION = 1;
+    private static final int FORMAT_VERSION = 2;
+
+    /**
+     * The stored index for an address whose index means nothing.
+     *
+     * <p>Matches {@code main._INDEX_UNKNOWN}. A secondary key is reported at whatever index the
+     * deriving call's range began at, so it is not a fact about the tag and must not be read
+     * back as one.
+     */
+    private static final int INDEX_UNKNOWN = -1;
 
     private static final String DIRECTORY = "derived-addresses";
 
@@ -78,7 +88,7 @@ public final class DerivedAddressStore {
             return this.hi;
         }
 
-        /** Address to the index it was derived at, where that is known, and null where it is not. */
+        /** Address to the index it was derived at, or null where that index means nothing. */
         public Map<String, Integer> getAddresses() {
             return this.addresses;
         }
@@ -117,7 +127,8 @@ public final class DerivedAddressStore {
             final byte[] mac = new byte[6];
             for (int i = 0; i < count; i++) {
                 in.readFully(mac);
-                addresses.put(formatMac(mac), null);
+                final int index = in.readInt();
+                addresses.put(formatMac(mac), index == INDEX_UNKNOWN ? null : index);
             }
 
             return new Derived(lo, hi, addresses);
@@ -153,10 +164,11 @@ public final class DerivedAddressStore {
             out.writeInt(hi);
             out.writeInt(addresses.size());
 
-            for (final String address : addresses.keySet()) {
-                final byte[] mac = parseMac(address);
+            for (final Map.Entry<String, Integer> entry : addresses.entrySet()) {
+                final byte[] mac = parseMac(entry.getKey());
                 if (mac != null) {
                     out.write(mac);
+                    out.writeInt(entry.getValue() == null ? INDEX_UNKNOWN : entry.getValue());
                 }
             }
         } catch (final IOException couldNotWrite) {
