@@ -111,6 +111,17 @@ public class NearbyTagWatcher {
     private final AtomicBoolean indexRebuildInFlight = new AtomicBoolean(false);
 
     /**
+     * Where derived addresses are kept between launches, once a scan has supplied a context.
+     *
+     * <p>Set in {@link #watch} rather than injected, because it needs the app's files directory
+     * and this class is constructed by screens and a service that have no reason to know about
+     * one. Null until then, which is what the JVM tests run against: they exercise the matching,
+     * and a test that has no filesystem should derive rather than persist.
+     */
+    @Nullable
+    private volatile DerivedAddressStore derivedAddresses;
+
+    /**
      * How hard the radio listens.
      *
      * <p>{@code SCAN_MODE_BALANCED} for a screen, {@code SCAN_MODE_LOW_POWER} for the service.
@@ -178,8 +189,15 @@ public class NearbyTagWatcher {
 
             // Blocking, one interpreter start per tag - hence subscribeOn(io) below, and hence
             // the index rather than resolving per scan result. See NearbyTagIndex.
+            if (this.derivedAddresses == null) {
+                this.derivedAddresses =
+                        new DerivedAddressStore(context.getApplicationContext().getFilesDir());
+            }
+            this.derivedAddresses.forgetAllExcept(accessoryJsonByBeaconId.keySet());
+
             if (this.index.isStale(this.clock.nowMs())) {
-                this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs());
+                this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs(),
+                        this.derivedAddresses);
                 Log.d(TAG, "Watching " + this.index.size() + " candidate address(es) for "
                         + accessoryJsonByBeaconId.size() + " tag(s)");
             }
@@ -306,7 +324,8 @@ public class NearbyTagWatcher {
         }
         Schedulers.io().scheduleDirect(() -> {
             try {
-                this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs());
+                this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs(),
+                        this.derivedAddresses);
                 Log.d(TAG, "Rebuilt the nearby index mid-watch: " + this.index.size()
                         + " candidate address(es) for " + accessoryJsonByBeaconId.size()
                         + " tag(s)");

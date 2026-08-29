@@ -186,8 +186,8 @@ public class NearbyTagIndexTest {
         final NearbyTagIndex index = new NearbyTagIndex();
         index.rebuild(Map.of(KEYS, "j"), resolverFor(Map.of("j", byMac)), 0L);
 
-        assertEquals(6221, index.matchFor("AA:AA:AA:AA:AA:01").getKeyIndex());
-        assertEquals(6222, index.matchFor("AA:AA:AA:AA:AA:02").getKeyIndex());
+        assertEquals(Integer.valueOf(6221), index.matchFor("AA:AA:AA:AA:AA:01").getKeyIndex());
+        assertEquals(Integer.valueOf(6222), index.matchFor("AA:AA:AA:AA:AA:02").getKeyIndex());
     }
 
     @Test
