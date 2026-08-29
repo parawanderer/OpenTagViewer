@@ -102,7 +102,12 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
 
             final Map<String, Integer> derived = new HashMap<>();
             for (final Map.Entry<PyObject, PyObject> entry : returned.asMap().entrySet()) {
-                derived.put(entry.getKey().toString(), entry.getValue().toInt());
+                final int index = entry.getValue().toInt();
+                // Python reports a secondary key's index as -1, because the number it would
+                // otherwise give is where the search began rather than where the tag is. Carried
+                // on as no hint at all: a wrong hint costs a check that fails and then the wide
+                // search anyway, which is strictly worse than not guessing.
+                derived.put(entry.getKey().toString(), index < 0 ? null : index);
             }
             return derived;
         } catch (final Exception e) {

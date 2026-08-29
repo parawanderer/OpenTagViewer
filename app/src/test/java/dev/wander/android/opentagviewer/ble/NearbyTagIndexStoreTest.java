@@ -165,7 +165,10 @@ public class NearbyTagIndexStoreTest {
 
         assertNotNull("an address derived hours ago must still be matched", match);
         assertEquals(BEACON, match.getBeaconId());
-        assertNull("the stored index is not kept, so there is no hint", match.getKeyIndex());
+        // A primary key sits at one index forever, so the stored index is an exact hint. That
+        // is what lets a tag found this way confirm its alignment with three derivations
+        // instead of a search of a window that, by definition, does not contain it.
+        assertEquals(Integer.valueOf(450), match.getKeyIndex());
     }
 
     @Test

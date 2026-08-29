@@ -1604,7 +1604,9 @@ def test_addresses_between_covers_exactly_the_requested_range():
 
     assert derived is not None
     assert derived
-    assert set(derived.values()) <= set(range(19100, 19151))
+    # -1 for the secondary keys, whose index would be an artefact of where the range began.
+    assert set(derived.values()) <= set(range(19100, 19151)) | {main._INDEX_UNKNOWN}
+    assert any(index != main._INDEX_UNKNOWN for index in derived.values())
 
 
 def test_addresses_between_is_stable_across_calls():
@@ -1636,24 +1638,43 @@ def test_addresses_between_pieces_join_up_into_the_whole_set():
     assert set(joined) == set(whole)
 
 
-def test_a_secondary_key_is_reported_at_wherever_the_range_started():
+def test_a_secondary_key_reports_no_index_rather_than_a_moving_one():
     """The address set is pure; the index attached to it is not, for secondary keys.
 
-    A secondary key covers 96 primary indices and `keys_between` de-duplicates, so it is
-    reported at the first index the call's own range reaches. Asserted rather than merely
-    documented because a caller storing the pair and later trusting the index as exact would
-    be trusting an artefact of where it started looking - see `addressesBetween`.
+    A secondary key covers 96 primary indices and `keys_between` de-duplicates, so it would
+    otherwise be reported at the first index the call's own range reaches - 19100 when asked
+    for 19100..19160 and 19131 for the same address when asked for 19131..19160. That is where
+    the search started, not a fact about the tag, so it is reported as unknown instead. Pinned
+    down because a caller that stored such a pair would later read it as exact.
     """
     accessory = json.dumps(_freshly_aligned_accessory())
 
     whole = main.addressesBetween(accessory, 19100, 19160)
     upper = main.addressesBetween(accessory, 19131, 19160)
 
-    moved = {mac for mac in set(whole) & set(upper) if whole[mac] != upper[mac]}
+    unknown = {mac for mac, index in whole.items() if index == main._INDEX_UNKNOWN}
 
-    assert moved, "expected at least one secondary key to be re-attributed"
-    for mac in moved:
-        assert whole[mac] < 19131 <= upper[mac]
+    assert unknown, "expected at least one secondary key in this range"
+
+    # Every index that is reported at all agrees between the two calls, which is what makes it
+    # safe to keep. The ones that would have disagreed are exactly the ones reported as unknown.
+    for mac in set(whole) & set(upper):
+        if whole[mac] != main._INDEX_UNKNOWN and upper[mac] != main._INDEX_UNKNOWN:
+            assert whole[mac] == upper[mac]
+
+
+def test_a_primary_key_index_survives_the_range_being_split():
+    """The property the stored hint rests on: a primary key sits at one index and stays there."""
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    lower = main.addressesBetween(accessory, 19100, 19130)
+
+    known = {mac: index for mac, index in lower.items() if index != main._INDEX_UNKNOWN}
+
+    assert known
+    for mac, index in known.items():
+        assert whole[mac] == index
 
 
 def test_addresses_between_refuses_nothing_for_an_empty_range():
