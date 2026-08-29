@@ -329,4 +329,6 @@
     <string name="icloud_membership_unreadable_message">本應用程式儲存了與你的 Apple 帳戶的連線，但已無法讀取。所需的金鑰保存在本裝置的安全儲存空間中，且無法復原，因此必須重新建立連線。
 
 你的標籤與其位置紀錄不受影響，Apple 帳戶中也沒有任何內容被移除。</string>
+    <string name="error_report_cause_membership_unreadable">已儲存的 Apple 帳戶連線無法解密，但其金鑰仍然存在</string>
+    <string name="error_report_body_membership">與你的 Apple 帳戶的連線就儲存在本裝置上，解開它的金鑰也還在，卻打不開了——這本不該發生。\n\n因此這值得回報，而不只是重做一次。你的標籤與其位置紀錄不受影響，Apple 帳戶中也沒有任何內容被移除。</string>
 </resources>

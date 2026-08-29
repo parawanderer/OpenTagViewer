@@ -329,4 +329,6 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="icloud_membership_unreadable_message">Cette application a une connexion à votre compte Apple enregistrée, mais ne parvient plus à la lire. Les clés nécessaires sont conservées dans le stockage sécurisé de cet appareil et ne peuvent pas être récupérées : la connexion doit donc être refaite.
 
 Vos tags et leur historique de position ne sont pas touchés, et rien n’a été supprimé de votre compte Apple.</string>
+    <string name="error_report_cause_membership_unreadable">La connexion au compte Apple enregistrée n’a pas pu être déchiffrée, bien que sa clé soit toujours présente</string>
+    <string name="error_report_body_membership">La connexion à votre compte Apple est enregistrée sur cet appareil, la clé qui l’ouvre est toujours là, et elle ne s’ouvre plus : cela ne devrait pas être possible.\n\nCela vaut donc la peine d’être signalé plutôt que simplement refait. Vos tags et leur historique de position ne sont pas touchés, et rien n’a été supprimé de votre compte Apple.</string>
 </resources>

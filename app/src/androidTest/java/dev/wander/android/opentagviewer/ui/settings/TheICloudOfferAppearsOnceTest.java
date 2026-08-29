@@ -40,6 +40,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
@@ -285,9 +286,10 @@ public class TheICloudOfferAppearsOnceTest {
      * except a Settings item they have no reason to open.
      */
     @Test
-    public void anUnreadableConnectionAsksThemToReconnectRatherThanOfferingSetup() {
+    public void aConnectionWhoseKeyHasGoneAsksThemToReconnect() {
         this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
-        this.givenAStoredMembershipThatCannotBeRead();
+        this.givenAConnection();
+        this.andThenItsKeystoreKeyDisappears();
 
         this.openTheMap();
 
@@ -299,18 +301,65 @@ public class TheICloudOfferAppearsOnceTest {
     }
 
     /**
-     * Bytes under the membership key that are not a ciphertext this app can open.
+     * <b>And the same situation with the key still present is a bug, so it offers a report.</b>
      *
-     * <p>Written straight into the store rather than through {@code store()}, because the point
-     * is a value that decryption fails on - which is what a rotated or lost keystore key leaves
-     * behind, and there is no way to ask the real writer to produce one.
+     * <p>The distinction @parawanderer asked for. A key that has gone is somebody's device - an
+     * OS upgrade, a wiped keystore, a transfer tool that copied app data and could not copy
+     * keystore keys - and the useful thing to say is "connect it again". A key that is right
+     * there and still does not open the data is not explainable by any of that, so an
+     * explanation would be an apology for something the user cannot act on, and the report is
+     * what is actually worth offering.
      */
-    private void givenAStoredMembershipThatCannotBeRead() {
+    @Test
+    public void aConnectionThatWillNotOpenWithItsOwnKeyOffersABugReport() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+        this.givenAConnection();
+        this.butItsStoredBytesAreDamaged();
+
+        this.openTheMap();
+
+        Eventually.check(() -> intended(hasComponent(ErrorReportActivity.class.getName())));
+
+        assertFalse("a fault must not spend the one-time offer either",
+                this.theOfferHasBeenMade());
+    }
+
+    /** A real membership, written through the real writer, so the ciphertext is genuine. */
+    private void givenAConnection() {
+        this.memberships.store(new KeychainMembership(
+                "{\"peer\":\"invented\"}", "entropy", "PASS-CODE-HERE", "This phone", 1))
+                .blockingAwait();
+    }
+
+    /**
+     * Take the keystore key away and leave the data behind.
+     *
+     * <p>Deleted rather than corrupted, because that is the actual shape of the situation: the
+     * keystore and this app's files have different lifetimes, and it is always the key that
+     * goes. Done explicitly rather than by writing junk and hoping the alias happens not to
+     * exist - an earlier test in the run may well have created it, which would make this assert
+     * the opposite case by accident.
+     */
+    private void andThenItsKeystoreKeyDisappears() {
+        try {
+            final java.security.KeyStore keyStore =
+                    java.security.KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+            keyStore.deleteEntry(
+                    dev.wander.android.opentagviewer.AppKeyStoreConstants.KEYSTORE_ALIAS_KEYCHAIN);
+        } catch (final Exception e) {
+            throw new IllegalStateException("could not take the keystore key away", e);
+        }
+    }
+
+    /** Keep the key, ruin the ciphertext: the combination that should not be possible. */
+    private void butItsStoredBytesAreDamaged() {
         UserAuthDataStore.getInstance(this.context).updateDataAsync(preferences -> {
             final androidx.datastore.preferences.core.MutablePreferences mutable =
                     preferences.toMutablePreferences();
-            mutable.set(dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore
-                    .KEYCHAIN_MEMBERSHIP, new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
+            mutable.set(UserAuthDataStore.KEYCHAIN_MEMBERSHIP,
+                    new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32});
             return io.reactivex.rxjava3.core.Single.just(mutable);
         }).blockingGet();
     }
