@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.python;
 
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
@@ -52,6 +54,59 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
             // Either Python has not started, or the accessory JSON could not be read. Neither
             // is worth failing the caller over: it reads as "nothing to match against yet".
             Log.w(TAG, "currentMacAddresses failed", e);
+            return Collections.emptyMap();
+        }
+    }
+
+    @Override
+    @Nullable
+    public IndexRange candidateWindow(final String accessoryJson) {
+        if (accessoryJson == null || accessoryJson.isEmpty()) {
+            return null;
+        }
+
+        try {
+            final var module = Python.getInstance().getModule(MODULE_MAIN);
+            final PyObject returned = module.callAttr("candidateWindow", accessoryJson);
+
+            if (returned == null) {
+                return null;
+            }
+
+            final Map<PyObject, PyObject> window = returned.asMap();
+            return new IndexRange(
+                    window.get(PyObject.fromJava("lo")).toInt(),
+                    window.get(PyObject.fromJava("hi")).toInt());
+        } catch (final Exception e) {
+            Log.w(TAG, "candidateWindow failed", e);
+            return null;
+        }
+    }
+
+    @Override
+    public Map<String, Integer> addressesBetween(
+            final String accessoryJson, final int lo, final int hi) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || hi < lo) {
+            return Collections.emptyMap();
+        }
+
+        try {
+            final var module = Python.getInstance().getModule(MODULE_MAIN);
+            final PyObject returned =
+                    module.callAttr("addressesBetween", accessoryJson, lo, hi);
+
+            if (returned == null) {
+                Log.w(TAG, "addressesBetween returned None (check python logs for details)");
+                return Collections.emptyMap();
+            }
+
+            final Map<String, Integer> derived = new HashMap<>();
+            for (final Map.Entry<PyObject, PyObject> entry : returned.asMap().entrySet()) {
+                derived.put(entry.getKey().toString(), entry.getValue().toInt());
+            }
+            return derived;
+        } catch (final Exception e) {
+            Log.w(TAG, "addressesBetween failed", e);
             return Collections.emptyMap();
         }
     }

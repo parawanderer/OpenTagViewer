@@ -62,9 +62,18 @@ public final class NearbyTagIndex {
      */
     public static final class Match {
         private final String beaconId;
-        private final int keyIndex;
+        /**
+         * Where this address came from, or null when that is not known.
+         *
+         * <p>Null for an address read back from {@link DerivedAddressStore}: the index a
+         * secondary key is reported at depends on where the deriving range began, so it is an
+         * artefact of how the work was split rather than a fact worth keeping. It travels on as
+         * a hint, and a missing hint simply costs Python one wide check.
+         */
+        @Nullable
+        private final Integer keyIndex;
 
-        Match(final String beaconId, final int keyIndex) {
+        Match(final String beaconId, @Nullable final Integer keyIndex) {
             this.beaconId = beaconId;
             this.keyIndex = keyIndex;
         }
@@ -73,7 +82,8 @@ public final class NearbyTagIndex {
             return this.beaconId;
         }
 
-        public int getKeyIndex() {
+        @Nullable
+        public Integer getKeyIndex() {
             return this.keyIndex;
         }
     }
@@ -99,12 +109,30 @@ public final class NearbyTagIndex {
             final Map<String, String> accessoryJsonByBeaconId,
             final AccessoryMacResolver resolver,
             final long nowMs) {
+        this.rebuild(accessoryJsonByBeaconId, resolver, nowMs, null);
+    }
+
+    /**
+     * As {@link #rebuild(Map, AccessoryMacResolver, long)}, keeping what it derives in {@code
+     * store} and deriving only what is missing from it.
+     *
+     * @param store where derived addresses are kept across launches, or null to derive
+     *              everything every time, which is what a test without a filesystem wants.
+     */
+    public void rebuild(
+            final Map<String, String> accessoryJsonByBeaconId,
+            final AccessoryMacResolver resolver,
+            final long nowMs,
+            @Nullable final DerivedAddressStore store) {
         final Map<String, Match> rebuilt = new HashMap<>();
 
         for (final Map.Entry<String, String> entry : accessoryJsonByBeaconId.entrySet()) {
             // Only the address is wanted here; the key index each maps to is not this class's
             // business - see AccessoryMacResolver#recordSeen on why only Python may act on it.
-            final Map<String, Integer> candidates = resolver.currentMacAddresses(entry.getValue());
+            final Map<String, Integer> candidates =
+                    store == null
+                            ? resolver.currentMacAddresses(entry.getValue())
+                            : addressesFor(entry.getKey(), entry.getValue(), resolver, store);
 
             // **Null is a documented answer, not a broken one, and it must not stop the loop.**
             // The interface permits it for an accessory the resolver cannot read, and for one
@@ -122,7 +150,9 @@ public final class NearbyTagIndex {
             }
 
             for (final Map.Entry<String, Integer> candidate : candidates.entrySet()) {
-                if (candidate.getKey() != null && candidate.getValue() != null) {
+                // A null value is an address whose index is not known, which is ordinary for one
+                // recovered from the store. Only a null address is useless.
+                if (candidate.getKey() != null) {
                     // Upper-cased on the way in so lookups need no normalisation per scan
                     // result, which is the hot path. Android reports uppercase and FindMy.py
                     // produces uppercase, but neither promises it forever.
@@ -135,6 +165,81 @@ public final class NearbyTagIndex {
         // Swapped whole, not mutated in place - see the class doc on the reader thread.
         this.matchByMac = rebuilt;
         this.builtAtMs = nowMs;
+    }
+
+    /**
+     * How wide a stored range is allowed to grow before it is started over.
+     *
+     * <p>The window creeps upward with the clock, about a hundred indices a day, so the union of
+     * everything ever derived grows without limit for a tag that is kept for years. At this width
+     * it is roughly a year of history and a few megabytes; past it, the oldest part is certainly
+     * dead and is not worth carrying. Starting over costs one derivation of the current window.
+     */
+    static final int MAX_STORED_INDICES = 40_000;
+
+    /**
+     * The addresses for one tag, derived only where the stored copy does not already have them.
+     *
+     * <p><b>Extended rather than replaced, and only while it stays contiguous.</b> The stored
+     * range and the wanted window normally overlap, because the window moves by one index every
+     * fifteen minutes. When they do not overlap at all the app has not run for a very long time,
+     * and the honest answer is a fresh derivation: recording a range as covered when the middle
+     * of it was never derived would mean silently never looking there again.
+     */
+    private static Map<String, Integer> addressesFor(
+            final String beaconId,
+            final String accessoryJson,
+            final AccessoryMacResolver resolver,
+            final DerivedAddressStore store) {
+
+        final AccessoryMacResolver.IndexRange window = resolver.candidateWindow(accessoryJson);
+        if (window == null || window.width() == 0) {
+            // Unreadable, or an accessory with no rolling keys at all. Ask the way that has
+            // always answered for those, and keep nothing.
+            return resolver.currentMacAddresses(accessoryJson);
+        }
+
+        final DerivedAddressStore.Derived held = store.load(beaconId);
+
+        if (held != null && held.covers(window.getLo(), window.getHi())) {
+            // The whole point: nothing is derived at all, on the launch where deriving is most
+            // expensive because everything else is starting up at the same time.
+            Log.d(TAG, "Reusing " + held.getAddresses().size() + " stored address(es) for"
+                    + " beaconId=" + beaconId + " covering " + held.getLo() + ".." + held.getHi());
+            return held.getAddresses();
+        }
+
+        final boolean extendable = held != null
+                && held.getLo() <= window.getHi() + 1
+                && window.getLo() <= held.getHi() + 1
+                && Math.max(held.getHi(), window.getHi())
+                        - Math.min(held.getLo(), window.getLo()) < MAX_STORED_INDICES;
+
+        final Map<String, Integer> addresses =
+                extendable ? new HashMap<>(held.getAddresses()) : new HashMap<>();
+
+        final int haveLo = extendable ? held.getLo() : Integer.MAX_VALUE;
+        final int haveHi = extendable ? held.getHi() : Integer.MIN_VALUE;
+
+        if (!extendable) {
+            addresses.putAll(resolver.addressesBetween(
+                    accessoryJson, window.getLo(), window.getHi()));
+        } else {
+            if (window.getLo() < haveLo) {
+                addresses.putAll(resolver.addressesBetween(
+                        accessoryJson, window.getLo(), haveLo - 1));
+            }
+            if (window.getHi() > haveHi) {
+                addresses.putAll(resolver.addressesBetween(
+                        accessoryJson, haveHi + 1, window.getHi()));
+            }
+        }
+
+        final int storedLo = extendable ? Math.min(haveLo, window.getLo()) : window.getLo();
+        final int storedHi = extendable ? Math.max(haveHi, window.getHi()) : window.getHi();
+
+        store.save(beaconId, storedLo, storedHi, addresses);
+        return addresses;
     }
 
     /** The tag this address belongs to and the index it came from, or null if it is not ours. */

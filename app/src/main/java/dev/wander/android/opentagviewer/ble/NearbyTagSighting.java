@@ -1,5 +1,7 @@
 package dev.wander.android.opentagviewer.ble;
 
+import androidx.annotation.Nullable;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -34,7 +36,8 @@ public final class NearbyTagSighting {
      * index instead of re-deriving a 48-hour window: three key derivations instead of about
      * 1150.
      */
-    private final int keyIndex;
+    @Nullable
+    private final Integer keyIndex;
 
     /** Signal strength in dBm. Negative; closer to zero is nearer. */
     private final int rssi;

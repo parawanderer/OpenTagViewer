@@ -1,5 +1,7 @@
 package dev.wander.android.opentagviewer.python;
 
+import androidx.annotation.Nullable;
+
 import java.util.Map;
 
 /**
@@ -65,6 +67,67 @@ public interface AccessoryMacResolver {
      * only ever care about the candidate set - keeps compiling. {@link ChaquopyAccessoryMacResolver}
      * overrides it for real.
      */
+    /**
+     * The inclusive key index range worth scanning for this accessory right now, or null if it
+     * cannot be read.
+     *
+     * <p>Separate from {@link #currentMacAddresses} because it costs nothing: it says which part
+     * of the range matters without deriving a single address. A caller that keeps what it
+     * derived last time needs exactly this to work out what it is missing, and not re-deriving
+     * what it already holds is the whole reason for keeping it.
+     *
+     * <p>Defaulted to null so a test double that only cares about candidate addresses keeps
+     * compiling, same as {@link #recordSeen}.
+     */
+    @Nullable
+    default IndexRange candidateWindow(String accessoryJson) {
+        return null;
+    }
+
+    /**
+     * The addresses this accessory can advertise across an inclusive key index range.
+     *
+     * <p>Takes the range rather than choosing one, so a caller widening its search downward can
+     * name the piece below whatever {@link #currentMacAddresses} would have picked.
+     *
+     * <p><b>The address set is stable; the index attached to it is not.</b> A secondary key is
+     * reported at the first index the call's own range reaches, so the same address comes back
+     * against a different index depending on where the range started. Primary keys do not move.
+     * See {@code main.addressesBetween}.
+     */
+    default Map<String, Integer> addressesBetween(String accessoryJson, int lo, int hi) {
+        return Map.of();
+    }
+
+    /** An inclusive range of key indices. */
+    final class IndexRange {
+        private final int lo;
+        private final int hi;
+
+        public IndexRange(final int lo, final int hi) {
+            this.lo = lo;
+            this.hi = hi;
+        }
+
+        public int getLo() {
+            return this.lo;
+        }
+
+        public int getHi() {
+            return this.hi;
+        }
+
+        /** How many indices this covers, which is what the derivation is charged by. */
+        public int width() {
+            return this.hi < this.lo ? 0 : this.hi - this.lo + 1;
+        }
+
+        @Override
+        public String toString() {
+            return this.lo + ".." + this.hi;
+        }
+    }
+
     default String recordSeen(
             String accessoryJson, String mac, long seenAtUnixMs, Integer hintIndex) {
         return null;
