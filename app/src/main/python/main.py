@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any, NamedTuple, cast
 import json
+import os
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -1633,6 +1634,109 @@ def _updateAlignment(accessory: StoredAccessory, report, index):
         print(f"Could not update alignment: {traceback.format_exc()}")
 
 
+def _alignmentOf(accessory: StoredAccessory):
+    """The stored (index, date) pair, or (None, None) for an accessory that has no alignment."""
+    try:
+        mapping = accessory.to_json()
+        return mapping.get("alignment_index"), mapping.get("alignment_date")
+    except Exception:
+        return None, None
+
+
+def _reportDrift(before_index, before_date, after_index, after_date) -> None:
+    """Says how far the extrapolation had run from where the tag turned out to be.
+
+    **The one measurement that settles how wide a search has to be.** Everything about which
+    addresses are worth scanning for rests on extrapolating the stored alignment forward at one
+    index every fifteen minutes, and on that extrapolation staying close to where the tag really
+    is. Nobody has ever measured whether it does. The candidate window, the bounded slice, how
+    far back a search should reach - all of it is currently sized by argument rather than by a
+    number.
+
+    An alignment that moved during a fetch is a real observation: something decrypted, so the new
+    pair says where the tag actually was at a moment. Extrapolating the *old* pair forward to that
+    same moment and subtracting gives the drift, as a signed number of indices, for free, on every
+    fetch that finds anything.
+
+    Positive means the extrapolation had run ahead of the tag, which is the direction that loses
+    it: the search then looks above where the tag is. Around zero over weeks would mean a tag that
+    is merely out of contact stays where the extrapolation says, and a search that widens downward
+    is solving a problem nobody has.
+
+    Compared this way rather than from a report's own index because the ordinary fetch never hands
+    one over: `fetch_location_history(accessory)` updates the alignment inside FindMy.py, so the
+    only place a report's index is visible in this file is the ranged path, which is the rarer
+    half. The before-and-after pair is visible in both.
+    """
+    if None in (before_index, before_date, after_index, after_date):
+        return
+
+    if before_index == after_index and before_date == after_date:
+        # The fetch found nothing to align to. Not a drift of zero, which is why it is not
+        # reported as one: a series full of those would read as a stable extrapolation.
+        return
+
+    try:
+        moved_by = datetime.fromisoformat(after_date) - datetime.fromisoformat(before_date)
+        extrapolated = before_index + int(moved_by // timedelta(minutes=15))
+    except Exception:
+        return
+
+    index = after_index
+
+    line = (f"Alignment drift: report at index {index}, extrapolated {extrapolated}, "
+            f"drift {extrapolated - index} index/indices "
+            f"({(extrapolated - index) / 4:.1f} hours ahead)")
+
+    print(line)
+    _appendDiagnostic(line)
+
+
+#: Where diagnostics are appended, set once by Java. None means logcat only.
+_DIAGNOSTICS_PATH = None
+
+#: Past this the file is halved, oldest first. A drift line is about 110 bytes, so this keeps
+#: something like the last thousand readings - months of fetches, and still nothing to notice.
+_DIAGNOSTICS_MAX_BYTES = 128 * 1024
+
+
+def setDiagnosticsPath(path: str) -> None:
+    """Point diagnostics at a file, so a measurement outlives the logcat ring buffer.
+
+    **Because the alternative was asking somebody to leave a phone plugged in.** The drift
+    measurement is only worth anything as a series over weeks, and logcat on a busy device
+    holds minutes. Java passes a directory it can reach without root - its own external files
+    directory - so the file can be pulled whenever the phone next happens to be connected.
+    """
+    global _DIAGNOSTICS_PATH
+    _DIAGNOSTICS_PATH = os.path.join(path, "diagnostics.log") if path else None
+
+
+def _appendDiagnostic(line: str) -> None:
+    """Adds one timestamped line, halving the file if it has grown past the cap.
+
+    Never raises. A diagnostic that can break the thing it is measuring is worse than no
+    diagnostic, and this sits directly in the fetch path.
+    """
+    path = _DIAGNOSTICS_PATH
+    if not path:
+        return
+
+    try:
+        stamped = f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} {line}\n"
+
+        if os.path.exists(path) and os.path.getsize(path) > _DIAGNOSTICS_MAX_BYTES:
+            with open(path, "r", encoding="utf-8", errors="replace") as existing:
+                kept = existing.readlines()
+            with open(path, "w", encoding="utf-8") as trimmed:
+                trimmed.writelines(kept[len(kept) // 2:])
+
+        with open(path, "a", encoding="utf-8") as out:
+            out.write(stamped)
+    except Exception:
+        print(f"Could not write a diagnostic line: {traceback.format_exc()}")
+
+
 def _serializeReports(reports):
     """
     Map FindMy 0.9.x LocationReport objects to the dict shape Java's mapResults expects.
@@ -1719,6 +1823,7 @@ def getLastReports(
             # Measured before and after, because "found nothing" on its own says nothing.
             # See _DEAD_TAG_WIDTH_INDICES.
             width_before = _isAlignmentWide(airtag, start_dt, now_dt)
+            aligned_before = _alignmentOf(airtag)
 
             # Per-accessory isolation. One beacon failing used to abort the whole call,
             # which meant no beacon's updated alignment was persisted - so every later
@@ -1733,6 +1838,12 @@ def getLastReports(
                 continue
 
             print(f"Got {len(reports)} raw reports for {beaconId}")
+
+            # Measured here because this is the one place both halves are in scope: what the
+            # alignment said before anything was fetched, and what the fetch made of it.
+            aligned_after = _alignmentOf(airtag)
+            _reportDrift(aligned_before[0], aligned_before[1],
+                         aligned_after[0], aligned_after[1])
 
             # A search that stayed as wide as it started found nothing to align to, which is
             # the difference between "no reports in the window asked for" and "no reports at

@@ -106,6 +106,7 @@ import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.python.PythonDiagnostics;
 import dev.wander.android.opentagviewer.python.LogRedactor;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
@@ -499,6 +500,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+        // The fetch this screen is about to run is what produces the drift measurement, so
+        // this is a place that starts Python anyway - see PythonDiagnostics.
+        PythonDiagnostics.attach(this);
+
         this.sightingPersister = new AccessorySightingPersister(this.beaconRepo,
                 new CachedPhoneLocation(new FusedPhoneLocation(this.getApplicationContext())),
                 this::onHeardHere);
