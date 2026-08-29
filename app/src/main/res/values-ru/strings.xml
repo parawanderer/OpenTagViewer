@@ -354,4 +354,8 @@
     <string name="left_behind_seconds_explainer">Сколько метка должна молчать, прежде чем приложение проверит, не забыли ли вы её. Меньше — раньше предупреждение и чаще проверки.</string>
     <string name="left_behind_sound">Звук будильника</string>
     <string name="left_behind_sound_default">Стандартный звук будильника</string>
+    <string name="icloud_membership_unreadable_title">Подключите учётную запись Apple заново</string>
+    <string name="icloud_membership_unreadable_message">Приложение хранит подключение к вашей учётной записи Apple, но больше не может его прочитать. Нужные ключи находятся в защищённом хранилище этого устройства и не подлежат восстановлению — поэтому подключение придётся выполнить заново.
+
+Ваши метки и история их местоположений не затронуты, и из учётной записи Apple ничего не удалено.</string>
 </resources>

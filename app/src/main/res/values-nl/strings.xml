@@ -354,4 +354,8 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="left_behind_seconds_explainer">Hoe lang een tag onhoorbaar moet blijven voordat de app controleert of je hem hebt laten liggen. Korter waarschuwt eerder en controleert vaker.</string>
     <string name="left_behind_sound">Alarmgeluid</string>
     <string name="left_behind_sound_default">Standaard alarmgeluid</string>
+    <string name="icloud_membership_unreadable_title">Verbind je Apple-account opnieuw</string>
+    <string name="icloud_membership_unreadable_message">Deze app heeft een verbinding met je Apple-account opgeslagen, maar kan die niet meer lezen. De benodigde sleutels staan in de beveiligde opslag van dit apparaat en zijn niet te herstellen — de verbinding moet dus opnieuw worden gemaakt.
+
+Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Apple-account verwijderd.</string>
 </resources>

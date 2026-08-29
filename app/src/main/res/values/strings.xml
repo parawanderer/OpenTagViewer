@@ -387,4 +387,8 @@ You can set this up now, or any time later from Settings.</string>
     <string name="left_behind_seconds_explainer">How long a tag has to go unheard before the app checks whether you have left it behind. Shorter catches you sooner and checks more often.</string>
     <string name="left_behind_sound">Alarm sound</string>
     <string name="left_behind_sound_default">Default alarm sound</string>
+    <string name="icloud_membership_unreadable_title">Reconnect your Apple account</string>
+    <string name="icloud_membership_unreadable_message">This app has a connection to your Apple account saved, but can no longer read it. The keys it needs are kept in this device\'s secure storage, and they cannot be recovered — so the connection has to be made again.
+
+Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
 </resources>

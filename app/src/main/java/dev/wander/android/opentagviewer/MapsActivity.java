@@ -22,6 +22,7 @@ import androidx.core.view.WindowCompat;
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.app.Dialog;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.location.Address;
@@ -2002,30 +2003,101 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         var async = new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(this.getApplicationContext()),
                 new AppCryptographyUtil())
-                .get()
+                .state()
                 .firstOrError()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        held -> ICloudSetupOfferDialog.offerIfDue(
-                                this, this.userSettings, held.isPresent(), this::recordICloudOffer),
+                        state -> this.respondToTheMembershipState(state),
                         error -> Log.w(TAG,
                                 "Could not tell whether an account is linked, so not offering"
                                         + " to connect one", error));
     }
 
-    /** Persist the answer, and act on it if they said yes. */
-    private void recordICloudOffer(final boolean accepted) {
-        var async = this.userSettingsRepo.storeUserSettings(this.userSettings)
+    /**
+     * Three situations, and only one of them is the first-time offer.
+     *
+     * <p><b>An account that was connected and can no longer be read is not a new user.</b> The
+     * membership read used to collapse "never joined" and "joined but undecryptable" into the
+     * same empty answer, so a device whose secure storage had moved on was offered the
+     * first-time setup - once, silently - and if that offer was declined the app then behaved
+     * as though iCloud had never been wanted. Nothing said anything was wrong; the account reads
+     * simply stopped working.
+     *
+     * <p>So the broken case gets its own screen, saying what happened and that the tags and
+     * their history are untouched. It is not gated on the one-time flag: this is a fault to fix
+     * rather than a preference to express, and it stops appearing the moment it is fixed.
+     */
+    private void respondToTheMembershipState(final KeychainMembershipRepository.MembershipState state) {
+        switch (state) {
+            case HELD:
+                // Already reading the account. Nothing to offer and nothing wrong.
+                return;
+            case UNREADABLE:
+                Log.w(TAG, "The stored keychain membership cannot be read, so telling them to"
+                        + " connect the account again rather than offering it as though new");
+                this.askThemToReconnectTheAccount();
+                return;
+            case NONE:
+            default:
+                this.offerICloudSetupTo(false);
+        }
+    }
+
+    private void askThemToReconnectTheAccount() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.icloud_membership_unreadable_title)
+                .setMessage(R.string.icloud_membership_unreadable_message)
+                .setPositiveButton(R.string.icloud_offer_set_up_now,
+                        (dialog, which) -> this.actOnTheICloudOffer(true))
+                .setNegativeButton(R.string.icloud_offer_not_now, (dialog, which) -> { })
+                .show();
+    }
+
+    /**
+     * Ask, and write down that we asked - immediately, and on settings read here.
+     *
+     * <p><b>The prompt was coming back, and this is why.</b> {@code offerIfDue} records the offer
+     * by setting a flag on the settings object it is handed, and that used to be
+     * {@code this.userSettings} - a field {@link #onResume} replaces with a fresh read on every
+     * single resume. So the sequence was: the dialog goes up and marks the object it was given;
+     * the activity resumes and the field becomes a different object, one still saying the offer
+     * was never made; the user answers; and the answer saves *that* object. The flag never
+     * reached storage, and the prompt returned on the next launch, and the next.
+     *
+     * <p>Two changes, and both are needed. The settings are read here rather than taken from the
+     * field, so nothing else can swap the object out underneath the dialog. And the write happens
+     * <b>when the dialog is shown</b>, not when it is answered - the gap between those was the
+     * race, and it also means a dialog dismissed by the activity being destroyed still counts,
+     * which is what {@code offerIfDue} promises.
+     */
+    private void offerICloudSetupTo(final boolean hasLinkedAccount) {
+        final UserSettings settings = this.userSettingsRepo.getUserSettings();
+
+        final Dialog offered = ICloudSetupOfferDialog.offerIfDue(
+                this, settings, hasLinkedAccount, this::actOnTheICloudOffer);
+
+        if (offered == null) {
+            return;
+        }
+
+        // Keeps the field in step for anything else reading it before the next resume. It is the
+        // stored copy that decides this next launch, and that is written below.
+        this.userSettings = settings;
+
+        var async = this.userSettingsRepo.storeUserSettings(settings)
                 .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(() -> {
-                    if (accepted) {
-                        Log.i(TAG, "taking them to connect an iCloud account");
-                        this.fetchFromICloudLauncher.launch(
-                                new Intent(this, FetchFromICloudActivity.class));
-                    }
-                }, error -> Log.e(TAG, "Failed to record the iCloud offer", error));
+                .subscribe(() -> Log.i(TAG, "recorded that the iCloud offer was made"),
+                        error -> Log.e(TAG, "Failed to record the iCloud offer, so it will be"
+                                + " made again on the next launch", error));
+    }
+
+    /** Act on the answer. Recording that it was asked already happened, when it was shown. */
+    private void actOnTheICloudOffer(final boolean accepted) {
+        if (accepted) {
+            Log.i(TAG, "taking them to connect an iCloud account");
+            this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
+        }
     }
 
     private static boolean isAccountRestoreFailure(Throwable t) {
@@ -2611,6 +2683,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // asking, and asks about whatever it was given.
         return this.beaconRepo.toScheduledAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
                 .doFinally(this::markFetchFinished);
@@ -2620,6 +2693,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doFinally(this::markFetchFinished);
     }
@@ -2677,6 +2751,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // Not Map.of - see BeaconRepository.plistFallback. A self-generated tag has no plist.
         return this.beaconRepo.toAccessoryRequests(BeaconRepository.plistFallback(beaconId, pList))
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
                 .flatMap(this.beaconRepo::storeFetchResult)
                 .doFinally(this::markFetchFinished);
@@ -2695,11 +2770,51 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * part-way through discards the work for all of them and the next launch starts over.
      */
     private void markFetchStarted() {
+        this.longFetchBannerHandler.post(this.bannerState::fetchStarted);
+    }
+
+    /**
+     * Arms the banner, but only for a batch that is actually going to be slow.
+     *
+     * <p><b>Counting a fetch and warning about one are now separate things.</b> This used to arm
+     * on every fetch that passed six seconds, which on a slow network is most of them - so the
+     * message showed up during loads that finished immediately, and a warning that appears when
+     * nothing is wrong is one people stop reading. The wait it exists for is the key search
+     * described above, and whether that search is long is known before the request goes out: it
+     * depends on how far back the accessory's alignment record starts it.
+     *
+     * <p>Asked of the requests rather than of the tags on screen, because the scheduled fetch
+     * drops tags that are ignored or backing off - an unaligned tag nobody is fetching should
+     * not put up a banner about a wait that is not happening.
+     *
+     * <p>The lookup is a database read and the banner is six seconds away, so there is time; and
+     * it re-checks that a fetch is still in flight before arming, since a quick batch can finish
+     * while the question is being answered.
+     */
+    private void armLongFetchBannerIfSlow(final List<AccessoryRequest> requests) {
+        var async = this.beaconRepo.aFetchOfTheseWouldBeSlow(requests)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        slow -> this.armLongFetchBanner(slow),
+                        // On doubt, warn. Silence through a three-minute wait is the failure
+                        // this mechanism exists to prevent; a banner during a quick fetch is
+                        // merely untidy.
+                        error -> {
+                            Log.w(TAG, "Could not tell whether this fetch will be slow,"
+                                    + " so assuming it might be", error);
+                            this.armLongFetchBanner(true);
+                        });
+    }
+
+    private void armLongFetchBanner(final boolean slow) {
         this.longFetchBannerHandler.post(() -> {
-            if (this.bannerState.fetchStarted()) {
-                this.longFetchBannerHandler.postDelayed(
-                        this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
+            if (!slow || !this.bannerState.isFetching()) {
+                return;
             }
+            this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
+            this.longFetchBannerHandler.postDelayed(
+                    this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
         });
     }
 
