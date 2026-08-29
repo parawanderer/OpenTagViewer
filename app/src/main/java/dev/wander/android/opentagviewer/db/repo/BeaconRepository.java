@@ -34,6 +34,7 @@ import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import dev.wander.android.opentagviewer.util.parse.KeyAlignmentPlist;
 import dev.wander.android.opentagviewer.util.rx.ScanOrder;
+import dev.wander.android.opentagviewer.util.rx.SlowFirstFetch;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -482,6 +483,34 @@ public class BeaconRepository {
         return Observable.fromCallable(
                         () -> (Set<String>) new HashSet<>(db.ownedBeaconDao().neverScannedIds()))
                 .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Whether fetching these accessories means a long key search.
+     *
+     * <p>Asked of the requests that were actually built rather than of everything on screen: the
+     * scheduled fetch skips tags that are ignored or backing off, and an unaligned tag that is
+     * not being fetched should not put a banner up about a wait that is not happening.
+     *
+     * <p>The same {@code observedAtMillis} XPath the scan ordering uses, over a plist already in
+     * memory - see {@link #dueForAScheduledScan}, which explains why this is read rather than
+     * stored in a column.
+     *
+     * @see dev.wander.android.opentagviewer.util.rx.SlowFirstFetch for the arithmetic.
+     */
+    public Observable<Boolean> aFetchOfTheseWouldBeSlow(final List<AccessoryRequest> requests) {
+        return Observable.fromCallable(() -> {
+            final var dao = db.ownedBeaconDao();
+            final List<Long> alignedAt = new ArrayList<>();
+
+            for (final AccessoryRequest request : requests) {
+                final OwnedBeacon row = dao.getById(request.getBeaconId());
+                alignedAt.add(row == null
+                        ? null : KeyAlignmentPlist.observedAtMillis(row.alignmentPlist));
+            }
+
+            return SlowFirstFetch.isLikely(alignedAt, System.currentTimeMillis());
+        }).subscribeOn(Schedulers.io());
     }
 
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
