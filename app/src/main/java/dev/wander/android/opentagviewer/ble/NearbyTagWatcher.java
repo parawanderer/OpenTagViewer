@@ -122,6 +122,23 @@ public class NearbyTagWatcher {
     private volatile DerivedAddressStore derivedAddresses;
 
     /**
+     * Looks further back for tags that are not turning up. Null until {@link #watch} supplies a
+     * context, for the same reason as {@link #derivedAddresses}.
+     */
+    @Nullable
+    private volatile WideningSearch wideningSearch;
+
+    /**
+     * When each of our tags was last heard, which is what decides who is worth widening for.
+     *
+     * <p>Written on the scan callback thread and read on an Rx io thread, hence the concurrent
+     * map. Not persisted: after a restart every tag reads as never heard, which widens for all
+     * of them until they turn up - the right way round, since a restart is also when the index
+     * knows least.
+     */
+    private final Map<String, Long> lastHeardMs = new ConcurrentHashMap<>();
+
+    /**
      * How hard the radio listens.
      *
      * <p>{@code SCAN_MODE_BALANCED} for a screen, {@code SCAN_MODE_LOW_POWER} for the service.
@@ -195,6 +212,11 @@ public class NearbyTagWatcher {
             }
             this.derivedAddresses.forgetAllExcept(accessoryJsonByBeaconId.keySet());
 
+            if (this.wideningSearch == null) {
+                this.wideningSearch = new WideningSearch(this.macResolver, this.derivedAddresses);
+            }
+            this.wideningSearch.started(this.clock.nowMs());
+
             if (this.index.isStale(this.clock.nowMs())) {
                 this.index.rebuild(accessoryJsonByBeaconId, this.macResolver, this.clock.nowMs(),
                         this.derivedAddresses);
@@ -220,6 +242,7 @@ public class NearbyTagWatcher {
                     // index is stale, our own tag's advertisements are exactly the ones that
                     // no longer match, so they cannot be the trigger.
                     maybeRebuildIndex(accessoryJsonByBeaconId);
+                    maybeWidenSearch(accessoryJsonByBeaconId);
 
                     final NearbyTagSighting sighting = sightingFrom(result);
                     if (sighting == null) {
@@ -336,6 +359,44 @@ public class NearbyTagWatcher {
     }
 
     /**
+     * Looks one chunk further back for a tag nobody has heard, when a round is due.
+     *
+     * <p>Driven by arriving advertisements for the same reason {@link #maybeRebuildIndex} is:
+     * it is the one signal this class reliably gets, and it costs nothing on the scan thread
+     * because everything expensive is handed to {@link Schedulers#io()} behind the same
+     * single-flight guard. Most of those advertisements belong to strangers, which is fine -
+     * they are a clock, not evidence.
+     *
+     * <p>The index is rebuilt straight after a round that derived something, because addresses
+     * that are only in the store and not in the index match nothing.
+     */
+    private void maybeWidenSearch(final Map<String, String> accessoryJsonByBeaconId) {
+        final WideningSearch search = this.wideningSearch;
+        if (search == null || !search.isDue(this.clock.nowMs())) {
+            return;
+        }
+        if (!this.indexRebuildInFlight.compareAndSet(false, true)) {
+            return;
+        }
+
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                final String widened = search.widenOne(
+                        accessoryJsonByBeaconId, this.lastHeardMs, this.clock.nowMs());
+
+                if (widened != null) {
+                    this.index.rebuild(accessoryJsonByBeaconId, this.macResolver,
+                            this.clock.nowMs(), this.derivedAddresses);
+                    Log.d(TAG, "Index now holds " + this.index.size()
+                            + " candidate address(es) after widening for beaconId=" + widened);
+                }
+            } finally {
+                this.indexRebuildInFlight.set(false);
+            }
+        });
+    }
+
+    /**
      * One scan result turned into a sighting, or null if it is not one of ours.
      *
      * <p>Package-private and separated from the scan callback so the decision - is this Find My
@@ -359,6 +420,11 @@ public class NearbyTagWatcher {
         if (match == null) {
             return null;
         }
+
+        // Noted here rather than in the emitter, so it is recorded even for a subscriber that
+        // has gone away: who is worth widening for is a fact about the radio, not about who
+        // happens to be listening.
+        this.lastHeardMs.put(match.getBeaconId(), this.clock.nowMs());
 
         return new NearbyTagSighting(match.getBeaconId(), match.getKeyIndex(), result.getRssi(),
                 advertisement.getBatteryLevel(), advertisement.getStatusByte(),
