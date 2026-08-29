@@ -325,4 +325,8 @@
     <string name="ring_status_connecting">接続中…</string>
     <string name="ring_status_triggering">送信中…</string>
     <string name="ring_status_success">鳴っています！</string>
+    <string name="icloud_membership_unreadable_title">Apple アカウントを接続し直してください</string>
+    <string name="icloud_membership_unreadable_message">このアプリには Apple アカウントとの接続が保存されていますが、読み取れなくなりました。必要な鍵はこの端末の安全な保管領域にあり、復元できません。そのため接続をやり直す必要があります。
+
+タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
 </resources>

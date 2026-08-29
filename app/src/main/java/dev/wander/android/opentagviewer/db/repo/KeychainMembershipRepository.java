@@ -55,35 +55,80 @@ public class KeychainMembershipRepository {
         this.cryptography = cryptography;
     }
 
+    /**
+     * What this app holds, told apart from what it can use.
+     *
+     * <p><b>"Nothing stored" and "stored but unreadable" are different situations with the same
+     * shape.</b> Collapsing them into an empty Optional is right for most callers - either way
+     * there is no membership to use - but it makes the app behave as though the account was
+     * never connected, which is wrong in a way the user can see: they are offered a first-time
+     * setup for something they already did, and nothing anywhere says why.
+     */
+    public enum MembershipState {
+        /** Never joined. The ordinary first run. */
+        NONE,
+        /** Joined, and the keys are usable. */
+        HELD,
+        /**
+         * Joined, and the stored keys cannot be decrypted.
+         *
+         * <p>The keys are the only copy of the means to use a peer that exists on the user's
+         * account, so this is not recoverable here - the remedy is to join again. It is reported
+         * rather than repaired: deleting the row on a decrypt failure would throw away a
+         * membership that a transient keystore problem might have made unreadable only for a
+         * moment.
+         */
+        UNREADABLE,
+    }
+
+    /**
+     * Which of the three situations this device is in.
+     *
+     * <p>Prefer {@link #get()} where only a usable membership matters; use this where the
+     * difference between "never connected" and "connected but broken" changes what the user is
+     * told.
+     */
+    public Observable<MembershipState> state() {
+        return Observable.fromPublisher(this.store.data()).map(preferences -> {
+            if (preferences.get(KEYCHAIN_MEMBERSHIP) == null) {
+                return MembershipState.NONE;
+            }
+            return this.readFrom(preferences).isPresent()
+                    ? MembershipState.HELD : MembershipState.UNREADABLE;
+        });
+    }
+
     /** The membership, or empty when this app has not joined - which is the ordinary first run. */
     public Observable<Optional<KeychainMembership>> get() {
-        return Observable.fromPublisher(this.store.data()).map(preferences -> {
-            final byte[] encrypted = preferences.get(KEYCHAIN_MEMBERSHIP);
-            if (encrypted == null) {
-                return Optional.empty();
-            }
+        return Observable.fromPublisher(this.store.data()).map(this::readFrom);
+    }
 
-            try {
-                final byte[] plain = this.cryptography.decrypt(
-                        AppCryptographyUtil.AppEncryptedData.fromFlattened(encrypted),
-                        KEYSTORE_ALIAS_KEYCHAIN);
-                final JSONObject json = new JSONObject(new String(plain, StandardCharsets.UTF_8));
+    private Optional<KeychainMembership> readFrom(final Preferences preferences) {
+        final byte[] encrypted = preferences.get(KEYCHAIN_MEMBERSHIP);
+        if (encrypted == null) {
+            return Optional.empty();
+        }
 
-                return Optional.of(new KeychainMembership(
-                        json.getString(FIELD_PEER),
-                        json.getString(FIELD_ENTROPY),
-                        json.getString(FIELD_PASSCODE),
-                        json.optString(FIELD_LABEL, ""),
-                        json.optInt(FIELD_SHARES, 0)));
-            } catch (Exception e) {
-                // **Reported as absent rather than thrown.** A membership that cannot be read is
-                // a membership this app cannot use, and the recovery is the same as never having
-                // joined: ask for a passcode and join again. Throwing here would take down the
-                // screen instead, on a path the user cannot do anything about.
-                Log.e(TAG, "The stored keychain membership could not be read", e);
-                return Optional.empty();
-            }
-        });
+        try {
+            final byte[] plain = this.cryptography.decrypt(
+                    AppCryptographyUtil.AppEncryptedData.fromFlattened(encrypted),
+                    KEYSTORE_ALIAS_KEYCHAIN);
+            final JSONObject json = new JSONObject(new String(plain, StandardCharsets.UTF_8));
+
+            return Optional.of(new KeychainMembership(
+                    json.getString(FIELD_PEER),
+                    json.getString(FIELD_ENTROPY),
+                    json.getString(FIELD_PASSCODE),
+                    json.optString(FIELD_LABEL, ""),
+                    json.optInt(FIELD_SHARES, 0)));
+        } catch (Exception e) {
+            // **Reported as absent rather than thrown.** A membership that cannot be read is
+            // a membership this app cannot use, and the recovery is the same as never having
+            // joined: ask for a passcode and join again. Throwing here would take down the
+            // screen instead, on a path the user cannot do anything about.
+            Log.e(TAG, "The stored keychain membership could not be read", e);
+            return Optional.empty();
+        }
     }
 
     /**

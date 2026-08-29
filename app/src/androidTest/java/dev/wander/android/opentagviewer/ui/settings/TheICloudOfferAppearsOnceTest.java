@@ -16,6 +16,7 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.content.Intent;
 
+import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.NoMatchingRootException;
 import androidx.test.espresso.NoMatchingViewException;
@@ -207,6 +208,111 @@ public class TheICloudOfferAppearsOnceTest {
         this.letTheMapSettle();
         assertFalse("somebody who said no once must never be asked again",
                 this.theOfferIsShowing());
+    }
+
+    /**
+     * <b>Showing it is what records it, before anybody has answered.</b>
+     *
+     * <p>The class promises that a dialog dismissed by the activity being torn down still counts
+     * as the one time. That only holds if the write happens when the dialog goes up - so this
+     * asserts exactly that, with nothing pressed.
+     */
+    @Test
+    public void theOfferIsRecordedTheMomentItIsShown() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+
+        this.openTheMap();
+        Eventually.check(() -> onView(withText(R.string.icloud_offer_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        Eventually.check(() -> assertTrue(
+                "the offer has to be recorded when it is shown, not when it is answered",
+                this.theOfferHasBeenMade()));
+    }
+
+    /**
+     * <b>A resume while the offer is up must not lose the record of it.</b>
+     *
+     * <p>This is the bug a user hit: the prompt came back days after they had answered it, with
+     * an account already connected. {@code MapsActivity.onResume} re-reads the settings into the
+     * field the dialog had marked, so the marked object was replaced by a fresh one still saying
+     * the offer had never been made - and the answer then saved that. Nothing failed, nothing
+     * logged, and the prompt returned on every launch.
+     *
+     * <p>A resume between showing and answering is not a contrived sequence: it is what happens
+     * when somebody glances at another app and comes back, and it is also the ordinary
+     * onCreate/onResume ordering when the membership lookup answers quickly.
+     *
+     * <p>Confirmed to fail before the fix - the stored flag came back false, and the offer
+     * appeared again on reopening.
+     */
+    @Test
+    public void theOfferSurvivesAResumeWhileItIsOnScreen() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+
+        this.openTheMap();
+        Eventually.check(() -> onView(withText(R.string.icloud_offer_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        // The step that used to swap the settings object out from under the dialog.
+        this.scenario.moveToState(Lifecycle.State.STARTED);
+        this.scenario.moveToState(Lifecycle.State.RESUMED);
+
+        Eventually.check(() -> assertTrue(
+                "a resume while the dialog was up threw away the record that it was offered",
+                this.theOfferHasBeenMade()));
+
+        this.scenario.close();
+        this.openTheMap();
+
+        this.letTheMapSettle();
+        assertFalse("the offer came back after a resume, which is the reported bug",
+                this.theOfferIsShowing());
+    }
+
+    /**
+     * <b>A connection that exists but cannot be read is a fault, not a fresh install.</b>
+     *
+     * <p>The membership read used to answer "empty" both for somebody who had never joined and
+     * for somebody whose stored keys could no longer be decrypted - so a device whose secure
+     * storage had moved on was shown the first-time setup offer, once, and if that was declined
+     * the app behaved from then on as though iCloud had never been wanted. Nothing said anything
+     * was wrong; account reads just stopped working.
+     *
+     * <p>Two claims here, and the second is the one with teeth: they are told what happened, and
+     * their one-and-only first-time offer is <b>not</b> spent on it. Spending it would leave
+     * somebody who dismissed a message they did not understand with no way back to the feature
+     * except a Settings item they have no reason to open.
+     */
+    @Test
+    public void anUnreadableConnectionAsksThemToReconnectRatherThanOfferingSetup() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+        this.givenAStoredMembershipThatCannotBeRead();
+
+        this.openTheMap();
+
+        Eventually.check(() -> onView(withText(R.string.icloud_membership_unreadable_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        assertFalse("the one-time offer must not be spent on a broken connection",
+                this.theOfferHasBeenMade());
+    }
+
+    /**
+     * Bytes under the membership key that are not a ciphertext this app can open.
+     *
+     * <p>Written straight into the store rather than through {@code store()}, because the point
+     * is a value that decryption fails on - which is what a rotated or lost keystore key leaves
+     * behind, and there is no way to ask the real writer to produce one.
+     */
+    private void givenAStoredMembershipThatCannotBeRead() {
+        UserAuthDataStore.getInstance(this.context).updateDataAsync(preferences -> {
+            final androidx.datastore.preferences.core.MutablePreferences mutable =
+                    preferences.toMutablePreferences();
+            mutable.set(dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore
+                    .KEYCHAIN_MEMBERSHIP, new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
+            return io.reactivex.rxjava3.core.Single.just(mutable);
+        }).blockingGet();
     }
 
     /**

@@ -325,4 +325,8 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="ring_status_connecting">Verbinde…</string>
     <string name="ring_status_triggering">Sende…</string>
     <string name="ring_status_success">Klingelt!</string>
+    <string name="icloud_membership_unreadable_title">Apple-Konto erneut verbinden</string>
+    <string name="icloud_membership_unreadable_message">Diese App hat eine Verbindung zu deinem Apple-Konto gespeichert, kann sie aber nicht mehr lesen. Die dafür nötigen Schlüssel liegen im sicheren Speicher dieses Geräts und lassen sich nicht wiederherstellen – die Verbindung muss also neu hergestellt werden.
+
+Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Apple-Konto wurde nichts entfernt.</string>
 </resources>

@@ -357,4 +357,8 @@ You can set this up now, or any time later from Settings.</string>
     <string name="ring_status_connecting">Connecting…</string>
     <string name="ring_status_triggering">Sending…</string>
     <string name="ring_status_success">Ringing!</string>
+    <string name="icloud_membership_unreadable_title">Reconnect your Apple account</string>
+    <string name="icloud_membership_unreadable_message">This app has a connection to your Apple account saved, but can no longer read it. The keys it needs are kept in this device\'s secure storage, and they cannot be recovered — so the connection has to be made again.
+
+Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
 </resources>
