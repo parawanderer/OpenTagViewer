@@ -1570,3 +1570,102 @@ def test_afailureToCloseIsReportedRatherThanRaised():
 
 def test_closingNothingIsHarmless():
     assert main.closeAccount(None) is False
+
+def test_candidate_window_agrees_with_what_current_mac_addresses_derives():
+    """The cheap answer and the expensive one must describe the same slice.
+
+    If they drift apart, a caller keeping what it derived would keep the wrong part of the
+    range and go on missing the tag while believing it had covered it.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    window = main.candidateWindow(accessory)
+    macs = main.currentMacAddresses(accessory)
+
+    assert window is not None
+    assert set(macs.values()) <= set(range(window["lo"], window["hi"] + 1))
+
+
+def test_candidate_window_is_bounded_for_a_stale_alignment():
+    """A window too wide to derive whole is reported as the bounded slice, not the true width."""
+    accessory = json.dumps(_unaligned_accessory(
+        datetime.now(timezone.utc) - timedelta(days=400)))
+
+    window = main.candidateWindow(accessory)
+
+    assert window is not None
+    assert window["hi"] - window["lo"] <= main._MAC_CANDIDATE_MAX_INDICES
+
+
+def test_addresses_between_covers_exactly_the_requested_range():
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    derived = main.addressesBetween(accessory, 19100, 19150)
+
+    assert derived is not None
+    assert derived
+    assert set(derived.values()) <= set(range(19100, 19151))
+
+
+def test_addresses_between_is_stable_across_calls():
+    """The mapping is a pure function of the keys and the index, which is what makes it
+    safe to store: a pair derived today has to still be true when it is read back."""
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    first = main.addressesBetween(accessory, 19100, 19120)
+    second = main.addressesBetween(accessory, 19100, 19120)
+
+    assert first == second
+
+
+def test_addresses_between_pieces_join_up_into_the_whole_set():
+    """Widening a search a piece at a time must reach the same addresses as asking once.
+
+    This is the property the stored copy rests on. Without it, extending the range would
+    leave gaps that nothing would ever go back for.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    lower = main.addressesBetween(accessory, 19100, 19130)
+    upper = main.addressesBetween(accessory, 19131, 19160)
+
+    joined = dict(lower)
+    joined.update(upper)
+
+    assert set(joined) == set(whole)
+
+
+def test_a_secondary_key_is_reported_at_wherever_the_range_started():
+    """The address set is pure; the index attached to it is not, for secondary keys.
+
+    A secondary key covers 96 primary indices and `keys_between` de-duplicates, so it is
+    reported at the first index the call's own range reaches. Asserted rather than merely
+    documented because a caller storing the pair and later trusting the index as exact would
+    be trusting an artefact of where it started looking - see `addressesBetween`.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    upper = main.addressesBetween(accessory, 19131, 19160)
+
+    moved = {mac for mac in set(whole) & set(upper) if whole[mac] != upper[mac]}
+
+    assert moved, "expected at least one secondary key to be re-attributed"
+    for mac in moved:
+        assert whole[mac] < 19131 <= upper[mac]
+
+
+def test_addresses_between_refuses_nothing_for_an_empty_range():
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    assert main.addressesBetween(accessory, 500, 499) == {}
+
+
+def test_addresses_between_returns_none_for_an_unreadable_accessory():
+    assert main.addressesBetween("not json at all", 0, 10) is None
+
+
+def test_candidate_window_returns_none_for_an_unreadable_accessory():
+    assert main.candidateWindow("not json at all") is None
+
