@@ -180,11 +180,14 @@ public final class NearbyTagIndex {
     /**
      * The addresses for one tag, derived only where the stored copy does not already have them.
      *
-     * <p><b>Extended rather than replaced, and only while it stays contiguous.</b> The stored
-     * range and the wanted window normally overlap, because the window moves by one index every
-     * fifteen minutes. When they do not overlap at all the app has not run for a very long time,
-     * and the honest answer is a fresh derivation: recording a range as covered when the middle
-     * of it was never derived would mean silently never looking there again.
+     * <p><b>Extended rather than replaced, and a gap in between is derived rather than skipped.</b>
+     * The stored range and the wanted window normally overlap, since the window moves by one
+     * index every fifteen minutes. When they do not, the app has simply not been opened for a
+     * few days, and deriving from the top of what is held up to the top of the window covers the
+     * gap and the window together - so the result is contiguous and nothing is recorded as
+     * covered that was never derived. Requiring them to touch, and starting over when they did
+     * not, threw away a range that had been widened over hours because somebody left the app
+     * closed for four days, which is exactly the case the widening exists for.
      */
     private static Map<String, Integer> addressesFor(
             final String beaconId,
@@ -209,9 +212,9 @@ public final class NearbyTagIndex {
             return held.getAddresses();
         }
 
+        // Only the total width can rule out extending: everything else is a gap, and a gap is
+        // derived along with the window rather than being a reason to discard what is held.
         final boolean extendable = held != null
-                && held.getLo() <= window.getHi() + 1
-                && window.getLo() <= held.getHi() + 1
                 && Math.max(held.getHi(), window.getHi())
                         - Math.min(held.getLo(), window.getLo()) < MAX_STORED_INDICES;
 
