@@ -1690,3 +1690,60 @@ def test_addresses_between_returns_none_for_an_unreadable_accessory():
 def test_candidate_window_returns_none_for_an_unreadable_accessory():
     assert main.candidateWindow("not json at all") is None
 
+def _drift_line(capsys, before_index, before_date, after_index, after_date):
+    main._reportDrift(before_index, before_date, after_index, after_date)
+    printed = capsys.readouterr().out
+    return [line for line in printed.splitlines() if "Alignment drift" in line]
+
+
+def test_drift_is_not_reported_when_the_alignment_did_not_move(capsys):
+    """A fetch that found nothing to align to is not a drift of zero.
+
+    Reporting it as one would fill the series with readings that say the extrapolation was
+    confirmed, when in fact nothing checked it.
+    """
+    when = datetime.now(timezone.utc).isoformat()
+
+    assert _drift_line(capsys, 19200, when, 19200, when) == []
+
+
+def test_drift_is_the_gap_between_extrapolation_and_where_the_tag_was(capsys):
+    """Six hours on, a tag that rolled on schedule is at 24 indices; one at 20 has drifted 4."""
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19220, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift 4 index/indices" in lines[0]
+
+
+def test_a_tag_exactly_on_schedule_reports_no_drift(capsys):
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19224, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift 0 index/indices" in lines[0]
+
+
+def test_drift_is_signed_so_an_extrapolation_behind_the_tag_is_visible(capsys):
+    """Negative cannot happen if the extrapolation is a true upper bound, so it is worth
+    seeing rather than clamping away: one would mean that assumption is wrong."""
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19230, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift -6 index/indices" in lines[0]
+
+
+def test_drift_is_silent_for_an_accessory_with_no_alignment_at_all(capsys):
+    assert _drift_line(capsys, None, None, 19200, "2026-01-01T00:00:00+00:00") == []
+
+
+def test_drift_survives_an_unparseable_date(capsys):
+    assert _drift_line(capsys, 19200, "not a date", 19220, "also not a date") == []
+
