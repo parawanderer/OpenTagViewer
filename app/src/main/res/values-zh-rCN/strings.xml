@@ -354,4 +354,8 @@
     <string name="left_behind_seconds_explainer">标签失去信号多久后，应用才检查你是否把它落下了。时间越短提醒越早，检查也越频繁。</string>
     <string name="left_behind_sound">报警声</string>
     <string name="left_behind_sound_default">默认报警声</string>
+    <string name="icloud_membership_unreadable_title">请重新连接您的 Apple 账户</string>
+    <string name="icloud_membership_unreadable_message">本应用保存了与你的 Apple 账户的连接，但已无法读取。所需的密钥保存在本设备的安全存储中，且无法恢复，因此需要重新建立连接。
+
+你的标签及其位置历史不受影响，Apple 账户中也没有任何内容被移除。</string>
 </resources>

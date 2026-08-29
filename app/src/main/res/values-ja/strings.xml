@@ -354,4 +354,8 @@
     <string name="left_behind_seconds_explainer">タグの信号が途絶えてから、置き忘れを確認するまでの時間です。短いほど早く気づき、確認回数も増えます。</string>
     <string name="left_behind_sound">アラーム音</string>
     <string name="left_behind_sound_default">既定のアラーム音</string>
+    <string name="icloud_membership_unreadable_title">Apple アカウントを接続し直してください</string>
+    <string name="icloud_membership_unreadable_message">このアプリには Apple アカウントとの接続が保存されていますが、読み取れなくなりました。必要な鍵はこの端末の安全な保管領域にあり、復元できません。そのため接続をやり直す必要があります。
+
+タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
 </resources>

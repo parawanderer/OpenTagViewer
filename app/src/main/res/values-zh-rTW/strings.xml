@@ -354,4 +354,8 @@
     <string name="left_behind_seconds_explainer">標籤失去訊號多久後，應用程式才檢查你是否把它落下了。時間越短提醒越早，檢查也越頻繁。</string>
     <string name="left_behind_sound">警報聲</string>
     <string name="left_behind_sound_default">預設警報聲</string>
+    <string name="icloud_membership_unreadable_title">請重新連接你的 Apple 帳戶</string>
+    <string name="icloud_membership_unreadable_message">本應用程式儲存了與你的 Apple 帳戶的連線，但已無法讀取。所需的金鑰保存在本裝置的安全儲存空間中，且無法復原，因此必須重新建立連線。
+
+你的標籤與其位置紀錄不受影響，Apple 帳戶中也沒有任何內容被移除。</string>
 </resources>

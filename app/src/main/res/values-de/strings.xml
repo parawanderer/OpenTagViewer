@@ -354,4 +354,8 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="left_behind_seconds_explainer">Wie lange ein Tag nicht zu hören sein muss, bevor die App prüft, ob du es zurückgelassen hast. Kürzer warnt früher und prüft öfter.</string>
     <string name="left_behind_sound">Alarmton</string>
     <string name="left_behind_sound_default">Standard-Alarmton</string>
+    <string name="icloud_membership_unreadable_title">Apple-Konto erneut verbinden</string>
+    <string name="icloud_membership_unreadable_message">Diese App hat eine Verbindung zu deinem Apple-Konto gespeichert, kann sie aber nicht mehr lesen. Die dafür nötigen Schlüssel liegen im sicheren Speicher dieses Geräts und lassen sich nicht wiederherstellen – die Verbindung muss also neu hergestellt werden.
+
+Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Apple-Konto wurde nichts entfernt.</string>
 </resources>
