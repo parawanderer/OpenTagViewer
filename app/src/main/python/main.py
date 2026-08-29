@@ -1090,6 +1090,82 @@ _MAC_CANDIDATE_MARGIN = timedelta(hours=48)
 _MAC_CANDIDATE_MAX_INDICES = 1000
 
 
+def candidateWindow(accessoryJson: str):
+    """The key index range worth scanning for this accessory right now, without deriving it.
+
+    **Cheap on purpose.** `currentMacAddresses` answers the same question and pays for the
+    answer, which is fine when the addresses are what you want and wasteful when all you need
+    to know is which part of the range you are missing. Deciding that is what lets a caller
+    keep what it derived last time and ask only for the rest, and the whole point of keeping
+    it is not paying this cost again.
+
+    Bounded exactly as `currentMacAddresses` bounds it, so the two never disagree about which
+    slice is the live one.
+
+    Returns a mapping with `lo` and `hi` inclusive, or None if the accessory cannot be read.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+
+        now = datetime.now(timezone.utc)
+        top = accessory.get_max_index(now + _MAC_CANDIDATE_MARGIN)
+        width = _isAlignmentWide(
+            accessory, now - _MAC_CANDIDATE_MARGIN, now + _MAC_CANDIDATE_MARGIN)
+
+        if width > _MAC_CANDIDATE_MAX_INDICES:
+            bottom = top - _MAC_CANDIDATE_MAX_INDICES
+        else:
+            bottom = accessory.get_min_index(now - _MAC_CANDIDATE_MARGIN)
+
+        return {"lo": max(0, bottom), "hi": top}
+    except Exception:
+        print(f"candidateWindow failed: {traceback.format_exc()}")
+        return None
+
+
+def addressesBetween(accessoryJson: str, lo: int, hi: int):
+    """The addresses this accessory can advertise at every index from `lo` to `hi` inclusive.
+
+    **The set of addresses never goes out of date, and that is what a stored copy rests on.**
+    An address is a pure function of the accessory's keys and an index, so an address derived
+    once is still one this accessory can advertise; only which part of the range is worth
+    watching moves, and that is `candidateWindow`'s answer rather than this one's. Splitting a
+    range into pieces and joining the results yields exactly the same set as asking for it
+    whole, which is what lets a caller widen its search a piece at a time.
+
+    **The index attached to an address is not pure, and must not be treated as though it
+    were.** `keys_between` de-duplicates, and a secondary key covers 96 consecutive primary
+    indices, so it is reported at the first index the *call's own* range happens to reach:
+    ask for 19100..19160 and it comes back at 19100, ask for 19131..19160 and the same address
+    comes back at 19131. Primary keys occur at exactly one index and do not move. This costs
+    nothing downstream because a secondary match is already only a hint - `recordAccessorySeen`
+    verifies it and refuses to align on one - but a caller that stored the pair and later
+    trusted the index as exact would be trusting an artefact of where it started looking.
+
+    Deliberately takes the range rather than working it out. A caller widening its search a
+    piece at a time needs to say which piece, and a function that decided for itself could not
+    be asked for the piece below the one it would have chosen.
+
+    Returns None on failure, which a caller must tell apart from an empty range.
+    """
+    try:
+        if hi < lo:
+            return {}
+
+        accessory = accessoryFromJson(accessoryJson)
+
+        started = time.perf_counter()
+        derived = {
+            key.mac_address: index
+            for index, key in accessory.keys_between(max(0, lo), hi)
+        }
+        _reportDerivationCost(hi - max(0, lo) + 1, derived, started)
+        return derived
+    except Exception:
+        print(f"addressesBetween failed: {traceback.format_exc()}")
+        return None
+
+
 def _reportDerivationCost(width, derived, started):
     """Says what deriving a candidate window actually cost, in indices and in seconds.
 
