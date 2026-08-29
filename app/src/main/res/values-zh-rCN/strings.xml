@@ -358,4 +358,6 @@
     <string name="icloud_membership_unreadable_message">本应用保存了与你的 Apple 账户的连接，但已无法读取。所需的密钥保存在本设备的安全存储中，且无法恢复，因此需要重新建立连接。
 
 你的标签及其位置历史不受影响，Apple 账户中也没有任何内容被移除。</string>
+    <string name="error_report_cause_membership_unreadable">已保存的 Apple 账户连接无法解密，但其密钥仍然存在</string>
+    <string name="error_report_body_membership">与你的 Apple 账户的连接就保存在本设备上，解开它的密钥也还在，却打不开了——这本不该发生。\n\n因此这值得报告，而不只是重做一次。你的标签及其位置历史不受影响，Apple 账户中也没有任何内容被移除。</string>
 </resources>

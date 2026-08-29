@@ -358,4 +358,6 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="icloud_membership_unreadable_message">Deze app heeft een verbinding met je Apple-account opgeslagen, maar kan die niet meer lezen. De benodigde sleutels staan in de beveiligde opslag van dit apparaat en zijn niet te herstellen — de verbinding moet dus opnieuw worden gemaakt.
 
 Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Apple-account verwijderd.</string>
+    <string name="error_report_cause_membership_unreadable">De opgeslagen verbinding met het Apple-account kon niet worden ontsleuteld, terwijl de sleutel er nog wel is</string>
+    <string name="error_report_body_membership">De verbinding met je Apple-account staat op dit apparaat, de sleutel die hem opent is er nog, en toch gaat hij niet meer open — dat hoort niet te kunnen.\n\nDaarom is dit het melden waard in plaats van het gewoon opnieuw te doen. Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Apple-account verwijderd.</string>
 </resources>

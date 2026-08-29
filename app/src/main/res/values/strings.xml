@@ -391,4 +391,6 @@ You can set this up now, or any time later from Settings.</string>
     <string name="icloud_membership_unreadable_message">This app has a connection to your Apple account saved, but can no longer read it. The keys it needs are kept in this device\'s secure storage, and they cannot be recovered — so the connection has to be made again.
 
 Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
+    <string name="error_report_cause_membership_unreadable">The saved Apple account connection could not be decrypted, although its key is still present</string>
+    <string name="error_report_body_membership">The connection to your Apple account is stored on this device, the key that unlocks it is still here, and it no longer opens — which should not be possible.\n\nThat makes it worth reporting rather than just redoing. Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
 </resources>

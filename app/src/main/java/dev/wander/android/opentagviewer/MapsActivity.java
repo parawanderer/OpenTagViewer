@@ -2033,10 +2033,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             case HELD:
                 // Already reading the account. Nothing to offer and nothing wrong.
                 return;
-            case UNREADABLE:
-                Log.w(TAG, "The stored keychain membership cannot be read, so telling them to"
+            case KEYS_GONE:
+                // Explainable and not a fault: the keystore key went away and the data it wrote
+                // stayed. Nothing to report, and something for them to do.
+                Log.w(TAG, "The keystore key for the membership is gone, so telling them to"
                         + " connect the account again rather than offering it as though new");
                 this.askThemToReconnectTheAccount();
+                return;
+            case UNREADABLE:
+                // **The key is present and it still does not open the data, which is a bug.**
+                // Nothing a user did causes this, so an explanation would be an apology for
+                // something they cannot act on - the report is the useful thing to offer, and
+                // it is the same screen an unexplainable import failure goes to.
+                Log.e(TAG, "The membership is stored and its key is present, and it still does"
+                        + " not decrypt - sending them to make a report");
+                this.startActivity(ErrorReportActivity.intentFor(this,
+                        getString(R.string.error_report_cause_membership_unreadable),
+                        R.string.error_report_body_membership));
                 return;
             case NONE:
             default:
