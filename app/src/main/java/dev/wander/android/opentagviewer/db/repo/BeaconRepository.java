@@ -659,7 +659,9 @@ public class BeaconRepository {
      * <p>Failure is swallowed like every other write on the sighting path: this runs behind a
      * passive scan nobody asked for, and nothing the user did may fail because of it.
      *
-     * @return true when a row was written, so a caller can log or test the decision.
+     * @return the report that was written, or empty when this sighting did not earn a row - so a
+     *         caller can log or test the decision, and can also draw what was just recorded
+     *         without reading it back.
      */
     public Observable<Optional<BeaconLocationReport>> recordLocalSighting(
             final String beaconId,

@@ -65,9 +65,15 @@ public class WritingDownWhereATagWasHeardTest {
         this.db.close();
     }
 
+    /**
+     * @return whether the sighting earned a row. {@code recordLocalSighting} used to answer that
+     *         with a boolean and now hands back the report it wrote, so presence is the same
+     *         answer - every assertion here is still about the decision, not the row.
+     */
     private boolean record(final double lat, final double lon, final long accuracy, final long at) {
         return this.repo.recordLocalSighting(A_TAG, lat, lon, accuracy, A_STATUS_BYTE, at)
-                .blockingFirst();
+                .blockingFirst()
+                .isPresent();
     }
 
     private List<LocationReport> allReports() {
