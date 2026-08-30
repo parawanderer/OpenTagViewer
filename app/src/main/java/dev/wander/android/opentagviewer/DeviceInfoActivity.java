@@ -238,7 +238,7 @@ public class DeviceInfoActivity extends AppCompatActivity
                 : this.beaconRepo.getImportById(importId).blockingFirst().orElse(null);
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
 
         binding.setHandleClickBack(this::handleEndActivity);
         binding.setHandleClickMenu(this::handleClickMenu);
