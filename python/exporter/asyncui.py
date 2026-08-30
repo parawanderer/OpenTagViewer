@@ -43,6 +43,29 @@ class Asker:
     def __init__(self, root: tk.Misc) -> None:
         self._root = root
         self._cancelled = threading.Event()
+        self._say: Callable[[str], None] | None = None
+
+    def attach_status(self, say: Callable[[str], None]) -> None:
+        """Wire `say` to the progress window's label. Called by :func:`run_with_progress`."""
+        self._say = say
+
+    def say(self, text: str) -> None:
+        """
+        Change what the progress window says, from the worker thread.
+
+        **A window that has said "Signing in to iCloud…" for a minute is indistinguishable from a
+        hung one**, and that matters here because waiting is now something this deliberately does:
+        after Apple takes a verification code and then fails, the recovery is to wait and ask for
+        a new one. A silent minute in the middle of a sign-in is exactly when somebody force-quits.
+
+        Unlike :meth:`ask` this does not block and does not raise when cancelled - it is a status
+        line, and a caller should not have to handle a window closing to write to one.
+        """
+        if self._say is None or self._cancelled.is_set():
+            return
+
+        say = self._say
+        self._root.after(0, lambda: say(text))
 
     def cancel(self) -> None:
         """
@@ -102,8 +125,12 @@ def run_with_progress(
     :raises Exception: Whatever the coroutine raised, on the main thread, so a caller can report it
         the way it would report any other failure.
     """
-    window = _progress_window(root, message)
+    window, label = _progress_window(root, message)
     asker = Asker(root)
+
+    # So the worker can say what it is doing, rather than leaving one sentence up for a minute.
+    # Guarded on the widget still existing: the worker keeps going after the window is closed.
+    asker.attach_status(_status_setter(label))
     outcome: queue.Queue = queue.Queue(maxsize=1)
 
     def _work() -> None:
@@ -154,8 +181,28 @@ def run_with_progress(
     return value
 
 
-def _progress_window(root: tk.Tk, message: str) -> tk.Toplevel:
-    """A small modal window with an indeterminate bar, since none of this reports progress."""
+def _status_setter(label: ttk.Label) -> Callable[[str], None]:
+    """
+    Rewrite the progress window's line, or do nothing once it has gone.
+
+    Its own function rather than a closure inside `run_with_progress`, which flake8 already
+    considers as branchy as it is allowed to get - and the guard is the interesting part: the
+    worker keeps running after the user closes the window, so this is called on a dead widget in
+    the ordinary course of cancelling.
+    """
+    def say(text: str) -> None:
+        if label.winfo_exists():
+            label.configure(text=text)
+
+    return say
+
+
+def _progress_window(root: tk.Tk, message: str) -> tuple[tk.Toplevel, ttk.Label]:
+    """
+    A small modal window with an indeterminate bar, since none of this reports progress.
+
+    Returns the label as well as the window so the worker can rewrite it - see :meth:`Asker.say`.
+    """
     window = tk.Toplevel(root)
     window.title("Working")
     window.resizable(width=False, height=False)
@@ -164,7 +211,8 @@ def _progress_window(root: tk.Tk, message: str) -> tk.Toplevel:
     frame = ttk.Frame(window, padding=16)
     frame.pack(fill="both", expand=True)
 
-    ttk.Label(frame, text=message, wraplength=320).pack(pady=(0, 12))
+    label = ttk.Label(frame, text=message, wraplength=320)
+    label.pack(pady=(0, 12))
 
     bar = ttk.Progressbar(frame, mode="indeterminate", length=320)
     bar.pack()
@@ -174,4 +222,4 @@ def _progress_window(root: tk.Tk, message: str) -> tk.Toplevel:
     window.grab_set()
     window.update_idletasks()
 
-    return window
+    return window, label
