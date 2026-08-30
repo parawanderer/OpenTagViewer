@@ -340,6 +340,24 @@ async def _retry_credentials(error, attempt: int):
     return email, await prompts.password("Password")
 
 
+_said = ""
+
+
+def _say(text: str) -> None:
+    """
+    Report what the sign-in is waiting for, on one line that rewrites itself.
+
+    `\r` and no newline, so a countdown does not produce forty lines of scrollback - and to
+    stderr, which is where everything else conversational here goes. A redirected stderr gets the
+    carriage returns and is none the worse for it.
+    """
+    global _said
+
+    padding = max(0, len(_said) - len(text))
+    print(f"\r{text}{' ' * padding}", end="", file=sys.stderr, flush=True)
+    _said = text
+
+
 async def _retry_code(error, attempt: int):
     """
     Offer the verification code again, and only send a new one if asked.
@@ -489,6 +507,9 @@ async def sign_in(arguments: argparse.Namespace):
                 get_code=_ask_verification_code,
                 retry_credentials=_retry_credentials,
                 retry_code=_retry_code,
+                # The CLI has no window to look hung, but a silent three-quarters of a minute
+                # after a code was entered reads as a stuck program just as well.
+                announce=_say,
             )
         except MobileMeDelegateError as e:
             # Authentication itself worked; the exchange that follows it did not. Unaccepted terms
