@@ -182,9 +182,11 @@ public class SettingsActivity extends AppCompatActivity {
         this.themeChoices.add(this.getString(R.string.dark_theme));
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
-        // The last row is the debug switch, and the navigation bar was sitting on top of it.
-        WindowPaddingUtil.insertUIBottomPadding(this.findViewById(R.id.settings_scroll_area));
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
+        // The bottom inset used to be applied to the scroll area here as well - the debug switch
+        // is the last row and the navigation bar sat on top of it. insetForSystemBars above now
+        // does that for the whole screen, as it does for every other one, so a second call would
+        // reserve the bar's height twice.
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
         this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);

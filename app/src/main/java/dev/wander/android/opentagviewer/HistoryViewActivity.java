@@ -180,7 +180,7 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
                 .blockingFirst();
 
         ActivityHistoryViewBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_history_view);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
 
         binding.setHandleClickBack(this::finish);
         binding.setPageTitle(this.getCurrentBeaconName());

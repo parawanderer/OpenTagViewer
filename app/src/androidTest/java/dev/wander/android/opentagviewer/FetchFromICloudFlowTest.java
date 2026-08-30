@@ -38,6 +38,7 @@ import java.util.List;
 import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
 import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.compat.TheNavigationBar;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 
@@ -121,6 +122,27 @@ public class FetchFromICloudFlowTest {
         this.scenario.onActivity(activity ->
                 shown[0] = activity.findViewById(id).getVisibility() == android.view.View.VISIBLE);
         return shown[0];
+    }
+
+    /**
+     * <b>The Unlock button is not under the navigation bar.</b>
+     *
+     * <p>This is the screen from @parawanderer's report - a screenshot of the passcode step with
+     * Unlock behind the gesture pill, on a phone whose bar is tall. Every screen is checked for
+     * this in {@code NothingSitsUnderTheNavigationBarTest}; this one is checked here instead,
+     * because it closes itself in {@code onCreate} without a usable iCloud session and this class
+     * is what knows how to give it one. Rebuilding that setup there would be the copy that drifts.
+     *
+     * <p>The bar is invented rather than measured - see {@link TheNavigationBar} for why that is
+     * the only way to ask this on a device whose real inset is zero.
+     */
+    @Test
+    public void theunlockButtonStaysClearOfTheNavigationBar() {
+        this.open(FakeICloudService.withTags());
+
+        this.chooseTheFirstDevice();
+
+        TheNavigationBar.doesNotCover(this.scenario, "FetchFromICloudActivity");
     }
 
     /** The whole errand: choose a device, unlock, see what is on the account. */
