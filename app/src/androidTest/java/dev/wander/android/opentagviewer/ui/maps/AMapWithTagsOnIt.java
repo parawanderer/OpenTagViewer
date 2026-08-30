@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.R;
@@ -258,13 +259,29 @@ public final class AMapWithTagsOnIt {
      * <p>Done here rather than with a {@code GrantPermissionRule} in each test, because a rule
      * is per-class and this is a property of arranging the map at all - a new test that used the
      * fixture and forgot the rule would hit the same six-minute wall.
+     *
+     * <p><b>Bluetooth is on this list for the same reason, and it arrived later.</b>
+     * {@code startWatchingForNearbyTags} asks for the scan permissions as the map opens - so the
+     * badges on the cards work without somebody pressing ring first - and its own comment notes
+     * that the system dialog pauses the activity. With only location granted, the map opened
+     * behind that dialog and the root picker span on "No activity currently resumed" until the
+     * job's own limit: not six minutes this time but forty-five, because there is no per-test
+     * timeout to stop it. It never failed, it just never ended.
+     *
+     * <p>Taken from {@link BlePermissions#required()} rather than named here, because which
+     * permissions those are depends on the API level - {@code BLUETOOTH_SCAN} and
+     * {@code BLUETOOTH_CONNECT} from S, and fine location before it. Naming them twice is how
+     * the copy that is wrong goes unnoticed.
      */
     private void grantLocationUpFront() {
         final String packageName = this.context.getPackageName();
 
-        for (final String permission : new String[] {
+        final List<String> needed = new ArrayList<>(List.of(
                 android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION}) {
+                android.Manifest.permission.ACCESS_COARSE_LOCATION));
+        needed.addAll(List.of(BlePermissions.required()));
+
+        for (final String permission : needed) {
             try {
                 getInstrumentation().getUiAutomation()
                         .grantRuntimePermission(packageName, permission);
