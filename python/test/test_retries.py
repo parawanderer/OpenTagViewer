@@ -26,9 +26,11 @@ import inspect
 
 import pytest
 from findmy import InvalidCredentialsError, LoginState
+from findmy.errors import UnhandledProtocolError
 from findmy.keychain.recovery import RecoveryError
 
 from exporter import icloud
+from exporter.icloud import ExportSourceError
 
 RECORD = object()
 
@@ -239,6 +241,129 @@ class FakeFactor:
             raise InvalidCredentialsError("Apple rejected that code.")
 
         return LoginState.LOGGED_IN
+
+
+class FakeFactorThatTakesTheCodeThenFails:
+    """
+    A second factor that models issue #168: the code is accepted, and signing in fails anyway.
+
+    `td_2fa_submit` submits the code and *then* re-authenticates against Grand Slam. The second
+    half returned 503 and the first had already spent the code, which is why `submitted` records
+    the attempt even though nothing succeeded.
+    """
+
+    def __init__(self) -> None:
+        self.submitted: list[str] = []
+        self.requests = 0
+
+    async def request(self) -> None:
+        self.requests += 1
+
+    async def submit(self, code: str):
+        self.submitted.append(code)
+        raise UnhandledProtocolError("Error response for GSA request: 503")
+
+
+class TestACodeAppleTookAndThenFailedOn:
+    """
+    Issue #168: Apple accepted the code, then answered 503 to the re-authentication behind it.
+
+    **The recovery is to stop, and that is a finding rather than a shrug.** The one report that
+    recovered did so by starting the sign-in again - and the attempt in between was refused at the
+    *password* step, which looks like Apple throttling for a while. Sending two more codes into
+    that is how a throttle becomes a lock, so nothing here retries.
+
+    What was wrong was never the retrying anyway. This escaped the loop entirely, landed in the
+    wizard's catch-all handler, and asked the one person who could do nothing about it to file a
+    bug. One duly did.
+    """
+
+    def test_it_is_recognised_as_a_spent_code(self):
+        assert icloud.code_was_already_spent(
+            UnhandledProtocolError("Error response for GSA request: 503"))
+
+    def test_a_rejected_code_is_not_a_spent_one(self):
+        """The opposite case, and the one where re-typing is right."""
+        assert not icloud.code_was_already_spent(
+            InvalidCredentialsError("Apple rejected that code."))
+
+    def test_it_stops_rather_than_asking_for_another_code(self):
+        """
+        The decision this turns on.
+
+        Retrying is untested against Apple and can only be tested on somebody's real account, so
+        it is not done - and `retry_code` must not even be consulted, because consulting it is how
+        an untested recovery gets offered by a later edit.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails()
+
+        with pytest.raises(ExportSourceError):
+            asyncio.run(icloud._submit_code_with_retries(
+                factor, lambda: _next(iter(["123456"])), _unused,
+            ))
+
+        assert factor.requests == 0, "a throttled account must not be sent more codes"
+        assert factor.submitted == ["123456"], "exactly one attempt"
+
+    def test_what_escapes_is_not_the_kind_that_asks_for_a_bug_report(self):
+        """
+        <b>The complaint, in one assertion.</b>
+
+        Both front ends show an ExportSourceError as a plain message and an unrecognised exception
+        with the issue link. Raising the protocol error unchanged is what put a person in front of
+        that link for weather.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails()
+
+        with pytest.raises(ExportSourceError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(
+                factor, lambda: _next(iter(["123456"])), _unused,
+            ))
+
+        assert not isinstance(raised.value, UnhandledProtocolError)
+
+    def test_it_says_the_fault_is_apples_and_what_to_do(self):
+        """Not merely that it failed: a person reading this needs to know it is worth retrying."""
+        factor = FakeFactorThatTakesTheCodeThenFails()
+
+        with pytest.raises(ExportSourceError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(
+                factor, lambda: _next(iter(["123456"])), _unused,
+            ))
+
+        message = str(raised.value)
+        assert "Apple" in message
+        assert "sign in again" in message
+        assert "used up" in message, "they will wonder whether to keep the code they have"
+
+    def test_the_status_code_survives_into_the_message_and_the_cause(self):
+        """
+        503 is the whole diagnosis if this ever turns out to be more than weather.
+
+        Both, because the message is what reaches a bug report and `__cause__` is what reaches the
+        log with a traceback under it.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails()
+
+        with pytest.raises(ExportSourceError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(
+                factor, lambda: _next(iter(["123456"])), _unused,
+            ))
+
+        assert "503" in str(raised.value)
+        assert isinstance(raised.value.__cause__, UnhandledProtocolError)
+
+    def test_a_rejected_code_still_reaches_the_retry_offer(self):
+        """The path this must not have broken."""
+        factor = FakeFactor(accepts="123456")
+        codes = iter(["000000", "123456"])
+
+        async def retry(_error, _attempt):
+            return icloud.CODE_AGAIN
+
+        assert asyncio.run(icloud._submit_code_with_retries(
+            factor, lambda: _next(codes), retry,
+        )) == LoginState.LOGGED_IN
 
 
 class TestAWrongPasswordCanBeCorrected:

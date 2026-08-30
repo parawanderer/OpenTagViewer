@@ -35,6 +35,7 @@ from findmy import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
+from findmy.errors import UnhandledProtocolError
 from findmy.accessory import _extract_serial_from_stable_id  # noqa: PLC2701 - see _candidate
 from findmy.cloudkit.beacons import (
     AsyncBeaconStore,
@@ -378,8 +379,9 @@ async def log_in(
     :param get_code: Returns the code the user received. Awaited, as above.
     :param retry_credentials: Awaited with the error and the attempt number when Apple rejects the
         Apple ID or password; returns a replacement pair, or None to stop. None means one attempt.
-    :param retry_code: Awaited with the error and the attempt number when Apple rejects the
-        verification code; returns :data:`CODE_AGAIN`, :data:`CODE_RESEND`, or None to stop.
+    :param retry_code: Awaited with the error and the attempt number when submitting the
+        verification code fails; returns :data:`CODE_AGAIN`, :data:`CODE_RESEND`, or None to stop.
+        Ask :func:`code_was_already_spent` about the error before offering to re-type it.
     :raises ExportSourceError: If signing in does not end signed in.
     :raises InvalidCredentialsError: If the last attempt is rejected, or the user stops.
     """
@@ -428,6 +430,26 @@ async def _log_in_with_retries(account, email, password, retry_credentials):
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+def code_was_already_spent(error: BaseException) -> bool:
+    """
+    Whether Apple took the verification code and then failed anyway.
+
+    **`td_2fa_submit` does two things, and only the second one failed.** It submits the code, and
+    then runs a full Grand Slam re-authentication behind it. Issue #168's log shows the first half
+    succeeding - "Attempting authentication for user" appears twice, and only `_gsa_authenticate`
+    logs that - and the second answering 503 half a second later.
+
+    That matters because it is the opposite of a rejected code. A rejected code is still live and
+    should be re-typed; this one has been consumed by the half that worked, so re-typing it is a
+    guaranteed second failure.
+
+    The net is wide - `UnhandledProtocolError` is FindMy.py's "Apple said something this library
+    does not model" - but every failure it catches here happened *after* the submit returned, so
+    the code is gone in all of them.
+    """
+    return isinstance(error, UnhandledProtocolError)
+
+
 async def _submit_code_with_retries(chosen, get_code, retry_code):
     """
     Submit the verification code, letting a mistyped one be corrected.
@@ -436,10 +458,17 @@ async def _submit_code_with_retries(chosen, get_code, retry_code):
     not cosmetic: requesting delivery again sends a second code *and invalidates the first*
     (findmy-export 01-authentication §5). So somebody who mistyped a code they are still holding
     would lose it by being "helpfully" sent another, and a resend has to be a thing they choose.
+
+    **A code Apple took and then failed on stops instead of retrying**, and that is deliberate
+    rather than lazy - see :func:`code_was_already_spent` for what it is, and the message below for
+    why nothing is offered.
     """
     for attempt in range(1, MAX_CODE_ATTEMPTS + 1):
         try:
             return await chosen.submit(await get_code())
+        except UnhandledProtocolError as e:
+            logger.info("Apple took the code and then failed to finish signing in: %s", e)
+            raise _apple_failed_after_taking_the_code(e) from e
         except InvalidCredentialsError as e:
             logger.info("Apple rejected the verification code on attempt %d", attempt)
 
@@ -456,6 +485,36 @@ async def _submit_code_with_retries(chosen, get_code, retry_code):
                 await chosen.request()
 
     raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _apple_failed_after_taking_the_code(error: BaseException) -> ExportSourceError:
+    """
+    What to tell somebody whose code was accepted and whose sign-in failed anyway.
+
+    **Nothing is offered, and that is the finding rather than a shrug.** Three recoveries were
+    available and only one is known to work:
+
+    - *Re-type the code.* Cannot work - it has been spent. Ruled out by what the failure is.
+    - *Send a new code and carry on.* **Untested.** Nobody has observed this recovering, and the
+      one report that recovered did not do it. Worse, the sign-in that followed #168's 503 was
+      refused at the *password* step, which looks like Apple throttling the account or the machine
+      identity for a while - and requesting two more codes into that is how a throttle becomes a
+      lock. Rule 15's point is that the wrong remedy costs more than none.
+    - *Start the sign-in again shortly.* What actually worked, twice.
+
+    So it says that, and stops. **An `ExportSourceError` rather than the protocol error it came
+    from**, because both front ends already show one of those as a plain message with no invitation
+    to report a bug - which is the entire complaint. `from e` keeps the status code in the log,
+    where it is the whole diagnosis if this ever turns out to be more than weather.
+    """
+    return ExportSourceError(
+        f"Apple accepted your verification code and then failed to finish signing in: {error}\n\n"
+        "This is a fault on Apple's side rather than anything you did, and it clears on its own."
+        " Nothing was changed and nothing was sent.\n\n"
+        "Wait a minute or two and sign in again from the start. The code you entered has been"
+        " used up, so a new one will be sent. Apple may also refuse the password once while it"
+        " settles - that is part of the same hiccup, and trying once more is the answer.",
+    )
 
 
 def _describe_factor(method: object) -> str:
