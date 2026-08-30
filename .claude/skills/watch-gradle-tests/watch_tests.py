@@ -165,6 +165,15 @@ def diagnose_stall(log: str, age: float) -> list[str]:
     elif done:
         lines.append("STALLED  tests had been running, so suspect the device rather than the "
                      "lock: adb logcat -b crash")
+        # **A live process with nothing resumed is the third hang, and it is not a crash.**
+        # An activity finished itself - a session that would not restore, or a started activity
+        # that a test had stubbed - and Espresso's root picker then retries on a 30-second
+        # backoff forever, printing only "No activity currently resumed". The crash buffer is
+        # empty and the process is alive, so both of the checks above say nothing is wrong.
+        lines.append("STALLED  if the crash buffer is empty, ask what is on screen: "
+                     "adb logcat -d -s TestRunner:I | tail -3   (which test never finished) and "
+                     "adb logcat -d | grep RootViewPicker   (an activity finished and nothing "
+                     "replaced it)")
     return lines
 
 
