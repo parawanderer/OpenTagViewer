@@ -249,33 +249,52 @@ class FakeFactorThatTakesTheCodeThenFails:
 
     `td_2fa_submit` submits the code and *then* re-authenticates against Grand Slam. The second
     half returned 503 and the first had already spent the code, which is why `submitted` records
-    the attempt even though nothing succeeded.
+    every attempt even when nothing succeeded.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, fail_first: int = 1) -> None:
+        self.fail_first = fail_first
         self.submitted: list[str] = []
         self.requests = 0
+        self.on_request = None
 
     async def request(self) -> None:
         self.requests += 1
+        if self.on_request is not None:
+            self.on_request()
 
     async def submit(self, code: str):
         self.submitted.append(code)
-        raise UnhandledProtocolError("Error response for GSA request: 503")
+
+        if len(self.submitted) <= self.fail_first:
+            raise UnhandledProtocolError("Error response for GSA request: 503")
+
+        return LoginState.LOGGED_IN
+
+
+@pytest.fixture
+def no_waiting(monkeypatch):
+    """
+    The same number of retries, with the waiting taken out.
+
+    Patched rather than shortened in the source: the durations are the finding (see
+    `SPENT_CODE_WAITS`), and a suite that quietly ran with different ones would be testing
+    something nobody ships.
+    """
+    monkeypatch.setattr(icloud, "SPENT_CODE_WAITS", tuple(0 for _ in icloud.SPENT_CODE_WAITS))
 
 
 class TestACodeAppleTookAndThenFailedOn:
     """
     Issue #168: Apple accepted the code, then answered 503 to the re-authentication behind it.
 
-    **The recovery is to stop, and that is a finding rather than a shrug.** The one report that
-    recovered did so by starting the sign-in again - and the attempt in between was refused at the
-    *password* step, which looks like Apple throttling for a while. Sending two more codes into
-    that is how a throttle becomes a lock, so nothing here retries.
+    Nothing the user could type recovers this - the code is spent - and the only recovery anyone
+    has observed is the passage of time. So it waits and asks for a new code itself, twice, and
+    only then says it could not.
 
-    What was wrong was never the retrying anyway. This escaped the loop entirely, landed in the
-    wizard's catch-all handler, and asked the one person who could do nothing about it to file a
-    bug. One duly did.
+    What was broken was never the retrying. This escaped the loop entirely, landed in the wizard's
+    catch-all handler, and asked the one person who could do nothing about it to file a bug. One
+    duly did.
     """
 
     def test_it_is_recognised_as_a_spent_code(self):
@@ -287,25 +306,83 @@ class TestACodeAppleTookAndThenFailedOn:
         assert not icloud.code_was_already_spent(
             InvalidCredentialsError("Apple rejected that code."))
 
-    def test_it_stops_rather_than_asking_for_another_code(self):
-        """
-        The decision this turns on.
+    def test_it_waits_and_sends_a_new_code(self, no_waiting):
+        """The recovery, and that the code is a *new* one rather than the spent one re-typed."""
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=1)
+        codes = iter(["111111", "222222"])
 
-        Retrying is untested against Apple and can only be tested on somebody's real account, so
-        it is not done - and `retry_code` must not even be consulted, because consulting it is how
-        an untested recovery gets offered by a later edit.
+        state = asyncio.run(icloud._submit_code_with_retries(
+            factor, lambda: _next(codes), _unused,
+        ))
+
+        assert state == LoginState.LOGGED_IN
+        assert factor.requests == 1, "a spent code has to be replaced"
+        assert factor.submitted == ["111111", "222222"]
+
+    def test_the_user_is_never_asked_about_it(self, no_waiting):
         """
-        factor = FakeFactorThatTakesTheCodeThenFails()
+        `retry_code` must not be consulted, and that is load-bearing.
+
+        There is no question worth asking: re-typing cannot work and waiting is the only option,
+        so a prompt would be asking somebody to choose between one real answer and a wrong one.
+        Asserted because a retry path that never fires looks harmless in review.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=1)
+        codes = iter(["111111", "222222"])
+
+        asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
+
+    def test_it_gives_up_after_the_waits_run_out(self, no_waiting):
+        """A fault that does not clear must stop, rather than sending codes forever."""
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=99)
+        codes = iter([str(n) * 6 for n in range(icloud.MAX_CODE_ATTEMPTS)])
 
         with pytest.raises(ExportSourceError):
-            asyncio.run(icloud._submit_code_with_retries(
-                factor, lambda: _next(iter(["123456"])), _unused,
-            ))
+            asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
 
-        assert factor.requests == 0, "a throttled account must not be sent more codes"
-        assert factor.submitted == ["123456"], "exactly one attempt"
+        assert factor.requests == len(icloud.SPENT_CODE_WAITS)
+        assert len(factor.submitted) == icloud.MAX_CODE_ATTEMPTS
 
-    def test_what_escapes_is_not_the_kind_that_asks_for_a_bug_report(self):
+    def test_there_is_a_wait_for_every_retry(self):
+        """
+        The two constants are coupled by an index, and nothing else says so.
+
+        `SPENT_CODE_WAITS[attempt - 1]` is read on every attempt but the last, so raising the
+        attempt cap without adding a duration is an IndexError in front of a user mid-sign-in.
+        """
+        assert len(icloud.SPENT_CODE_WAITS) == icloud.MAX_CODE_ATTEMPTS - 1
+
+    def test_the_waits_clear_the_interval_that_was_seen_to_fail(self):
+        """
+        <b>The floor the one observed recovery puts under this.</b>
+
+        A whole manual round - re-typing the Apple ID and password, waiting for a code, entering
+        it - is the better part of a minute, and the attempt *after* that round was still refused.
+        So a first wait materially under a minute is known to be too short, and this is the number
+        that would have to be argued with rather than quietly lowered.
+        """
+        assert icloud.SPENT_CODE_WAITS[0] >= 60
+        assert sum(icloud.SPENT_CODE_WAITS) >= 180, "the recovery seen was about two rounds out"
+
+    def test_the_new_code_is_requested_after_the_wait_not_before(self, no_waiting):
+        """
+        Apple's codes expire, so one fetched before a two-minute wait is two minutes stale by the
+        time it is typed. Ordering asserted because both orders look correct in a diff.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=1)
+        order: list[str] = []
+
+        async def announce_free(_text: str) -> None:  # pragma: no cover - not awaited
+            pass
+
+        factor.on_request = lambda: order.append("requested")
+        asyncio.run(icloud._wait_then_send_a_new_code(
+            factor, 2, lambda text: order.append(text)))
+
+        assert order[-1] == "requested", "the code must be the last thing fetched"
+        assert any("2s" in step for step in order[:-1]), "it counts down before asking"
+
+    def test_what_escapes_is_not_the_kind_that_asks_for_a_bug_report(self, no_waiting):
         """
         <b>The complaint, in one assertion.</b>
 
@@ -313,57 +390,33 @@ class TestACodeAppleTookAndThenFailedOn:
         with the issue link. Raising the protocol error unchanged is what put a person in front of
         that link for weather.
         """
-        factor = FakeFactorThatTakesTheCodeThenFails()
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=99)
+        codes = iter([str(n) * 6 for n in range(icloud.MAX_CODE_ATTEMPTS)])
 
         with pytest.raises(ExportSourceError) as raised:
-            asyncio.run(icloud._submit_code_with_retries(
-                factor, lambda: _next(iter(["123456"])), _unused,
-            ))
+            asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
 
         assert not isinstance(raised.value, UnhandledProtocolError)
-
-    def test_it_says_the_fault_is_apples_and_what_to_do(self):
-        """Not merely that it failed: a person reading this needs to know it is worth retrying."""
-        factor = FakeFactorThatTakesTheCodeThenFails()
-
-        with pytest.raises(ExportSourceError) as raised:
-            asyncio.run(icloud._submit_code_with_retries(
-                factor, lambda: _next(iter(["123456"])), _unused,
-            ))
-
-        message = str(raised.value)
-        assert "Apple" in message
-        assert "sign in again" in message
-        assert "used up" in message, "they will wonder whether to keep the code they have"
-
-    def test_the_status_code_survives_into_the_message_and_the_cause(self):
-        """
-        503 is the whole diagnosis if this ever turns out to be more than weather.
-
-        Both, because the message is what reaches a bug report and `__cause__` is what reaches the
-        log with a traceback under it.
-        """
-        factor = FakeFactorThatTakesTheCodeThenFails()
-
-        with pytest.raises(ExportSourceError) as raised:
-            asyncio.run(icloud._submit_code_with_retries(
-                factor, lambda: _next(iter(["123456"])), _unused,
-            ))
-
         assert "503" in str(raised.value)
         assert isinstance(raised.value.__cause__, UnhandledProtocolError)
 
-    def test_a_rejected_code_still_reaches_the_retry_offer(self):
-        """The path this must not have broken."""
-        factor = FakeFactor(accepts="123456")
-        codes = iter(["000000", "123456"])
+    def test_it_says_it_already_waited(self, no_waiting):
+        """
+        Otherwise the advice reads as "just try again", which is what they have been doing.
 
-        async def retry(_error, _attempt):
-            return icloud.CODE_AGAIN
+        Somebody who has watched it wait three minutes needs to be told that is what happened, or
+        the message is asking them to repeat work the program already did.
+        """
+        factor = FakeFactorThatTakesTheCodeThenFails(fail_first=99)
+        codes = iter([str(n) * 6 for n in range(icloud.MAX_CODE_ATTEMPTS)])
 
-        assert asyncio.run(icloud._submit_code_with_retries(
-            factor, lambda: _next(codes), retry,
-        )) == LoginState.LOGGED_IN
+        with pytest.raises(ExportSourceError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
+
+        message = str(raised.value)
+        assert "chances to settle" in message
+        assert "Apple's side" in message
+        assert "password" in message, "the next attempt may be refused once, and that surprised us"
 
 
 class TestAWrongPasswordCanBeCorrected:

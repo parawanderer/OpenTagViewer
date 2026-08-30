@@ -17,6 +17,7 @@ inside one call each and dropped. A run starts from nothing, every time.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import uuid
@@ -342,6 +343,25 @@ failed export, it is an account they have to go and recover.
 """
 
 MAX_CODE_ATTEMPTS = 3
+
+# How long to wait before asking Apple for a new verification code, after it took the last one and
+# then failed on the re-authentication behind it (issue #168). One entry per retry.
+#
+# **The one recovery anyone has observed puts a floor under this, and it is higher than it looks.**
+# The sequence was: 503 after the code; then a whole manual round - re-typing the Apple ID and
+# password, choosing a delivery method, waiting for the code, typing it - which was refused at the
+# *password* step; then another round, which worked. A manual round is the better part of a minute,
+# so **roughly a minute after the 503 the account was still being refused**, and the thing that
+# eventually worked was about two rounds out. That is why the first wait is not thirty seconds.
+#
+# Strictly, the refusal in the middle was on the password call rather than the 2FA call, so it does
+# not *prove* a new code would have been rejected at that moment. It is the only measurement there
+# is, and it points one way.
+#
+# Two entries rather than one long wait, because the first is cheap and might be enough, and
+# because a single three-minute pause is indistinguishable from a hang however loudly it counts
+# down. Together they bracket the recovery that was actually seen.
+SPENT_CODE_WAITS = (60, 120)
 """How many times a verification code may be submitted before the sign-in is given up on."""
 
 CODE_AGAIN = "again"
@@ -366,6 +386,7 @@ async def log_in(
     get_code: Callable[[], Awaitable[str]],
     retry_credentials: Callable[[Exception, int], Awaitable[tuple[str, str] | None]] | None = None,
     retry_code: Callable[[Exception, int], Awaitable[str | None]] | None = None,
+    announce: Callable[[str], None] | None = None,
 ) -> None:
     """
     Sign in, dealing with two-factor authentication if the account asks for it.
@@ -381,7 +402,11 @@ async def log_in(
         Apple ID or password; returns a replacement pair, or None to stop. None means one attempt.
     :param retry_code: Awaited with the error and the attempt number when submitting the
         verification code fails; returns :data:`CODE_AGAIN`, :data:`CODE_RESEND`, or None to stop.
-        Ask :func:`code_was_already_spent` about the error before offering to re-type it.
+        Ask :func:`code_was_already_spent` about the error before offering to re-type it - a
+        spent code is not offered to it at all.
+    :param announce: Called with a line of status while this waits out a fault on Apple's side.
+        Not awaited, and never required: it exists so a window can stop looking hung. See
+        :func:`_wait_then_send_a_new_code`.
     :raises ExportSourceError: If signing in does not end signed in.
     :raises InvalidCredentialsError: If the last attempt is rejected, or the user stops.
     """
@@ -396,7 +421,7 @@ async def log_in(
 
         chosen = methods[await choose_second_factor([_describe_factor(m) for m in methods])]
         await chosen.request()
-        state = await _submit_code_with_retries(chosen, get_code, retry_code)
+        state = await _submit_code_with_retries(chosen, get_code, retry_code, announce)
 
     if state != LoginState.LOGGED_IN:
         raise ExportSourceError(f"Signing in ended at {state} rather than signed in.")
@@ -430,6 +455,18 @@ async def _log_in_with_retries(account, email, password, retry_credentials):
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+class SignInInterrupted(ExportSourceError):
+    """
+    Signing in stopped part-way through, for a reason that is Apple's rather than the user's.
+
+    **An `ExportSourceError` so nothing has to change to handle it**, and a distinct type so the
+    wizard can title the dialog truthfully. Its generic handler says "Could not read your
+    accessories", which is right for most of what `_load` raises and wrong for this: nothing was
+    read, because signing in never finished. A dialog that misdescribes what happened is worse
+    than a vague one - the reader corrects for it and then trusts the rest of it less.
+    """
+
+
 def code_was_already_spent(error: BaseException) -> bool:
     """
     Whether Apple took the verification code and then failed anyway.
@@ -450,7 +487,7 @@ def code_was_already_spent(error: BaseException) -> bool:
     return isinstance(error, UnhandledProtocolError)
 
 
-async def _submit_code_with_retries(chosen, get_code, retry_code):
+async def _submit_code_with_retries(chosen, get_code, retry_code, announce=None):
     """
     Submit the verification code, letting a mistyped one be corrected.
 
@@ -459,16 +496,26 @@ async def _submit_code_with_retries(chosen, get_code, retry_code):
     (findmy-export 01-authentication §5). So somebody who mistyped a code they are still holding
     would lose it by being "helpfully" sent another, and a resend has to be a thing they choose.
 
-    **A code Apple took and then failed on stops instead of retrying**, and that is deliberate
-    rather than lazy - see :func:`code_was_already_spent` for what it is, and the message below for
-    why nothing is offered.
+    **A code Apple took and then failed on is not re-typed and is not asked about**: it waits and
+    sends a new one by itself. Nothing the user could type would help - the code is spent - and the
+    only recovery anyone has observed is the passage of time. Asking "shall I try again?" of
+    somebody with no way to judge the answer is a worse interface than doing it.
+
+    Bounded by the same attempt budget as a mistyped code, so the worst case is two waits and then
+    the message in :func:`_apple_failed_after_taking_the_code`.
     """
     for attempt in range(1, MAX_CODE_ATTEMPTS + 1):
         try:
             return await chosen.submit(await get_code())
         except UnhandledProtocolError as e:
             logger.info("Apple took the code and then failed to finish signing in: %s", e)
-            raise _apple_failed_after_taking_the_code(e) from e
+
+            # The last attempt has nothing left to wait for, and waiting before saying so would
+            # only add a minute to a failure that has already happened.
+            if attempt == MAX_CODE_ATTEMPTS:
+                raise _apple_failed_after_taking_the_code(e) from e
+
+            await _wait_then_send_a_new_code(chosen, SPENT_CODE_WAITS[attempt - 1], announce)
         except InvalidCredentialsError as e:
             logger.info("Apple rejected the verification code on attempt %d", attempt)
 
@@ -487,7 +534,35 @@ async def _submit_code_with_retries(chosen, get_code, retry_code):
     raise AssertionError("unreachable")  # pragma: no cover
 
 
-def _apple_failed_after_taking_the_code(error: BaseException) -> ExportSourceError:
+async def _wait_then_send_a_new_code(chosen, seconds: int, announce=None) -> None:
+    """
+    Sit out Apple's bad minute, then ask for a fresh verification code.
+
+    **Counting down out loud, because the alternative is a window that looks hung.** Three quarters
+    of a minute of silence in the middle of a sign-in is when somebody force-quits, and this is a
+    deliberate wait rather than a slow call - so it says so, every second, and the progress window
+    keeps moving.
+
+    `announce` is optional so the retry logic stays testable without a front end; a caller that
+    passes nothing simply waits.
+    """
+    for remaining in range(seconds, 0, -1):
+        if announce is not None:
+            announce(
+                "Apple accepted the code and then had a problem finishing. That clears on its"
+                f" own - waiting {remaining}s, then sending a new code…",
+            )
+        await asyncio.sleep(1)
+
+    if announce is not None:
+        announce("Asking Apple for a new verification code…")
+
+    # Only now, because a code requested before the wait would be ageing throughout it - and
+    # Apple's codes expire. See findmy-export 01-authentication §5.
+    await chosen.request()
+
+
+def _apple_failed_after_taking_the_code(error: BaseException) -> SignInInterrupted:
     """
     What to tell somebody whose code was accepted and whose sign-in failed anyway.
 
@@ -495,25 +570,27 @@ def _apple_failed_after_taking_the_code(error: BaseException) -> ExportSourceErr
     available and only one is known to work:
 
     - *Re-type the code.* Cannot work - it has been spent. Ruled out by what the failure is.
-    - *Send a new code and carry on.* **Untested.** Nobody has observed this recovering, and the
-      one report that recovered did not do it. Worse, the sign-in that followed #168's 503 was
-      refused at the *password* step, which looks like Apple throttling the account or the machine
-      identity for a while - and requesting two more codes into that is how a throttle becomes a
-      lock. Rule 15's point is that the wrong remedy costs more than none.
-    - *Start the sign-in again shortly.* What actually worked, twice.
+    - *Send a new code immediately.* Not enough on its own. The sign-in that followed #168's 503
+      was refused at the *password* step, so whatever was unhappy stayed unhappy for longer than
+      one call.
+    - *Wait, then send a new code.* What :func:`_wait_then_send_a_new_code` now does, and what the
+      only successful recovery amounted to. This message is what is left when that has been tried
+      and has not worked.
 
     So it says that, and stops. **An `ExportSourceError` rather than the protocol error it came
     from**, because both front ends already show one of those as a plain message with no invitation
     to report a bug - which is the entire complaint. `from e` keeps the status code in the log,
     where it is the whole diagnosis if this ever turns out to be more than weather.
     """
-    return ExportSourceError(
+    return SignInInterrupted(
         f"Apple accepted your verification code and then failed to finish signing in: {error}\n\n"
         "This is a fault on Apple's side rather than anything you did, and it clears on its own."
         " Nothing was changed and nothing was sent.\n\n"
-        "Wait a minute or two and sign in again from the start. The code you entered has been"
-        " used up, so a new one will be sent. Apple may also refuse the password once while it"
-        " settles - that is part of the same hiccup, and trying once more is the answer.",
+        f"It was given {len(SPENT_CODE_WAITS)} chances to settle - waiting"
+        f" {' and then '.join(f'{s}s' for s in SPENT_CODE_WAITS)} - and did not.\n\n"
+        "Leave it a few minutes and sign in again. Apple may also refuse the password once while"
+        " it settles - that is part of the same hiccup rather than a second problem, and trying"
+        " once more is the answer.",
     )
 
 
