@@ -22,6 +22,23 @@ python .claude/skills/watch-gradle-tests/watch_tests.py tmp/run.log
 Each line it prints is one event: `FAILED <Class>.<method>` as each failure appears,
 `STALLED …` if the log stops growing, and `FINISHED` + `VERDICT` at the end.
 
+### Give every run its own log file
+
+Reusing one name races the watcher against the run that is starting. Arm a Monitor while the
+previous run's log is still on disk and it reads *that* — matches its `BUILD` line, prints its
+verdict, and reports a finished run that has not started. The XML age in `VERDICT` is the only
+hint, and "2 min old" looks perfectly current.
+
+That cost a wrong conclusion here: a stale verdict was read as the new run's, its crash trace
+pointed at a line number the fix had already moved, and the obvious inference — "the APK did
+not rebuild" — was wrong twice over.
+
+```bash
+log=tmp/run-$(date +%H%M%S).log
+./gradlew :app:testEmulatorDebugAndroidTest --console=plain > "$log" 2>&1 &
+python .claude/skills/watch-gradle-tests/watch_tests.py "$log"
+```
+
 ### Never wrap `--once` in your own sleep loop
 
 That is the shape step 3 exists to replace, and it looks close enough to right to pass review:

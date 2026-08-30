@@ -104,7 +104,10 @@ android {
         // field exists in both variants so code reading it compiles in both.
         buildConfigField("String", "BUILD_COMMIT", "null")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Grants the app's runtime permissions before the first test - see the class, which
+        // explains why an ungranted one hangs the suite rather than failing a test.
+        testInstrumentationRunner =
+            "dev.wander.android.opentagviewer.GrantWhatTheAppAsksForRunner"
 
         // **Do not add `timeout_msec` here.** It works - a hanging test fails at the cap with
         // its own name - but AndroidJUnitRunner pays for it per test, not per hang: with it set
