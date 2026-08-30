@@ -311,7 +311,24 @@ public class NearbyTagWatcher {
             emitter.setCancellable(() -> {
                 Log.d(TAG, "Stopped watching for nearby tags");
                 scanRefresh.dispose();
-                scanner.stopScan(callback);
+
+                // **Stopping a scan the adapter has already ended throws, and on this path a
+                // throw is fatal.** stopScan raises IllegalStateException("BT Adapter is not
+                // turned ON") when Bluetooth went off while we were watching - which is an
+                // ordinary thing for somebody to do - and a cancellable that throws during
+                // disposal has no subscriber left to receive it, so RxJava hands it to the
+                // global error handler and the process goes down. Not a crash on some exotic
+                // path either: turn Bluetooth off with the map open, then leave the screen.
+                //
+                // Nothing is lost by swallowing it. The adapter turning off is what stops a
+                // scan; there is no scan left to stop. Same reasoning as the restart above,
+                // which already catches this for the same reason.
+                try {
+                    scanner.stopScan(callback);
+                } catch (final Exception bluetoothWentAway) {
+                    Log.d(TAG, "The nearby scan had already ended with the adapter",
+                            bluetoothWentAway);
+                }
             });
         }).subscribeOn(Schedulers.io());
     }
