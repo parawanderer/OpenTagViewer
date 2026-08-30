@@ -124,6 +124,23 @@ public final class FakeAppleAuthService implements AppleAuthService {
         return this;
     }
 
+    /**
+     * <b>Apple takes the code and then fails to finish - so the code is spent.</b>
+     *
+     * <p>FindMy.py's submit does two calls: the check, which passed, and a Grand Slam
+     * re-authentication, which 503s. The message is the one that actually arrives across the
+     * bridge, because that string is what the app has to pattern-match on - FindMy.py folds
+     * every non-OK status into {@code UnhandledProtocolError} carrying only the number.
+     *
+     * <p>Reported as issue #168; the desktop exporter fixed its half in #169.
+     */
+    public FakeAppleAuthService whereAppleTakesTheCodeThenFails() {
+        this.codeFailsWith = new RuntimeException(
+                "com.chaquo.python.PyException: findmy.errors.UnhandledProtocolError:"
+                        + " Error response for GSA request: 503");
+        return this;
+    }
+
     @Override
     public Observable<PythonAuthResponse> login(
             final String emailOrPhone, final String password, final String anisetteServerUrl,
