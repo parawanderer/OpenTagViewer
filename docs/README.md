@@ -13,6 +13,7 @@ no natural home in a source comment.
 | [android-import-handover.md](./android-import-handover.md) | What the Android app has to do to catch up with the exporter: the shared package's Chaquopy wiring, encrypted bundles, self-generated tags. A task brief - delete it when the work lands. |
 | [anisette-native-android.md](./anisette-native-android.md) | Proof-of-concept log for running Apple's ADI libraries in-process on Android, and the measurements that came out of it. Historical; the implementation shipped. |
 | [findmy-export/](./findmy-export/) | Clean-room specification of the protocol for reading FindMy accessory keys from iCloud without a Mac. Stage 1 written; five stages to go. |
+| [owner-connected-tags.md](./owner-connected-tags.md) | Reading list for the one case the app cannot handle: matching or ringing a tag while it is with its owner, so the Find My network never sees it. Links plus what each one actually establishes — including that authorised and unauthorised ringing are different protocols. |
 
 ## If you add a document here
 
