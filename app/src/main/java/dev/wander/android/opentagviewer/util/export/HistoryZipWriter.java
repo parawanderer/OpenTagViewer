@@ -12,7 +12,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -51,12 +50,11 @@ public final class HistoryZipWriter {
      * <p>The stream is not closed - whoever opened it closes it, which for the storage picker
      * means the try-with-resources that produced it.
      *
-     * @param historyByTagName reports keyed by the name to show the user, which is the
-     *                         user's own name for the tag rather than an identifier
+     * @param histories ordered tags with both their stable identity and user-visible name
      */
     public void write(
             @NonNull final OutputStream out,
-            @NonNull final Map<String, List<BeaconLocationReport>> historyByTagName)
+            @NonNull final List<HistoryExportEntry> histories)
             throws IOException {
 
         final Set<String> used = new HashSet<>();
@@ -65,8 +63,9 @@ public final class HistoryZipWriter {
         // and the caller owns that.
         final ZipOutputStream zip = new ZipOutputStream(out);
 
-        for (Map.Entry<String, List<BeaconLocationReport>> tag : historyByTagName.entrySet()) {
-            final String entryName = uniqueEntryName(used, tag.getKey(), tag.getValue());
+        for (HistoryExportEntry tag : histories) {
+            final String entryName = uniqueEntryName(
+                    used, tag.getDisplayName(), tag.getReports());
 
             zip.putNextEntry(new ZipEntry(entryName));
 
@@ -74,7 +73,7 @@ public final class HistoryZipWriter {
             // here would close the zip with it, and the encoding has to be explicit anyway -
             // the default charset is the platform's, and these files travel.
             Writer writer = new OutputStreamWriter(zip, StandardCharsets.UTF_8);
-            this.csvWriter.write(writer, tag.getValue());
+            this.csvWriter.write(writer, tag.getBeaconId(), tag.getReports());
             writer.flush();
 
             zip.closeEntry();

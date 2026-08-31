@@ -313,4 +313,14 @@
     <string name="twofactor_apple_took_the_code">Apple이 코드를 받은 뒤 로그인을 끝내지 못했습니다. 코드는 이미 사용되었으므로 새 코드가 필요합니다. 바로 요청하면 거부되기 때문에 잠시 기다린 뒤 요청합니다.</string>
     <string name="twofactor_waiting_seconds">%1$d초 후에 Apple에 새 코드를 요청합니다…</string>
     <string name="twofactor_apple_did_not_recover">Apple이 아직 로그인을 마치지 못하고 있습니다. 이는 Apple 쪽 장애이며, 사용자의 잘못도 코드 문제도 아닙니다.\n\n몇 분 뒤에 다시 시도하세요. 그때 비밀번호가 한 번 거부될 수 있는데, 이것도 같은 장애의 일부이므로 틀렸다고 생각하지 말고 다시 입력하세요.</string>
+    <string name="import_history">기록 가져오기</string>
+    <string name="history_import_complete_title">기록 가져오기 완료</string>
+    <string name="history_import_result_counts">읽은 행: %1$d\n추가된 행: %2$d\n이미 존재함: %3$d\n잘못된 행: %4$d\n건너뜀(태그를 가져오지 않음): %5$d</string>
+    <string name="history_import_unknown_guidance">누락된 태그를 먼저 가져온 다음 이 기록 ZIP을 다시 가져오면 건너뛴 행을 복원할 수 있습니다.</string>
+    <string name="history_import_legacy_title">기록 내보내기가 너무 오래됨</string>
+    <string name="history_import_legacy_message">이 내보내기는 태그를 안전하게 식별하지 못하므로 기록을 복원할 수 없습니다. 현재 앱에서 새 기록 ZIP을 만든 후 해당 파일을 가져오세요.</string>
+    <string name="history_import_invalid_title">지원되지 않는 기록 파일</string>
+    <string name="history_import_invalid_message">Android용 OpenTagViewer의 기록 내보내기에서 만든 손상되지 않은 ZIP을 선택하세요.</string>
+    <string name="history_import_failed_title">기록을 가져올 수 없음</string>
+    <string name="history_import_failed_message">기록을 가져오지 않았습니다. 다시 시도하거나 다른 기록 ZIP을 선택하세요.</string>
 </resources>

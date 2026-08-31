@@ -25,6 +25,7 @@ import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 public class HistoryCsvWriterTest {
 
     private static final ZoneId AMSTERDAM = ZoneId.of("Europe/Amsterdam");
+    private static final String BEACON_ID = "beacon-123";
 
     /**
      * Summer, so Amsterdam is +02:00 and the UTC and local columns differ visibly.
@@ -50,8 +51,18 @@ public class HistoryCsvWriterTest {
 
     private static String write(final List<BeaconLocationReport> reports) throws IOException {
         StringWriter out = new StringWriter();
-        new HistoryCsvWriter(AMSTERDAM).write(out, reports);
+        new HistoryCsvWriter(AMSTERDAM).write(out, BEACON_ID, reports);
         return out.toString();
+    }
+
+    @Test
+    public void everyReportCarriesTheStableBeaconIdentity() throws Exception {
+        final String[] rows = write(List.of(report().build())).split("\r\n");
+
+        assertTrue("the header should identify the stable beacon column",
+                rows[0].endsWith(",beacon_id"));
+        assertTrue("the report should carry the stable beacon id, got: " + rows[1],
+                rows[1].endsWith("," + BEACON_ID));
     }
 
     @Test

@@ -313,4 +313,14 @@ You can set this up now, or any time later from Settings.</string>
     <string name="twofactor_apple_took_the_code">Apple accepted your code and then had a problem finishing the sign-in. The code is used up, so a new one is needed — waiting a moment before asking for it, because asking straight away is refused.</string>
     <string name="twofactor_waiting_seconds">Asking Apple for a new code in %1$d s…</string>
     <string name="twofactor_apple_did_not_recover">Apple is still not finishing the sign-in. This is a fault on Apple\'s side, not something you did, and not your code.\n\nTry again in a few minutes. Your password may be refused once when you do — that is part of the same fault, so enter it again rather than assuming it is wrong.</string>
+    <string name="import_history">Import History</string>
+    <string name="history_import_complete_title">History import complete</string>
+    <string name="history_import_result_counts">Rows read: %1$d\nRows added: %2$d\nAlready present: %3$d\nMalformed: %4$d\nSkipped (tag not imported): %5$d</string>
+    <string name="history_import_unknown_guidance">Import the missing tags first, then import this history ZIP again to restore the skipped rows.</string>
+    <string name="history_import_legacy_title">History export is too old</string>
+    <string name="history_import_legacy_message">This export does not identify tags safely, so its history cannot be restored. Create a new Export History ZIP with the current app and import that file instead.</string>
+    <string name="history_import_invalid_title">History file not supported</string>
+    <string name="history_import_invalid_message">Choose an undamaged ZIP created by Export History in OpenTagViewer for Android.</string>
+    <string name="history_import_failed_title">History could not be imported</string>
+    <string name="history_import_failed_message">No history was imported. Try again, or choose another Export History ZIP.</string>
 </resources>
