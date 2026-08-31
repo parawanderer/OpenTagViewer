@@ -310,4 +310,7 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="refresh_from_account_done">À jour avec votre compte Apple</string>
     <string name="refresh_from_account_failed">Impossible de joindre votre compte Apple pour le moment. Vos tags sont inchangés.</string>
     <string name="error_report_log_too_big_to_copy">Ce journal est trop volumineux pour être copié. Enregistrez-le plutôt sous forme de fichier et joignez celui-ci.</string>
+    <string name="twofactor_apple_took_the_code">Apple a accepté votre code puis n’a pas pu terminer la connexion. Le code est donc utilisé et il en faut un nouveau — nous patientons un instant avant de le demander, car une demande immédiate est refusée.</string>
+    <string name="twofactor_waiting_seconds">Nouveau code demandé à Apple dans %1$d s…</string>
+    <string name="twofactor_apple_did_not_recover">Apple ne termine toujours pas la connexion. C’est une panne du côté d’Apple, pas quelque chose que vous avez fait, ni votre code.\n\nRéessayez dans quelques minutes. Votre mot de passe pourra être refusé une fois à ce moment-là : cela fait partie de la même panne, saisissez-le à nouveau plutôt que de le croire erroné.</string>
 </resources>
