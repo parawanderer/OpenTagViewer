@@ -310,4 +310,7 @@
     <string name="refresh_from_account_done">Apple アカウントと同じ状態になりました</string>
     <string name="refresh_from_account_failed">いま Apple アカウントに接続できませんでした。タグはそのままです。</string>
     <string name="error_report_log_too_big_to_copy">このログはコピーするには大きすぎます。代わりにファイルとして保存して添付してください。</string>
+    <string name="twofactor_apple_took_the_code">Apple はコードを受け付けたあと、サインインを完了できませんでした。コードは使用済みなので新しいものが必要です。すぐに要求しても拒否されるため、少し待ってから要求します。</string>
+    <string name="twofactor_waiting_seconds">%1$d 秒後に Apple へ新しいコードを要求します…</string>
+    <string name="twofactor_apple_did_not_recover">Apple はまだサインインを完了できていません。これは Apple 側の障害であり、あなたの操作やコードのせいではありません。\n\n数分後にもう一度お試しください。そのときパスワードが一度だけ拒否されることがありますが、これも同じ障害の一部です。間違っていると考えず、もう一度入力してください。</string>
 </resources>
