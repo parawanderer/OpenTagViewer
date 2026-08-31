@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    How to get tags in, from a screen that already has some.
+    How to get tags or their history in, from a screen that already has some.
 
     Both of these were only ever reachable from the empty state, which is hidden the moment
     anything is imported - so after a first import there was no way back to either. That matters
     most for the account route: the app joins the keychain precisely so a later read costs one
     tap and no passcode, and there was nothing to tap.
 
-    Same wording as the empty-state buttons, deliberately. They are the same two actions, and a
-    menu that renames them makes the second one look like a third option.
+    The tag-import wording matches the empty-state buttons deliberately. History import is a
+    separate action because it restores reports only after their tags already exist.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -41,5 +41,9 @@
     <item
         android:id="@+id/action_import_from_file"
         android:title="@string/icloud_import_from_file" />
+
+    <item
+        android:id="@+id/action_import_history"
+        android:title="@string/import_history" />
 
 </menu>

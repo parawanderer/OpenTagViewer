@@ -313,4 +313,14 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="twofactor_apple_took_the_code">Apple hat deinen Code angenommen und danach die Anmeldung nicht abschließen können. Der Code ist damit verbraucht, es wird also ein neuer gebraucht – wir warten kurz, bevor wir ihn anfordern, denn sofortiges Anfordern wird abgelehnt.</string>
     <string name="twofactor_waiting_seconds">Neuer Code wird in %1$d s bei Apple angefordert …</string>
     <string name="twofactor_apple_did_not_recover">Apple schließt die Anmeldung weiterhin nicht ab. Das liegt an Apple, nicht an dir und nicht an deinem Code.\n\nVersuche es in ein paar Minuten erneut. Dein Passwort wird dabei möglicherweise einmal abgelehnt – das gehört zum selben Fehler, gib es also einfach noch einmal ein, statt es für falsch zu halten.</string>
+    <string name="import_history">Verlauf importieren</string>
+    <string name="history_import_complete_title">Verlaufsimport abgeschlossen</string>
+    <string name="history_import_result_counts">Gelesene Zeilen: %1$d\nHinzugefügte Zeilen: %2$d\nBereits vorhanden: %3$d\nFehlerhaft: %4$d\nÜbersprungen (Tag nicht importiert): %5$d</string>
+    <string name="history_import_unknown_guidance">Importiere zuerst die fehlenden Tags und anschließend diese Verlaufs-ZIP erneut, um die übersprungenen Zeilen wiederherzustellen.</string>
+    <string name="history_import_legacy_title">Verlaufsexport ist zu alt</string>
+    <string name="history_import_legacy_message">Dieser Export identifiziert Tags nicht zuverlässig, daher kann sein Verlauf nicht wiederhergestellt werden. Erstelle mit der aktuellen App eine neue Verlaufs-ZIP und importiere stattdessen diese Datei.</string>
+    <string name="history_import_invalid_title">Verlaufsdatei nicht unterstützt</string>
+    <string name="history_import_invalid_message">Wähle eine unbeschädigte ZIP-Datei, die mit „Verlauf exportieren“ in OpenTagViewer für Android erstellt wurde.</string>
+    <string name="history_import_failed_title">Verlauf konnte nicht importiert werden</string>
+    <string name="history_import_failed_message">Es wurde kein Verlauf importiert. Versuche es erneut oder wähle eine andere Verlaufs-ZIP.</string>
 </resources>

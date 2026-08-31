@@ -313,4 +313,14 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="twofactor_apple_took_the_code">Apple a accepté votre code puis n’a pas pu terminer la connexion. Le code est donc utilisé et il en faut un nouveau — nous patientons un instant avant de le demander, car une demande immédiate est refusée.</string>
     <string name="twofactor_waiting_seconds">Nouveau code demandé à Apple dans %1$d s…</string>
     <string name="twofactor_apple_did_not_recover">Apple ne termine toujours pas la connexion. C’est une panne du côté d’Apple, pas quelque chose que vous avez fait, ni votre code.\n\nRéessayez dans quelques minutes. Votre mot de passe pourra être refusé une fois à ce moment-là : cela fait partie de la même panne, saisissez-le à nouveau plutôt que de le croire erroné.</string>
+    <string name="import_history">Importer l’historique</string>
+    <string name="history_import_complete_title">Importation de l’historique terminée</string>
+    <string name="history_import_result_counts">Lignes lues : %1$d\nLignes ajoutées : %2$d\nDéjà présentes : %3$d\nIncorrectes : %4$d\nIgnorées (balise non importée) : %5$d</string>
+    <string name="history_import_unknown_guidance">Importez d’abord les balises manquantes, puis importez à nouveau ce fichier ZIP d’historique pour restaurer les lignes ignorées.</string>
+    <string name="history_import_legacy_title">L’exportation de l’historique est trop ancienne</string>
+    <string name="history_import_legacy_message">Cette exportation n’identifie pas les balises de manière fiable ; son historique ne peut donc pas être restauré. Créez un nouveau fichier ZIP d’historique avec l’application actuelle et importez-le à la place.</string>
+    <string name="history_import_invalid_title">Fichier d’historique non pris en charge</string>
+    <string name="history_import_invalid_message">Choisissez un fichier ZIP intact créé par « Exporter l’historique » dans OpenTagViewer pour Android.</string>
+    <string name="history_import_failed_title">Impossible d’importer l’historique</string>
+    <string name="history_import_failed_message">Aucun historique n’a été importé. Réessayez ou choisissez un autre fichier ZIP d’historique.</string>
 </resources>
