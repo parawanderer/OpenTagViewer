@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,7 +29,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.util.export.HistoryCsvWriter;
 
 /** Restores an Android history-export ZIP through one blocking interface. */
-public final class HistoryImporter {
+public final class HistoryImporter implements HistoryArchiveImporter {
     private static final String BEACON_ID = "beacon_id";
 
     private static final CSVFormat CSV = CSVFormat.RFC4180.builder()
@@ -57,10 +58,19 @@ public final class HistoryImporter {
     public HistoryImportResult importArchive(@NonNull final InputStream archive)
             throws HistoryImportException {
 
+        return this.importArchive(archive, HistoryImportProgress.NONE);
+    }
+
+    @Override
+    public HistoryImportResult importArchive(
+            @NonNull final InputStream archive,
+            @NonNull final HistoryImportProgress progress) throws HistoryImportException {
+
+        progress.changed(HistoryImportProgress.Stage.READING, 0, 0);
         final ReadResult read = this.readArchive(archive);
         try {
             return this.sink.merge(
-                    read.rows, read.rowsRead, read.malformedRows, this.clock.getAsLong());
+                    read.rows, read.rowsRead, read.malformedRows, this.clock.getAsLong(), progress);
         } catch (RuntimeException error) {
             throw new HistoryImportException(
                     HistoryImportException.Reason.DATABASE_FAILED,
@@ -97,10 +107,9 @@ public final class HistoryImporter {
                     "History archive could not be read",
                     error);
         } catch (RuntimeException error) {
-            // Commons CSV reports some malformed record shapes while its iterator advances.
             throw new HistoryImportException(
-                    HistoryImportException.Reason.INVALID_ARCHIVE,
-                    "History CSV structure is invalid",
+                    HistoryImportException.Reason.UNEXPECTED,
+                    "History import failed unexpectedly while reading the archive",
                     error);
         }
 
@@ -142,7 +151,7 @@ public final class HistoryImporter {
 
             for (CSVRecord record : parser) {
                 result.rowsRead++;
-                final HistoryImportRow row = parseRow(record);
+                final HistoryImportRow row = parseRow(record, result.beaconIds);
                 if (row == null) {
                     result.malformedRows++;
                 } else {
@@ -152,12 +161,19 @@ public final class HistoryImporter {
         }
     }
 
-    private static HistoryImportRow parseRow(final CSVRecord row) {
+    private static HistoryImportRow parseRow(
+            final CSVRecord row,
+            final Map<String, String> beaconIds) {
         try {
-            final String beaconId = row.get(BEACON_ID);
-            if (beaconId == null || beaconId.isBlank()) {
+            final String readBeaconId = row.get(BEACON_ID);
+            if (readBeaconId == null || readBeaconId.isBlank()) {
                 return null;
             }
+            // A multi-year archive repeats one UUID tens of thousands of times. Keep one String
+            // object per beacon rather than one per row while the full archive is held for its
+            // atomic merge.
+            final String beaconId = beaconIds.computeIfAbsent(
+                    readBeaconId, ignored -> readBeaconId);
 
             final double latitude = Double.parseDouble(row.get("latitude_exact"));
             final double longitude = Double.parseDouble(row.get("longitude_exact"));
@@ -198,6 +214,7 @@ public final class HistoryImporter {
 
     private static final class ReadResult {
         private final List<HistoryImportRow> rows = new ArrayList<>();
+        private final Map<String, String> beaconIds = new HashMap<>();
         private int rowsRead;
         private int malformedRows;
     }

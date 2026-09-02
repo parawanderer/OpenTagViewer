@@ -10,6 +10,7 @@ public final class HistoryImportException extends Exception {
         INVALID_ARCHIVE,
         READ_FAILED,
         DATABASE_FAILED,
+        UNEXPECTED,
     }
 
     private final Reason reason;

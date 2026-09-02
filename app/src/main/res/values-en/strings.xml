@@ -323,4 +323,7 @@ You can set this up now, or any time later from Settings.</string>
     <string name="history_import_invalid_message">Choose an undamaged ZIP created by Export History in OpenTagViewer for Android.</string>
     <string name="history_import_failed_title">History could not be imported</string>
     <string name="history_import_failed_message">No history was imported. Try again, or choose another Export History ZIP.</string>
+    <string name="error_report_body_history_import">The app could not restore history from the file you picked, and cannot say why — so trying again with the same file may not help.
+
+No history was imported and nothing already stored was changed.</string>
 </resources>

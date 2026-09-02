@@ -6,7 +6,11 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.intent.Intents.intended;
+import static androidx.test.espresso.intent.VerificationModes.times;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
 import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
@@ -32,6 +36,8 @@ import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.google.android.material.progressindicator.CircularProgressIndicator;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +49,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -53,7 +61,12 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.util.export.HistoryCsvWriter;
+import dev.wander.android.opentagviewer.util.history.HistoryImportException;
+import dev.wander.android.opentagviewer.util.history.HistoryImportProgress;
+import dev.wander.android.opentagviewer.util.history.HistoryImportResult;
 
 /** The history picker and every result the My Devices screen promises to explain. */
 @LargeTest
@@ -81,6 +94,8 @@ public class ImportingHistoryFromTheDeviceListTest {
     private final List<File> files = new ArrayList<>();
     private OpenTagViewerDatabase db;
     private ActivityScenario<MyDevicesListActivity> scenario;
+    private CountDownLatch showFakeMerge;
+    private CountDownLatch finishFakeImport;
 
     @Before
     public void seedOneKnownTag() {
@@ -112,10 +127,17 @@ public class ImportingHistoryFromTheDeviceListTest {
 
     @After
     public void cleanUp() {
+        if (this.showFakeMerge != null) {
+            this.showFakeMerge.countDown();
+        }
+        if (this.finishFakeImport != null) {
+            this.finishFakeImport.countDown();
+        }
         if (this.scenario != null) {
             this.scenario.close();
         }
         Intents.release();
+        AppDependencies.reset();
         this.forgetTestData();
         for (File file : this.files) {
             file.delete();
@@ -138,6 +160,7 @@ public class ImportingHistoryFromTheDeviceListTest {
                 R.string.history_import_result_counts, 4, 1, 1, 1, 1);
         Eventually.check(() -> onView(withText(containsString(counts))).inRoot(isDialog())
                 .check(matches(isDisplayed())));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
         onView(withText(containsString(context.getString(
                         R.string.history_import_unknown_guidance))))
                 .inRoot(isDialog())
@@ -156,6 +179,70 @@ public class ImportingHistoryFromTheDeviceListTest {
     }
 
     @Test
+    public void aLongImportShowsAndUpdatesProgressBeforeItsResult() throws Exception {
+        final CountDownLatch startedReading = new CountDownLatch(1);
+        final CountDownLatch reachedMerge = new CountDownLatch(1);
+        this.showFakeMerge = new CountDownLatch(1);
+        this.finishFakeImport = new CountDownLatch(1);
+        AppDependencies.replaceHistoryImporter((archive, progress) -> {
+            progress.changed(HistoryImportProgress.Stage.READING, 0, 0);
+            startedReading.countDown();
+            awaitTestLatch(this.showFakeMerge);
+            progress.changed(HistoryImportProgress.Stage.MERGING, 4, 10);
+            reachedMerge.countDown();
+            awaitTestLatch(this.finishFakeImport);
+            return new HistoryImportResult(10, 0, 10, 0, 0);
+        });
+        this.answerPickerWith(zip("ignored.txt", "the fake importer owns this"));
+        this.openAndChooseHistory();
+
+        assertTrue(startedReading.await(5, TimeUnit.SECONDS));
+        Eventually.check(() -> onView(withId(R.id.history_import_progress))
+                .inRoot(isDialog()).check((view, missing) -> {
+                    if (missing != null) {
+                        throw missing;
+                    }
+                    assertTrue(((CircularProgressIndicator) view).isIndeterminate());
+                }));
+
+        this.showFakeMerge.countDown();
+        assertTrue(reachedMerge.await(5, TimeUnit.SECONDS));
+        Eventually.check(() -> onView(withId(R.id.history_import_progress))
+                .inRoot(isDialog()).check((view, missing) -> {
+                    if (missing != null) {
+                        throw missing;
+                    }
+                    final CircularProgressIndicator indicator =
+                            (CircularProgressIndicator) view;
+                    assertFalse(indicator.isIndeterminate());
+                    assertEquals(10, indicator.getMax());
+                    assertEquals(4, indicator.getProgress());
+                }));
+
+        this.finishFakeImport.countDown();
+        Eventually.check(() -> onView(withText(R.string.history_import_complete_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
+    }
+
+    private static void awaitTestLatch(final CountDownLatch latch)
+            throws HistoryImportException {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new HistoryImportException(
+                        HistoryImportException.Reason.UNEXPECTED,
+                        "test import was never released");
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new HistoryImportException(
+                    HistoryImportException.Reason.UNEXPECTED,
+                    "test import was interrupted",
+                    error);
+        }
+    }
+
+    @Test
     public void legacyNameOnlyExportExplainsWhyItIsUnsafe() throws Exception {
         final List<String> currentHeaders = HistoryCsvWriter.requiredHeaders();
         final String legacyHeader = String.join(",",
@@ -165,6 +252,7 @@ public class ImportingHistoryFromTheDeviceListTest {
 
         Eventually.check(() -> onView(withText(R.string.history_import_legacy_title))
                 .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
         onView(withText(R.string.history_import_legacy_message)).inRoot(isDialog())
                 .check(matches(isDisplayed()));
     }
@@ -176,8 +264,10 @@ public class ImportingHistoryFromTheDeviceListTest {
 
         Eventually.check(() -> onView(withText(R.string.history_import_invalid_title))
                 .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
         onView(withText(R.string.history_import_invalid_message)).inRoot(isDialog())
                 .check(matches(isDisplayed()));
+        intended(hasComponent(ErrorReportActivity.class.getName()), times(0));
     }
 
     @Test
@@ -191,8 +281,30 @@ public class ImportingHistoryFromTheDeviceListTest {
 
         Eventually.check(() -> onView(withText(R.string.history_import_failed_title))
                 .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
         onView(withText(R.string.history_import_failed_message)).inRoot(isDialog())
                 .check(matches(isDisplayed()));
+    }
+
+    @Test
+    public void anUnexpectedFailureReachesTheBugPageWithItsRootCause() throws Exception {
+        AppDependencies.replaceHistoryImporter((archive, progress) -> {
+            throw new RuntimeException(
+                    "history wrapper",
+                    new IllegalStateException("parser invariant failed"));
+        });
+        intending(hasComponent(ErrorReportActivity.class.getName()))
+                .respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null));
+        this.answerPickerWith(zip("ignored.txt", "the fake importer owns this"));
+        this.openAndChooseHistory();
+
+        Eventually.check(() -> intended(allOf(
+                hasComponent(ErrorReportActivity.class.getName()),
+                hasExtra(ErrorReportActivity.EXTRA_BODY,
+                        R.string.error_report_body_history_import),
+                hasExtra(ErrorReportActivity.EXTRA_CAUSE,
+                        "IllegalStateException: parser invariant failed"))));
+        onView(withId(R.id.history_import_progress)).check(doesNotExist());
     }
 
     @Test

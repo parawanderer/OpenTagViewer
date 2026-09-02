@@ -9,5 +9,6 @@ interface HistoryImportSink {
             List<HistoryImportRow> rows,
             int rowsRead,
             int malformedRows,
-            long now);
+            long now,
+            HistoryImportProgress progress);
 }

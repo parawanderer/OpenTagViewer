@@ -323,4 +323,7 @@
     <string name="history_import_invalid_message">請選擇由 Android 版 OpenTagViewer 的「匯出歷史記錄」建立且未損壞的 ZIP。</string>
     <string name="history_import_failed_title">無法匯入歷史記錄</string>
     <string name="history_import_failed_message">未匯入任何歷史記錄。請重試或選擇其他歷史記錄 ZIP。</string>
+    <string name="error_report_body_history_import">應用程式無法從所選檔案還原歷史記錄，也無法確定原因，因此再次嘗試同一檔案可能無法解決問題。
+
+未匯入任何歷史記錄，已儲存的資料也沒有變更。</string>
 </resources>
