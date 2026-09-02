@@ -313,4 +313,17 @@
     <string name="twofactor_apple_took_the_code">Apple 已接受你的驗證碼，隨後未能完成登入。該驗證碼已被用掉，需要一個新的——我們會先等一下再申請，因為立刻申請會被拒絕。</string>
     <string name="twofactor_waiting_seconds">將在 %1$d 秒後向 Apple 申請新驗證碼…</string>
     <string name="twofactor_apple_did_not_recover">Apple 仍未完成登入。這是 Apple 一側的故障，不是你的操作問題，也不是驗證碼的問題。\n\n請過幾分鐘再試。屆時你的密碼可能會被拒絕一次——這屬於同一個故障，請再輸入一次，而不要以為密碼錯了。</string>
+    <string name="import_history">匯入歷史記錄</string>
+    <string name="history_import_complete_title">歷史記錄匯入完成</string>
+    <string name="history_import_result_counts">讀取的列數：%1$d\n新增的列數：%2$d\n已存在：%3$d\n格式錯誤：%4$d\n已略過（標籤未匯入）：%5$d</string>
+    <string name="history_import_unknown_guidance">請先匯入缺少的標籤，然後再次匯入此歷史記錄 ZIP，以還原已略過的列。</string>
+    <string name="history_import_legacy_title">歷史記錄匯出檔版本過舊</string>
+    <string name="history_import_legacy_message">此匯出檔無法安全識別標籤，因此不能還原其中的歷史記錄。請使用目前的應用程式建立新的歷史記錄 ZIP，然後匯入新檔案。</string>
+    <string name="history_import_invalid_title">不支援此歷史記錄檔</string>
+    <string name="history_import_invalid_message">請選擇由 Android 版 OpenTagViewer 的「匯出歷史記錄」建立且未損壞的 ZIP。</string>
+    <string name="history_import_failed_title">無法匯入歷史記錄</string>
+    <string name="history_import_failed_message">未匯入任何歷史記錄。請重試或選擇其他歷史記錄 ZIP。</string>
+    <string name="error_report_body_history_import">應用程式無法從所選檔案還原歷史記錄，也無法確定原因，因此再次嘗試同一檔案可能無法解決問題。
+
+未匯入任何歷史記錄，已儲存的資料也沒有變更。</string>
 </resources>

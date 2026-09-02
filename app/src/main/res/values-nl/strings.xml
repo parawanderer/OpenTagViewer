@@ -313,4 +313,17 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="twofactor_apple_took_the_code">Apple heeft je code geaccepteerd en kon daarna het inloggen niet afronden. De code is dus opgebruikt en er is een nieuwe nodig — we wachten even voordat we die aanvragen, want meteen aanvragen wordt geweigerd.</string>
     <string name="twofactor_waiting_seconds">Over %1$d s wordt een nieuwe code bij Apple aangevraagd…</string>
     <string name="twofactor_apple_did_not_recover">Apple rondt het inloggen nog steeds niet af. Dit ligt aan Apple, niet aan jou en niet aan je code.\n\nProbeer het over een paar minuten opnieuw. Je wachtwoord kan dan één keer worden geweigerd — dat hoort bij dezelfde storing, dus voer het gewoon nog een keer in in plaats van aan te nemen dat het fout is.</string>
+    <string name="import_history">Geschiedenis importeren</string>
+    <string name="history_import_complete_title">Geschiedenis geïmporteerd</string>
+    <string name="history_import_result_counts">Gelezen rijen: %1$d\nToegevoegde rijen: %2$d\nAl aanwezig: %3$d\nOngeldig: %4$d\nOvergeslagen (tag niet geïmporteerd): %5$d</string>
+    <string name="history_import_unknown_guidance">Importeer eerst de ontbrekende tags en importeer deze geschiedenis-ZIP daarna opnieuw om de overgeslagen rijen te herstellen.</string>
+    <string name="history_import_legacy_title">Geschiedenisexport is te oud</string>
+    <string name="history_import_legacy_message">Deze export identificeert tags niet veilig, waardoor de geschiedenis niet kan worden hersteld. Maak met de huidige app een nieuwe geschiedenis-ZIP en importeer die.</string>
+    <string name="history_import_invalid_title">Geschiedenisbestand niet ondersteund</string>
+    <string name="history_import_invalid_message">Kies een onbeschadigde ZIP die is gemaakt met Geschiedenis exporteren in OpenTagViewer voor Android.</string>
+    <string name="history_import_failed_title">Geschiedenis kon niet worden geïmporteerd</string>
+    <string name="history_import_failed_message">Er is geen geschiedenis geïmporteerd. Probeer het opnieuw of kies een andere geschiedenis-ZIP.</string>
+    <string name="error_report_body_history_import">De app kon de geschiedenis uit het gekozen bestand niet herstellen en kan niet bepalen waarom — opnieuw proberen met hetzelfde bestand helpt daarom mogelijk niet.
+
+Er is geen geschiedenis geïmporteerd en eerder opgeslagen gegevens zijn niet gewijzigd.</string>
 </resources>

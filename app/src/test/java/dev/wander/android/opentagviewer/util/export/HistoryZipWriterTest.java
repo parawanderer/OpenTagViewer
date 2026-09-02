@@ -12,9 +12,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -52,7 +50,7 @@ public class HistoryZipWriterTest {
         return names;
     }
 
-    private static byte[] write(final Map<String, List<BeaconLocationReport>> history)
+    private static byte[] write(final List<HistoryExportEntry> history)
             throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         new HistoryZipWriter(UTC).write(out, history);
@@ -61,9 +59,9 @@ public class HistoryZipWriterTest {
 
     @Test
     public void entryNamesCarryTheTagAndTheRangeItCovers() throws Exception {
-        Map<String, List<BeaconLocationReport>> history = new LinkedHashMap<>();
-        history.put("Shane's Wallet", List.of(
-                at("2026-07-02T08:00:00Z"), at("2026-08-15T20:00:00Z")));
+        List<HistoryExportEntry> history = List.of(new HistoryExportEntry(
+                "wallet-id", "Shane's Wallet", List.of(
+                at("2026-07-02T08:00:00Z"), at("2026-08-15T20:00:00Z"))));
 
         assertEquals(List.of("Shane's Wallet_2026-07-02_2026-08-15.csv"),
                 entryNamesOf(write(history)));
@@ -73,9 +71,11 @@ public class HistoryZipWriterTest {
     public void twoTagsSharingANameDoNotProduceADuplicateEntry() throws Exception {
         // Nothing stops somebody naming two tags "Keys", and some readers reject an archive
         // outright when it contains the same entry twice.
-        Map<String, List<BeaconLocationReport>> history = new LinkedHashMap<>();
-        history.put("Keys", List.of(at("2026-08-15T10:00:00Z")));
-        history.put("Keys ", List.of(at("2026-08-15T10:00:00Z")));
+        List<HistoryExportEntry> history = List.of(
+                new HistoryExportEntry("keys-1", "Keys",
+                        List.of(at("2026-08-15T10:00:00Z"))),
+                new HistoryExportEntry("keys-2", "Keys",
+                        List.of(at("2026-08-15T10:00:00Z"))));
 
         List<String> names = entryNamesOf(write(history));
 
@@ -98,8 +98,8 @@ public class HistoryZipWriterTest {
     public void aTagWithNoHistoryStillGetsAFileWithItsColumns() throws Exception {
         // A tag with no locations is a normal state - see the beacons that get no card - and
         // silently omitting it would read as the export having lost something.
-        Map<String, List<BeaconLocationReport>> history = new LinkedHashMap<>();
-        history.put("Never Seen", List.of());
+        List<HistoryExportEntry> history = List.of(
+                new HistoryExportEntry("never-seen", "Never Seen", List.of()));
 
         byte[] zipBytes = write(history);
         assertEquals(List.of("Never Seen.csv"), entryNamesOf(zipBytes));
@@ -114,10 +114,13 @@ public class HistoryZipWriterTest {
 
     @Test
     public void everySelectedTagGetsItsOwnFile() throws Exception {
-        Map<String, List<BeaconLocationReport>> history = new LinkedHashMap<>();
-        history.put("Wallet", List.of(at("2026-08-15T10:00:00Z")));
-        history.put("Backpack", List.of(at("2026-08-14T10:00:00Z")));
-        history.put("Keys", List.of(at("2026-08-13T10:00:00Z")));
+        List<HistoryExportEntry> history = List.of(
+                new HistoryExportEntry("wallet", "Wallet",
+                        List.of(at("2026-08-15T10:00:00Z"))),
+                new HistoryExportEntry("backpack", "Backpack",
+                        List.of(at("2026-08-14T10:00:00Z"))),
+                new HistoryExportEntry("keys", "Keys",
+                        List.of(at("2026-08-13T10:00:00Z"))));
 
         assertEquals(3, entryNamesOf(write(history)).size());
     }

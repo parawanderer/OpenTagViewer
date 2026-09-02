@@ -313,4 +313,17 @@
     <string name="twofactor_apple_took_the_code">Apple 已接受你的验证码，随后未能完成登录。该验证码已被用掉，需要一个新的——我们会先等一会儿再申请，因为立刻申请会被拒绝。</string>
     <string name="twofactor_waiting_seconds">将在 %1$d 秒后向 Apple 申请新验证码…</string>
     <string name="twofactor_apple_did_not_recover">Apple 仍未完成登录。这是 Apple 一侧的故障，不是你的操作问题，也不是验证码的问题。\n\n请过几分钟再试。届时你的密码可能会被拒绝一次——这属于同一个故障，请再输入一次，而不要以为密码错了。</string>
+    <string name="import_history">导入历史记录</string>
+    <string name="history_import_complete_title">历史记录导入完成</string>
+    <string name="history_import_result_counts">读取的行数：%1$d\n新增的行数：%2$d\n已存在：%3$d\n格式错误：%4$d\n已跳过（标签未导入）：%5$d</string>
+    <string name="history_import_unknown_guidance">请先导入缺失的标签，然后再次导入此历史记录 ZIP，以恢复已跳过的行。</string>
+    <string name="history_import_legacy_title">历史记录导出文件版本过旧</string>
+    <string name="history_import_legacy_message">此导出文件无法安全识别标签，因此不能恢复其中的历史记录。请使用当前应用创建新的历史记录 ZIP，然后导入新文件。</string>
+    <string name="history_import_invalid_title">不支持此历史记录文件</string>
+    <string name="history_import_invalid_message">请选择由 Android 版 OpenTagViewer 的“导出历史记录”创建且未损坏的 ZIP。</string>
+    <string name="history_import_failed_title">无法导入历史记录</string>
+    <string name="history_import_failed_message">未导入任何历史记录。请重试或选择其他历史记录 ZIP。</string>
+    <string name="error_report_body_history_import">应用无法从所选文件恢复历史记录，也无法确定原因，因此再次尝试同一文件可能无法解决问题。
+
+未导入任何历史记录，已存储的数据也没有更改。</string>
 </resources>

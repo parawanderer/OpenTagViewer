@@ -5,12 +5,17 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
+import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.not;
 
 import android.app.Activity;
@@ -111,6 +116,8 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
         // at the door rather than launched.
         Intents.intending(hasComponent(FetchFromICloudActivity.class.getName()))
                 .respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null));
+        intending(hasAction(Intent.ACTION_OPEN_DOCUMENT))
+                .respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null));
     }
 
     @After
@@ -168,6 +175,24 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
         onView(withText(R.string.icloud_import_from_file))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed()));
+        onView(withText(R.string.import_history))
+                .inRoot(isPlatformPopup()).check(matches(isDisplayed()));
+    }
+
+    @Test
+    public void importingHistoryAsksTheSystemForAZipAndCancellationIsSilent() {
+        this.openTheListWithATagInIt();
+
+        onView(withId(R.id.page_menu_button)).perform(click());
+        Eventually.check(() -> onView(withText(R.string.import_history))
+                .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
+        onView(withText(R.string.import_history)).inRoot(isPlatformPopup()).perform(click());
+
+        Eventually.check(() -> intended(allOf(
+                hasAction(Intent.ACTION_OPEN_DOCUMENT),
+                hasExtra(Intent.EXTRA_MIME_TYPES, arrayContaining("application/zip")))));
+        onView(withText(R.string.history_import_complete_title)).check(doesNotExist());
+        onView(withText(R.string.history_import_failed_title)).check(doesNotExist());
     }
 
     /**

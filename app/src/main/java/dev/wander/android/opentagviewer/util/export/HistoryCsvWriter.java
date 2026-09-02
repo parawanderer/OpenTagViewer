@@ -50,7 +50,21 @@ public final class HistoryCsvWriter {
             "status",
             "published_at_utc",
             "description",
+            // Preserve the spreadsheet-facing formatting above while keeping restoration exact.
+            "published_at_epoch_ms",
+            "latitude_exact",
+            "longitude_exact",
+            "description_present",
+            // Last because it is for restoring this file, not for reading it in a spreadsheet.
+            // Stable identity must live in the contents: display names and filenames can both
+            // change, and two tags may have the same one.
+            "beacon_id",
     };
+
+    /** The immutable file contract used by the restore side to validate a CSV. */
+    public static List<String> requiredHeaders() {
+        return List.of(HEADERS);
+    }
 
     private static final DateTimeFormatter UTC =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneId.of("UTC"));
@@ -75,6 +89,7 @@ public final class HistoryCsvWriter {
      */
     public void write(
             @NonNull final Writer out,
+            @NonNull final String beaconId,
             @NonNull final List<BeaconLocationReport> reports) throws IOException {
 
         out.write(String.join(",", HEADERS));
@@ -84,7 +99,7 @@ public final class HistoryCsvWriter {
                 .sorted((a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp()))
                 .forEach(report -> {
                     try {
-                        out.write(toRow(report));
+                        out.write(toRow(beaconId, report));
                         out.write(NEWLINE);
                     } catch (IOException e) {
                         throw new UncheckedWriteFailure(e);
@@ -92,7 +107,7 @@ public final class HistoryCsvWriter {
                 });
     }
 
-    private String toRow(final BeaconLocationReport report) {
+    private String toRow(final String beaconId, final BeaconLocationReport report) {
         final Instant recorded = Instant.ofEpochMilli(report.getTimestamp());
 
         return String.join(",",
@@ -107,7 +122,12 @@ public final class HistoryCsvWriter {
                 Long.toString(report.getConfidence()),
                 Long.toString(report.getStatus()),
                 UTC.format(Instant.ofEpochMilli(report.getPublishedAt())),
-                escape(report.getDescription()));
+                escape(report.getDescription()),
+                Long.toString(report.getPublishedAt()),
+                Double.toString(report.getLatitude()),
+                Double.toString(report.getLongitude()),
+                Boolean.toString(report.getDescription() != null),
+                escape(beaconId));
     }
 
     /**

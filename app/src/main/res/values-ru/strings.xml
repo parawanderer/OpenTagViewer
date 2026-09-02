@@ -313,4 +313,17 @@
     <string name="twofactor_apple_took_the_code">Apple приняла ваш код, а затем не смогла завершить вход. Код уже использован, поэтому нужен новый — подождём немного перед запросом, потому что сразу запрашивать бесполезно.</string>
     <string name="twofactor_waiting_seconds">Запросим новый код у Apple через %1$d с…</string>
     <string name="twofactor_apple_did_not_recover">Apple по-прежнему не завершает вход. Это сбой на стороне Apple — не ваша вина и не проблема кода.\n\nПопробуйте снова через несколько минут. Пароль при этом может быть отклонён один раз: это часть того же сбоя, поэтому введите его ещё раз, а не считайте неверным.</string>
+    <string name="import_history">Импортировать историю</string>
+    <string name="history_import_complete_title">Импорт истории завершён</string>
+    <string name="history_import_result_counts">Прочитано строк: %1$d\nДобавлено строк: %2$d\nУже есть: %3$d\nПовреждено: %4$d\nПропущено (метка не импортирована): %5$d</string>
+    <string name="history_import_unknown_guidance">Сначала импортируйте недостающие метки, а затем снова импортируйте этот ZIP-файл истории, чтобы восстановить пропущенные строки.</string>
+    <string name="history_import_legacy_title">Экспорт истории слишком старый</string>
+    <string name="history_import_legacy_message">Этот экспорт не позволяет надёжно определить метки, поэтому историю нельзя восстановить. Создайте новый ZIP-файл истории в текущей версии приложения и импортируйте его.</string>
+    <string name="history_import_invalid_title">Файл истории не поддерживается</string>
+    <string name="history_import_invalid_message">Выберите неповреждённый ZIP-файл, созданный командой «Экспорт истории» в OpenTagViewer для Android.</string>
+    <string name="history_import_failed_title">Не удалось импортировать историю</string>
+    <string name="history_import_failed_message">История не была импортирована. Повторите попытку или выберите другой ZIP-файл истории.</string>
+    <string name="error_report_body_history_import">Приложению не удалось восстановить историю из выбранного файла, и определить причину невозможно — повторная попытка с тем же файлом может не помочь.
+
+История не была импортирована, а уже сохранённые данные не изменились.</string>
 </resources>

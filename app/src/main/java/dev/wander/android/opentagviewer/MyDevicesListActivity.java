@@ -14,6 +14,7 @@ import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
@@ -28,16 +29,16 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -49,6 +50,7 @@ import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.util.TagOrder;
@@ -63,7 +65,11 @@ import dev.wander.android.opentagviewer.util.export.TagExporter;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
+import dev.wander.android.opentagviewer.util.export.HistoryExportEntry;
 import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
+import dev.wander.android.opentagviewer.util.history.HistoryImportException;
+import dev.wander.android.opentagviewer.util.history.HistoryImportResult;
+import dev.wander.android.opentagviewer.util.history.HistoryImportProgress;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
@@ -111,6 +117,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
     /** The in-flight read of that, so leaving does not land on a menu that has gone. */
     private Disposable membershipLookup;
 
+    /** The visible owner of a history import while its blocking work runs on the IO scheduler. */
+    private AlertDialog historyImportProgressDialog;
+    private CircularProgressIndicator historyImportProgressIndicator;
+
     /**
      * The tags whose history is being written, captured when the storage picker was opened.
      *
@@ -131,6 +141,15 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this.writeHistoryZip(uri, this.pendingExport);
             }
     );
+
+    private final ActivityResultLauncher<String[]> openHistoryZipLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.OpenDocument(),
+                    uri -> {
+                        if (uri != null) {
+                            this.importHistory(uri);
+                        }
+                    });
 
     /**
      * Reading the account, which can end by asking for the file picker instead.
@@ -272,6 +291,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
         if (this.membershipLookup != null && !this.membershipLookup.isDisposed()) {
             this.membershipLookup.dispose();
         }
+        this.dismissHistoryImportProgress();
         super.onDestroy();
     }
 
@@ -346,6 +366,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        this.refreshLatestLocations();
+    }
+
+    private void refreshLatestLocations() {
         if (this.beaconInfo.isEmpty()) {
             return;
         }
@@ -635,10 +659,156 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this.handleStartImport();
                 return true;
             }
+            if (id == R.id.action_import_history) {
+                this.openHistoryZipLauncher.launch(new String[]{"application/zip"});
+                return true;
+            }
             return false;
         });
 
         menu.show();
+    }
+
+    private void importHistory(@NonNull final Uri uri) {
+        this.showHistoryImportProgress();
+        Observable.fromCallable(() -> {
+                    final InputStream opened = this.getContentResolver().openInputStream(uri);
+                    if (opened == null) {
+                        throw new IOException("The document provider returned no history data");
+                    }
+                    return AppDependencies.historyImporter(this.getApplicationContext())
+                            .importArchive(opened, this::historyImportProgressChanged);
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::historyImported, this::historyImportFailed);
+    }
+
+    private void historyImported(@NonNull final HistoryImportResult result) {
+        this.dismissHistoryImportProgress();
+        if (this.isFinishing() || this.isDestroyed()) {
+            return;
+        }
+        if (result.getRowsAdded() > 0) {
+            this.devicesListChanged = true;
+            this.refreshLatestLocations();
+        }
+
+        String message = this.getString(
+                R.string.history_import_result_counts,
+                result.getRowsRead(),
+                result.getRowsAdded(),
+                result.getRowsAlreadyPresent(),
+                result.getRowsMalformed(),
+                result.getRowsSkippedUnknownBeacon());
+        if (result.getRowsSkippedUnknownBeacon() > 0) {
+            message += "\n\n" + this.getString(R.string.history_import_unknown_guidance);
+        }
+
+        new MaterialAlertDialogBuilder(
+                this,
+                com.google.android.material.R.style
+                        .ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.history_import_complete_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
+    }
+
+    private void historyImportFailed(@NonNull final Throwable error) {
+        Log.e(TAG, "Could not import history", error);
+
+        this.dismissHistoryImportProgress();
+        if (this.isFinishing() || this.isDestroyed()) {
+            return;
+        }
+
+        final HistoryImportException failure = historyImportExceptionIn(error);
+        if (failure == null
+                || failure.getReason() == HistoryImportException.Reason.UNEXPECTED) {
+            this.startActivity(ErrorReportActivity.intentFor(
+                    this,
+                    ErrorReportActivity.describe(rootOf(error)),
+                    R.string.error_report_body_history_import));
+            return;
+        }
+
+        final int title;
+        final int message;
+        if (failure != null
+                && failure.getReason() == HistoryImportException.Reason.UNSUPPORTED_LEGACY) {
+            title = R.string.history_import_legacy_title;
+            message = R.string.history_import_legacy_message;
+        } else if (failure != null
+                && failure.getReason() == HistoryImportException.Reason.INVALID_ARCHIVE) {
+            title = R.string.history_import_invalid_title;
+            message = R.string.history_import_invalid_message;
+        } else {
+            title = R.string.history_import_failed_title;
+            message = R.string.history_import_failed_message;
+        }
+
+        new MaterialAlertDialogBuilder(
+                this,
+                com.google.android.material.R.style
+                        .ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
+    }
+
+    private void showHistoryImportProgress() {
+        final View view = this.getLayoutInflater().inflate(
+                R.layout.history_import_progress, null);
+        this.historyImportProgressIndicator = view.findViewById(R.id.history_import_progress);
+        this.historyImportProgressDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.import_history)
+                .setView(view)
+                .setCancelable(false)
+                .create();
+        this.historyImportProgressDialog.setCanceledOnTouchOutside(false);
+        this.historyImportProgressDialog.show();
+    }
+
+    private void historyImportProgressChanged(
+            final HistoryImportProgress.Stage stage,
+            final int completed,
+            final int total) {
+        this.runOnUiThread(() -> {
+            final CircularProgressIndicator indicator = this.historyImportProgressIndicator;
+            if (indicator == null || this.isFinishing() || this.isDestroyed()) {
+                return;
+            }
+            if (stage == HistoryImportProgress.Stage.READING) {
+                indicator.setIndeterminate(true);
+                return;
+            }
+
+            indicator.setIndeterminate(false);
+            indicator.setMax(Math.max(1, total));
+            indicator.setProgressCompat(completed, true);
+        });
+    }
+
+    private void dismissHistoryImportProgress() {
+        if (this.historyImportProgressDialog != null) {
+            this.historyImportProgressDialog.dismiss();
+            this.historyImportProgressDialog = null;
+        }
+        this.historyImportProgressIndicator = null;
+    }
+
+    private static HistoryImportException historyImportExceptionIn(final Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HistoryImportException) {
+                return (HistoryImportException) cause;
+            }
+            if (cause == cause.getCause()) {
+                break;
+            }
+        }
+        return null;
     }
 
     /**
@@ -877,24 +1047,16 @@ public class MyDevicesListActivity extends AppCompatActivity {
                         // The whole stored range. The app only holds what it has fetched, so
                         // this is already bounded; a date picker is issue #71.
                         .getLocationsFor(beacon.getBeaconId(), 0L, Long.MAX_VALUE)
-                        .map(reports -> Pair.create(beacon.getName(), reports)))
+                        .map(reports -> new HistoryExportEntry(
+                                beacon.getBeaconId(), beacon.getName(), reports)))
                 .toList()
-                .map(pairs -> {
-                    // LinkedHashMap: entry order follows the order shown on screen, which is
-                    // the order the user picked them in.
-                    Map<String, List<BeaconLocationReport>> byName = new LinkedHashMap<>();
-                    for (var pair : pairs) {
-                        byName.put(pair.first, pair.second);
-                    }
-                    return byName;
-                })
                 .subscribeOn(Schedulers.io())
-                .subscribe(historyByName -> {
+                .subscribe(histories -> {
                     try (OutputStream out = this.getContentResolver().openOutputStream(destination)) {
                         if (out == null) {
                             throw new IOException("the picker returned nothing to write to");
                         }
-                        new HistoryZipWriter(ZoneId.systemDefault()).write(out, historyByName);
+                        new HistoryZipWriter(ZoneId.systemDefault()).write(out, histories);
                     }
 
                     this.runOnUiThread(() -> {
