@@ -422,11 +422,6 @@ constraint it does not understand, and the argument is the payload.
 **A person reading a pull request review is a different job.** State the finding, the file and line,
 and the fix. The same goes for issue replies and anything else sent to a contributor or a reporter.
 
-This has gone wrong once already: a review of #173 was drafted in this register, and its reader was
-a first-time contributor who wanted three line numbers. The failure mode is a loop with nobody in
-it - agents write the docs, a later agent reads them as evidence of what the maintainer wants, and
-writes more of the same. Nothing in the repository contradicts that, because nothing in the
-repository is written by the maintainer.
 
 ---
 
