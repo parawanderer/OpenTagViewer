@@ -323,4 +323,7 @@
     <string name="history_import_invalid_message">Выберите неповреждённый ZIP-файл, созданный командой «Экспорт истории» в OpenTagViewer для Android.</string>
     <string name="history_import_failed_title">Не удалось импортировать историю</string>
     <string name="history_import_failed_message">История не была импортирована. Повторите попытку или выберите другой ZIP-файл истории.</string>
+    <string name="error_report_body_history_import">Приложению не удалось восстановить историю из выбранного файла, и определить причину невозможно — повторная попытка с тем же файлом может не помочь.
+
+История не была импортирована, а уже сохранённые данные не изменились.</string>
 </resources>

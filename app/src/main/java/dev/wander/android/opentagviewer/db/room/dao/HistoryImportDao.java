@@ -16,6 +16,7 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import dev.wander.android.opentagviewer.util.history.HistoryImportResult;
 import dev.wander.android.opentagviewer.util.history.HistoryImportRow;
+import dev.wander.android.opentagviewer.util.history.HistoryImportProgress;
 
 /** The atomic database half of restoring a history archive. */
 @Dao
@@ -39,13 +40,17 @@ public interface HistoryImportDao {
             final List<HistoryImportRow> rows,
             final int rowsRead,
             final int malformedRows,
-            final long now) {
+            final long now,
+            final HistoryImportProgress progress) {
 
         final Map<String, Boolean> activeBeacons = new HashMap<>();
         final Map<String, Set<Long>> heldTimestamps = new HashMap<>();
         int added = 0;
         int alreadyPresent = 0;
         int unknown = 0;
+        int processed = 0;
+
+        progress.changed(HistoryImportProgress.Stage.MERGING, 0, rows.size());
 
         for (HistoryImportRow row : rows) {
             final String beaconId = row.getBeaconId();
@@ -53,6 +58,7 @@ public interface HistoryImportDao {
                     beaconId, this::isActiveBeacon);
             if (!active) {
                 unknown++;
+                reportProgress(progress, ++processed, rows.size());
                 continue;
             }
 
@@ -60,6 +66,7 @@ public interface HistoryImportDao {
                     beaconId, id -> new HashSet<>(this.timestampsFor(id)));
             if (!timestamps.add(row.getReport().getTimestamp())) {
                 alreadyPresent++;
+                reportProgress(progress, ++processed, rows.size());
                 continue;
             }
 
@@ -83,9 +90,20 @@ public interface HistoryImportDao {
             } else {
                 added++;
             }
+            reportProgress(progress, ++processed, rows.size());
         }
 
         return new HistoryImportResult(
                 rowsRead, added, alreadyPresent, malformedRows, unknown);
+    }
+
+    /** Do not enqueue one main-thread update for every row in a large archive. */
+    private static void reportProgress(
+            final HistoryImportProgress progress,
+            final int completed,
+            final int total) {
+        if (completed == total || completed % 1_000 == 0) {
+            progress.changed(HistoryImportProgress.Stage.MERGING, completed, total);
+        }
     }
 }

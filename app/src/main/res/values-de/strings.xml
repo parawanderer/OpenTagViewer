@@ -323,4 +323,7 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="history_import_invalid_message">Wähle eine unbeschädigte ZIP-Datei, die mit „Verlauf exportieren“ in OpenTagViewer für Android erstellt wurde.</string>
     <string name="history_import_failed_title">Verlauf konnte nicht importiert werden</string>
     <string name="history_import_failed_message">Es wurde kein Verlauf importiert. Versuche es erneut oder wähle eine andere Verlaufs-ZIP.</string>
+    <string name="error_report_body_history_import">Die App konnte den Verlauf aus der ausgewählten Datei nicht wiederherstellen und kann nicht feststellen, warum — ein erneuter Versuch mit derselben Datei hilft daher möglicherweise nicht.
+
+Es wurde kein Verlauf importiert und bereits gespeicherte Daten wurden nicht geändert.</string>
 </resources>

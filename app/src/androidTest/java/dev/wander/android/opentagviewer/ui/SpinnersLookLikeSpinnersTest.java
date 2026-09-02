@@ -46,7 +46,7 @@ import dev.wander.android.opentagviewer.R;
 public class SpinnersLookLikeSpinnersTest {
 
     /** What the app has today. A new spinner should raise this, not be excluded from it. */
-    private static final int AT_LEAST_THIS_MANY = 8;
+    private static final int AT_LEAST_THIS_MANY = 9;
 
     private static Context themed() {
         return new ContextThemeWrapper(

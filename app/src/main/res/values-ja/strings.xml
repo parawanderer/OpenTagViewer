@@ -323,4 +323,7 @@
     <string name="history_import_invalid_message">Android 版 OpenTagViewer の「履歴をエクスポート」で作成した、破損していない ZIP を選択してください。</string>
     <string name="history_import_failed_title">履歴をインポートできませんでした</string>
     <string name="history_import_failed_message">履歴はインポートされませんでした。もう一度試すか、別の履歴 ZIP を選択してください。</string>
+    <string name="error_report_body_history_import">選択したファイルから履歴を復元できず、アプリはその原因を特定できませんでした。そのため、同じファイルでもう一度試しても解決しない可能性があります。
+
+履歴はインポートされず、すでに保存されているデータも変更されていません。</string>
 </resources>

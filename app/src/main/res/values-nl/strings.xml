@@ -323,4 +323,7 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="history_import_invalid_message">Kies een onbeschadigde ZIP die is gemaakt met Geschiedenis exporteren in OpenTagViewer voor Android.</string>
     <string name="history_import_failed_title">Geschiedenis kon niet worden geïmporteerd</string>
     <string name="history_import_failed_message">Er is geen geschiedenis geïmporteerd. Probeer het opnieuw of kies een andere geschiedenis-ZIP.</string>
+    <string name="error_report_body_history_import">De app kon de geschiedenis uit het gekozen bestand niet herstellen en kan niet bepalen waarom — opnieuw proberen met hetzelfde bestand helpt daarom mogelijk niet.
+
+Er is geen geschiedenis geïmporteerd en eerder opgeslagen gegevens zijn niet gewijzigd.</string>
 </resources>

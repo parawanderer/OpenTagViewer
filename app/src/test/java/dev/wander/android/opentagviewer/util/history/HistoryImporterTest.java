@@ -2,12 +2,15 @@ package dev.wander.android.opentagviewer.util.history;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -48,7 +51,7 @@ public class HistoryImporterTest {
 
         final List<HistoryImportRow> received = new ArrayList<>();
         final HistoryImporter importer = new HistoryImporter(
-                (rows, rowsRead, malformedRows, now) -> {
+                (rows, rowsRead, malformedRows, now, progress) -> {
                     received.addAll(rows);
                     return new HistoryImportResult(rowsRead, rows.size(), 0, malformedRows, 0);
                 },
@@ -103,6 +106,20 @@ public class HistoryImporterTest {
         assertEquals(1, result.getRowsAdded());
         assertEquals(1, result.getRowsMalformed());
         assertEquals("good", received.get(0).getReport().getDescription());
+    }
+
+    @Test
+    public void repeatedBeaconIdsShareOneStringWhileTheArchiveIsHeld() throws Exception {
+        final String header = String.join(",", HistoryCsvWriter.requiredHeaders());
+        final List<HistoryImportRow> received = new ArrayList<>();
+
+        importerCapturing(received).importArchive(new ByteArrayInputStream(zip(
+                "Wallet.csv", header + "\r\n"
+                        + row("52.3702157", "first") + "\r\n"
+                        + row("52.3702157", "second") + "\r\n")));
+
+        assertSame("the repeated UUID should be interned per archive",
+                received.get(0).getBeaconId(), received.get(1).getBeaconId());
     }
 
     @Test
@@ -167,10 +184,27 @@ public class HistoryImporterTest {
     }
 
     @Test
+    public void anUnexpectedReaderBugIsNotBlamedOnTheArchive() {
+        final InputStream brokenReader = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IllegalStateException("reader invariant failed");
+            }
+        };
+
+        final HistoryImportException error = assertThrows(
+                HistoryImportException.class,
+                () -> importerCapturing(new ArrayList<>()).importArchive(brokenReader));
+
+        assertEquals(HistoryImportException.Reason.UNEXPECTED, error.getReason());
+        assertEquals("reader invariant failed", error.getCause().getMessage());
+    }
+
+    @Test
     public void aLaterBrokenFilePreventsTheEntireArchiveReachingPersistence() throws Exception {
         final AtomicBoolean persistenceWasCalled = new AtomicBoolean(false);
         final HistoryImporter importer = new HistoryImporter(
-                (rows, rowsRead, malformedRows, now) -> {
+                (rows, rowsRead, malformedRows, now, progress) -> {
                     persistenceWasCalled.set(true);
                     return new HistoryImportResult(rowsRead, rows.size(), 0, malformedRows, 0);
                 },
@@ -194,7 +228,7 @@ public class HistoryImporterTest {
     @Test
     public void databaseFailureHasItsOwnTypedResult() throws Exception {
         final HistoryImporter importer = new HistoryImporter(
-                (rows, rowsRead, malformedRows, now) -> {
+                (rows, rowsRead, malformedRows, now, progress) -> {
                     throw new IllegalStateException("database unavailable");
                 },
                 () -> 1_800_000_000_000L);
@@ -210,7 +244,7 @@ public class HistoryImporterTest {
 
     private static HistoryImporter importerCapturing(final List<HistoryImportRow> received) {
         return new HistoryImporter(
-                (rows, rowsRead, malformedRows, now) -> {
+                (rows, rowsRead, malformedRows, now, progress) -> {
                     received.addAll(rows);
                     return new HistoryImportResult(rowsRead, rows.size(), 0, malformedRows, 0);
                 },
