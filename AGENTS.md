@@ -3,6 +3,22 @@
 Rules for agents working on OpenTagViewer. Written for automated contributors, but the
 constraints apply to anyone.
 
+**This file is owned and maintained by agents, and keeping it current is part of the work rather
+than a favour to whoever comes next.** @parawanderer asked for that and has not read it since. No
+human reviews what lands here, so the agent writing a change is the only check on it.
+
+What that means in practice:
+
+- **If you learned something the hard way, write it down in the same change that taught you.** The
+  next agent starts here, and anything left out is an afternoon they pay for and you did not.
+- **The reason travels with the rule.** An instruction with no reasoning attached is one a later
+  agent deletes the first time it looks inconvenient. That is why the entries here argue.
+- **Earn it.** Nobody is filtering this, so a rule that has not actually cost somebody something
+  does not belong. Rule 10 has the test.
+- **Do not carry this register outside the repository.** It is written for agents who need to be
+  argued out of breaking something. A pull request review, an issue reply, or anything else a
+  person reads is a different job. See rule 16.
+
 ## What this project is
 
 An Android app that shows Apple AirTag locations without an Apple device. Tags are exported
@@ -393,6 +409,18 @@ job nobody asked for, is its own bug.
 Every one of these is tested twice: `WhichFailuresNeedAFreshSignInTest` on the JVM for the
 decision, `EveryPathAsksForAFreshSignInTest` on a device for each caller honouring it. A shared
 predicate does not stop a fourth screen being written that never asks.
+
+### 16. Do not carry this file's voice into anything a person reads
+
+**@parawanderer has not read this file**, nor most of `docs/`, most docstrings, or most commit
+messages. Agents wrote them. So an agent reading them cannot tell the maintainer's house style from
+its own predecessors' output, and by default assumes the former.
+
+These documents argue at length on purpose. The reader is a future agent deciding whether to undo a
+constraint it does not understand, and the argument is the payload.
+
+**A person reading a pull request review is a different job.** State the finding, the file and line,
+and the fix. The same goes for issue replies and anything else sent to a contributor or a reporter.
 
 
 ---
