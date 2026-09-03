@@ -53,6 +53,18 @@ public interface LocationReportDao {
     @Query("SELECT MAX(timestamp) FROM LocationReport WHERE beacon_id = :beaconId")
     Long newestReportTimeFor(String beaconId);
 
+    /**
+     * The newest report this phone wrote for one tag, or null if it has never heard it.
+     *
+     * <p>Scoped to local rows because it decides whether the next sighting is worth keeping -
+     * see {@code LocalFixWorthKeeping}. An Apple report says nothing about that: it describes
+     * where somebody else's iPhone was, so a fresh one would silently suppress the local row
+     * that is the more precise of the two.
+     */
+    @Query("SELECT * FROM LocationReport WHERE beacon_id = :beaconId AND provenance = 'local'"
+            + " ORDER BY timestamp DESC LIMIT 1")
+    LocationReport getLastLocalFor(String beaconId);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(LocationReport... locationReports);
 }

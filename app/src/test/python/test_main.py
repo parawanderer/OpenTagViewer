@@ -19,6 +19,7 @@ import re
 import pytest
 
 import main
+from findmy.keys import KeyPairType
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 BEACON_PLISTS = sorted(RESOURCES.glob("*/OwnedBeacons/*.plist"))
@@ -163,6 +164,363 @@ def test_an_unknown_type_is_refused_rather_than_guessed_at():
 def test_json_that_is_not_an_accessory_is_refused(blob):
     with pytest.raises(ValueError):
         main.accessoryFromJson(blob)
+
+
+# --------------------------------------------------------------------------
+# currentMacAddresses
+#
+# The BLE MAC address(es) an accessory might currently be advertising - what
+# dev.wander.android.opentagviewer.ble matches a scan result against to trigger an owned
+# accessory's sound directly, without going through Apple's Find My network.
+# --------------------------------------------------------------------------
+
+_MAC_RE = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){5}$")
+
+
+def test_current_mac_addresses_for_a_self_generated_tag():
+    macs = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert macs is not None
+    assert len(macs) > 0
+    for mac in macs:
+        assert _MAC_RE.match(mac), f"{mac!r} is not a MAC address"
+
+
+def test_current_mac_addresses_is_deterministic_for_a_fixed_key_tag():
+    """A self-generated tag's keys don't rotate, so asking twice must agree - unlike an Apple-
+    paired one, where this is only true at the exact same instant (rollover happens meanwhile)."""
+    once = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+    twice = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert once == twice
+
+
+def test_current_mac_addresses_returns_none_on_garbage():
+    """Failure must be None, not an exception - see AccessoryMacResolver's Java contract, which
+    reads None the same way as an empty answer: nothing to scan for yet."""
+    assert main.currentMacAddresses("not an accessory at all") is None
+
+
+def test_current_mac_addresses_refuses_an_unknown_accessory_type():
+    assert main.currentMacAddresses(
+        json.dumps({"type": "something_from_the_future"})) is None
+
+
+def _unaligned_accessory(paired_at: datetime) -> dict:
+    """An accessory that has never been aligned - what an owner's own Apple device looks like.
+
+    A phone reaches this code through "show my own Apple devices"; it has no rolling-key
+    alignment record and never gains one, so its candidate window spans its whole life.
+    """
+    from findmy import FindMyAccessory
+
+    accessory = FindMyAccessory(
+        master_key=b"\x11" * 28,
+        skn=b"\x22" * 32,
+        sks=b"\x33" * 32,
+        paired_at=paired_at,
+        name="Something with no alignment",
+    )
+    return accessory.to_json()
+
+
+def test_current_mac_addresses_bounds_a_window_too_wide_to_derive():
+    """Bounded rather than derived whole, and bounded *here*.
+
+    The caller asks per accessory in a loop, and the derivation is blocking. Measured on a real
+    device that had been switched off: 39636 indices, over a year of keys - the loop never
+    reached the tags after it, so the scan never started and every real tag silently stopped
+    being seen. A caller cannot protect itself from this, because by the time it could measure
+    the answer the work is already done.
+    """
+    stored = _unaligned_accessory(datetime.now(timezone.utc) - timedelta(days=400))
+
+    macs = main.currentMacAddresses(json.dumps(stored))
+
+    assert macs is not None and macs, "a never-aligned tag must still be scannable for"
+    spanned = max(macs.values()) - min(macs.values())
+    assert spanned <= main._MAC_CANDIDATE_MAX_INDICES, (
+        f"derived {spanned} indices, past the bound")
+
+
+def test_current_mac_addresses_bounds_to_the_newest_indices():
+    """The newest end, not the oldest.
+
+    An accessory advertising right now has been running, so its index tracks the wall clock.
+    The bottom of an over-wide window belongs to a tag that was off for months, which is not
+    advertising at all - deriving that end would spend the whole budget where nothing can match.
+    """
+    stored = _unaligned_accessory(datetime.now(timezone.utc) - timedelta(days=400))
+    accessory = main.accessoryFromJson(json.dumps(stored))
+    reachable_now = accessory.get_max_index(
+        datetime.now(timezone.utc) + main._MAC_CANDIDATE_MARGIN)
+
+    macs = main.currentMacAddresses(json.dumps(stored))
+
+    assert max(macs.values()) >= reachable_now - 1, (
+        "the newest reachable index must be inside the derived set")
+
+
+def _freshly_aligned_accessory() -> dict:
+    """An accessory aligned as of now, which is what any tag the network found looks like."""
+    from findmy import FindMyAccessory
+
+    now = datetime.now(timezone.utc)
+    accessory = FindMyAccessory(
+        master_key=b"\x11" * 28,
+        skn=b"\x22" * 32,
+        sks=b"\x33" * 32,
+        paired_at=now - timedelta(days=200),
+        name="A tag the network found this morning",
+        alignment_date=now,
+        alignment_index=19200,
+    )
+    return accessory.to_json()
+
+
+def test_current_mac_addresses_still_answers_for_a_freshly_aligned_accessory():
+    """The guard must not swallow the ordinary case it sits in front of.
+
+    Note this one is paired 200 days ago: it is the *alignment* being current that keeps the
+    window narrow, not the tag being new.
+    """
+    macs = main.currentMacAddresses(json.dumps(_freshly_aligned_accessory()))
+
+    assert macs is not None
+    assert len(macs) > 0
+
+
+def test_current_mac_addresses_bounds_an_accessory_whose_alignment_went_stale():
+    """Staleness is what sets the width, so an old alignment is bounded like none at all.
+
+    Deriving such a window whole took 9 seconds at 30 days stale and two minutes at 400 on a
+    desktop, per the table on `_MAC_CANDIDATE_MAX_INDICES` - several times that under Chaquopy.
+    The bound keeps the tag scannable without paying for the part of the range that cannot be
+    live.
+    """
+    stored = _paired_accessory(alignment_index=100)  # aligned at a fixed date in the past
+
+    macs = main.currentMacAddresses(json.dumps(stored))
+
+    assert macs is not None and macs
+    spanned = max(macs.values()) - min(macs.values())
+    assert spanned <= main._MAC_CANDIDATE_MAX_INDICES
+
+
+# --------------------------------------------------------------------------
+# recordAccessorySeen
+#
+# What keeps a wide currentMacAddresses margin from being paid for on every scan: a match
+# against a *primary* key realigns the stored index, in either direction. A secondary key's
+# index is only a lower bound and must not be trusted the same way.
+# --------------------------------------------------------------------------
+
+_ALIGNMENT_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def _paired_accessory(alignment_index: int) -> dict:
+    """A `FindMyAccessory` mapping with fixed, deterministic key material.
+
+    Real master/session keys, so the derived MACs below are the actual ones a scan would see -
+    not a fake fixture standing in for them. Alignment is planted away from index 0 so a
+    correction has somewhere to move both above and below.
+    """
+    from findmy import FindMyAccessory
+
+    accessory = FindMyAccessory(
+        master_key=b"\x11" * 28,
+        skn=b"\x22" * 32,
+        sks=b"\x33" * 32,
+        paired_at=_ALIGNMENT_DATE,
+        name="Test tag",
+        alignment_date=_ALIGNMENT_DATE,
+        alignment_index=alignment_index,
+    )
+    return accessory.to_json()
+
+
+def _mac_at(accessoryJson: dict, index: int, key_type) -> str:
+    from findmy import FindMyAccessory
+
+    accessory = FindMyAccessory.from_json(accessoryJson)
+    for key in accessory.keys_at(index):
+        if key.key_type == key_type:
+            return key.mac_address
+    raise AssertionError(f"no {key_type} key at index {index}")
+
+
+def _ms(dt: datetime) -> int:
+    return int(dt.timestamp() * 1000)
+
+
+def test_recordAccessorySeen_realigns_downward_from_a_primary_match():
+    """The case the whole feature exists for: alignment drifted ahead of the truth."""
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850  # inside the 12h margin, below the stored (wrong) alignment
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    assert corrected is not None
+    parsed = json.loads(corrected)
+    assert parsed["alignment_index"] == true_index
+    assert parsed["alignment_date"] == _ALIGNMENT_DATE.isoformat()
+
+
+def test_recordAccessorySeen_realigns_upward_from_a_primary_match():
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2910  # inside the 12h margin, above the stored alignment
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    assert corrected is not None
+    assert json.loads(corrected)["alignment_index"] == true_index
+
+
+def test_recordAccessorySeen_is_a_noop_when_already_aligned():
+    """The common case, once alignment has healed: no write on every sighting thereafter."""
+    stored = _paired_accessory(alignment_index=2880)
+    mac = _mac_at(stored, 2880, KeyPairType.PRIMARY)
+
+    assert main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_with_a_hint_agrees_with_the_wide_search():
+    """The hint is an optimisation, not a second rule - both paths must answer the same.
+
+    Checking one index is three key derivations; the 48-hour window is about 1150, measured at
+    1.15s on desktop and several times that under Chaquopy. Called on the sighting cadence
+    without the hint, the app sat at 135% CPU with two tags in range until Android killed it.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+    at = _ms(_ALIGNMENT_DATE)
+
+    without_hint = main.recordAccessorySeen(json.dumps(stored), mac, at)
+    with_hint = main.recordAccessorySeen(json.dumps(stored), mac, at, true_index)
+
+    assert with_hint == without_hint
+    assert json.loads(with_hint)["alignment_index"] == true_index
+
+
+def test_recordAccessorySeen_falls_back_when_the_hint_is_wrong():
+    """A hint that misses must cost the wide search, not the sighting.
+
+    The candidate set may have rolled between the scan that matched and this call, so the index
+    it named can be one the address no longer belongs to. Trusting the hint to be exhaustive
+    would silently drop a correction that was there to be made.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    corrected = main.recordAccessorySeen(
+        json.dumps(stored), mac, _ms(_ALIGNMENT_DATE), true_index + 7)
+
+    assert corrected is not None
+    assert json.loads(corrected)["alignment_index"] == true_index
+
+
+def test_recordAccessorySeen_ignores_a_secondary_match_below_the_stored_alignment():
+    """A secondary key is shared by 96 primary indices, so its reported index is a floor rather
+    than a fix. A floor below where alignment already stands proves nothing and moves nothing."""
+    stored = _paired_accessory(alignment_index=2880)
+    mac = _mac_at(stored, 2850, KeyPairType.SECONDARY)
+
+    assert main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE)) is None
+
+
+def _a_secondary_reported_above(accessoryJson: dict, floor: int):
+    """A secondary key the app itself would report above `floor`, and the index it reports.
+
+    Picked through `current_keys` rather than by index arithmetic, because `keys_at` yields
+    more than one secondary key for a given index and taking whichever comes first says
+    nothing about where the app would place it. The window's own answer is the input the
+    function under test actually receives.
+    """
+    accessory = main.accessoryFromJson(json.dumps(accessoryJson))
+    reported = accessory.current_keys(_ALIGNMENT_DATE, margin=main._MAC_CANDIDATE_MARGIN)
+
+    for key, index in sorted(reported.items(), key=lambda pair: pair[1]):
+        if key.key_type == KeyPairType.SECONDARY and index > floor:
+            return key.mac_address, index
+
+    raise AssertionError(f"no secondary key is reported above index {floor}")
+
+
+def test_recordAccessorySeen_raises_the_floor_from_a_secondary_match_above_alignment():
+    """The case a long-separated tag actually presents, measured on hardware.
+
+    A tag that has been away from its owner holds a day key, so it matches on a secondary and
+    never on a primary - and with primary-only correction its alignment could never recover, no
+    matter how often somebody walked past it. Measured on a real accessory: heard at -24 dBm
+    lying beside the phone, its address sat 58 indices (14.5 hours) above where alignment
+    believed "now" was, and it was therefore absent from its own candidate set.
+
+    Raising alignment to the secondary's own index cannot overshoot: the true index lies inside
+    that key's ~96-index span, and the span starts at the index reported here.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    mac, reported_at = _a_secondary_reported_above(stored, 2880)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    assert corrected is not None
+    parsed = json.loads(corrected)
+    assert parsed["alignment_index"] == reported_at
+    assert parsed["alignment_index"] > 2880
+
+
+def test_recordAccessorySeen_never_moves_the_floor_past_the_key_that_justified_it():
+    """The floor may only ever undershoot the truth, which is what makes it safe to apply.
+
+    Overshooting is the failure that produced the 114-index drift this whole path exists to
+    undo, and it comes from taking the *highest* index a key could belong to. This takes the
+    lowest, so the stored index must never exceed the index whose key was actually heard.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    mac, reported_at = _a_secondary_reported_above(stored, 2880)
+
+    corrected = main.recordAccessorySeen(json.dumps(stored), mac, _ms(_ALIGNMENT_DATE))
+
+    # The span this key covers starts where it was reported, so the true index is at or above
+    # that. Storing anything higher would be inventing certainty the key does not carry.
+    assert json.loads(corrected)["alignment_index"] <= reported_at
+
+
+def test_recordAccessorySeen_refuses_a_sighting_dated_before_the_stored_alignment():
+    """The backward-time guard update_alignment has, kept when bypassing it: a rolled-back
+    device clock must not persist a (past date, current index) pair - the index extrapolated
+    from that past date would overshoot once the clock corrects."""
+    stored = _paired_accessory(alignment_index=2880)
+    true_index = 2850
+    mac = _mac_at(stored, true_index, KeyPairType.PRIMARY)
+
+    an_hour_before_alignment = _ALIGNMENT_DATE - timedelta(hours=1)
+    assert main.recordAccessorySeen(
+        json.dumps(stored), mac, _ms(an_hour_before_alignment)) is None
+
+
+def test_recordAccessorySeen_returns_none_for_an_unmatched_address():
+    stored = _paired_accessory(alignment_index=2880)
+
+    assert main.recordAccessorySeen(
+        json.dumps(stored), "00:00:00:00:00:00", _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_ignores_a_self_generated_tag():
+    """A fixed key set never rotates - update_alignment is a no-op for it too - so there is no
+    drift here for this to fix."""
+    macs = main.currentMacAddresses(json.dumps(_CUSTOM_ACCESSORY))
+
+    assert main.recordAccessorySeen(
+        json.dumps(_CUSTOM_ACCESSORY), next(iter(macs)), _ms(_ALIGNMENT_DATE)) is None
+
+
+def test_recordAccessorySeen_returns_none_on_garbage():
+    assert main.recordAccessorySeen("not an accessory at all", "00:00:00:00:00:00", 0) is None
 
 
 def test_convertPlistToJson_returns_none_on_garbage():
@@ -1212,3 +1570,180 @@ def test_afailureToCloseIsReportedRatherThanRaised():
 
 def test_closingNothingIsHarmless():
     assert main.closeAccount(None) is False
+
+def test_candidate_window_agrees_with_what_current_mac_addresses_derives():
+    """The cheap answer and the expensive one must describe the same slice.
+
+    If they drift apart, a caller keeping what it derived would keep the wrong part of the
+    range and go on missing the tag while believing it had covered it.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    window = main.candidateWindow(accessory)
+    macs = main.currentMacAddresses(accessory)
+
+    assert window is not None
+    assert set(macs.values()) <= set(range(window["lo"], window["hi"] + 1))
+
+
+def test_candidate_window_is_bounded_for_a_stale_alignment():
+    """A window too wide to derive whole is reported as the bounded slice, not the true width."""
+    accessory = json.dumps(_unaligned_accessory(
+        datetime.now(timezone.utc) - timedelta(days=400)))
+
+    window = main.candidateWindow(accessory)
+
+    assert window is not None
+    assert window["hi"] - window["lo"] <= main._MAC_CANDIDATE_MAX_INDICES
+
+
+def test_addresses_between_covers_exactly_the_requested_range():
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    derived = main.addressesBetween(accessory, 19100, 19150)
+
+    assert derived is not None
+    assert derived
+    # -1 for the secondary keys, whose index would be an artefact of where the range began.
+    assert set(derived.values()) <= set(range(19100, 19151)) | {main._INDEX_UNKNOWN}
+    assert any(index != main._INDEX_UNKNOWN for index in derived.values())
+
+
+def test_addresses_between_is_stable_across_calls():
+    """The mapping is a pure function of the keys and the index, which is what makes it
+    safe to store: a pair derived today has to still be true when it is read back."""
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    first = main.addressesBetween(accessory, 19100, 19120)
+    second = main.addressesBetween(accessory, 19100, 19120)
+
+    assert first == second
+
+
+def test_addresses_between_pieces_join_up_into_the_whole_set():
+    """Widening a search a piece at a time must reach the same addresses as asking once.
+
+    This is the property the stored copy rests on. Without it, extending the range would
+    leave gaps that nothing would ever go back for.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    lower = main.addressesBetween(accessory, 19100, 19130)
+    upper = main.addressesBetween(accessory, 19131, 19160)
+
+    joined = dict(lower)
+    joined.update(upper)
+
+    assert set(joined) == set(whole)
+
+
+def test_a_secondary_key_reports_no_index_rather_than_a_moving_one():
+    """The address set is pure; the index attached to it is not, for secondary keys.
+
+    A secondary key covers 96 primary indices and `keys_between` de-duplicates, so it would
+    otherwise be reported at the first index the call's own range reaches - 19100 when asked
+    for 19100..19160 and 19131 for the same address when asked for 19131..19160. That is where
+    the search started, not a fact about the tag, so it is reported as unknown instead. Pinned
+    down because a caller that stored such a pair would later read it as exact.
+    """
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    upper = main.addressesBetween(accessory, 19131, 19160)
+
+    unknown = {mac for mac, index in whole.items() if index == main._INDEX_UNKNOWN}
+
+    assert unknown, "expected at least one secondary key in this range"
+
+    # Every index that is reported at all agrees between the two calls, which is what makes it
+    # safe to keep. The ones that would have disagreed are exactly the ones reported as unknown.
+    for mac in set(whole) & set(upper):
+        if whole[mac] != main._INDEX_UNKNOWN and upper[mac] != main._INDEX_UNKNOWN:
+            assert whole[mac] == upper[mac]
+
+
+def test_a_primary_key_index_survives_the_range_being_split():
+    """The property the stored hint rests on: a primary key sits at one index and stays there."""
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    whole = main.addressesBetween(accessory, 19100, 19160)
+    lower = main.addressesBetween(accessory, 19100, 19130)
+
+    known = {mac: index for mac, index in lower.items() if index != main._INDEX_UNKNOWN}
+
+    assert known
+    for mac, index in known.items():
+        assert whole[mac] == index
+
+
+def test_addresses_between_refuses_nothing_for_an_empty_range():
+    accessory = json.dumps(_freshly_aligned_accessory())
+
+    assert main.addressesBetween(accessory, 500, 499) == {}
+
+
+def test_addresses_between_returns_none_for_an_unreadable_accessory():
+    assert main.addressesBetween("not json at all", 0, 10) is None
+
+
+def test_candidate_window_returns_none_for_an_unreadable_accessory():
+    assert main.candidateWindow("not json at all") is None
+
+def _drift_line(capsys, before_index, before_date, after_index, after_date):
+    main._reportDrift(before_index, before_date, after_index, after_date)
+    printed = capsys.readouterr().out
+    return [line for line in printed.splitlines() if "Alignment drift" in line]
+
+
+def test_drift_is_not_reported_when_the_alignment_did_not_move(capsys):
+    """A fetch that found nothing to align to is not a drift of zero.
+
+    Reporting it as one would fill the series with readings that say the extrapolation was
+    confirmed, when in fact nothing checked it.
+    """
+    when = datetime.now(timezone.utc).isoformat()
+
+    assert _drift_line(capsys, 19200, when, 19200, when) == []
+
+
+def test_drift_is_the_gap_between_extrapolation_and_where_the_tag_was(capsys):
+    """Six hours on, a tag that rolled on schedule is at 24 indices; one at 20 has drifted 4."""
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19220, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift 4 index/indices" in lines[0]
+
+
+def test_a_tag_exactly_on_schedule_reports_no_drift(capsys):
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19224, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift 0 index/indices" in lines[0]
+
+
+def test_drift_is_signed_so_an_extrapolation_behind_the_tag_is_visible(capsys):
+    """Negative cannot happen if the extrapolation is a true upper bound, so it is worth
+    seeing rather than clamping away: one would mean that assumption is wrong."""
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    after = before + timedelta(hours=6)
+
+    lines = _drift_line(capsys, 19200, before.isoformat(), 19230, after.isoformat())
+
+    assert len(lines) == 1
+    assert "drift -6 index/indices" in lines[0]
+
+
+def test_drift_is_silent_for_an_accessory_with_no_alignment_at_all(capsys):
+    assert _drift_line(capsys, None, None, 19200, "2026-01-01T00:00:00+00:00") == []
+
+
+def test_drift_survives_an_unparseable_date(capsys):
+    assert _drift_line(capsys, 19200, "not a date", 19220, "also not a date") == []
+

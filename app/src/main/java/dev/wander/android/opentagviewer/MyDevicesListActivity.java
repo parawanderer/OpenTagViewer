@@ -214,7 +214,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
         }
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_my_devices_list);
-        WindowPaddingUtil.insertUITopPadding(this.binding.getRoot());
+        WindowPaddingUtil.insetForSystemBars(this.binding.getRoot());
         this.binding.setHandleClickBack(this::handleEndActivity);
 
         if (this.getSupportActionBar() != null) {

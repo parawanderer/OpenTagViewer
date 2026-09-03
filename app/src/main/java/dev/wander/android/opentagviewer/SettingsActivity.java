@@ -1,11 +1,17 @@
 package dev.wander.android.opentagviewer;
 
+import androidx.core.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import android.content.pm.PackageManager;
+import android.Manifest;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.View.inflate;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.Intent;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -20,6 +26,7 @@ import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.google.android.material.slider.Slider;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -52,6 +59,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.service.NearbyScanService;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryImporter;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
@@ -174,9 +182,11 @@ public class SettingsActivity extends AppCompatActivity {
         this.themeChoices.add(this.getString(R.string.dark_theme));
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_settings);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
-        // The last row is the debug switch, and the navigation bar was sitting on top of it.
-        WindowPaddingUtil.insertUIBottomPadding(this.findViewById(R.id.settings_scroll_area));
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
+        // The bottom inset used to be applied to the scroll area here as well - the debug switch
+        // is the last row and the navigation bar sat on top of it. insetForSystemBars above now
+        // does that for the whole screen, as it does for every other one, so a second call would
+        // reserve the bar's height twice.
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
         this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);
@@ -192,6 +202,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.binding.setIsDebugDataEnabled(Optional.ofNullable(this.currentSettings.getEnableDebugData()).orElse(false));
         this.binding.setIsShowAppleDevicesEnabled(this.currentSettings.shouldShowAppleDevices());
+        this.binding.setIsScanInBackgroundEnabled(this.currentSettings.shouldScanInBackground());
         this.binding.setOnClickAppleDevicesHelpLink(this::onClickAppleDevicesHelpLink);
         this.binding.setIsSystemColorsSupported(DynamicColors.isDynamicColorAvailable());
         this.binding.setIsSystemColorsEnabled(
@@ -207,8 +218,13 @@ public class SettingsActivity extends AppCompatActivity {
         MaterialSwitch appleDevices = this.findViewById(R.id.settings_show_apple_devices);
         appleDevices.setOnCheckedChangeListener(this::onShowAppleDevicesChange);
 
+        MaterialSwitch backgroundScan = this.findViewById(R.id.settings_scan_in_background);
+        backgroundScan.setOnCheckedChangeListener(this::onScanInBackgroundChange);
+
         MaterialSwitch systemColors = this.findViewById(R.id.settings_app_use_system_colors);
         systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
+
+        this.setupLeftBehindSettings();
 
         this.setupUserInfo();
 
@@ -261,6 +277,95 @@ public class SettingsActivity extends AppCompatActivity {
 
         Log.i(TAG, "The owner's own Apple devices are now " + (isChecked ? "shown" : "hidden")
                 + "; they are " + (isChecked ? "also" : "no longer") + " searched for");
+    }
+
+    /**
+     * Starts or stops the background scan, and saves the choice.
+     *
+     * <p><b>Acted on immediately rather than at the next launch</b>, unlike its neighbour above.
+     * Somebody turning this on is asking for something to start happening, and somebody turning
+     * it off is asking for it to stop - most likely because they have just seen the notification
+     * and want it gone. Deferring either would read as the switch not working.
+     */
+    private void onScanInBackgroundChange(CompoundButton buttonView, boolean isChecked) {
+        if (this.currentSettings.shouldScanInBackground() == isChecked) {
+            return;
+        }
+
+        this.currentSettings.setScanInBackground(isChecked);
+        this.binding.setIsScanInBackgroundEnabled(isChecked);
+        this.saveSettings();
+
+        if (isChecked) {
+            this.askToShowTheNotification();
+            NearbyScanService.start(this);
+        } else {
+            NearbyScanService.stop(this);
+        }
+
+        Log.i(TAG, "Background scanning is now " + (isChecked ? "on" : "off"));
+    }
+
+    /**
+     * Asks for permission to show the service's notification, on the versions that require it.
+     *
+     * <p><b>The service runs either way, and that is the problem.</b> Android 13 made
+     * notifications a runtime permission, and a foreground service whose notification is
+     * suppressed still scans - so somebody who turned this on would get the battery cost and no
+     * sign that anything was happening, which is the one thing a permanent notification is for.
+     *
+     * <p>Asked at the moment it becomes relevant rather than at startup: a prompt at first
+     * launch, before anything wants to notify, is one people dismiss without reading. Nothing
+     * hangs on the answer - a refusal leaves the service running and invisible, which is the
+     * user's call to make.
+     */
+    private void askToShowTheNotification() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        ActivityCompat.requestPermissions(
+                this, new String[] {Manifest.permission.POST_NOTIFICATIONS},
+                NOTIFICATION_PERMISSION_REQUEST_CODE);
+    }
+
+    /** Request code for {@link #askToShowTheNotification()}. Nothing depends on the answer. */
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 2001;
+
+    /**
+     * Re-posts the service's notification once permission arrives.
+     *
+     * <p><b>Because the grant lands after the service has already started.</b> The dialog is
+     * asynchronous, so the service goes to the foreground while notifications are still denied,
+     * and the system drops the notification it posts. Nothing re-posts it afterwards, so the
+     * service scans invisibly for the rest of its life - permission granted, status bar empty,
+     * which is exactly the state this setting must not leave somebody in.
+     *
+     * <p>Starting an already-running service is cheap and safe: it re-enters
+     * {@code onStartCommand}, which posts the notification again and leaves the existing scan
+     * alone.
+     */
+    @Override
+    public void onRequestPermissionsResult(
+            final int requestCode, final String[] permissions, final int[] grantResults) {
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            return;
+        }
+
+        final boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+        if (granted && this.currentSettings.shouldScanInBackground()) {
+            Log.i(TAG, "Notification permission granted; re-posting the service notification");
+            NearbyScanService.start(this);
+        }
     }
 
     /**
@@ -1177,5 +1282,107 @@ public class SettingsActivity extends AppCompatActivity {
                 this.performTestButton.setText(R.string.test);
             }
         }
+    }
+
+    /**
+     * Wires the two left-behind settings: how long to wait, and what it sounds like.
+     *
+     * <p>Both are written straight through on change rather than on leaving the screen. The
+     * service re-reads them on its own schedule, so a value that is only in memory here is one
+     * the thing that uses it never sees.
+     */
+    private void setupLeftBehindSettings() {
+        final Slider seconds = this.findViewById(R.id.settings_left_behind_seconds);
+        final TextView label = this.findViewById(R.id.settings_left_behind_seconds_label);
+
+        final int configured = this.currentSettings.resolveLeftBehindAfterSeconds();
+        seconds.setValue(configured);
+        label.setText(this.getString(R.string.left_behind_seconds_label, configured));
+
+        seconds.addOnChangeListener((slider, value, fromUser) -> {
+            final int chosen = Math.round(value);
+            label.setText(this.getString(R.string.left_behind_seconds_label, chosen));
+
+            if (!fromUser) {
+                return;
+            }
+
+            this.currentSettings.setLeftBehindAfterSeconds(chosen);
+            this.persistCurrentSettings("left-behind delay");
+        });
+
+        this.showChosenAlarmSound();
+        this.findViewById(R.id.settings_left_behind_sound_row)
+                .setOnClickListener(v -> this.pickAlarmSound());
+    }
+
+    /** Writes the current sound's own name under the row, so the setting says what it does. */
+    private void showChosenAlarmSound() {
+        final TextView value = this.findViewById(R.id.settings_left_behind_sound_value);
+        final String stored = this.currentSettings.getLeftBehindSoundUri();
+
+        if (stored == null || stored.isEmpty()) {
+            value.setText(R.string.left_behind_sound_default);
+            return;
+        }
+
+        // A sound can be deleted, or live on a volume that is not mounted, long after it was
+        // chosen. Naming it "default" then is honest: that is what will actually play.
+        final Ringtone ringtone = RingtoneManager.getRingtone(this, Uri.parse(stored));
+        final String title = ringtone == null ? null : ringtone.getTitle(this);
+
+        value.setText(title == null || title.isEmpty()
+                ? this.getString(R.string.left_behind_sound_default) : title);
+    }
+
+    /** Opens the system ringtone picker, starting from whatever is set now. */
+    private void pickAlarmSound() {
+        final String stored = this.currentSettings.getLeftBehindSoundUri();
+
+        final Intent picker = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE,
+                        this.getString(R.string.left_behind_sound))
+                // Offering silence here would be a way to turn the alert off that leaves the
+                // switch reading as on, so the picker does not show it.
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                        stored == null || stored.isEmpty() ? null : Uri.parse(stored));
+
+        this.alarmSoundPicker.launch(picker);
+    }
+
+    /**
+     * The chosen alarm sound coming back from the system picker.
+     *
+     * <p>A null URI is the "Default" entry rather than a cancelled pick - the picker is launched
+     * without a silent option - and is stored as empty, which is what the service reads as "the
+     * system default alarm".
+     */
+    private final ActivityResultLauncher<Intent> alarmSoundPicker =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                            return;
+                        }
+
+                        final Uri picked = result.getData().getParcelableExtra(
+                                RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+
+                        this.currentSettings.setLeftBehindSoundUri(
+                                picked == null ? "" : picked.toString());
+                        this.persistCurrentSettings("alarm sound");
+                        this.showChosenAlarmSound();
+                    });
+
+    /** Stores the settings object as it stands, logging rather than interrupting on failure. */
+    private void persistCurrentSettings(final String what) {
+        this.settingsRepository.storeUserSettings(this.currentSettings)
+                .subscribeOn(Schedulers.io())
+                .subscribe(() -> Log.i(TAG, "Stored the " + what),
+                        error -> Log.w(TAG, "Could not store the " + what, error));
     }
 }

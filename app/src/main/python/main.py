@@ -1,15 +1,17 @@
 from enum import Enum
 from typing import Any, NamedTuple, cast
 import json
+import os
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import base64
 import NSKeyedUnArchiver
 
 from findmy import FindMyAccessory, MobileMeDelegateError
 from findmy.accessory import FixedRollingKeyPairAccessory
+from findmy.keys import KeyPairType
 from findmy.reports import (
     RemoteAnisetteProvider,
     AppleAccount,
@@ -1017,6 +1019,381 @@ def accessoryFromJson(accessoryJson: str) -> StoredAccessory:
     return accessoryType.from_json(cast(Any, mapping))
 
 
+#: How far either side of the believed alignment to look for the accessory's current key.
+#
+# **Not zero, which is what a bare call would use.** Without a margin the search starts at the
+# alignment index, so an accessory whose true index has drifted *below* where alignment believes
+# it is can never be matched - it is simply absent from its own candidate set, with nothing
+# raising anywhere. FindMy.py's own `NearbyOfflineFindingDevice.is_from` takes the same
+# precaution with the same twelve hours, and its docstring records the failure being observed on
+# real hardware advertising a metre from the scanner.
+#
+# **Forty-eight hours, and the number is derived rather than guessed.** Alignment is written
+# from `min(key_to_ind[key])` in the pinned FindMy.py's `reports.py` - deliberately the lowest
+# index a matched key could belong to, because underestimating is the safe direction. For a
+# secondary key that is an underestimate of real size: `keys_at` offers two secondary keys per
+# index (`ind // 96 + 1` and `+ 2`), so one secondary key spans 192 primary indices. A report
+# decrypted against a secondary key can therefore leave alignment up to 192 indices - 48 hours -
+# below the truth, and stay there until a primary match corrects it.
+#
+# So the margin has to reach 48 hours or a tag aligned that way is absent from its own candidate
+# set. Measured before this was understood: a tag beside the phone at -24 dBm, advertising
+# steadily, sat 58 indices above where alignment believed "now" was, and the twelve hours
+# FindMy.py's own `is_from` uses reaches only 48 indices.
+#
+# The margin is what lets such a tag be picked up again at all; `recordAccessorySeen`'s
+# secondary-key floor is what pulls alignment back up afterwards, so the full width is only
+# needed until the first sighting lands.
+#
+# Forty-eight hours off a fresh alignment is around 1150 key derivations - 1.15s on desktop
+# and several times that under Chaquopy, which is why `recordAccessorySeen` takes an index
+# hint rather than re-deriving the window on every sighting. The
+# cost is only bounded while the alignment *is* fresh, and this app does produce accessories
+# where it is not: enabling "show my own Apple devices" puts a phone in the list, and a phone
+# has no rolling-key alignment to be fresh. Measured on one that was switched off, the window
+# came to 39636 indices - over a year of keys, derived on a blocking call. See
+# `_MAC_CANDIDATE_MAX_INDICES`, which is what stops the whole of that being attempted.
+_MAC_CANDIDATE_MARGIN = timedelta(hours=48)
+
+#: How much of a candidate window is derived when the whole of it is too wide.
+#
+# **This is a guard against one entry costing every other entry its scan.** Callers ask per
+# accessory, in a loop, and the derivation is blocking EC work with no interruption point. If
+# one accessory takes minutes, the loop never reaches the ones after it and the scan never
+# starts - so every tag stops being seen, with nothing failing anywhere to say why.
+#
+# The width is set by how *stale* the alignment is, not by whether there is one. Measured on
+# desktop CPython, which is several times faster than Chaquopy on a phone:
+#
+#     alignment stale by     width      derivation
+#              1 day           144          0.5 s
+#              7 days          720          2.3 s
+#             30 days        2,928          9.3 s
+#            120 days       11,568         36.6 s
+#            400 days       38,448        121.9 s
+#
+# Linear, about 3.2 ms per index. The 39,636-index case that prompted this was an owner's own
+# phone, switched off, pulled in by "show my own Apple devices" - a phone has no rolling-key
+# alignment and never gains one.
+#
+# A thousand is roughly a week of staleness: enough for a tag that has missed a few fetches,
+# and a couple of seconds at worst.
+#
+# **An accessory past it is bounded rather than refused**, deriving the newest N indices rather
+# than the whole span. A tag that is advertising right now has been running, so its true index
+# tracks the wall clock and sits at the top of the window; the bottom is only reachable by a
+# tag that was switched off for months, which is not advertising and so has nothing to match
+# anyway. Refusing outright was the earlier answer and was worse: it cost every never-aligned
+# tag its BLE matching entirely.
+#
+# Done here with a second key walk, because `current_mac_addresses` in the pinned FindMy.py
+# has no `max_indices` to ask for this. Worth sending upstream so the walk can go.
+_MAC_CANDIDATE_MAX_INDICES = 1000
+
+
+#: What `addressesBetween` reports instead of an index it cannot vouch for. Not None, because
+#: the mapping crosses to Java as a plain map and a null value there is indistinguishable from
+#: an address that was never derived at all.
+_INDEX_UNKNOWN = -1
+
+
+def candidateWindow(accessoryJson: str):
+    """The key index range worth scanning for this accessory right now, without deriving it.
+
+    **Cheap on purpose.** `currentMacAddresses` answers the same question and pays for the
+    answer, which is fine when the addresses are what you want and wasteful when all you need
+    to know is which part of the range you are missing. Deciding that is what lets a caller
+    keep what it derived last time and ask only for the rest, and the whole point of keeping
+    it is not paying this cost again.
+
+    Bounded exactly as `currentMacAddresses` bounds it, so the two never disagree about which
+    slice is the live one.
+
+    Returns a mapping with `lo` and `hi` inclusive, or None if the accessory cannot be read.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+
+        now = datetime.now(timezone.utc)
+        top = accessory.get_max_index(now + _MAC_CANDIDATE_MARGIN)
+        width = _isAlignmentWide(
+            accessory, now - _MAC_CANDIDATE_MARGIN, now + _MAC_CANDIDATE_MARGIN)
+
+        if width > _MAC_CANDIDATE_MAX_INDICES:
+            bottom = top - _MAC_CANDIDATE_MAX_INDICES
+        else:
+            bottom = accessory.get_min_index(now - _MAC_CANDIDATE_MARGIN)
+
+        return {"lo": max(0, bottom), "hi": top}
+    except Exception:
+        print(f"candidateWindow failed: {traceback.format_exc()}")
+        return None
+
+
+def addressesBetween(accessoryJson: str, lo: int, hi: int):
+    """The addresses this accessory can advertise at every index from `lo` to `hi` inclusive.
+
+    **The set of addresses never goes out of date, and that is what a stored copy rests on.**
+    An address is a pure function of the accessory's keys and an index, so an address derived
+    once is still one this accessory can advertise; only which part of the range is worth
+    watching moves, and that is `candidateWindow`'s answer rather than this one's. Splitting a
+    range into pieces and joining the results yields exactly the same set as asking for it
+    whole, which is what lets a caller widen its search a piece at a time.
+
+    **A secondary key's index is reported as -1 rather than as a number that would be
+    believed.** `keys_between` de-duplicates, and a secondary key covers 96 consecutive primary
+    indices, so it comes back at the first index the *call's own* range happens to reach: ask
+    for 19100..19160 and it is 19100, ask for 19131..19160 and the same address is 19131. That
+    is an artefact of where the search started, not a fact about the tag, and a caller storing
+    it would later read it as exact. A primary key occurs at exactly one index and does not
+    move, so its index is given as it is.
+
+    That distinction is what lets an address kept from an earlier, wider derivation still repair
+    an alignment months out of step: the sighting arrives with an exact index, and
+    `recordAccessorySeen` confirms it with three derivations instead of searching a window that,
+    by definition, does not contain it.
+
+    Deliberately takes the range rather than working it out. A caller widening its search a
+    piece at a time needs to say which piece, and a function that decided for itself could not
+    be asked for the piece below the one it would have chosen.
+
+    Returns None on failure, which a caller must tell apart from an empty range.
+    """
+    try:
+        if hi < lo:
+            return {}
+
+        accessory = accessoryFromJson(accessoryJson)
+
+        started = time.perf_counter()
+        derived = {
+            key.mac_address: (index if key.key_type == KeyPairType.PRIMARY else _INDEX_UNKNOWN)
+            for index, key in accessory.keys_between(max(0, lo), hi)
+        }
+        _reportDerivationCost(hi - max(0, lo) + 1, derived, started)
+        return derived
+    except Exception:
+        print(f"addressesBetween failed: {traceback.format_exc()}")
+        return None
+
+
+def _reportDerivationCost(width, derived, started):
+    """Says what deriving a candidate window actually cost, in indices and in seconds.
+
+    This is the one expensive call in the BLE path and the only one whose price scales with
+    how stale an alignment is, so how far a search can be widened before it stops being
+    affordable is a question about this number. It was answered with adjectives for a long
+    time - "several times slower under Chaquopy" - which is not a number anybody can size a
+    background task with. Printed per index rebuild rather than per sighting, which is rare
+    enough to be free and often enough to catch a device that is far slower than the desktop.
+    """
+    elapsed = time.perf_counter() - started
+    count = 0 if derived is None else len(derived)
+    per_thousand = (elapsed / width * 1000) if width else 0.0
+    print(f"Derived {count} candidate address(es) over {width} index/indices "
+          f"in {elapsed:.2f}s ({per_thousand:.2f}s per 1000)")
+
+
+def currentMacAddresses(accessoryJson: str) -> dict[str, int] | None:
+    """
+    The BLE MAC address(es) this accessory might currently be advertising, each with its index.
+
+    Lets Java recognise an owned accessory's own advertisement in a BLE scan, so it can be
+    triggered directly (playing a sound) without going through Apple's Find My network - the
+    same thing Find My itself does when a tag is close enough to reach over Bluetooth.
+
+    Delegates to `RollingKeyPairSource.current_mac_addresses`, added to the pinned FindMy.py
+    fork alongside this feature: it spans the accessory's `get_min_index`/`get_max_index`
+    range for *now* rather than a single index, to account for rollover uncertainty since the
+    last observed alignment.
+
+    **Each address maps to the key index it came from**, so a caller that matches one can hand
+    it straight to `recordAccessorySeen` - which is what keeps the next call cheap. Returning a
+    bare list would throw that away.
+
+    Returns None on failure so Java can decide how to recover - a missing or unreadable
+    accessory is worth telling apart from "no keys", which would be an empty mapping.
+
+    **An accessory whose window is absurdly wide has only its newest slice derived**, and that
+    is decided here rather than in the caller, because by the time the caller could measure the
+    answer the work has already been done. See `_MAC_CANDIDATE_MAX_INDICES` for what that
+    protects, and why the slice is the newest one.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+
+        now = datetime.now(timezone.utc)
+        started = time.perf_counter()
+        width = _isAlignmentWide(
+            accessory, now - _MAC_CANDIDATE_MARGIN, now + _MAC_CANDIDATE_MARGIN)
+
+        if width > _MAC_CANDIDATE_MAX_INDICES:
+            # **Bounded to the newest slice rather than refused.** A tag advertising right now
+            # has been running, so its index tracks the wall clock and sits at the top of the
+            # window; the bottom belongs to a tag that was switched off for months, which is not
+            # advertising and so has nothing to match anyway. Refusing outright cost every
+            # never-aligned tag its BLE matching, which is a worse trade than searching the part
+            # of the range that can plausibly be live.
+            top = accessory.get_max_index(now + _MAC_CANDIDATE_MARGIN)
+            bottom = top - _MAC_CANDIDATE_MAX_INDICES
+            print(f"Candidate window is {width} indices wide; deriving only the newest "
+                  f"{_MAC_CANDIDATE_MAX_INDICES} ({bottom}..{top}), which is what a running "
+                  f"accessory can plausibly be advertising.")
+            derived = {
+                key.mac_address: index
+                for index, key in accessory.keys_between(max(0, bottom), top)
+            }
+            _reportDerivationCost(_MAC_CANDIDATE_MAX_INDICES, derived, started)
+            return derived
+
+        derived = accessory.current_mac_addresses(margin=_MAC_CANDIDATE_MARGIN)
+        _reportDerivationCost(width, derived, started)
+        return derived
+    except Exception:
+        print(f"currentMacAddresses failed: {traceback.format_exc()}")
+        return None
+
+
+def _matchAt(accessory, mac: str, index: int | None):
+    """Check one index for `mac`, which is the whole point of the hint.
+
+    **Java knows which index its candidate set derived the address from, and cannot act on
+    it.** Only here can a primary key be told from a secondary one, and that distinction is what
+    decides whether alignment may be trusted. So the index arrives as a hint to be verified
+    rather than as an answer: this re-derives the keys at that index and checks the address
+    itself, exactly as the wide scan would, and reports the key type it actually found.
+
+    The saving is the reason it exists. The 48-hour window is around 1150 key derivations,
+    measured at 1.15s on desktop and several times that under Chaquopy; one index is three.
+    Running the wide version on the sighting callback's cadence put the app at 135% CPU with two
+    tags in range and got it killed for not answering input.
+    """
+    if index is None:
+        return None, None
+
+    for key in accessory.keys_at(index):
+        if key.mac_address != mac:
+            continue
+        if key.key_type == KeyPairType.PRIMARY:
+            return index, None
+        return None, index
+
+    return None, None
+
+
+def _matchAcross(candidates: dict, mac: str):
+    """Find `mac` among already-derived keys, preferring a primary match."""
+    matched_secondary = None
+
+    for key, index in candidates.items():
+        if key.mac_address != mac:
+            continue
+        if key.key_type == KeyPairType.PRIMARY:
+            return index, None
+        matched_secondary = index
+
+    return None, matched_secondary
+
+
+def recordAccessorySeen(accessoryJson: str, mac: str, seenAtUnixMs: int,
+                        hintIndex: int | None = None) -> str | None:
+    """
+    Tell an accessory it was seen advertising as `mac`, and hand back its new state.
+
+    **This is what stops the margin above being paid for twice.** A BLE sighting is worth
+    realigning to, the same as a decrypted location report is. Without this the twelve-hour
+    range is re-derived on every scan; with it, the call after a hit collapses to the three
+    keys of a single index.
+
+    **Takes the address rather than the index `currentMacAddresses` returned for it, and that
+    difference is load-bearing.** That index is only trustworthy when the address came from a
+    *primary* key: a primary index is unique, one key per index, so a match against it proves
+    the true index outright. A secondary key covers 96 consecutive primary indices - see
+    `_AccessoryKeyGenerator._secondary_keys_at` - so its index is only the first one the search
+    happened to reach, not the true one. Fed to `update_alignment` without checking, that index
+    can ratchet alignment past the true index in the wrong direction - measured on a real
+    accessory that drifted 114 indices (28.5 hours) ahead this way and then needed a multi-day
+    margin just to be found at all. The fix has to happen here rather than by filtering the map
+    `currentMacAddresses` returns, because an address derived from a secondary key is still
+    worth *scanning for* - only not worth *aligning to*.
+
+    **Does not go through `update_alignment`, and that is also deliberate.** It only ever moves
+    forward - correct for a fetch, where every index it sees came from searching ahead of where
+    alignment already believes it is, so "never seen a lower one" is a safe rule there. A BLE
+    match is not built that way: it comes from a wide, symmetric window, so a primary match can
+    legitimately land below the stored alignment - proof that alignment had already drifted too
+    far ahead, from an earlier secondary-key mistake or otherwise. Refusing to correct downward
+    would leave that drift permanent, which is the whole failure this function exists to undo.
+    So a primary match's index is written to the accessory's serialized state directly, in
+    either direction.
+
+    So this re-derives the key at `mac` itself, from scratch, and only accepts a match through
+    its primary key. A secondary-only match, or no match at all (the candidate set may have
+    moved on since the scan that found `mac`), records nothing.
+
+    Returns the re-serialized accessory for Java to write back to `OwnedBeacon.accessory_json`,
+    the same field and the same reason as `getLastReports`' `updatedAccessoryJson`. None on
+    failure or on nothing worth recording, because a sighting that cannot be recorded is not
+    worth failing a sound over.
+    """
+    try:
+        accessory = accessoryFromJson(accessoryJson)
+        if not isinstance(accessory, FindMyAccessory):
+            # A self-generated accessory's keys don't rotate (update_alignment is a no-op for
+            # it) - there is no drift here for this to fix.
+            return None
+
+        seen_at = datetime.fromtimestamp(seenAtUnixMs / 1000, tz=timezone.utc)
+        mac = mac.upper()
+
+        matched_primary, matched_secondary = _matchAt(accessory, mac, hintIndex)
+
+        if matched_primary is None and matched_secondary is None:
+            # The hint missed, or there was none. Fall back to the window the caller's candidate
+            # set was built from - the address may belong to an index the hint did not name, and
+            # a scan that found it must not be thrown away over a wrong guess.
+            matched_primary, matched_secondary = _matchAcross(
+                accessory.current_keys(seen_at, margin=_MAC_CANDIDATE_MARGIN), mac)
+
+        mapping = json.loads(accessoryJson)
+        stored_index = mapping.get("alignment_index")
+
+        if matched_primary is not None:
+            matched_index = matched_primary
+        elif matched_secondary is not None and (
+                stored_index is None or matched_secondary > stored_index):
+            # A floor, not a fix. The true index is somewhere in this secondary key's 192-index
+            # span - `keys_at` offers each secondary at both `ind // 96 + 1` and `+ 2`, so one is
+            # reachable from two 96-blocks, which is the same 192 the margin above is derived
+            # from - and `keys_between` de-duplicates while walking indices upward, so the index
+            # paired with a key is the lowest in the searched range at which it is valid. It is
+            # therefore a lower bound, and moving alignment up to it can only ever undershoot
+            # the truth - never overshoot it, which is the direction that does damage. Raising
+            # the floor is what stops the lag growing without bound for a tag that only ever
+            # matches on its day key.
+            matched_index = matched_secondary
+        else:
+            return None
+
+        if stored_index == matched_index:
+            return None
+
+        # Bypassing update_alignment for the downward index move must not also bypass its
+        # backward-time guard: a device clock rolled back (manual change, bad carrier time)
+        # would otherwise persist a (past date, current index) pair, and once the clock
+        # corrects, the index extrapolated from that past date overshoots the true one.
+        stored_date = mapping.get("alignment_date")
+        if stored_date is not None and seen_at < datetime.fromisoformat(stored_date):
+            return None
+
+        mapping["alignment_index"] = matched_index
+        mapping["alignment_date"] = seen_at.isoformat()
+        return json.dumps(mapping)
+    except Exception:
+        print(f"recordAccessorySeen failed: {traceback.format_exc()}")
+        return None
+
+
 def _isAlignmentWide(accessory: StoredAccessory, start, end) -> int:
     """Width of the key-index range a history fetch would search, or 0 if unknown."""
     try:
@@ -1257,6 +1634,109 @@ def _updateAlignment(accessory: StoredAccessory, report, index):
         print(f"Could not update alignment: {traceback.format_exc()}")
 
 
+def _alignmentOf(accessory: StoredAccessory):
+    """The stored (index, date) pair, or (None, None) for an accessory that has no alignment."""
+    try:
+        mapping = accessory.to_json()
+        return mapping.get("alignment_index"), mapping.get("alignment_date")
+    except Exception:
+        return None, None
+
+
+def _reportDrift(before_index, before_date, after_index, after_date) -> None:
+    """Says how far the extrapolation had run from where the tag turned out to be.
+
+    **The one measurement that settles how wide a search has to be.** Everything about which
+    addresses are worth scanning for rests on extrapolating the stored alignment forward at one
+    index every fifteen minutes, and on that extrapolation staying close to where the tag really
+    is. Nobody has ever measured whether it does. The candidate window, the bounded slice, how
+    far back a search should reach - all of it is currently sized by argument rather than by a
+    number.
+
+    An alignment that moved during a fetch is a real observation: something decrypted, so the new
+    pair says where the tag actually was at a moment. Extrapolating the *old* pair forward to that
+    same moment and subtracting gives the drift, as a signed number of indices, for free, on every
+    fetch that finds anything.
+
+    Positive means the extrapolation had run ahead of the tag, which is the direction that loses
+    it: the search then looks above where the tag is. Around zero over weeks would mean a tag that
+    is merely out of contact stays where the extrapolation says, and a search that widens downward
+    is solving a problem nobody has.
+
+    Compared this way rather than from a report's own index because the ordinary fetch never hands
+    one over: `fetch_location_history(accessory)` updates the alignment inside FindMy.py, so the
+    only place a report's index is visible in this file is the ranged path, which is the rarer
+    half. The before-and-after pair is visible in both.
+    """
+    if None in (before_index, before_date, after_index, after_date):
+        return
+
+    if before_index == after_index and before_date == after_date:
+        # The fetch found nothing to align to. Not a drift of zero, which is why it is not
+        # reported as one: a series full of those would read as a stable extrapolation.
+        return
+
+    try:
+        moved_by = datetime.fromisoformat(after_date) - datetime.fromisoformat(before_date)
+        extrapolated = before_index + int(moved_by // timedelta(minutes=15))
+    except Exception:
+        return
+
+    index = after_index
+
+    line = (f"Alignment drift: report at index {index}, extrapolated {extrapolated}, "
+            f"drift {extrapolated - index} index/indices "
+            f"({(extrapolated - index) / 4:.1f} hours ahead)")
+
+    print(line)
+    _appendDiagnostic(line)
+
+
+#: Where diagnostics are appended, set once by Java. None means logcat only.
+_DIAGNOSTICS_PATH = None
+
+#: Past this the file is halved, oldest first. A drift line is about 110 bytes, so this keeps
+#: something like the last thousand readings - months of fetches, and still nothing to notice.
+_DIAGNOSTICS_MAX_BYTES = 128 * 1024
+
+
+def setDiagnosticsPath(path: str) -> None:
+    """Point diagnostics at a file, so a measurement outlives the logcat ring buffer.
+
+    **Because the alternative was asking somebody to leave a phone plugged in.** The drift
+    measurement is only worth anything as a series over weeks, and logcat on a busy device
+    holds minutes. Java passes a directory it can reach without root - its own external files
+    directory - so the file can be pulled whenever the phone next happens to be connected.
+    """
+    global _DIAGNOSTICS_PATH
+    _DIAGNOSTICS_PATH = os.path.join(path, "diagnostics.log") if path else None
+
+
+def _appendDiagnostic(line: str) -> None:
+    """Adds one timestamped line, halving the file if it has grown past the cap.
+
+    Never raises. A diagnostic that can break the thing it is measuring is worse than no
+    diagnostic, and this sits directly in the fetch path.
+    """
+    path = _DIAGNOSTICS_PATH
+    if not path:
+        return
+
+    try:
+        stamped = f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} {line}\n"
+
+        if os.path.exists(path) and os.path.getsize(path) > _DIAGNOSTICS_MAX_BYTES:
+            with open(path, "r", encoding="utf-8", errors="replace") as existing:
+                kept = existing.readlines()
+            with open(path, "w", encoding="utf-8") as trimmed:
+                trimmed.writelines(kept[len(kept) // 2:])
+
+        with open(path, "a", encoding="utf-8") as out:
+            out.write(stamped)
+    except Exception:
+        print(f"Could not write a diagnostic line: {traceback.format_exc()}")
+
+
 def _serializeReports(reports):
     """
     Map FindMy 0.9.x LocationReport objects to the dict shape Java's mapResults expects.
@@ -1343,6 +1823,7 @@ def getLastReports(
             # Measured before and after, because "found nothing" on its own says nothing.
             # See _DEAD_TAG_WIDTH_INDICES.
             width_before = _isAlignmentWide(airtag, start_dt, now_dt)
+            aligned_before = _alignmentOf(airtag)
 
             # Per-accessory isolation. One beacon failing used to abort the whole call,
             # which meant no beacon's updated alignment was persisted - so every later
@@ -1357,6 +1838,12 @@ def getLastReports(
                 continue
 
             print(f"Got {len(reports)} raw reports for {beaconId}")
+
+            # Measured here because this is the one place both halves are in scope: what the
+            # alignment said before anything was fetched, and what the fetch made of it.
+            aligned_after = _alignmentOf(airtag)
+            _reportDrift(aligned_before[0], aligned_before[1],
+                         aligned_after[0], aligned_after[1])
 
             # A search that stayed as wide as it started found nothing to align to, which is
             # the difference between "no reports in the window asked for" and "no reports at

@@ -78,9 +78,28 @@ public interface UserBeaconOptionsDao {
         }
     }
 
+    /**
+     * Store whether this tag is worth a noise when it is left behind.
+     *
+     * <p>Insert-then-update rather than a replace, for the reason spelled out on
+     * {@link #storeArrangement}: most tags have no row here, and {@code INSERT OR REPLACE} would
+     * delete the nickname and the arrangement on the way past.
+     */
+    @Transaction
+    default void storeAlertOnSeparation(
+            final String beaconId, final boolean alert, final long now) {
+
+        this.createIfAbsent(beaconId, now);
+        this.setAlertOnSeparation(beaconId, alert, now);
+    }
+
+    @Query("UPDATE UserBeaconOptions SET alert_on_separation = :alert, last_update = :now"
+            + " WHERE beacon_id = :beaconId")
+    void setAlertOnSeparation(String beaconId, boolean alert, long now);
+
     /** A row to hang a position on, for a tag the user has never renamed. See above. */
     @Query("INSERT OR IGNORE INTO UserBeaconOptions (beacon_id, last_update, ui_name, ui_emoji,"
-            + " ui_order) VALUES (:beaconId, :now, NULL, NULL, NULL)")
+            + " ui_order, alert_on_separation) VALUES (:beaconId, :now, NULL, NULL, NULL, NULL)")
     void createIfAbsent(String beaconId, long now);
 
     /** Writes only the position, leaving the nickname and emoji exactly as they are. */

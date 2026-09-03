@@ -175,7 +175,11 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         this.membershipRepo = new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(this.getApplicationContext()),
                 new AppCryptographyUtil());
-        WindowPaddingUtil.insertUITopPadding(this.findViewById(R.id.icloud_scroll));
+        // **The root, not the scroll area.** The buttons on this screen - back, and the primary
+        // one that says Unlock - sit *outside* icloud_scroll, anchored to the bottom of the
+        // activity, so padding the scroll view moved the text and left them exactly where they
+        // were: under the navigation bar. That is the screenshot in the bug report.
+        WindowPaddingUtil.insetForSystemBars(this.findViewById(R.id.icloud_root));
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();

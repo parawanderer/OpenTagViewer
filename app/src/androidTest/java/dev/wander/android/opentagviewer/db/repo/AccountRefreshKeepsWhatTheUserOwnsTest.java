@@ -99,6 +99,7 @@ public class AccountRefreshKeepsWhatTheUserOwnsTest {
                 .horizontalAccuracy(83)
                 .status(144)
                 .lastUpdate(1_000L)
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build());
     }
 

@@ -118,8 +118,75 @@ public class UserSettings {
      */
     private Boolean icloudOfferMade;
 
+    /**
+     * Whether to keep listening for the user's tags while the app is closed.
+     *
+     * <p><b>Off unless somebody turns it on, and this one changes what the app is.</b> Without
+     * it the radio only listens while a screen is open, which makes this a display feature: it
+     * tells you what is near you while you are looking. With it the app runs a foreground
+     * service with a permanent notification, listens continuously, and writes down where your
+     * tags were heard - which is a recording feature, and one this app's users have specific
+     * reasons to want to opt into rather than receive.
+     *
+     * <p>It is also what makes the local position history worth having: the case a history
+     * answers is "where did I leave it", and the app is shut at exactly that moment.
+     *
+     * <p>Null reads as off. See {@link #shouldScanInBackground()}.
+     */
+    private Boolean scanInBackground;
+
+    /**
+     * How many seconds of silence make a tag count as left behind.
+     *
+     * <p>Adjustable because the right answer is about the person, not the tag. Somebody who
+     * wants to be caught before the end of the street wants a few seconds and will accept the
+     * occasional check that finds the tag still there; somebody who puts their bag down a lot
+     * wants a minute and no interruptions. Neither is wrong, and no single number is right for
+     * both.
+     *
+     * <p>Null means {@link #LEFT_BEHIND_AFTER_SECONDS_DEFAULT}. See
+     * {@link #resolveLeftBehindAfterSeconds()}, which also enforces the floor - below it the
+     * check cadence, not this number, decides when the alert arrives, and a setting that
+     * silently does nothing is worse than one that will not go that low.
+     */
+    private Integer leftBehindAfterSeconds;
+
+    /**
+     * The alarm sound, as a content URI string, or null/empty for the system default alarm.
+     *
+     * <p>Held as the URI the ringtone picker handed back rather than anything resolved: the
+     * sound behind it can be deleted or live on a volume that is not mounted, so it is read
+     * defensively at the moment it is played and falls back to the default there.
+     */
+    private String leftBehindSoundUri;
+
+    /** What a tag's silence has to outlast before it is worth a targeted check. */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_DEFAULT = 30;
+
+    /**
+     * The shortest silence worth offering.
+     *
+     * <p>A tag advertises every one to three seconds, but a scan at a duty cycle below full
+     * leaves gaps of its own, and the verification scan that follows takes six seconds on its
+     * own. Under ten there is nothing left for the number to control.
+     */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_MIN = 10;
+
+    /** Beyond this the tag is somewhere else entirely and the alert has missed its moment. */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_MAX = 300;
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
+
+    /** The configured silence in seconds, defaulted and clamped to what the check can honour. */
+    public int resolveLeftBehindAfterSeconds() {
+        if (this.leftBehindAfterSeconds == null || this.leftBehindAfterSeconds <= 0) {
+            return LEFT_BEHIND_AFTER_SECONDS_DEFAULT;
+        }
+
+        return Math.max(LEFT_BEHIND_AFTER_SECONDS_MIN,
+                Math.min(LEFT_BEHIND_AFTER_SECONDS_MAX, this.leftBehindAfterSeconds));
+    }
 
     public boolean hasDarkThemeEnabled() {
         return this.useDarkTheme == Boolean.TRUE;
@@ -189,6 +256,14 @@ public class UserSettings {
      */
     public boolean shouldShowAppleDevices() {
         return this.showAppleDevices == Boolean.TRUE;
+    }
+
+    /**
+     * Whether to keep listening while the app is closed - see {@link #scanInBackground}. Null
+     * means nobody has turned it on, which is off.
+     */
+    public boolean shouldScanInBackground() {
+        return this.scanInBackground == Boolean.TRUE;
     }
 
     /**
