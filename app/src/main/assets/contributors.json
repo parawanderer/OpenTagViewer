@@ -4,7 +4,7 @@
       "login": "parawanderer",
       "profileUrl": "https://github.com/parawanderer",
       "avatar": "parawanderer.png",
-      "commits": 594
+      "commits": 605
     },
     {
       "login": "SadGare",
@@ -17,6 +17,12 @@
       "profileUrl": "https://github.com/jamorenom",
       "avatar": "jamorenom.png",
       "commits": 1
+    },
+    {
+      "login": "Fayupable",
+      "profileUrl": "https://github.com/Fayupable",
+      "avatar": "fayupable.png",
+      "commits": 2
     },
     {
       "login": "horihori2013",

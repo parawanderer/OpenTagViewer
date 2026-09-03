@@ -363,4 +363,7 @@ Vos tags et leur historique de position ne sont pas touchés, et rien n’a ét�
     <string name="debug_key_alignment">Alignement des clés</string>
     <string name="debug_key_alignment_value">Index %1$d, aligné %2$s</string>
     <string name="debug_key_alignment_none">Aucun enregistré — la prochaine récupération part de la date d\'association</string>
+    <string name="twofactor_apple_took_the_code">Apple a accepté votre code puis n’a pas pu terminer la connexion. Le code est donc utilisé et il en faut un nouveau — nous patientons un instant avant de le demander, car une demande immédiate est refusée.</string>
+    <string name="twofactor_waiting_seconds">Nouveau code demandé à Apple dans %1$d s…</string>
+    <string name="twofactor_apple_did_not_recover">Apple ne termine toujours pas la connexion. C’est une panne du côté d’Apple, pas quelque chose que vous avez fait, ni votre code.\n\nRéessayez dans quelques minutes. Votre mot de passe pourra être refusé une fois à ce moment-là : cela fait partie de la même panne, saisissez-le à nouveau plutôt que de le croire erroné.</string>
 </resources>

@@ -366,6 +366,13 @@ class WizardApp(tk.Tk):
             )
             self.destroy()
             return
+        except icloud.SignInInterrupted as e:
+            # **Before the handler below, only for its title.** Nothing was read here, because
+            # signing in never finished - and "Could not read your accessories" over the top of a
+            # message about a verification code is the kind of wrong heading a reader corrects
+            # for and then trusts the rest of less.
+            messagebox.showerror("Could not finish signing in", str(e))
+            return
         except (ExportSourceError, ExportError) as e:
             messagebox.showerror("Could not read your accessories", str(e))
             return
@@ -461,6 +468,10 @@ class WizardApp(tk.Tk):
                     retry_credentials=lambda error, attempt: _async(
                         _ask_again_for_credentials(self, asker, error, attempt),
                     ),
+                    # So the progress window says what it is waiting for. Without this the wait
+                    # after a spent code is three quarters of a minute of "Signing in to iCloud…",
+                    # which is what a hang looks like.
+                    announce=asker.say,
                     retry_code=lambda error, attempt: _async(
                         _ask_again_for_code(self, asker, error, attempt),
                     ),
