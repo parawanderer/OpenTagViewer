@@ -129,6 +129,13 @@
             name="bleStatusByte"
             type="String" />
 
+        <!-- Where the rolling key search will start from, for the debug panel. Read from the
+             accessory state the last fetch left behind rather than from the export's record,
+             because only the first of those moves. See AccessoryAlignment. -->
+        <variable
+            name="keyAlignment"
+            type="String" />
+
         <!-- Whether this tag is worth an alarm when it is left behind. -->
         <variable
             name="warnIfLeftBehind"
@@ -638,6 +645,14 @@
                             app:onClick="@{clickItemHandler}"
                             app:sectionSubtitle="@{backoffState}"
                             app:title="@{@string/debug_backoff_state}" />
+
+                        <include
+                            android:id="@+id/settings_debug_key_alignment"
+                            layout="@layout/settings_item_noicon_clickable"
+                            app:clickable="@{true}"
+                            app:onClick="@{clickItemHandler}"
+                            app:sectionSubtitle="@{keyAlignment}"
+                            app:title="@{@string/debug_key_alignment}" />
 
                         <include
                             android:id="@+id/settings_debug_device_name_original"

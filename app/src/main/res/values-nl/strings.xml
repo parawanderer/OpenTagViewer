@@ -360,4 +360,7 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
 Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Apple-account verwijderd.</string>
     <string name="error_report_cause_membership_unreadable">De opgeslagen verbinding met het Apple-account kon niet worden ontsleuteld, terwijl de sleutel er nog wel is</string>
     <string name="error_report_body_membership">De verbinding met je Apple-account staat op dit apparaat, de sleutel die hem opent is er nog, en toch gaat hij niet meer open — dat hoort niet te kunnen.\n\nDaarom is dit het melden waard in plaats van het gewoon opnieuw te doen. Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Apple-account verwijderd.</string>
+    <string name="debug_key_alignment">Sleuteluitlijning</string>
+    <string name="debug_key_alignment_value">Index %1$d, uitgelijnd %2$s</string>
+    <string name="debug_key_alignment_none">Niets opgeslagen — de volgende ophaalactie zoekt vanaf de koppeldatum</string>
 </resources>

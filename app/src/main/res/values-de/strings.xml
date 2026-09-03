@@ -360,4 +360,7 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
 Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Apple-Konto wurde nichts entfernt.</string>
     <string name="error_report_cause_membership_unreadable">Die gespeicherte Verbindung zum Apple-Konto ließ sich nicht entschlüsseln, obwohl ihr Schlüssel noch vorhanden ist</string>
     <string name="error_report_body_membership">Die Verbindung zu deinem Apple-Konto liegt auf diesem Gerät, der Schlüssel dazu ist noch da, und sie lässt sich trotzdem nicht mehr öffnen – das sollte nicht möglich sein.\n\nDeshalb lohnt sich eine Meldung, statt es einfach neu einzurichten. Deine Tags und ihr Standortverlauf sind nicht betroffen, und aus deinem Apple-Konto wurde nichts entfernt.</string>
+    <string name="debug_key_alignment">Schlüssel-Ausrichtung</string>
+    <string name="debug_key_alignment_value">Index %1$d, ausgerichtet %2$s</string>
+    <string name="debug_key_alignment_none">Keine gespeichert — der nächste Abruf sucht ab dem Kopplungsdatum</string>
 </resources>

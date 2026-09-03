@@ -360,4 +360,7 @@
 태그와 위치 기록에는 영향이 없으며, Apple 계정에서 삭제된 것도 없습니다.</string>
     <string name="error_report_cause_membership_unreadable">저장된 Apple 계정 연결을 복호화하지 못했습니다. 키는 그대로 남아 있습니다</string>
     <string name="error_report_body_membership">Apple 계정 연결은 이 기기에 저장되어 있고 이를 여는 키도 그대로 있는데 더 이상 열리지 않습니다. 원래는 있을 수 없는 일입니다.\n\n그래서 그냥 다시 설정하기보다 신고할 가치가 있습니다. 태그와 위치 기록에는 영향이 없으며, Apple 계정에서 삭제된 것도 없습니다.</string>
+    <string name="debug_key_alignment">키 정렬</string>
+    <string name="debug_key_alignment_value">인덱스 %1$d, 정렬 시각 %2$s</string>
+    <string name="debug_key_alignment_none">저장된 값 없음 — 다음 가져오기는 페어링 날짜부터 검색합니다</string>
 </resources>
