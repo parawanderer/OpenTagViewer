@@ -74,6 +74,7 @@ import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.rx.ACodeAppleAlreadyTook;
 import dev.wander.android.opentagviewer.viewmodel.AppleLoginViewModel;
 import dev.wander.android.opentagviewer.viewmodel.LoginActivityState;
 import dev.wander.android.opentagviewer.viewmodel.LoginActivityState.PAGE;
@@ -1018,6 +1019,104 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.show2FAChoiceScreen(Direction.BACK);
     }
 
+    /**
+     * How many times a spent code has been waited out on this screen. Never reset on purpose:
+     * two goes at it is the budget for one sign-in, not per code.
+     */
+    private int spentCodeRecoveries = 0;
+
+    /** Cancelled if the screen goes away mid-wait, so a dead activity is not written to. */
+    private final Handler waitingForApple = new Handler(Looper.getMainLooper());
+
+    /**
+     * Apple took the code and then failed. Wait, then ask for a new one - without a prompt.
+     *
+     * <p><b>There is no question worth asking, so none is asked.</b> Re-typing cannot work and
+     * waiting is the only option, so a dialog would offer a choice between one real answer and a
+     * wrong one. The exporter reached the same conclusion and has a test asserting the user is
+     * never prompted.
+     *
+     * <p><b>The wait is shown counting down.</b> Two minutes of a still screen on a phone is
+     * indistinguishable from a hang, and gets force-quit.
+     *
+     * <p><b>And the new code is requested after the wait, never before.</b> Both orders look
+     * right in a diff; Apple's codes expire, so one fetched first is two minutes stale by the
+     * time it is typed.
+     *
+     * <p>The Apple ID and password are not asked for again. The account is still in its
+     * second-factor state, so requesting on the chosen method is all that is needed.
+     */
+    private void recoverFromApppleTakingTheCode(
+            final FrameLayout errorBox, final TextView errorText) {
+
+        final long wait = ACodeAppleAlreadyTook.waitBefore(this.spentCodeRecoveries);
+        this.spentCodeRecoveries++;
+
+        this.hideLoading();
+        this.showPage(R.id.login_2fa_container, Direction.BACK);
+        this.twoFactorEntryManager.clear();
+        this.twoFactorAuthChoiceBackButton.setEnabled(true);
+        errorBox.setVisibility(VISIBLE);
+
+        if (wait < 0) {
+            // Out of goes. Say whose fault it is, and warn about the password refusal - it
+            // happened in the one observed recovery, and unwarned it reads as a second,
+            // unrelated problem.
+            Log.w(TAG, "Apple did not recover after waiting it out twice");
+            errorText.setText(R.string.twofactor_apple_did_not_recover);
+            return;
+        }
+
+        Log.i(TAG, "Apple took the code and then failed; waiting " + wait
+                + "ms before asking for a new one");
+        errorText.setText(R.string.twofactor_apple_took_the_code);
+        this.countDownThenAskForANewCode(wait, errorBox, errorText);
+    }
+
+    private void countDownThenAskForANewCode(
+            final long remaining, final FrameLayout errorBox, final TextView errorText) {
+        if (this.isFinishing() || this.isDestroyed()) {
+            return;
+        }
+
+        if (remaining <= 0) {
+            final var chosen = this.getUiState().getChosenAuthMethod();
+            if (chosen == null) {
+                errorText.setText(R.string.twofactor_apple_did_not_recover);
+                return;
+            }
+
+            var async = this.authService.requestCode(chosen)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(
+                            () -> {
+                                // The box is already empty and the prompt above it still says
+                                // where the code was sent, so the error line's job is done.
+                                Log.i(TAG, "Asked Apple for a fresh code after the wait");
+                                errorBox.setVisibility(GONE);
+                            },
+                            error -> {
+                                Log.e(TAG, "Asking for a fresh code failed too", error);
+                                errorText.setText(R.string.twofactor_apple_did_not_recover);
+                            });
+            return;
+        }
+
+        errorText.setText(this.getString(
+                R.string.twofactor_waiting_seconds, (int) Math.ceil(remaining / 1000.0)));
+
+        this.waitingForApple.postDelayed(
+                () -> this.countDownThenAskForANewCode(remaining - 1000L, errorBox, errorText),
+                1000L);
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Or a countdown outlives the screen and writes to views that are gone.
+        this.waitingForApple.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
     private void on2FAAuthCodeFilled(final String authCode) {
         if (!REGEX_2FA_CODE.matcher(authCode).matches()) {
             Log.w(TAG, "2FA Auth code from callback was invalid: " + authCode);
@@ -1060,6 +1159,17 @@ public class AppleLoginActivity extends AppCompatActivity {
         }, error -> {
             // I really would like to handle this error separately from the one above, hence the nesting above.
             Log.e(TAG, "Failed to authenticate using auth code " + authCode, error);
+
+            // **Apple taking the code and then failing is not a wrong code**, and must be told
+            // apart before anything counts it as one. See ACodeAppleAlreadyTook: the submit does
+            // two calls, the first succeeded, and the code is spent - so returning to the code
+            // box is the one action guaranteed to fail, and the attempt counter would eventually
+            // advise changing the Anisette server for a fault Anisette had no part in.
+            if (ACodeAppleAlreadyTook.spentIt(error)) {
+                this.recoverFromApppleTakingTheCode(twoFactorErrorMessage, errorMessageText);
+                return;
+            }
+
             var state = this.getUiState();
             final int failedLoginAttemptCount = state.getFailed2FAAttemptCount() + 1;
             state.setFailed2FAAttemptCount(failedLoginAttemptCount);

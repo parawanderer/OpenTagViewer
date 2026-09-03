@@ -363,4 +363,7 @@
     <string name="debug_key_alignment">金鑰對齊</string>
     <string name="debug_key_alignment_value">索引 %1$d，對齊於 %2$s</string>
     <string name="debug_key_alignment_none">未儲存 — 下次擷取將從配對日期開始搜尋</string>
+    <string name="twofactor_apple_took_the_code">Apple 已接受你的驗證碼，隨後未能完成登入。該驗證碼已被用掉，需要一個新的——我們會先等一下再申請，因為立刻申請會被拒絕。</string>
+    <string name="twofactor_waiting_seconds">將在 %1$d 秒後向 Apple 申請新驗證碼…</string>
+    <string name="twofactor_apple_did_not_recover">Apple 仍未完成登入。這是 Apple 一側的故障，不是你的操作問題，也不是驗證碼的問題。\n\n請過幾分鐘再試。屆時你的密碼可能會被拒絕一次——這屬於同一個故障，請再輸入一次，而不要以為密碼錯了。</string>
 </resources>
