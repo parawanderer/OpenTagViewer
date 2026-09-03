@@ -360,4 +360,7 @@
 タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
     <string name="error_report_cause_membership_unreadable">保存された Apple アカウント接続を復号できませんでした。鍵は残っています</string>
     <string name="error_report_body_membership">Apple アカウントへの接続はこの端末に保存されていて、それを開く鍵も残っているのに、開けなくなりました。本来ありえないことです。\n\nそのため、設定し直すだけでなく報告する価値があります。タグとその位置履歴には影響がなく、Apple アカウントからは何も削除されていません。</string>
+    <string name="debug_key_alignment">キーの同期位置</string>
+    <string name="debug_key_alignment_value">インデックス %1$d、同期日時 %2$s</string>
+    <string name="debug_key_alignment_none">保存されていません — 次回の取得はペアリング日から検索します</string>
 </resources>

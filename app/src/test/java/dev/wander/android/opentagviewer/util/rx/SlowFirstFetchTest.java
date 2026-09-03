@@ -1,6 +1,8 @@
 package dev.wander.android.opentagviewer.util.rx;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -99,5 +101,55 @@ public class SlowFirstFetchTest {
         assertFalse("a future timestamp is nonsense, but it is not evidence of a long search",
                 SlowFirstFetch.isLikely(
                         Collections.singletonList(NOW + TimeUnit.DAYS.toMillis(2)), NOW));
+    }
+
+    /**
+     * The bug this pair of methods exists to stop.
+     *
+     * <p>A tag exported a month ago and fetched this morning is not a slow fetch, but the export's
+     * record still says a month. Reading only the record showed the banner on every single
+     * refresh, for anybody whose export was more than a week old, however healthy their tags.
+     */
+    @Test
+    public void arecentFetchBeatsAnOldExportRecord() {
+        final long now = 1_700_000_000_000L;
+        final long thisMorning = now - TimeUnit.HOURS.toMillis(6);
+        final long aMonthAgo = now - TimeUnit.DAYS.toMillis(30);
+
+        assertFalse("the export is old, but the keys are aligned to this morning",
+                SlowFirstFetch.isLikely(
+                        List.of(SlowFirstFetch.laterOf(thisMorning, aMonthAgo)), now));
+    }
+
+    /** And a tag never fetched still leans on whatever the export knew. */
+    @Test
+    public void theexportRecordStillCountsBeforeTheFirstFetch() {
+        final long now = 1_700_000_000_000L;
+
+        assertEquals(Long.valueOf(now - TimeUnit.DAYS.toMillis(2)),
+                SlowFirstFetch.laterOf(null, now - TimeUnit.DAYS.toMillis(2)));
+        assertFalse(SlowFirstFetch.isLikely(
+                List.of(SlowFirstFetch.laterOf(null, now - TimeUnit.DAYS.toMillis(2))), now));
+    }
+
+    /** Neither known is the slowest case there is, and must stay slow. */
+    @Test
+    public void neitherKnownIsStillSlow() {
+        final long now = 1_700_000_000_000L;
+
+        assertNull(SlowFirstFetch.laterOf(null, null));
+        assertTrue(SlowFirstFetch.isLikely(
+                Collections.singletonList(SlowFirstFetch.laterOf(null, null)), now));
+    }
+
+    /** A re-import can carry a newer record than a stale accessory blob. */
+    @Test
+    public void afreshReimportBeatsAStaleAccessory() {
+        final long now = 1_700_000_000_000L;
+        final long yesterday = now - TimeUnit.DAYS.toMillis(1);
+        final long aYearAgo = now - TimeUnit.DAYS.toMillis(365);
+
+        assertEquals(Long.valueOf(yesterday), SlowFirstFetch.laterOf(aYearAgo, yesterday));
+        assertFalse(SlowFirstFetch.isLikely(List.of(SlowFirstFetch.laterOf(aYearAgo, yesterday)), now));
     }
 }

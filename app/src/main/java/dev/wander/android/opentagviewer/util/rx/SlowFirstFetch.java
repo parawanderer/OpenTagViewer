@@ -36,6 +36,10 @@ import java.util.concurrent.TimeUnit;
  * wait for something that turns out to be quick costs a moment's attention, and being told
  * nothing during three minutes of apparent hang is what this whole mechanism exists to prevent.
  *
+ * <p><b>Which timestamp is the live one matters, and originally the wrong one was read.</b> The
+ * record in the export is written once at import; the accessory state Python returns after every
+ * fetch carries an {@code alignment_date} that moves. See {@link #laterOf}.
+ *
  * <p>Pure and on the JVM, per AGENTS.md rule 13 - it takes timestamps and returns a boolean.
  */
 public final class SlowFirstFetch {
@@ -61,6 +65,35 @@ public final class SlowFirstFetch {
      *         enough: the batch is fetched one accessory at a time, so a single unaligned tag
      *         holds up everything behind it.
      */
+    /**
+     * The later of what the export recorded and what the last fetch left behind.
+     *
+     * <p><b>The record in the export stops being the answer the moment a fetch succeeds.</b> It is
+     * written once at import and never again; the accessory state Python hands back carries an
+     * {@code alignment_date} that advances every time. Reading only the record meant a tag
+     * exported a month ago and fetched hourly ever since still looked like a month-wide search,
+     * so the banner went up on every refresh - which is the noise this class was written to stop.
+     *
+     * <p>{@code ScanOrder} already had this right, and its comment says so: the record there is
+     * "only ever consulted for a tag with no scan history". This is that rule, for this caller.
+     *
+     * <p>The later of the two rather than simply preferring the live value, because a re-import
+     * can bring a newer record than a stale accessory blob, and neither is wrong to trust.
+     *
+     * @param alignedAt    {@code alignment_date} from the accessory state, or null.
+     * @param observedAt   {@code lastIndexObservationDate} from the export's record, or null.
+     * @return the later of the two, or null when neither is known - the slowest case there is.
+     */
+    public static Long laterOf(final Long alignedAt, final Long observedAt) {
+        if (alignedAt == null) {
+            return observedAt;
+        }
+        if (observedAt == null) {
+            return alignedAt;
+        }
+        return Math.max(alignedAt, observedAt);
+    }
+
     public static boolean isLikely(final Collection<Long> alignmentObservedAt, final long now) {
         if (alignmentObservedAt == null) {
             // Nothing known about the batch. Treated as slow, because the alternative is

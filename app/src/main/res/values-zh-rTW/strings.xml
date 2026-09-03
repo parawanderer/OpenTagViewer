@@ -360,4 +360,7 @@
 你的標籤與其位置紀錄不受影響，Apple 帳戶中也沒有任何內容被移除。</string>
     <string name="error_report_cause_membership_unreadable">已儲存的 Apple 帳戶連線無法解密，但其金鑰仍然存在</string>
     <string name="error_report_body_membership">與你的 Apple 帳戶的連線就儲存在本裝置上，解開它的金鑰也還在，卻打不開了——這本不該發生。\n\n因此這值得回報，而不只是重做一次。你的標籤與其位置紀錄不受影響，Apple 帳戶中也沒有任何內容被移除。</string>
+    <string name="debug_key_alignment">金鑰對齊</string>
+    <string name="debug_key_alignment_value">索引 %1$d，對齊於 %2$s</string>
+    <string name="debug_key_alignment_none">未儲存 — 下次擷取將從配對日期開始搜尋</string>
 </resources>

@@ -36,6 +36,7 @@ import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
 import dev.wander.android.opentagviewer.util.LocalFixWorthKeeping;
+import dev.wander.android.opentagviewer.util.parse.AccessoryAlignment;
 import dev.wander.android.opentagviewer.util.parse.KeyAlignmentPlist;
 import dev.wander.android.opentagviewer.util.rx.ScanOrder;
 import dev.wander.android.opentagviewer.util.rx.SlowFirstFetch;
@@ -509,8 +510,13 @@ public class BeaconRepository {
 
             for (final AccessoryRequest request : requests) {
                 final OwnedBeacon row = dao.getById(request.getBeaconId());
-                alignedAt.add(row == null
-                        ? null : KeyAlignmentPlist.observedAtMillis(row.alignmentPlist));
+                // **Both, and the later one wins.** The export's record is frozen at import;
+                // the accessory state carries the alignment the last fetch actually reached.
+                // Reading only the record showed the banner on every refresh for anybody whose
+                // export was more than a week old, however recently their tags had updated.
+                alignedAt.add(row == null ? null : SlowFirstFetch.laterOf(
+                        AccessoryAlignment.alignedAtMillis(row.accessoryJson),
+                        KeyAlignmentPlist.observedAtMillis(row.alignmentPlist)));
             }
 
             return SlowFirstFetch.isLikely(alignedAt, System.currentTimeMillis());

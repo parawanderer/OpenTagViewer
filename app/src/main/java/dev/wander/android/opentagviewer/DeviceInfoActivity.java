@@ -83,6 +83,7 @@ import dev.wander.android.opentagviewer.util.android.CachedPhoneLocation;
 import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
+import dev.wander.android.opentagviewer.util.parse.AccessoryAlignment;
 import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
 import dev.wander.android.opentagviewer.util.parse.LocationReportFields;
@@ -364,7 +365,8 @@ public class DeviceInfoActivity extends AppCompatActivity
                 R.id.settings_debug_naming_record_pairing_date,
                 R.id.settings_debug_naming_record_product_id,
                 R.id.settings_debug_naming_record_system_version,
-                R.id.settings_debug_naming_record_vendor_id
+                R.id.settings_debug_naming_record_vendor_id,
+                R.id.settings_debug_key_alignment
         );
 
         ClipboardManager clipboard = (ClipboardManager)
@@ -1288,6 +1290,29 @@ public class DeviceInfoActivity extends AppCompatActivity
                 : timestamps.format(new Date(newest)));
 
         this.binding.setBackoffState(this.describeBackoff(timestamps));
+        this.binding.setKeyAlignment(this.describeKeyAlignment(timestamps));
+    }
+
+    /**
+     * Where the next key search starts, and how far the last one got.
+     *
+     * <p><b>Read from the accessory state, not from the export's record.</b> The record is written
+     * once at import; this advances on every fetch, which is what makes it worth showing. A tag
+     * whose row says "None stored" is one whose next fetch searches from the pairing date - tens
+     * of thousands of keys for an old tag - and that is the single most useful thing to know when
+     * somebody reports a fetch that takes minutes or comes back empty.
+     */
+    private String describeKeyAlignment(final SimpleDateFormat timestamps) {
+        final String accessoryJson = this.beaconInformation.getOwnedBeaconAccessoryJson();
+        final Integer index = AccessoryAlignment.alignedIndex(accessoryJson);
+        final Long alignedAt = AccessoryAlignment.alignedAtMillis(accessoryJson);
+
+        if (index == null || alignedAt == null) {
+            return this.getString(R.string.debug_key_alignment_none);
+        }
+
+        return this.getString(
+                R.string.debug_key_alignment_value, index, timestamps.format(new Date(alignedAt)));
     }
 
     private String describeBackoff(final SimpleDateFormat timestamps) {

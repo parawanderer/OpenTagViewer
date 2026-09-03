@@ -360,4 +360,7 @@
 你的标签及其位置历史不受影响，Apple 账户中也没有任何内容被移除。</string>
     <string name="error_report_cause_membership_unreadable">已保存的 Apple 账户连接无法解密，但其密钥仍然存在</string>
     <string name="error_report_body_membership">与你的 Apple 账户的连接就保存在本设备上，解开它的密钥也还在，却打不开了——这本不该发生。\n\n因此这值得报告，而不只是重做一次。你的标签及其位置历史不受影响，Apple 账户中也没有任何内容被移除。</string>
+    <string name="debug_key_alignment">密钥对齐</string>
+    <string name="debug_key_alignment_value">索引 %1$d，对齐于 %2$s</string>
+    <string name="debug_key_alignment_none">未存储 — 下次获取将从配对日期开始搜索</string>
 </resources>

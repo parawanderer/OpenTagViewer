@@ -393,4 +393,7 @@ You can set this up now, or any time later from Settings.</string>
 Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
     <string name="error_report_cause_membership_unreadable">The saved Apple account connection could not be decrypted, although its key is still present</string>
     <string name="error_report_body_membership">The connection to your Apple account is stored on this device, the key that unlocks it is still here, and it no longer opens — which should not be possible.\n\nThat makes it worth reporting rather than just redoing. Your tags and their location history are not affected, and nothing was removed from your Apple account.</string>
+    <string name="debug_key_alignment">Key alignment</string>
+    <string name="debug_key_alignment_value">Index %1$d, aligned %2$s</string>
+    <string name="debug_key_alignment_none">None stored — the next fetch searches from the pairing date</string>
 </resources>
