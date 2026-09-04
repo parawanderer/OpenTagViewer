@@ -222,9 +222,18 @@ Four things follow:
 
 - **One source of truth.** A path that needs the identity reads it; it does not compose its own.
   `AdiDeviceIdentity.Hardware` is it — Python reads the six values across the bridge rather than
-  keeping a copy, because there is no single right answer to keep: an install from before the
-  choice existed must present the Mac its ADI was provisioned with, while a fresh one presents
-  the iPhone.
+  keeping a copy, because the profile is a runtime choice and not a constant: an install must
+  present the hardware its ADI was provisioned with, whatever that was.
+
+  **Today that is always `LEGACY_MAC`.** `Hardware.DEFAULT` is it, a fresh install gets it, and
+  `IPHONE` is built and deliberately not chosen — see `generate()`. So every entry this project
+  registers currently appears as a `MacBookPro` on macOS 13.1, and the serial `0PENTAGVIEWR` is
+  the only thing distinguishing it from real hardware. The exporter is separately a MacBook Pro
+  on macOS 13.4.1, FindMy.py's own default, with serial `0PENTAGXPORT`.
+
+  Changing which profile a fresh install gets is not a cosmetic edit: it registers a *second*
+  device rather than renaming the first, for anybody who reinstalls. That is why `IPHONE` exists
+  unused rather than being switched on.
 - **The parts must agree with each other.** Model, OS version, build, CFNetwork and Darwin
   describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
   Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
