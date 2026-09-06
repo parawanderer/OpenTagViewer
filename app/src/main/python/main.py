@@ -1360,6 +1360,16 @@ def recordAccessorySeen(accessoryJson: str, mac: str, seenAtUnixMs: int,
 
         if matched_primary is not None:
             matched_index = matched_primary
+
+            # **A real observation, and for an offline tag the only one there will ever be.** A
+            # primary key sits at exactly one index, so a match says where the tag actually is
+            # rather than where it might be. Reported before the equality check below, because
+            # a match at the index alignment already holds is not a non-event: time has passed
+            # since that alignment was written, so the extrapolation has moved on, and a tag
+            # still sitting at the old index is precisely the drift worth knowing about.
+            _reportDrift(stored_index, mapping.get("alignment_date"),
+                         matched_index, seen_at.isoformat(), source="ble")
+
         elif matched_secondary is not None and (
                 stored_index is None or matched_secondary > stored_index):
             # A floor, not a fix. The true index is somewhere in this secondary key's 192-index
@@ -1643,7 +1653,7 @@ def _alignmentOf(accessory: StoredAccessory):
         return None, None
 
 
-def _reportDrift(before_index, before_date, after_index, after_date) -> None:
+def _reportDrift(before_index, before_date, after_index, after_date, source="fetch") -> None:
     """Says how far the extrapolation had run from where the tag turned out to be.
 
     **The one measurement that settles how wide a search has to be.** Everything about which
@@ -1667,6 +1677,14 @@ def _reportDrift(before_index, before_date, after_index, after_date) -> None:
     one over: `fetch_location_history(accessory)` updates the alignment inside FindMy.py, so the
     only place a report's index is visible in this file is the ranged path, which is the rarer
     half. The before-and-after pair is visible in both.
+
+    **`source` matters more than it looks.** A fetch reading only exists for a tag the Find My
+    network has seen, and the network can search around 290 keys per request, so such a tag is
+    re-anchored long before it is ever lost. The question of how far a tag drifts is really a
+    question about the tags the network never sees - a cellar, a workshop, no passing iPhones -
+    and for those the only observation that will ever exist is a primary-key match over
+    Bluetooth. Measuring only the fetch side would answer the question for exactly the
+    population that does not have the problem.
     """
     if None in (before_index, before_date, after_index, after_date):
         return
@@ -1684,7 +1702,8 @@ def _reportDrift(before_index, before_date, after_index, after_date) -> None:
 
     index = after_index
 
-    line = (f"Alignment drift: report at index {index}, extrapolated {extrapolated}, "
+    line = (f"Alignment drift ({source}): observed at index {index}, "
+            f"extrapolated {extrapolated}, "
             f"drift {extrapolated - index} index/indices "
             f"({(extrapolated - index) / 4:.1f} hours ahead)")
 

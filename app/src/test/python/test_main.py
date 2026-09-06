@@ -1747,3 +1747,76 @@ def test_drift_is_silent_for_an_accessory_with_no_alignment_at_all(capsys):
 def test_drift_survives_an_unparseable_date(capsys):
     assert _drift_line(capsys, 19200, "not a date", 19220, "also not a date") == []
 
+def _ble_drift_lines(capsys):
+    return [line for line in capsys.readouterr().out.splitlines()
+            if "Alignment drift (ble)" in line]
+
+
+def test_a_primary_match_over_ble_reports_drift(capsys):
+    """The reading an offline tag can produce, and the only one it ever will.
+
+    A tag the Find My network never sees has no fetch to be re-anchored by, so a primary-key
+    match over Bluetooth is the sole observation of where it really is.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    seen_at = _ALIGNMENT_DATE + timedelta(hours=6)
+
+    # Six hours on, a tag rolling on schedule would be at 2904. This one is at 2900.
+    mac = _mac_at(stored, 2900, KeyPairType.PRIMARY)
+    main.recordAccessorySeen(json.dumps(stored), mac, _ms(seen_at))
+
+    lines = _ble_drift_lines(capsys)
+
+    assert len(lines) == 1
+    assert "observed at index 2900" in lines[0]
+    assert "extrapolated 2904" in lines[0]
+    assert "drift 4 index/indices" in lines[0]
+
+
+def test_a_tag_still_at_the_stored_index_reports_its_drift(capsys):
+    """The reading that matters most, and the one an equality check would have swallowed.
+
+    Matching at the index alignment already holds is not a non-event: six hours have passed, so
+    the extrapolation has moved twenty-four indices on while the tag has not moved at all. That
+    is exactly the drift the whole question is about.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    seen_at = _ALIGNMENT_DATE + timedelta(hours=6)
+
+    mac = _mac_at(stored, 2880, KeyPairType.PRIMARY)
+    written = main.recordAccessorySeen(json.dumps(stored), mac, _ms(seen_at))
+
+    lines = _ble_drift_lines(capsys)
+
+    assert len(lines) == 1
+    assert "drift 24 index/indices" in lines[0]
+    assert written is None, "nothing to write, but the reading still had to happen"
+
+
+def test_a_tag_exactly_on_schedule_reports_no_drift_over_ble(capsys):
+    stored = _paired_accessory(alignment_index=2880)
+    seen_at = _ALIGNMENT_DATE + timedelta(hours=6)
+
+    mac = _mac_at(stored, 2904, KeyPairType.PRIMARY)
+    main.recordAccessorySeen(json.dumps(stored), mac, _ms(seen_at))
+
+    lines = _ble_drift_lines(capsys)
+
+    assert len(lines) == 1
+    assert "drift 0 index/indices" in lines[0]
+
+
+def test_a_secondary_match_reports_no_drift(capsys):
+    """A secondary key covers 192 indices, so its index is a lower bound rather than a position.
+
+    Reporting it as an observation would fill the series with readings that look like drift and
+    are really only the width of a day key.
+    """
+    stored = _paired_accessory(alignment_index=2880)
+    seen_at = _ALIGNMENT_DATE + timedelta(hours=6)
+
+    mac = _mac_at(stored, 2900, KeyPairType.SECONDARY)
+    main.recordAccessorySeen(json.dumps(stored), mac, _ms(seen_at))
+
+    assert _ble_drift_lines(capsys) == []
+
