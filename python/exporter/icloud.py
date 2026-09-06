@@ -36,7 +36,7 @@ from findmy import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
-from findmy.errors import UnhandledProtocolError
+from findmy.errors import AppleServiceUnavailableError, UnhandledProtocolError
 from findmy.accessory import _extract_serial_from_stable_id  # noqa: PLC2701 - see _candidate
 from findmy.cloudkit.beacons import (
     AsyncBeaconStore,
@@ -560,6 +560,46 @@ async def _wait_then_send_a_new_code(chosen, seconds: int, announce=None) -> Non
     # Only now, because a code requested before the wait would be ageing throughout it - and
     # Apple's codes expire. See findmy-export 01-authentication §5.
     await chosen.request()
+
+
+def apple_is_declining(error: BaseException) -> AppleServiceUnavailableError | None:
+    """
+    The `AppleServiceUnavailableError` in this failure, if there is one.
+
+    **A 503 from Apple is not a bug in this program, and until FindMy.py could say so there was
+    no way to tell.** Every non-OK status arrived as `UnhandledProtocolError`, whose meaning is
+    "Apple said something this library does not model" - so the wizard's catch-all offered the
+    issue tracker, and people took it up. Issue #176 is one account meeting the same 503 at three
+    different call sites in three minutes, and reporting it.
+
+    Searches the cause chain because a failure from inside `open_client` arrives wrapped.
+
+    Only the 2FA path recovers on its own, in :func:`_wait_then_send_a_new_code`, because that is
+    the one place the program knows what to retry: the code has been spent and a new one can be
+    requested. There is no equivalent for a refused `login` or `request_pet` - the caller has
+    nothing to re-do but the whole sign-in - so those say what happened and stop.
+    """
+    seen = set()
+    cause: BaseException | None = error
+    while cause is not None and id(cause) not in seen:
+        if isinstance(cause, AppleServiceUnavailableError):
+            return cause
+        seen.add(id(cause))
+        cause = cause.__cause__ or cause.__context__
+
+    return None
+
+
+def describe_apple_declining(error: AppleServiceUnavailableError) -> str:
+    """What to tell somebody whose sign-in was refused by Apple rather than by their password."""
+    return (
+        f"Apple's sign-in service refused the request with HTTP {error.status_code}.\n\n"
+        "This is a fault on Apple's side rather than anything you did. Your Apple ID, your"
+        " password and your verification code are all fine, and nothing was changed or sent."
+        " It usually clears on its own within a few minutes.\n\n"
+        "Wait a little and sign in again. If it is still refusing after ten minutes or so, it"
+        " is worth reporting - but a run of these over a few minutes is ordinary."
+    )
 
 
 def _apple_failed_after_taking_the_code(error: BaseException) -> SignInInterrupted:
