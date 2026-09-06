@@ -351,7 +351,7 @@
     <string name="warn_if_left_behind">遗落时提醒</string>
     <string name="warn_if_left_behind_explainer">当此标签不再被接收且你已离开时发出提示音。需要开启后台接收。</string>
     <string name="left_behind_seconds_label">%1$d 秒后提醒</string>
-    <string name="left_behind_seconds_explainer">标签失去信号多久后，应用才检查你是否把它落下了。时间越短提醒越早，检查也越频繁。</string>
+    <string name="left_behind_seconds_explainer">标签失去信号多久后，应用才判定你把它落下了。超过一半时间后会全力搜索，所以时间越短提醒越早，也越耗电。</string>
     <string name="left_behind_sound">报警声</string>
     <string name="left_behind_sound_default">默认报警声</string>
     <string name="icloud_membership_unreadable_title">请重新连接您的 Apple 账户</string>

@@ -374,8 +374,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:stepSize="5"
-                    android:value="30"
-                    android:valueFrom="10"
+                    android:value="120"
+                    android:valueFrom="30"
                     android:valueTo="300" />
 
                 <TextView

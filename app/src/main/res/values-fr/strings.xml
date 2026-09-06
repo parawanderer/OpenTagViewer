@@ -351,7 +351,7 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="warn_if_left_behind">Avertir si oublié</string>
     <string name="warn_if_left_behind_explainer">Déclenche une alarme quand cette balise n\'est plus entendue et que vous êtes parti. Nécessite l\'écoute en arrière-plan.</string>
     <string name="left_behind_seconds_label">Avertir après %1$d secondes</string>
-    <string name="left_behind_seconds_explainer">Durée pendant laquelle un tag doit rester inaudible avant que l\'application vérifie si vous l\'avez oublié. Plus court avertit plus tôt et vérifie plus souvent.</string>
+    <string name="left_behind_seconds_explainer">Combien de temps un tag doit rester inaudible avant que l\'application décide que vous l\'avez oublié. Elle écoute à pleine puissance à partir de la moitié de ce délai, donc un délai plus court avertit plus tôt et consomme plus de batterie.</string>
     <string name="left_behind_sound">Son de l\'alarme</string>
     <string name="left_behind_sound_default">Son d\'alarme par défaut</string>
     <string name="icloud_membership_unreadable_title">Reconnectez votre compte Apple</string>

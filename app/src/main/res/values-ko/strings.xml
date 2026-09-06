@@ -351,7 +351,7 @@
     <string name="warn_if_left_behind">두고 오면 경고</string>
     <string name="warn_if_left_behind_explainer">이 태그가 더 이상 수신되지 않고 자리를 떠났을 때 알람을 울립니다. 백그라운드 수신이 필요합니다.</string>
     <string name="left_behind_seconds_label">%1$d초 후 경고</string>
-    <string name="left_behind_seconds_explainer">태그 신호가 끊긴 뒤 물건을 두고 왔는지 확인하기까지의 시간입니다. 짧을수록 빨리 알아차리고 더 자주 확인합니다.</string>
+    <string name="left_behind_seconds_explainer">태그 신호가 끊긴 뒤 물건을 두고 왔다고 판단하기까지의 시간입니다. 그 절반이 지나면 전력을 다해 찾으므로, 짧을수록 빨리 알리지만 배터리를 더 씁니다.</string>
     <string name="left_behind_sound">알람음</string>
     <string name="left_behind_sound_default">기본 알람음</string>
     <string name="icloud_membership_unreadable_title">Apple 계정을 다시 연결하세요</string>

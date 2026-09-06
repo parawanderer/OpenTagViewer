@@ -160,17 +160,41 @@ public class UserSettings {
      */
     private String leftBehindSoundUri;
 
-    /** What a tag's silence has to outlast before it is worth a targeted check. */
-    public static final int LEFT_BEHIND_AFTER_SECONDS_DEFAULT = 30;
+    /**
+     * What a tag's silence has to outlast before it is worth a targeted check.
+     *
+     * <p>Well above the floor, because this is the value for everybody who never opens the
+     * setting. Erring long costs a later alert; erring short costs an alert that is wrong, and
+     * a wrong one teaches people to ignore the right one.
+     */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_DEFAULT = 120;
 
     /**
-     * The shortest silence worth offering.
+     * The shortest silence the slider will offer.
      *
-     * <p>A tag advertises every one to three seconds, but a scan at a duty cycle below full
-     * leaves gaps of its own, and the verification scan that follows takes six seconds on its
-     * own. Under ten there is nothing left for the number to control.
+     * <p><b>Thirty seconds, and the number moved because the mechanism under it did.</b> While a
+     * tag going quiet was answered by a six second scan alongside the background one, thirty was
+     * unusable: tags lying in the same room were called left behind repeatedly, because the
+     * background scan does not listen anywhere near continuously - with several apps scanning,
+     * the controller reported our client as {@code mode[BALANCED, used=LOW_POWER]}, roughly a
+     * tenth of the time rather than a quarter - and the short scan that was supposed to catch
+     * the mistake never once succeeded.
+     *
+     * <p>The scan is now raised to full rate at half the wait instead, and the controller grants
+     * it: {@code mode[LOW_LATENCY, used=LOW_LATENCY]}. Every one of eight silences in a measured
+     * window was answered before the deadline, with no alert at all. So the wait no longer has
+     * to outlast the background scan's gaps on its own; it only has to leave the escalation time
+     * to work, and half of thirty seconds is enough for that in practice.
+     *
+     * <p>Practice, not proof: that rests on one person's tags in one flat over a short period,
+     * not on a distribution of sighting gaps, which is still unmeasured.
+     * {@link #LEFT_BEHIND_AFTER_SECONDS_DEFAULT} therefore stays far above here, since the
+     * default is for people whose tags are weaker and whose phones are busier.
+     *
+     * <p>What a short wait costs is not on this line: the escalation starts at half of it, so
+     * thirty seconds means the radio is at full rate for a good part of any quiet spell.
      */
-    public static final int LEFT_BEHIND_AFTER_SECONDS_MIN = 10;
+    public static final int LEFT_BEHIND_AFTER_SECONDS_MIN = 30;
 
     /** Beyond this the tag is somewhere else entirely and the alert has missed its moment. */
     public static final int LEFT_BEHIND_AFTER_SECONDS_MAX = 300;
