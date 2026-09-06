@@ -331,6 +331,35 @@ public class FetchFromICloudFlowTest {
         TestPace.afterAStep();
     }
 
+    /**
+     * Apple declining reaches the retry screen, saying which of the two it is.
+     *
+     * <p><b>Issue #176.</b> Before this it fell through to the default branch, which puts the
+     * failure's own detail on screen - an HTTP status and Apple's internal service name. Correct,
+     * unreadable, and indistinguishable from a bug in this app.
+     *
+     * <p>Asserted on the raw text being absent as well as the sentence being present, because a
+     * branch that showed both would pass a check for only the second.
+     */
+    @Test
+    public void appleDecliningSaysSoRatherThanShowingTheStatusCode() {
+        this.open(FakeICloudService.whereAppleIsDeclining());
+
+        final android.content.Context context =
+                androidx.test.platform.app.InstrumentationRegistry
+                        .getInstrumentation().getTargetContext();
+
+        Eventually.check(() -> onView(withId(R.id.icloud_retry_container))
+                .check(matches(isDisplayed())));
+        Eventually.check(() -> onView(withId(R.id.icloud_retry_body)).check(matches(
+                withText(context.getString(R.string.icloud_apple_declined_body)))));
+
+        onView(withId(R.id.icloud_retry_body)).check(matches(
+                not(withText(org.hamcrest.Matchers.containsString("503")))));
+        onView(withId(R.id.icloud_no_tags_container)).check(matches(not(isDisplayed())));
+        TestPace.afterAStep();
+    }
+
     /** Retrying starts a fresh session rather than reusing the one that failed. */
     @Test
     public void retryingAsksAgain() {

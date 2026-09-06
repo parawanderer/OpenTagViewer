@@ -694,6 +694,16 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                 SignInAgain.from(this);
                 break;
 
+            case APPLE_DECLINED:
+                // The retry screen, like SERVICE_UNSURE, but saying which of the two it is.
+                // Falling through to `default` would put the raw detail on screen - an HTTP
+                // status and a sentence about Grand Slam - which reads as a bug here.
+                this.showOnly(R.id.icloud_retry_container,
+                        R.string.icloud_apple_declined_title, Direction.FORWARD);
+                ((TextView) this.findViewById(R.id.icloud_retry_body))
+                        .setText(R.string.icloud_apple_declined_body);
+                break;
+
             case SERVICE_UNSURE:
             default:
                 // Everything unrecognised lands here on purpose: "try again later" is the safe

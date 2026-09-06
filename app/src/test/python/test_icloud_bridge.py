@@ -997,6 +997,49 @@ class TestASignInThatNoLongerWorks:
 
         assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
 
+    def test_apple_declining_is_its_own_reason(self):
+        """
+        Issue #176. Neither a dead session nor a mystery.
+
+        Classified in `_unexpected` so all eight entry points get it - the same argument the
+        credentials check above is here for.
+        """
+        from findmy.errors import AppleServiceUnavailableError
+
+        try:
+            raise AppleServiceUnavailableError(503, "The Grand Slam request")
+        except AppleServiceUnavailableError:
+            answer = json.loads(icloud_bridge._unexpected("opening the Find My client"))
+
+        assert answer["reason"] == icloud_bridge.REASON_APPLE_DECLINED
+
+    def test_apple_declining_does_not_sign_anybody_out(self):
+        """
+        <b>The expensive half of getting this wrong.</b>
+
+        CREDENTIALS_REJECTED ends in a forced sign-out. Reaching it over a 503 destroys a working
+        session for a fault that clears itself in minutes.
+        """
+        from findmy.errors import AppleServiceUnavailableError
+
+        try:
+            raise AppleServiceUnavailableError(503, "The Grand Slam request")
+        except AppleServiceUnavailableError:
+            answer = json.loads(icloud_bridge._unexpected("reading the account's accessories"))
+
+        assert answer["reason"] != icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_an_ordinary_protocol_error_is_still_unknown(self):
+        """A response this library cannot read is still worth reporting, so it stays UNKNOWN."""
+        from findmy.errors import UnhandledProtocolError
+
+        try:
+            raise UnhandledProtocolError("Error response for GSA request: 418")
+        except UnhandledProtocolError:
+            answer = json.loads(icloud_bridge._unexpected("opening the Find My client"))
+
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
+
     def test_an_unauthorized_error_is_deliberately_left_alone(self):
         """
         **Two meanings, so it stays unclassified until they can be told apart.**
