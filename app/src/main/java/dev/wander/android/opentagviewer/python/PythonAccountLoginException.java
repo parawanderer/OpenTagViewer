@@ -34,6 +34,14 @@ public class PythonAccountLoginException extends RuntimeException {
     public static final String REASON_TERMS = "terms";
 
     /** Anything not recognised. The detail is shown as-is rather than guessed at. */
+    /**
+     * Apple answered and refused to serve. Matches {@code REASON_APPLE_DECLINED}.
+     *
+     * <p>Kept apart from {@link #REASON_NETWORK} because the advice differs: a network failure is
+     * usually the phone's and worth checking, and this one is Apple's and is not.
+     */
+    public static final String REASON_APPLE_DECLINED = "apple_declined";
+
     public static final String REASON_UNKNOWN = "unknown";
 
     private final String reason;

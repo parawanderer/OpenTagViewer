@@ -834,6 +834,44 @@ class TestClassifyingAFailedLogin:
         """
         assert main.classifyLoginFailure(ValueError("bad password")) == main.REASON_UNKNOWN
 
+    def test_apple_declining_is_not_a_network_failure(self):
+        """
+        Issue #176. Apple answered, and refused.
+
+        Told to check their connection, somebody with a perfectly good connection resets a
+        router over a 503. The two failures look identical on screen and want opposite advice.
+        """
+        from findmy.errors import AppleServiceUnavailableError
+
+        declined = AppleServiceUnavailableError(503, "The Grand Slam request")
+
+        assert main.classifyLoginFailure(declined) == main.REASON_APPLE_DECLINED
+        assert main.classifyLoginFailure(declined) != main.REASON_NETWORK
+
+    def test_apple_declining_is_not_left_unclassified(self):
+        """
+        UNKNOWN shows the detail verbatim, which here is a sentence about Grand Slam and an HTTP
+        status. Accurate, and it reads as a bug in this app - which is what got reported.
+        """
+        from findmy.errors import AppleServiceUnavailableError
+
+        assert main.classifyLoginFailure(
+            AppleServiceUnavailableError(429, "The two-factor request"),
+        ) != main.REASON_UNKNOWN
+
+    def test_an_ordinary_protocol_error_is_still_unclassified(self):
+        """
+        The subclass is the signal, not the parent.
+
+        A response this library genuinely cannot read is still a bug worth reporting, and must
+        not be swept into "wait a few minutes".
+        """
+        from findmy.errors import UnhandledProtocolError
+
+        assert main.classifyLoginFailure(
+            UnhandledProtocolError("Error response for GSA request: 418"),
+        ) == main.REASON_UNKNOWN
+
     def test_a_library_error_is_recognised_by_its_module(self):
         class ClientConnectorError(Exception):
             pass

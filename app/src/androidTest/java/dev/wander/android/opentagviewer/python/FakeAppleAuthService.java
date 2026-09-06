@@ -118,6 +118,24 @@ public final class FakeAppleAuthService implements AppleAuthService {
         return fake;
     }
 
+    /**
+     * Apple answered and refused to serve, which is neither a wrong password nor a dead network.
+     *
+     * <p>Its own state because the message is the giveaway: the real one is a sentence about the
+     * Grand Slam request and an HTTP status, which the screen used to echo verbatim. That reads
+     * as a bug in this app, and issue #176 is somebody reporting it as one.
+     */
+    public static FakeAppleAuthService appleIsDeclining() {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "The Grand Slam request was refused with HTTP 503. This is Apple declining to"
+                        + " serve the request rather than a response this library cannot read,"
+                        + " and it usually clears on its own -- wait and try again.",
+                PythonAccountLoginException.REASON_APPLE_DECLINED);
+        return fake;
+    }
+
     /** Signing in works, but the code that gets typed is refused. */
     public FakeAppleAuthService thatRejectsTheCode(final String message) {
         this.codeFailsWith = new PythonAccountLoginException(message);

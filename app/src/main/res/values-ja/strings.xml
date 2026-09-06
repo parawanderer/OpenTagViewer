@@ -313,4 +313,7 @@
     <string name="twofactor_apple_took_the_code">Apple はコードを受け付けたあと、サインインを完了できませんでした。コードは使用済みなので新しいものが必要です。すぐに要求しても拒否されるため、少し待ってから要求します。</string>
     <string name="twofactor_waiting_seconds">%1$d 秒後に Apple へ新しいコードを要求します…</string>
     <string name="twofactor_apple_did_not_recover">Apple はまだサインインを完了できていません。これは Apple 側の障害であり、あなたの操作やコードのせいではありません。\n\n数分後にもう一度お試しください。そのときパスワードが一度だけ拒否されることがありますが、これも同じ障害の一部です。間違っていると考えず、もう一度入力してください。</string>
+    <string name="login_failed_apple_declined">現在、Appleがサインインを受け付けていません。Apple ID やパスワードではなく、Apple 側の問題です。通常は数分で解消しますので、少し待ってからもう一度お試しください。</string>
+    <string name="icloud_apple_declined_title">現在 Apple が応答していません</string>
+    <string name="icloud_apple_declined_body">Apple は応答しなかったのではなく、要求を拒否しました。アカウントに問題はなく、何も変更されていません。通常は数分で解消します。</string>
 </resources>

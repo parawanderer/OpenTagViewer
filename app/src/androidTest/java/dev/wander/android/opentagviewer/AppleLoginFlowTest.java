@@ -13,6 +13,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -307,6 +308,38 @@ public class AppleLoginFlowTest {
 
         Eventually.check(() -> onView(withId(R.id.login_error_message_text))
                 .check(matches(withText(containsString("Bad password")))));
+    }
+
+    /**
+     * Apple declining is told apart from a wrong password and from a dead network.
+     *
+     * <p><b>Issue #176.</b> The screen echoed the failure verbatim, so somebody entering correct
+     * credentials during a Grand Slam outage was shown a sentence about HTTP 503 and an Apple
+     * internal service name. It reads as a bug in this app, and was filed as one.
+     *
+     * <p>Asserted on all three halves, because each is a different wrong turn: that it does not
+     * blame the password, that it does not send them to check a working connection, and that the
+     * raw protocol text is gone from the screen.
+     */
+    @Test
+    public void appleDecliningIsNotBlamedOnThePasswordOrTheNetwork() {
+        this.apple = FakeAppleAuthService.appleIsDeclining();
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        final android.content.Context context = getInstrumentation().getTargetContext();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
+                withText(context.getString(R.string.login_failed_apple_declined)))));
+
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_network)))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(containsString("503")))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(containsString("Grand Slam")))));
     }
 
     /** A rejected code says so, and gives the boxes back rather than stranding them. */
