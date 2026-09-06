@@ -28,22 +28,29 @@ import androidx.annotation.Nullable;
  * allowed to interrupt, so it goes out the way an alarm clock does and stays audible with the
  * ringer down.
  *
- * <p><b>It stops itself.</b> A loop with only one way out is a loop that eventually runs in
- * somebody's pocket for an hour, so {@link #MAX_DURATION_MS} ends it regardless of whether the
- * notification was ever touched. Being told twice is a nuisance; a siren nobody can find is a
- * reason to uninstall.
+ * <p><b>Once, briefly, and then it is over.</b> Alarm usage already solves being heard; making
+ * the sound repeat as well was a second answer to the same question, and it turned the alert
+ * into something that had to be switched off. That is a worse problem than the one it solved.
+ * Tapping the notification dismissed it through {@code setAutoCancel} without firing the delete
+ * intent, so the obvious reaction to an alarm removed the only control over it, and a tag at the
+ * edge of range re-triggered before the cap could ever run out.
+ *
+ * <p>So it plays once and is cut off at {@link #MAX_DURATION_MS} regardless of how long the
+ * chosen ringtone runs. Nothing here needs stopping, which is why nothing offers to.
  */
 public final class LeftBehindAlarm {
     private static final String TAG = LeftBehindAlarm.class.getSimpleName();
 
     /**
-     * How long the alarm repeats before giving up on being answered.
+     * How long the sound is allowed to run.
      *
-     * <p>Long enough to be heard through a coat and walked back for, short enough that a phone
-     * left on a table does not make a scene. The notification stays either way - the sound is
-     * what is time-limited, not the message.
+     * <p>Long enough to be noticed through a coat, short enough that it is over before anybody
+     * reaches for the phone. The cap exists because the sound is the user's to choose and some
+     * alarm ringtones run for half a minute: without it, "plays once" would mean something
+     * different for every choice. The notification stays either way; the sound is what is
+     * time-limited, not the message.
      */
-    static final long MAX_DURATION_MS = 60_000L;
+    static final long MAX_DURATION_MS = 5_000L;
 
     private final Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -56,7 +63,7 @@ public final class LeftBehindAlarm {
     }
 
     /**
-     * Starts the alarm, replacing one already sounding.
+     * Sounds the alarm once, replacing one already sounding.
      *
      * <p>Replacing rather than layering: two tags left behind at once is one situation, and two
      * alarm sounds over each other is just noise. Each still gets its own notification.
@@ -79,7 +86,7 @@ public final class LeftBehindAlarm {
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build());
             started.setDataSource(this.context, sound);
-            started.setLooping(true);
+            started.setLooping(false);
             started.prepare();
             started.start();
 

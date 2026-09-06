@@ -1,5 +1,6 @@
 package dev.wander.android.opentagviewer.service;
 
+import android.bluetooth.le.ScanSettings;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -41,7 +42,7 @@ import dev.wander.android.opentagviewer.util.LeftBehind;
 import dev.wander.android.opentagviewer.util.LocalFixWorthKeeping;
 import dev.wander.android.opentagviewer.util.android.PhoneLocation;
 import io.reactivex.rxjava3.core.Observable;
-import dev.wander.android.opentagviewer.ble.NearbyAccessoryScanner;
+import dev.wander.android.opentagviewer.ble.DerivedAddressStore;
 import java.util.HashMap;
 import java.util.List;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -97,17 +98,6 @@ public class NearbyScanService extends Service {
     private static final String ACTION_DISMISSED = "dev.wander.opentagviewer.SCAN_DISMISSED";
 
     /**
-     * Swiping the left-behind alert away, which silences the sound and nothing else.
-     *
-     * <p>Deliberately not {@link #ACTION_DISMISSED}: that one is the permanent notification being
-     * swiped, and means "stop listening". Dismissing an alarm means "I have read it", and
-     * turning the whole feature off because somebody answered it would be the worst possible
-     * reading of that gesture.
-     */
-    private static final String ACTION_SILENCE_ALARM =
-            "dev.wander.opentagviewer.SILENCE_LEFT_BEHIND";
-
-    /**
      * Channel for the left-behind alert, which is loud on purpose - see {@link #alertLeftBehind}.
      *
      * <p><b>The suffix is not decoration.</b> A notification channel is immutable once created:
@@ -130,7 +120,7 @@ public class NearbyScanService extends Service {
      * silence it was watching for.
      *
      * <p>Five seconds because the silence to wait for is now the user's to choose and goes as
-     * low as ten - see {@code UserSettings.LEFT_BEHIND_AFTER_SECONDS_MIN}. A tick coarser than
+     * low as a minute - see {@code UserSettings.LEFT_BEHIND_AFTER_SECONDS_MIN}. A tick coarser than
      * the setting makes the setting a lie: at fifteen, asking for ten and asking for fifteen
      * produced the same alert at the same moment. The two reads it costs are a query against a
      * tiny table and an in-memory preferences lookup, next to a radio that is scanning
@@ -141,14 +131,22 @@ public class NearbyScanService extends Service {
     /** What is known about a tag right now: heard since when, and where it turned up. */
     private static final class Presence {
         private long lastHeardMs;
-        private final Double appearedLatitude;
-        private final Double appearedLongitude;
+
+        /**
+         * Where the phone was when this tag turned up, filled in just after the arrival is
+         * claimed rather than at construction.
+         *
+         * <p>Not final for that reason: reading a location is slow enough that it must not
+         * happen while {@code presence} is holding a lock, so the entry goes into the map first
+         * and the coordinates follow. A reader that catches the gap in between sees null, which
+         * is the same thing it sees when there is no fix at all, and is handled.
+         */
+        private Double appearedLatitude;
+        private Double appearedLongitude;
         private boolean gone;
 
-        private Presence(final long lastHeardMs, final Double latitude, final Double longitude) {
+        private Presence(final long lastHeardMs) {
             this.lastHeardMs = lastHeardMs;
-            this.appearedLatitude = latitude;
-            this.appearedLongitude = longitude;
         }
     }
 
@@ -202,8 +200,14 @@ public class NearbyScanService extends Service {
     /** The user's chosen alarm sound, re-read with the rest. Empty means the system default. */
     private volatile String alarmSoundUri = "";
 
-    /** Plays that sound, on repeat, until the alert is answered. */
+    /** Plays that sound once when a tag looks left behind. */
     private LeftBehindAlarm alarm;
+
+    /**
+     * The addresses already derived for each tag, so a verification scan looks for the same ones
+     * the passive scan matches on rather than re-deriving a narrower window of its own.
+     */
+    private DerivedAddressStore derivedAddresses;
 
     /**
      * Whether the settings have been read yet in this service's life.
@@ -218,6 +222,18 @@ public class NearbyScanService extends Service {
 
     @Nullable
     private Disposable watch;
+
+    /**
+     * The scan itself, held so its mode can be raised while it runs.
+     *
+     * <p>Kept rather than rebuilt, because a new watcher would bring a new empty address index
+     * with it and pay the whole derivation again.
+     */
+    @Nullable
+    private NearbyTagWatcher watcher;
+
+    /** Whether the scan is currently running at full rate because something is missing. */
+    private boolean listeningHard = false;
 
     /** The periodic left-behind check, running for as long as the service does. */
     @Nullable
@@ -251,6 +267,8 @@ public class NearbyScanService extends Service {
                 new FusedPhoneLocation(this.getApplicationContext()));
         this.sightingPersister = new AccessorySightingPersister(this.beaconRepo);
         this.alarm = new LeftBehindAlarm(this.getApplicationContext());
+        this.derivedAddresses =
+                new DerivedAddressStore(this.getApplicationContext().getFilesDir());
     }
 
     @Override
@@ -263,13 +281,6 @@ public class NearbyScanService extends Service {
         if (intent != null && ACTION_DISMISSED.equals(intent.getAction())) {
             this.turnBackgroundScanningOff();
             return START_NOT_STICKY;
-        }
-
-        if (intent != null && ACTION_SILENCE_ALARM.equals(intent.getAction())) {
-            this.alarm.stop();
-            // Falls through to goToForeground below rather than returning: the service is still
-            // meant to be listening, and returning here would leave it started without the
-            // notification the platform requires it to have.
         }
 
         this.goToForeground();
@@ -319,6 +330,12 @@ public class NearbyScanService extends Service {
                 .subscribeOn(Schedulers.io())
                 .subscribe(beacons -> {
                     this.namesByBeaconId = readNames(beacons);
+
+                    // The only place with the whole list, which is what retiring a file needs.
+                    // A screen watches one tag and must never conclude the others are gone.
+                    this.derivedAddresses.forgetAllExcept(
+                            keyMaterialOf(beacons).keySet());
+
                     this.watchThese(keyMaterialOf(beacons));
                 }, error -> Log.w(TAG, "Could not read the tags to watch for", error));
     }
@@ -379,16 +396,26 @@ public class NearbyScanService extends Service {
 
         this.accessoryJsonByBeaconId = accessoryJsonByBeaconId;
 
-        this.watch = new NearbyTagWatcher(
+        this.watcher = new NearbyTagWatcher(
                 AppDependencies.accessoryMacResolver(),
-                (sighting, mac) -> {
-                    this.sightingPersister.onSighting(sighting, mac);
-                    this.noteHeard(sighting.getBeaconId());
-                },
-                android.bluetooth.le.ScanSettings.SCAN_MODE_BALANCED)
+                this.sightingPersister::onSighting,
+                ScanSettings.SCAN_MODE_BALANCED);
+
+        this.watch = this.watcher
                 .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
                 .subscribe(
-                        sighting -> { },
+                        // **Every advertisement, not the throttled listener.** The listener
+                        // above fires at most once a minute per beacon, which is right for the
+                        // alignment write it exists for and wrong for knowing when a tag was
+                        // last heard: at a 60 second resolution an 80 second wait has 20
+                        // seconds of margin, and a single missed window is enough to call a tag
+                        // left behind while it is lying on the table advertising every second.
+                        // Measured on a device as a 92 second gap between two sightings of a
+                        // tag that never left the room.
+                        //
+                        // Safe to call this often: noteHeard only does real work on the
+                        // transition back from gone, and returns immediately otherwise.
+                        sighting -> this.noteHeard(sighting.getBeaconId()),
                         error -> Log.w(TAG, "Background watch ended with an error", error),
                         () -> Log.i(TAG, "Background watch ended"));
 
@@ -415,20 +442,34 @@ public class NearbyScanService extends Service {
      */
     private void noteHeard(final String beaconId) {
         final long now = System.currentTimeMillis();
-        final Presence known = this.presence.get(beaconId);
 
-        if (known != null && !known.gone) {
-            known.lastHeardMs = now;
+        // **The arrival is claimed atomically, and exactly one caller wins it.** This runs once
+        // per advertisement now rather than once a minute, so two arriving together both used
+        // to see "not present", and both then read a location and wrote a row for the same
+        // return. Checking and then putting is two steps; compute is one.
+        //
+        // The lambda stays trivial because it runs while the map holds a bin lock. Everything
+        // slow - the location, the database write - happens below, once, and only for whoever
+        // installed the new entry.
+        final Presence arrived = new Presence(now);
+        final boolean isTheOneWhoSawItReturn = this.presence.compute(beaconId, (id, existing) -> {
+            if (existing != null && !existing.gone) {
+                existing.lastHeardMs = now;
+                return existing;
+            }
+            return arrived;
+        }) == arrived;
+
+        if (!isTheOneWhoSawItReturn) {
             return;
         }
 
         final PhoneLocation.Fix fix = this.phoneLocation.lastKnown();
 
-        this.presence.put(beaconId, new Presence(now,
-                fix == null ? null : fix.getLatitude(),
-                fix == null ? null : fix.getLongitude()));
-
         if (fix != null) {
+            arrived.appearedLatitude = fix.getLatitude();
+            arrived.appearedLongitude = fix.getLongitude();
+
             this.beaconRepo.recordLocalSighting(beaconId, fix.getLatitude(), fix.getLongitude(),
                             fix.getAccuracyMetres(), 0, now)
                     .subscribe(written -> { }, error ->
@@ -441,6 +482,65 @@ public class NearbyScanService extends Service {
         this.alarm.stop();
 
         Log.d(TAG, "beaconId=" + beaconId + " is in range again");
+    }
+
+    /**
+     * How far into a tag's wait the scan goes to full rate.
+     *
+     * <p>Halfway, so there is as much time left to be proved wrong as has already passed. Any
+     * later and the escalation cannot change the outcome, which is what the old separate scan
+     * was: it ran after the decision and only ever confirmed it.
+     */
+    private static final double LISTEN_HARD_AFTER = 0.5;
+
+    /**
+     * Puts the scan at full rate while anything is on its way to being called left behind, and
+     * back to the background rate when nothing is.
+     *
+     * <p>One mode change per event, not one scan per check. The platform degrades an app that
+     * starts scans more than about five times in thirty seconds, so a burst per check risked
+     * suppressing the scanning it was meant to improve - and every one of those bursts failed
+     * while the ordinary scan heard the tag seconds later.
+     *
+     * <p>Only tags whose owner wants an alert count, and only while the question is still open.
+     * Listening hard for a tag nobody will be told about spends the radio on nothing, and so does
+     * listening hard for one that has already been reported: the escalation exists to stop a
+     * wrong alert, so once the alert is out it has nothing left to prevent. Without that second
+     * condition the scan stayed at full rate for as long as the tag was away - keys left at the
+     * office would have held the radio wide open all evening, hunting something ten kilometres
+     * off.
+     */
+    private void listenAsHardAsAnythingMissingNeeds(final long nowMs) {
+        final NearbyTagWatcher scanning = this.watcher;
+        if (scanning == null) {
+            return;
+        }
+
+        final long escalateAfter = (long) (this.quietForMs * LISTEN_HARD_AFTER);
+
+        boolean somethingIsMissing = false;
+        for (final Map.Entry<String, Presence> entry : this.presence.entrySet()) {
+            if (!this.alertsOn.contains(entry.getKey()) || entry.getValue().gone) {
+                continue;
+            }
+            if (nowMs - entry.getValue().lastHeardMs >= escalateAfter) {
+                somethingIsMissing = true;
+                break;
+            }
+        }
+
+        if (somethingIsMissing == this.listeningHard) {
+            return;
+        }
+
+        this.listeningHard = somethingIsMissing;
+        scanning.useScanMode(somethingIsMissing
+                ? ScanSettings.SCAN_MODE_LOW_LATENCY
+                : ScanSettings.SCAN_MODE_BALANCED);
+
+        Log.i(TAG, somethingIsMissing
+                ? "A tag has gone quiet; listening at full rate"
+                : "Everything is accounted for; back to the background scan rate");
     }
 
     /**
@@ -482,6 +582,14 @@ public class NearbyScanService extends Service {
             Log.w(TAG, "Could not re-read the left-behind settings", couldNotRead);
         }
 
+        // **Listen harder before deciding, not after.** A tag halfway to its deadline is the
+        // moment to spend radio on, because there is still time for the answer to change the
+        // outcome. Doing it afterwards, as a separate short scan, meant the escalation only ever
+        // confirmed a decision already taken - and in practice it never even did that: not one
+        // of those scans succeeded, while the tag was heard again seconds later by the ordinary
+        // one.
+        this.listenAsHardAsAnythingMissingNeeds(now);
+
         for (final Map.Entry<String, Presence> entry : this.presence.entrySet()) {
             final Presence known = entry.getValue();
 
@@ -506,69 +614,14 @@ public class NearbyScanService extends Service {
             // happens to be the state the service is in after a reboot until the app is next
             // opened, so the gate turned the whole feature off exactly when it was meant to be
             // working on its own.
-            this.verifyThenAlert(entry.getKey(), known, this.phoneLocation.lastKnown(), now);
+            final PhoneLocation.Fix here = this.phoneLocation.lastKnown();
+            if (here != null) {
+                this.recordContactLost(entry.getKey(), known, here, now);
+            }
+            this.alertLeftBehind(entry.getKey(), known.lastHeardMs);
         }
     }
 
-    /**
-     * Listens hard for one tag before saying it is gone.
-     *
-     * <p><b>Silence from a low-power scan is not evidence.</b> {@code SCAN_MODE_LOW_POWER}
-     * listens for roughly half a second in five, so a tag in a pocket with a body in the way
-     * misses windows in runs - a gap of 66 seconds was measured while carrying one, against a
-     * threshold of 90. Any threshold short enough to be useful while walking out of a cafe sits
-     * inside that noise, and the alert that fired 20 minutes into a walk was exactly this: the
-     * tag was in the pocket the whole time.
-     *
-     * <p>So the timer no longer decides. When it runs out, the radio listens properly for a few
-     * seconds - the same targeted, low-latency scan the ring button uses - and only silence
-     * <i>then</i> earns an alert. It costs one short burst per suspicion instead of running the
-     * radio hard all day, and it makes a short threshold safe: about a minute of quiet plus a
-     * few seconds of listening, rather than five minutes of waiting and still being wrong.
-     */
-    private void verifyThenAlert(final String beaconId, final Presence known,
-                                 @Nullable final PhoneLocation.Fix here, final long nowMs) {
-
-        final String accessoryJson = this.accessoryJsonByBeaconId.get(beaconId);
-        if (accessoryJson == null) {
-            return;
-        }
-
-        final Map<String, Integer> candidates =
-                AppDependencies.accessoryMacResolver().currentMacAddresses(accessoryJson);
-
-        if (candidates == null || candidates.isEmpty()) {
-            return;
-        }
-
-        NearbyAccessoryScanner
-                .findNearby(this.getApplicationContext(), candidates.keySet(), VERIFY_SCAN_MS)
-                .subscribeOn(Schedulers.io())
-                .subscribe(
-                        device -> {
-                            // It was a gap. Put the tag back to present so the next silence is
-                            // judged from here rather than from before the burst.
-                            known.gone = false;
-                            known.lastHeardMs = System.currentTimeMillis();
-                            Log.d(TAG, "beaconId=" + beaconId
-                                    + " answered the verification scan; no alert");
-                        },
-                        notNearby -> {
-                            if (here != null) {
-                                this.recordContactLost(beaconId, known, here, nowMs);
-                            }
-                            this.alertLeftBehind(beaconId, known.lastHeardMs);
-                        });
-    }
-
-    /**
-     * How long the verification scan listens.
-     *
-     * <p>A tag in range advertises every second or two, so a few seconds of low-latency
-     * listening hears it several times over. Long enough to be conclusive, short enough that the
-     * burst costs nothing next to the day the radio spends idling.
-     */
-    private static final long VERIFY_SCAN_MS = 6_000L;
 
     /**
      * Writes where contact with a tag was lost, as well as it can be known.
@@ -644,11 +697,6 @@ public class NearbyScanService extends Service {
                 this, beaconId.hashCode(), open,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        final Intent quiet = new Intent(this, NearbyScanService.class)
-                .setAction(ACTION_SILENCE_ALARM);
-        final PendingIntent silence = PendingIntent.getService(
-                this, 2, quiet, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-
         final CharSequence howLongAgo = DateUtils.getRelativeTimeSpanString(
                 lastHeardMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
 
@@ -663,8 +711,11 @@ public class NearbyScanService extends Service {
                 // to read later.
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setContentIntent(show)
-                // Swiping it away is the answer to it, so that is where the sound stops.
-                .setDeleteIntent(silence)
+                // No delete intent, and none is needed: the sound is over in seconds, so there
+                // is nothing left for a gesture to stop. An earlier version repeated until the
+                // notification was swiped, which made tapping it - the obvious reaction - remove
+                // the only control, because setAutoCancel dismisses without firing a delete
+                // intent.
                 .setAutoCancel(true)
                 .build();
 

@@ -146,7 +146,67 @@ public class NearbyTagWatcher {
      * so a tag takes longer to be noticed - acceptable when nobody is watching the screen, and
      * not acceptable when they are.
      */
-    private final int scanMode;
+    private volatile int scanMode;
+
+    /**
+     * The running scan, kept so {@link #useScanMode} can raise it without tearing the watch down.
+     *
+     * <p>Null while nothing is scanning, in which case a mode change is simply remembered and
+     * applied when the scan next starts.
+     */
+    @Nullable
+    private volatile BluetoothLeScanner activeScanner;
+
+    @Nullable
+    private volatile ScanCallback activeCallback;
+
+    @Nullable
+    private volatile List<ScanFilter> activeFilters;
+
+    /**
+     * Raises or lowers how hard the running scan listens, without restarting the watch.
+     *
+     * <p><b>Why this exists rather than a second scan.</b> Looking harder for a tag that has gone
+     * quiet used to mean starting another scan alongside this one for a few seconds. That put the
+     * app into a start-stop cycle whenever a tag was intermittent, and the platform allows about
+     * five scan starts per thirty seconds before it quietly degrades the app - so the act of
+     * checking could suppress the very scanning it was checking with. It also cost a second
+     * concurrent scan, and six seconds is a short window for a radio that has just missed the
+     * tag for a minute.
+     *
+     * <p>Changing the mode of the one scan costs a single stop and start per escalation instead
+     * of one per check, and what follows is a full-rate scan for as long as it takes rather than
+     * a fixed burst.
+     */
+    @SuppressLint("MissingPermission")
+    public void useScanMode(final int mode) {
+        if (mode == this.scanMode) {
+            return;
+        }
+        this.scanMode = mode;
+
+        final BluetoothLeScanner scanner = this.activeScanner;
+        final ScanCallback callback = this.activeCallback;
+        final List<ScanFilter> filters = this.activeFilters;
+
+        if (scanner == null || callback == null || filters == null) {
+            return;
+        }
+
+        try {
+            scanner.stopScan(callback);
+            scanner.startScan(filters, settingsFor(mode), callback);
+            Log.i(TAG, "Nearby scan is now at scan mode " + mode);
+        } catch (final Exception couldNotChange) {
+            // Bluetooth went away between the two calls. The watch's own restart and the
+            // caller's retry both cover this; a failed escalation is not worth ending on.
+            Log.w(TAG, "Could not change the nearby scan mode", couldNotChange);
+        }
+    }
+
+    private static ScanSettings settingsFor(final int mode) {
+        return new ScanSettings.Builder().setScanMode(mode).build();
+    }
 
     public NearbyTagWatcher(final AccessoryMacResolver macResolver) {
         this(macResolver, null);
@@ -210,7 +270,13 @@ public class NearbyTagWatcher {
                 this.derivedAddresses =
                         new DerivedAddressStore(context.getApplicationContext().getFilesDir());
             }
-            this.derivedAddresses.forgetAllExcept(accessoryJsonByBeaconId.keySet());
+            // **No tidying up from here.** A watcher is routinely given a subset: the device
+            // screen watches the one tag it is showing. Forgetting everything outside the set it
+            // was handed therefore deleted every other tag's stored addresses each time somebody
+            // opened a tag, and they came back as a freshly derived narrow window - which for a
+            // tag whose alignment has moved does not contain it at all, so it stopped being
+            // heard entirely. Retiring a tag's file needs the full list of tags, which only
+            // NearbyScanService has.
 
             if (this.wideningSearch == null) {
                 this.wideningSearch = new WideningSearch(this.macResolver, this.derivedAddresses);
@@ -276,11 +342,11 @@ public class NearbyTagWatcher {
                             new byte[]{FindMyAdvertisement.TYPE_OFFLINE_FINDING},
                             new byte[]{(byte) 0xFF})
                     .build());
-            final ScanSettings settings = new ScanSettings.Builder()
-                    .setScanMode(this.scanMode)
-                    .build();
+            scanner.startScan(findMyFramesOnly, settingsFor(this.scanMode), callback);
 
-            scanner.startScan(findMyFramesOnly, settings, callback);
+            this.activeScanner = scanner;
+            this.activeCallback = callback;
+            this.activeFilters = findMyFramesOnly;
 
             // Restarted well before the platform's 30 minute mark: Android silently downgrades
             // any scan running longer than that to SCAN_MODE_OPPORTUNISTIC, which only delivers
@@ -294,7 +360,8 @@ public class NearbyTagWatcher {
                     .subscribe(tick -> {
                         try {
                             scanner.stopScan(callback);
-                            scanner.startScan(findMyFramesOnly, settings, callback);
+                            scanner.startScan(
+                                    findMyFramesOnly, settingsFor(this.scanMode), callback);
                             Log.d(TAG, "Restarted the nearby scan before the platform's "
                                     + "long-scan downgrade");
                         } catch (final Exception e) {
@@ -311,6 +378,12 @@ public class NearbyTagWatcher {
             emitter.setCancellable(() -> {
                 Log.d(TAG, "Stopped watching for nearby tags");
                 scanRefresh.dispose();
+
+                // Forgotten before the scan is stopped, so a mode change arriving from
+                // another thread cannot restart a scan this is in the middle of ending.
+                this.activeScanner = null;
+                this.activeCallback = null;
+                this.activeFilters = null;
 
                 // **Stopping a scan the adapter has already ended throws, and on this path a
                 // throw is fatal.** stopScan raises IllegalStateException("BT Adapter is not
