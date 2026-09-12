@@ -143,17 +143,23 @@ REASON_UNKNOWN = "unknown"
 """Anything else, with the exception text carried through so a report can be answered."""
 
 
-APP_IDENTITY = icloud.ClientIdentity(
-    serial=app_identity.APP_SERIAL,
-    device_name=app_identity.APP_CLOUDKIT_DEVICE_NAME,
-)
-"""
-Who this app says it is to CloudKit.
+def appIdentity(asyncAccount: Any) -> Any:
+    """
+    Who this app says it is to CloudKit, **for this session**.
 
-Rule 11: the same identity every path already sends. Defaulting this would present Apple with
-`0PENTAGXPORT` - the *desktop exporter* - from a phone, and the two would share one device-list
-entry that neither could be removed from safely.
-"""
+    Rule 11: the same identity every path already sends. Defaulting it would present Apple with
+    `0PENTAGXPORT` - the *desktop exporter* - from a phone, and the two would share one
+    device-list entry that neither could be removed from safely.
+
+    **Per session rather than per process**, because the serial is per install and a restored
+    session keeps whatever it was established with. A constant here would be right for a fresh
+    install and wrong for every other one, in the field CloudKit writes into the escrow record
+    and the recovery picker matches on.
+    """
+    return icloud.ClientIdentity(
+        serial=app_identity.serialOfSession(asyncAccount),
+        device_name=app_identity.APP_CLOUDKIT_DEVICE_NAME,
+    )
 
 
 def _toUnixEpochMs(when: Any) -> int | None:
@@ -298,6 +304,9 @@ class ICloudSession:
         self._account = account
         self._async = asyncAccount
         self._loop = loop
+        # Resolved once, here, so `open` and `recoveryOptions` cannot disagree about who this
+        # is - which would write a record under one serial and then fail to recognise it.
+        self._identity = appIdentity(asyncAccount)
         self._client: Any = None
         self._records: list[Any] = []
         # The peer an unlock recovered, kept because it is what sponsors a join.
@@ -315,7 +324,7 @@ class ICloudSession:
 
         try:
             client = self._loop.run_until_complete(
-                icloud.open_client(self._async, APP_IDENTITY))
+                icloud.open_client(self._async, self._identity))
             self._loop.run_until_complete(client.__aenter__())
             self._client = client
 
@@ -349,21 +358,21 @@ class ICloudSession:
         # **This app's own escrow record is dropped, not shown.**
         #
         # Joining the trust circle registers this app as a device, so the account then holds a
-        # record for `0PENTAGVIEWR` alongside the user's real hardware - and the picker offered
+        # record for this app alongside the user's real hardware - and the picker offered
         # it, asking for "the screen-lock passcode of one of your Apple devices" for a device
         # that has no screen and no lock. There is no answer to that question: the escrow
         # passcode was generated, never shown, and is not the user's to know.
         #
-        # Matched on the serial from `APP_IDENTITY`, which is the one place this app's identity
-        # is written (rule 11) - not on the name, which Apple does not carry for this entry, nor
-        # on a literal, which would be a second copy of the identity to keep in step.
+        # Matched on the serial this session presents, which is the one place this app's
+        # identity is written (rule 11) - not on the name, which Apple does not carry for this
+        # entry, nor on a literal, which would be a second copy of the identity to keep in step.
         #
         # Filtered here rather than in the screen so the count below is honest: an account whose
         # only recoverable record is this app's has nothing the user can recover from, and
         # should be told so rather than shown one unusable tile.
         self._records = [
             record for record in options.recoverable
-            if record.serial != APP_IDENTITY.serial
+            if record.serial != self._identity.serial
         ]
 
         if not self._records:

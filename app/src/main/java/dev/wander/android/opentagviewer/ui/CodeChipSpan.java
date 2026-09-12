@@ -14,7 +14,7 @@ import androidx.annotation.NonNull;
  * A value rendered as inline code - monospace, on a tinted rounded chip.
  *
  * <p><b>For the one string in this app that people compare character by character.</b> The serial
- * {@code 0PENTAGVIEWR} is the only field distinguishing this app's entry in an Apple device list
+ * The serial is the only field distinguishing this app's entry in an Apple device list
  * from real hardware, and it is deliberately near-miss shaped: a zero where an O belongs, and no
  * vowel in VIEWR. In body text it reads as a typo. Set as code it reads as a value to be matched,
  * which is what somebody is about to do with it.

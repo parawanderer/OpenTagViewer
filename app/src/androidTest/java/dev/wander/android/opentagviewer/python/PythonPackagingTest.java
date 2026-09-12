@@ -11,6 +11,8 @@ import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
+import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
+
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.BeforeClass;
@@ -224,13 +226,22 @@ public class PythonPackagingTest {
      * <p>The serial is asserted here as well as in the Python tests because this is where it is
      * real. Rule 11: a phone presenting {@code 0PENTAGXPORT} would share a device-list entry
      * with the desktop exporter, and removing either would break the other.
+     *
+     * <p>It is built from the session rather than read off the module, because the serial is
+     * drawn per install - a constant here would be right for a fresh install and wrong for every
+     * other one, in the field CloudKit writes into the escrow record.
      */
     @Test
     public void theappsIcloudBridgeIsPackagedAndKnowsWhoItIs() {
         final PyObject bridge = Python.getInstance().getModule("icloud_bridge");
 
         assertNotNull("icloud_bridge must be importable in the APK", bridge);
-        assertEquals("0PENTAGVIEWR", bridge.get("APP_IDENTITY").get("serial").toString());
+
+        final PyObject identity = bridge.callAttr("appIdentity", new Object[]{null});
+
+        assertEquals("with no session to read, it still names this app",
+                AdiDeviceIdentity.LEGACY_SERIAL, identity.get("serial").toString());
+        assertEquals("OpenTagViewer", identity.get("device_name").toString());
     }
 
     /**

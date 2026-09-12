@@ -79,6 +79,21 @@ public interface AnisetteSource {
      */
     String deviceIdsJson();
 
+    /**
+     * The serial this install presents to Apple, in {@code X-Apple-I-SRL-NO}.
+     *
+     * <p>Drawn once per install and then kept, because Apple binds a session to the identity
+     * that established it and the user has a row in their device list with this printed on it.
+     * See {@link AdiDeviceIdentity#serial()}.
+     *
+     * <p><b>Python asks rather than holding a copy.</b> It used to be a constant on both sides,
+     * pinned equal by a test; a per-install value cannot be, and a copy of it would be the
+     * second source of truth rule 11 is about - here in the one field the user actually reads.
+     *
+     * <p>Answerable without ADI, for the same reason as {@link #hardwareProfileJson}.
+     */
+    String serial();
+
     /** Short human-readable state, for logs and diagnostics. */
     String describe();
 }
