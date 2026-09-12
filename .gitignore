@@ -41,3 +41,6 @@ tmp/
 # stripped: device names ("<person>'s iPad"), record UUIDs, key material. Committing it would
 # publish, in a notebook, exactly what was redacted out of the plists next to it.
 scripts/plist_explorer.ipynb
+
+# Local throwaway signing key for release builds. Never a real one.
+*.jks

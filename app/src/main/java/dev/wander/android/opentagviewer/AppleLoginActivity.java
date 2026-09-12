@@ -32,6 +32,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 import androidx.databinding.DataBindingUtil;
+
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.chaquo.python.PyObject;
@@ -232,6 +234,9 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.twoFactorEntryManager = new Apple2FACodeInputManager(this, this::on2FAAuthCodeFilled);
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_apple_login);
+        // This screen had neither inset applied - so its buttons sat under the navigation bar
+        // and its heading under the status bar, on the very first screen anybody sees.
+        WindowPaddingUtil.insetForSystemBars(this.binding.getRoot());
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();
