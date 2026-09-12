@@ -229,6 +229,10 @@ def uninstall() -> None:
     theClient = None
 
 
+SESSION_SERIAL = "0PENTAGVK7QX"
+"""The serial the fake session presents. Drawable, and deliberately not `LEGACY_SERIAL`."""
+
+
 def anAccount() -> Any:
     """
     An account object shaped like the one the app signs in with.
@@ -236,10 +240,14 @@ def anAccount() -> Any:
     ``openSession`` guards on the two private attributes FindMy.py's account carries, and a join
     reads the identity and serial off the async half - rule 11's single source of truth, which is
     why they are here rather than invented further down.
+
+    The serial is a **drawn** one rather than the value every install used to share, so a test
+    asserting it reached the join cannot pass against code that never read the session at all:
+    that path falls back to `identity.LEGACY_SERIAL`, and the two must not be the same string.
     """
     return SimpleNamespace(
         _asyncacc=SimpleNamespace(
-            serial="0PENTAGVIEWR",
+            serial=SESSION_SERIAL,
             identity=SimpleNamespace(
                 model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
                 os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0")),

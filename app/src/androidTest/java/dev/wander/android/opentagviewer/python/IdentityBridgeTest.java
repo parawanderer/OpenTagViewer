@@ -63,11 +63,12 @@ public class IdentityBridgeTest {
     }
 
     /**
-     * <b>The serial Java shows the user is the serial Python sends Apple.</b>
+     * <b>The serial Java stores is the serial Python sends Apple.</b>
      *
-     * <p>Python owns {@code APP_SERIAL}; {@code AdiDeviceIdentity.APP_SERIAL} is a copy, so that
-     * the screen naming the device-list entry does not have to start CPython to draw a label. Two
-     * copies of one value is what rule 11 is about, and this is the pin that stops them drifting.
+     * <p>It used to be a constant on each side, pinned equal here. It is drawn per install now,
+     * so there is nothing to pin - and that is the stronger position: Python asks across the
+     * bridge, so there is only one value and it cannot drift. What is left to check is that the
+     * asking works, which is what this does.
      *
      * <p>The failure it prevents is quiet and nasty: the app registers under one serial and the
      * screen tells the user to look for another, so the row they find looks like somebody else's
@@ -75,9 +76,26 @@ public class IdentityBridgeTest {
      */
     @Test
     public void theserialOnScreenIsTheSerialOnTheWire() {
-        assertEquals("Java shows a serial Python never sends",
-                identity().get("APP_SERIAL").toString(),
-                AdiDeviceIdentity.APP_SERIAL);
+        assertEquals("Python did not ask Java which serial this install has",
+                FakeAnisetteSource.SERIAL,
+                identity().callAttr("appSerial", FakeAnisetteSource.ready()).toString());
+    }
+
+    /**
+     * And it is a drawn serial, not the one every install used to share.
+     *
+     * <p>Worth its own assertion because the fallback is the old constant: code that never
+     * reached the bridge at all would return a perfectly plausible serial, and the test above
+     * would be the only thing to notice.
+     */
+    @Test
+    public void thefallbackIsNotMistakenForAnAnswer() {
+        assertEquals("with nothing to ask, Python must still name this app",
+                AdiDeviceIdentity.LEGACY_SERIAL,
+                identity().callAttr("appSerial", (Object) null).toString());
+
+        assertNotEquals("the fake must not answer the fallback, or nothing here proves anything",
+                AdiDeviceIdentity.LEGACY_SERIAL, FakeAnisetteSource.SERIAL);
     }
 
     /**
@@ -142,7 +160,7 @@ public class IdentityBridgeTest {
                 "identityForNewSession",
                 FakeAnisetteSource.ready().claiming(Hardware.IPHONE));
 
-        assertEquals("0PENTAGVIEWR", kwargs.callAttr("get", "serial").toString());
+        assertEquals(FakeAnisetteSource.SERIAL, kwargs.callAttr("get", "serial").toString());
         assertEquals("iPhone15,2",
                 kwargs.callAttr("get", "identity").get("model").toString());
     }
@@ -180,8 +198,8 @@ public class IdentityBridgeTest {
 
         assertEquals("MacBookPro13,2",
                 kwargs.callAttr("get", "identity").get("model").toString());
-        assertEquals("the serial is a label, and a new sign-in is a new entry either way",
-                "0PENTAGVIEWR", kwargs.callAttr("get", "serial").toString());
+        assertEquals("the machine is what ADI pinned; the serial is stored separately",
+                FakeAnisetteSource.SERIAL, kwargs.callAttr("get", "serial").toString());
     }
 
     /**
@@ -255,7 +273,8 @@ public class IdentityBridgeTest {
 
         final PyObject kwargs = identity().callAttr("identityForNewSession", (Object) null);
 
-        assertEquals("0PENTAGVIEWR", kwargs.callAttr("get", "serial").toString());
+        assertEquals(AdiDeviceIdentity.LEGACY_SERIAL,
+                kwargs.callAttr("get", "serial").toString());
         assertFalse("with no machine to claim, none should be asserted",
                 kwargs.callAttr("__contains__", "identity").toBoolean());
     }

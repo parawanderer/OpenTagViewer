@@ -87,6 +87,44 @@ public class FetchFromICloudFlowTest {
                 .forget().blockingAwait();
     }
 
+    /**
+     * A serial only the generator could have produced, stored before the screen is opened.
+     *
+     * <p><b>Not {@link AdiDeviceIdentity#LEGACY_SERIAL}</b>, because that is what the screen
+     * falls back to when nothing is stored - so a test asserting the fallback would pass against
+     * a screen that never read this install's identity at all, which is the regression that
+     * matters: the app registers under one serial and the screen names another, and the row the
+     * user finds looks like somebody else's device.
+     */
+    private static final String THE_STORED_SERIAL = "0PENTAGVK7QX";
+
+    @org.junit.Before
+    public void giveThisInstallASerialToShow() {
+        final android.content.Context context =
+                InstrumentationRegistry.getInstrumentation().getTargetContext();
+
+        context.getSharedPreferences(
+                        dev.wander.android.opentagviewer.anisette.LocalAnisette.PREFERENCES,
+                        android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString(
+                        dev.wander.android.opentagviewer.anisette.LocalAnisette.KEY_SERIAL,
+                        THE_STORED_SERIAL)
+                .commit();
+    }
+
+    /** The identity is shared with the rest of the suite; one left behind is adopted as real. */
+    @After
+    public void takeTheSerialBackOut() {
+        InstrumentationRegistry.getInstrumentation().getTargetContext()
+                .getSharedPreferences(
+                        dev.wander.android.opentagviewer.anisette.LocalAnisette.PREFERENCES,
+                        android.content.Context.MODE_PRIVATE)
+                .edit()
+                .remove(dev.wander.android.opentagviewer.anisette.LocalAnisette.KEY_SERIAL)
+                .commit();
+    }
+
     private void open(final FakeICloudService fake) {
         this.icloud = fake;
         AppDependencies.replaceICloud(() -> fake);
@@ -209,13 +247,15 @@ public class FetchFromICloudFlowTest {
                 .check(matches(withText(containsString(hardware.marketingName()))));
         onView(withId(R.id.icloud_registered_device_model))
                 .check(matches(withText(containsString(hardware.osVersion()))));
+        // The serial this install stored, not a constant: it is drawn per install now, so a
+        // screen showing a literal would send the user looking for a row that is not theirs.
         onView(withId(R.id.icloud_registered_device_serial))
-                .check(matches(withText(containsString(AdiDeviceIdentity.APP_SERIAL))));
+                .check(matches(withText(containsString(THE_STORED_SERIAL))));
         TestPace.afterAStep();
 
         onView(withId(R.id.icloud_registered_body)).perform(scrollTo());
         onView(withId(R.id.icloud_registered_body))
-                .check(matches(withText(containsString(AdiDeviceIdentity.APP_SERIAL))));
+                .check(matches(withText(containsString(THE_STORED_SERIAL))));
 
         // The serial reaches the sentence as well as the tile. The resource holds a ^1 slot, and
         // a template that lost it expands to a sentence about "the serial" that never says which.

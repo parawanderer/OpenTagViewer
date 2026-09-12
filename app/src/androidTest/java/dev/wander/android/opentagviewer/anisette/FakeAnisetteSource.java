@@ -131,6 +131,20 @@ public final class FakeAnisetteSource implements AnisetteSource {
         return "{\"uid\":\"" + UID + "\",\"devid\":\"" + DEVID + "\"}";
     }
 
+    /**
+     * A drawn serial, not {@link AdiDeviceIdentity#LEGACY_SERIAL}.
+     *
+     * <p>Deliberately a value only the generator could produce, so a test asserting that this
+     * reached Apple cannot pass against code that fell back to the constant - which is the
+     * regression that matters here, and the one a fake returning the old literal would hide.
+     */
+    public static final String SERIAL = "0PENTAGVK7QX";
+
+    @Override
+    public String serial() {
+        return SERIAL;
+    }
+
     @Override
     public String describe() {
         return this.ready ? "fake, ready" : "fake, unavailable: " + this.unavailableReason;

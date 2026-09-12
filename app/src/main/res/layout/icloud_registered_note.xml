@@ -4,7 +4,7 @@
 
   **A replica of the row, not a description of it.** Connecting registers this app as a device,
   and Apple renders that entry from the claimed model: title "MacBookPro", model "MacBook Pro 13"",
-  macOS 13.1, serial 0PENTAGVIEWR - confirmed against a real account in macOS Settings > Apple
+  macOS 13.1, serial 0PENTAGV**** - confirmed against a real account in macOS Settings > Apple
   Account > My Devices. The app does send a name and Apple ignores it, so nothing here says
   "OpenTagViewer", because that is not what the user will be looking at.
 
@@ -92,7 +92,7 @@
                 android:layout_marginTop="5dp"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
-                tools:text="Serial Number: 0PENTAGVIEWR" />
+                tools:text="Serial Number: 0PENTAGVK7QX" />
 
         </LinearLayout>
 

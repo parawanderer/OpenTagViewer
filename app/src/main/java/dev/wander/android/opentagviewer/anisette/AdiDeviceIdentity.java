@@ -34,18 +34,23 @@ public final class AdiDeviceIdentity {
     private final String uniqueDeviceIdentifier;
     private final String adiIdentifier;
     private final String localUserUuid;
+    private final String serial;
     private final Hardware hardware;
 
     /**
+     * @param serial   what Apple prints against this install's device-list entry. An install
+     *                 that already existed before serials were drawn passes
+     *                 {@link #LEGACY_SERIAL}, and must keep doing so.
      * @param hardware which machine this install claims to be. An install that already existed
      *                 before profiles were introduced passes {@link Hardware#LEGACY_MAC}, and
      *                 must keep doing so - see the enum.
      */
     public AdiDeviceIdentity(String uniqueDeviceIdentifier, String adiIdentifier,
-                             String localUserUuid, Hardware hardware) {
+                             String localUserUuid, String serial, Hardware hardware) {
         this.uniqueDeviceIdentifier = uniqueDeviceIdentifier;
         this.adiIdentifier = adiIdentifier;
         this.localUserUuid = localUserUuid;
+        this.serial = serial;
         this.hardware = hardware;
     }
 
@@ -68,18 +73,51 @@ public final class AdiDeviceIdentity {
      * themselves to Apple as the same machine.
      */
     /**
-     * The serial Apple prints against this app's entry in the user's device list.
+     * The eight characters every serial this app presents begins with.
      *
-     * <p><b>Python owns it</b> - {@code identity.APP_SERIAL} is what actually goes to Apple, and
-     * this is a copy for the screen that shows the user what to look for. A copy at all only
-     * because a UI thread should not have to start CPython to render a label.
-     *
-     * <p>Two copies of one value is exactly what rule 11 warns about, so they are pinned
-     * together: {@code IdentityBridgeTest} fails if they ever differ. A screen naming a serial
-     * Apple never saw is worse than naming none, because the user would go looking for it,
-     * not find it, and conclude the row in front of them belongs to somebody else.
+     * <p>Recognisability lives in the prefix rather than in the whole string. An entry reading
+     * {@code 0PENTAGV} followed by anything is identifiably this app, which is what stops
+     * somebody pressing <i>Remove from Account</i> on it - and it sorts next to the desktop
+     * exporter's {@code 0PENTAGX...}, so the two read as one project.
      */
-    public static final String APP_SERIAL = "0PENTAGVIEWR";
+    public static final String SERIAL_PREFIX = "0PENTAGV";
+
+    /**
+     * What the four characters after the prefix are drawn from.
+     *
+     * <p>Uppercase alphanumeric, which is the shape Apple accepts, with the pairs a person
+     * comparing a serial on this screen against a row in their Apple device list is most likely
+     * to confuse left out - no {@code O} against {@code 0}, no {@code I} or {@code 1}, no
+     * {@code S} against {@code 5}, no {@code B} against {@code 8}, no {@code Z} against
+     * {@code 2}. Nobody types this; they only ever compare it, and that is the whole job it has.
+     *
+     * <p>The same alphabet as {@code python/exporter/identity.py}, deliberately.
+     */
+    public static final String SERIAL_ALPHABET = "ACDEFGHJKLMNPQRTUVWXY34679";
+
+    /**
+     * The serial every install presented before this was drawn per install.
+     *
+     * <p><b>Still presented, by every install that already has an identity.</b> Changing the
+     * serial on an install that works costs a second device-list entry and may cost a sign-in,
+     * for no benefit to somebody who is not affected - see the warning on {@link #serial()}.
+     *
+     * <p>It shares the prefix with a drawn serial but is not one and cannot be: {@code IEWR}
+     * contains an {@code I}, which {@link #SERIAL_ALPHABET} leaves out. So a serial with an
+     * {@code I} in it is, by construction, an install from before this change.
+     *
+     * <p><b>Why this stopped being the only one.</b> It was a constant, so every install of this
+     * app anywhere presented Apple the same serial while presenting a <i>different</i> machine
+     * identity: one serial against thousands of device ids and thousands of Apple IDs, from every
+     * continent, at once. Real hardware does not look like that. The 503s from Grand Slam that
+     * some accounts never recover from - issues #168, #176 and #181 - are consistent with that
+     * fingerprint being refused, and one reporter cleared their device identity to no effect,
+     * which is what would happen if the serial were the part being matched on.
+     *
+     * <p>That is a hypothesis and is written down as one. It has not been confirmed against
+     * Apple, and the cheap way to confirm it is exactly this change.
+     */
+    public static final String LEGACY_SERIAL = "0PENTAGVIEWR";
 
     public static AdiDeviceIdentity generate() {
         final SecureRandom random = new SecureRandom();
@@ -89,7 +127,28 @@ public final class AdiDeviceIdentity {
                 UUID.randomUUID().toString().toUpperCase(Locale.ROOT),
                 hex(random, 8).toLowerCase(Locale.ROOT),
                 hardware.newLocalUserId(random),
+                generateSerial(random),
                 hardware);
+    }
+
+    /**
+     * A serial for an install that does not have one yet.
+     *
+     * <p>Twelve characters, of which the last four vary - about 450,000 of them, which is not a
+     * large space and does not need to be. The point is that two installs are unlikely to share
+     * one, not that a serial is unguessable; there is nothing here to guess.
+     *
+     * <p><b>{@link SecureRandom}, and it matters which one.</b> A seedable generator would hand
+     * every fresh install the same serial and reproduce exactly the fingerprint this change
+     * exists to break up. {@code SecureRandom}'s no-argument constructor is seeded by the
+     * platform and cannot be pinned from here; nothing in this app calls {@code setSeed}.
+     */
+    static String generateSerial(SecureRandom random) {
+        final StringBuilder tail = new StringBuilder(4);
+        for (int i = 0; i < 4; i++) {
+            tail.append(SERIAL_ALPHABET.charAt(random.nextInt(SERIAL_ALPHABET.length())));
+        }
+        return SERIAL_PREFIX + tail;
     }
 
     private static String hex(SecureRandom random, int bytes) {
@@ -172,7 +231,7 @@ public final class AdiDeviceIdentity {
          * eligible as a second factor: that is decided by the push token, which FindMy.py has no
          * parameter for and never sends, and an iPhone-shaped entry still reports "This device
          * cannot be used to receive Apple Account verification codes". And it arrives together
-         * with the serial {@code 0PENTAGVIEWR}, which is what keeps it recognisable - an iPhone
+         * with a {@code 0PENTAGV} serial, which is what keeps it recognisable - an iPhone
          * claim on its own, unnamed and unserialled, would be worse than the Mac it replaces.
          */
         IPHONE(
@@ -293,7 +352,7 @@ public final class AdiDeviceIdentity {
          *
          * <p><b>So the name cannot be what a user matches on, and the serial has to be.</b> Every
          * install of this app produces a row with this same title and model, which is why
-         * {@code 0PENTAGVIEWR} carries the whole weight of telling it apart - rule 11.
+         * the serial carries the whole weight of telling it apart - rule 11.
          */
         public String deviceListName() {
             return this.model.replaceAll("\\d+,\\d+$", "");
@@ -372,5 +431,22 @@ public final class AdiDeviceIdentity {
     /** Sent as X-Apple-I-MD-LU. */
     public String localUserUuid() {
         return this.localUserUuid;
+    }
+
+    /**
+     * The serial Apple prints against this app's entry in the user's device list.
+     *
+     * <p><b>The only field here the user actually sees</b>, and the only thing telling their
+     * entry apart from anyone else's: every install of this app produces a row with the same
+     * title and the same model, so the serial carries the whole weight of recognising it
+     * (rule 11). Python reads this across the bridge at sign-in rather than holding a copy, and
+     * the screen that tells the user what to look for reads the same stored value.
+     *
+     * <p><b>Changing it adds an entry rather than renaming one</b>, and may require signing in
+     * again - Apple binds a session to the identity that established it. So it is drawn once,
+     * on the first run that needs an identity, and then kept for the life of the install.
+     */
+    public String serial() {
+        return this.serial;
     }
 }

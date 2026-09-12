@@ -571,7 +571,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                         ? R.drawable.smartphone_24px : R.drawable.laptop_24px);
 
         // The same chip in the prose. It is the value the sentence is about, and it reads as a
-        // typo in body text - "0PENTAGVIEWR" has a zero for an O and no vowel in VIEWR.
+        // typo in body text - it has a zero for an O and no vowel after "0PENTAGV".
         // Read from the resource rather than from the view: the view may already hold an expanded
         // copy from a previous visit to this step, and expanding twice leaves the ^1 gone and the
         // chip applied to nothing.
@@ -586,10 +586,18 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                 Direction.FORWARD);
     }
 
-    /** The serial, as a chip, ready to drop into a sentence or a label. */
+    /**
+     * The serial, as a chip, ready to drop into a sentence or a label.
+     *
+     * <p><b>This install's, not a constant.</b> Serials are drawn per install, so a literal here
+     * would name a serial Apple never saw for this user - who would then go looking for it in
+     * their device list, not find it, and conclude the row in front of them is somebody else's.
+     * Read-only: see {@link LocalAnisette#serialToShow}, and note that this screen is only
+     * reached once a sign-in has registered a device, so one has been drawn by now.
+     */
     private CharSequence serialAsCode() {
-        return CodeChipSpan.applyTo(
-                AdiDeviceIdentity.APP_SERIAL, AdiDeviceIdentity.APP_SERIAL, this.codeChip());
+        final String serial = LocalAnisette.serialToShow(this);
+        return CodeChipSpan.applyTo(serial, serial, this.codeChip());
     }
 
     private CodeChipSpan codeChip() {

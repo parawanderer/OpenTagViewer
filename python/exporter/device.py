@@ -9,8 +9,10 @@ happened to share a serial.
 
 So the identity is kept between runs. What that means precisely:
 
-- **What is stored**: two UUIDs Apple knows this installation by, and the Anisette provisioning
-  data - the state that makes this machine the same machine to Apple's servers.
+- **What is stored**: two UUIDs Apple knows this installation by, the serial it presents, and the
+  Anisette provisioning data - the state that makes this machine the same machine to Apple's
+  servers. The serial is here rather than a constant in the source because a constant meant every
+  install of this program presented Apple the same one; see `identity.EXPORTER_SERIAL`.
 - **What is not**: the Apple ID, the password, any session token, any keychain key, anything about
   the accessories. :func:`_only_identity` enforces that rather than trusting this docstring, and
   refuses to write a file carrying anything else.
@@ -37,7 +39,7 @@ FILENAME = "device-identity.json"
 # Everything this file may contain. A key outside this set is a bug or a change upstream, and
 # either way the file is not written - the point of keeping it is that it holds nothing sensitive,
 # and a check is worth more than an intention.
-_ALLOWED = frozenset({"uid", "devid", "anisette"})
+_ALLOWED = frozenset({"uid", "devid", "anisette", "serial"})
 
 # Nothing named like this reaches disk, whatever else changes. Belt and braces with `_ALLOWED`,
 # because the anisette mapping comes from a library and its shape is not this project's to fix.
@@ -82,7 +84,13 @@ def load(path: Path | None = None) -> dict[str, Any] | None:
     return stored
 
 
-def save(uid: str, devid: str, anisette: Any, path: Path | None = None) -> None:
+def save(
+    uid: str,
+    devid: str,
+    anisette: Any,
+    path: Path | None = None,
+    serial: str | None = None,
+) -> None:
     """
     Store the identity for next time.
 
@@ -90,7 +98,13 @@ def save(uid: str, devid: str, anisette: Any, path: Path | None = None) -> None:
     export that has already succeeded costs the export.
     """
     path = path or identity_path()
-    document = {"uid": uid, "devid": devid, "anisette": anisette}
+    document: dict[str, Any] = {"uid": uid, "devid": devid, "anisette": anisette}
+
+    # Omitted rather than defaulted when a caller does not pass one, so that a save from a path
+    # that does not know the serial cannot overwrite a stored one with a guess. `serial_from`
+    # reads an absent key as "an install from before this varied", which is the right answer.
+    if serial:
+        document["serial"] = serial
 
     try:
         _only_identity(document)
