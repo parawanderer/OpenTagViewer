@@ -6,6 +6,10 @@
         android:title="@string/location_history" />
 
     <item
+        android:id="@+id/device_play_sound_nearby"
+        android:title="@string/play_sound_nearby" />
+
+    <item
         android:id="@+id/device_delete"
         android:title="@string/remove_device" />
 

@@ -118,8 +118,99 @@ public class UserSettings {
      */
     private Boolean icloudOfferMade;
 
+    /**
+     * Whether to keep listening for the user's tags while the app is closed.
+     *
+     * <p><b>Off unless somebody turns it on, and this one changes what the app is.</b> Without
+     * it the radio only listens while a screen is open, which makes this a display feature: it
+     * tells you what is near you while you are looking. With it the app runs a foreground
+     * service with a permanent notification, listens continuously, and writes down where your
+     * tags were heard - which is a recording feature, and one this app's users have specific
+     * reasons to want to opt into rather than receive.
+     *
+     * <p>It is also what makes the local position history worth having: the case a history
+     * answers is "where did I leave it", and the app is shut at exactly that moment.
+     *
+     * <p>Null reads as off. See {@link #shouldScanInBackground()}.
+     */
+    private Boolean scanInBackground;
+
+    /**
+     * How many seconds of silence make a tag count as left behind.
+     *
+     * <p>Adjustable because the right answer is about the person, not the tag. Somebody who
+     * wants to be caught before the end of the street wants a few seconds and will accept the
+     * occasional check that finds the tag still there; somebody who puts their bag down a lot
+     * wants a minute and no interruptions. Neither is wrong, and no single number is right for
+     * both.
+     *
+     * <p>Null means {@link #LEFT_BEHIND_AFTER_SECONDS_DEFAULT}. See
+     * {@link #resolveLeftBehindAfterSeconds()}, which also enforces the floor - below it the
+     * check cadence, not this number, decides when the alert arrives, and a setting that
+     * silently does nothing is worse than one that will not go that low.
+     */
+    private Integer leftBehindAfterSeconds;
+
+    /**
+     * The alarm sound, as a content URI string, or null/empty for the system default alarm.
+     *
+     * <p>Held as the URI the ringtone picker handed back rather than anything resolved: the
+     * sound behind it can be deleted or live on a volume that is not mounted, so it is read
+     * defensively at the moment it is played and falls back to the default there.
+     */
+    private String leftBehindSoundUri;
+
+    /**
+     * What a tag's silence has to outlast before it is worth a targeted check.
+     *
+     * <p>Well above the floor, because this is the value for everybody who never opens the
+     * setting. Erring long costs a later alert; erring short costs an alert that is wrong, and
+     * a wrong one teaches people to ignore the right one.
+     */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_DEFAULT = 120;
+
+    /**
+     * The shortest silence the slider will offer.
+     *
+     * <p><b>Thirty seconds, and the number moved because the mechanism under it did.</b> While a
+     * tag going quiet was answered by a six second scan alongside the background one, thirty was
+     * unusable: tags lying in the same room were called left behind repeatedly, because the
+     * background scan does not listen anywhere near continuously - with several apps scanning,
+     * the controller reported our client as {@code mode[BALANCED, used=LOW_POWER]}, roughly a
+     * tenth of the time rather than a quarter - and the short scan that was supposed to catch
+     * the mistake never once succeeded.
+     *
+     * <p>The scan is now raised to full rate at half the wait instead, and the controller grants
+     * it: {@code mode[LOW_LATENCY, used=LOW_LATENCY]}. Every one of eight silences in a measured
+     * window was answered before the deadline, with no alert at all. So the wait no longer has
+     * to outlast the background scan's gaps on its own; it only has to leave the escalation time
+     * to work, and half of thirty seconds is enough for that in practice.
+     *
+     * <p>Practice, not proof: that rests on one person's tags in one flat over a short period,
+     * not on a distribution of sighting gaps, which is still unmeasured.
+     * {@link #LEFT_BEHIND_AFTER_SECONDS_DEFAULT} therefore stays far above here, since the
+     * default is for people whose tags are weaker and whose phones are busier.
+     *
+     * <p>What a short wait costs is not on this line: the escalation starts at half of it, so
+     * thirty seconds means the radio is at full rate for a good part of any quiet spell.
+     */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_MIN = 30;
+
+    /** Beyond this the tag is somewhere else entirely and the alert has missed its moment. */
+    public static final int LEFT_BEHIND_AFTER_SECONDS_MAX = 300;
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
+
+    /** The configured silence in seconds, defaulted and clamped to what the check can honour. */
+    public int resolveLeftBehindAfterSeconds() {
+        if (this.leftBehindAfterSeconds == null || this.leftBehindAfterSeconds <= 0) {
+            return LEFT_BEHIND_AFTER_SECONDS_DEFAULT;
+        }
+
+        return Math.max(LEFT_BEHIND_AFTER_SECONDS_MIN,
+                Math.min(LEFT_BEHIND_AFTER_SECONDS_MAX, this.leftBehindAfterSeconds));
+    }
 
     public boolean hasDarkThemeEnabled() {
         return this.useDarkTheme == Boolean.TRUE;
@@ -189,6 +280,14 @@ public class UserSettings {
      */
     public boolean shouldShowAppleDevices() {
         return this.showAppleDevices == Boolean.TRUE;
+    }
+
+    /**
+     * Whether to keep listening while the app is closed - see {@link #scanInBackground}. Null
+     * means nobody has turned it on, which is off.
+     */
+    public boolean shouldScanInBackground() {
+        return this.scanInBackground == Boolean.TRUE;
     }
 
     /**

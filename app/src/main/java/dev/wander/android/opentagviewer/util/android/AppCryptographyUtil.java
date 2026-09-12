@@ -10,6 +10,7 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
 import android.security.keystore.KeyGenParameterSpec;
+import android.util.Log;
 import android.util.Pair;
 
 import java.io.IOException;
@@ -31,11 +32,14 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 import dev.wander.android.opentagviewer.db.AppCryptographyException;
+import dev.wander.android.opentagviewer.db.MissingKeystoreKeyException;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 public final class AppCryptographyUtil {
+
+    private static final String TAG = AppCryptographyUtil.class.getSimpleName();
     // https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec#example:-aes-key-for-encryptiondecryption-in-gcm-mode
     // https://developer.android.com/privacy-and-security/cryptography
     // https://developer.android.com/reference/android/security/keystore/KeyProtection#example:-aes-key-for-encryptiondecryption-in-gcm-mode
@@ -71,9 +75,23 @@ public final class AppCryptographyUtil {
         }
     }
 
+    /**
+     * <b>Decryption never creates a key.</b> A key made now cannot open anything written before,
+     * so generating one here can only turn a missing key into a failed decrypt - while putting
+     * the alias back, which hides the fact that it was ever gone. Absence is reported as
+     * {@link MissingKeystoreKeyException}, which is the one decryption failure that is somebody's
+     * device rather than this app's bug.
+     */
     public synchronized byte[] decrypt(final byte[] dataToDecrypt, final byte[] iv, final String keystoreAlias) {
+        final SecretKey existing = this.existingKeyForAlias(keystoreAlias);
+        if (existing == null) {
+            throw new MissingKeystoreKeyException(
+                    "There is no keystore key under " + keystoreAlias + " any more, so what was"
+                            + " encrypted with it cannot be read");
+        }
+
         try {
-            SecretKey key = this.getKeyForAlias(keystoreAlias);
+            SecretKey key = existing;
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(DECRYPT_MODE, key, new GCMParameterSpec(AES_GMC_TAG_SIZE * 8, iv));
             return cipher.doFinal(dataToDecrypt);
@@ -84,6 +102,27 @@ public final class AppCryptographyUtil {
 
     public synchronized byte[] decrypt(@NonNull final AppEncryptedData data, final String keystoreAlias) {
         return decrypt(data.getCipherText(), data.getIv(), keystoreAlias);
+    }
+
+    /**
+     * The key under this alias, or null if there is not one. Never creates.
+     *
+     * <p>A keystore that cannot be opened at all is reported as absent too: it is the same
+     * situation for a caller, and throwing out of here would take down a screen on a path
+     * nobody can act on.
+     */
+    private synchronized SecretKey existingKeyForAlias(@NonNull final String keystoreAlias) {
+        try {
+            final KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+
+            final Key entry = keyStore.getKey(keystoreAlias, null);
+            return entry instanceof SecretKey ? (SecretKey) entry : null;
+        } catch (final Exception keystoreUnavailable) {
+            Log.w(TAG, "Could not read the keystore looking for " + keystoreAlias,
+                    keystoreUnavailable);
+            return null;
+        }
     }
 
     private synchronized SecretKey getKeyForAlias(@NonNull final String keystoreAlias) throws KeyStoreException, CertificateException, IOException, NoSuchAlgorithmException, UnrecoverableEntryException, NoSuchProviderException, InvalidAlgorithmParameterException {

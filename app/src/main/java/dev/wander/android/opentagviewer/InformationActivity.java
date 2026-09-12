@@ -44,7 +44,7 @@ public class InformationActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         ActivityInformationBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_information);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
         binding.setHandleClickBack(this::finish);
 
         if (this.getSupportActionBar() != null) {
