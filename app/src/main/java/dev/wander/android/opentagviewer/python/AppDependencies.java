@@ -14,6 +14,8 @@ import java.util.function.Supplier;
 
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
+import dev.wander.android.opentagviewer.ble.AccessorySoundTrigger;
+import dev.wander.android.opentagviewer.ble.BleAccessorySoundTrigger;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -73,6 +75,32 @@ public final class AppDependencies {
      * "an accessory nothing recognises" renderable on demand, rather than needing such a tag.
      */
     private static HardwareDescriber hardwareDescriber = new ChaquopyHardwareDescriber();
+
+    /**
+     * Resolves an accessory's current BLE MAC address candidate(s), through the pinned
+     * FindMy.py fork's rolling-key derivation.
+     *
+     * <p>Here for the same reason as {@link #hardwareDescriber}: the real one starts Chaquopy,
+     * so a screen or a test of {@link #accessorySoundTrigger} could not otherwise run without it.
+     */
+    private static AccessoryMacResolver accessoryMacResolver = new ChaquopyAccessoryMacResolver();
+
+    /**
+     * Plays an owned accessory's sound directly over Bluetooth - see
+     * {@code dev.wander.android.opentagviewer.ble.AccessorySoundTrigger}.
+     *
+     * <p>Built from {@link #accessoryMacResolver} rather than constructing its own, so replacing
+     * one in a test replaces what the other depends on too.
+     *
+     * <p><b>Null until asked for, which is what makes the sentence above true.</b> Built eagerly
+     * here, it captured whichever resolver existed at class-init - a {@code final} field inside
+     * it - so {@link #replaceAccessoryMacResolver} swapped this class's field and left the
+     * trigger holding the real Chaquopy one. A test that stubbed only the resolver would then
+     * start CPython, which is the single thing that seam exists to avoid, and it would do it
+     * without failing: Chaquopy works on a device, so the test passes slowly rather than
+     * loudly.
+     */
+    private static AccessorySoundTrigger accessorySoundTrigger = null;
 
     /**
      * Strips personal identifiers out of a log before it is offered to anybody.
@@ -169,6 +197,17 @@ public final class AppDependencies {
         return hardwareDescriber;
     }
 
+    public static AccessoryMacResolver accessoryMacResolver() {
+        return accessoryMacResolver;
+    }
+
+    public static AccessorySoundTrigger accessorySoundTrigger() {
+        if (accessorySoundTrigger == null) {
+            accessorySoundTrigger = BleAccessorySoundTrigger.forRealBluetooth(accessoryMacResolver);
+        }
+        return accessorySoundTrigger;
+    }
+
     public static LogRedactor logRedactor() {
         return logRedactor;
     }
@@ -202,10 +241,23 @@ public final class AppDependencies {
     }
 
     @VisibleForTesting
+    public static void replaceAccessoryMacResolver(final AccessoryMacResolver replacement) {
+        accessoryMacResolver = replacement;
+        // Dropped rather than rebuilt, so an explicit replaceAccessorySoundTrigger made after
+        // this one still wins. It is rebuilt from the new resolver on the next call.
+        accessorySoundTrigger = null;
+    }
+
+    @VisibleForTesting
+    public static void replaceAccessorySoundTrigger(final AccessorySoundTrigger replacement) {
+        accessorySoundTrigger = replacement;
+    }
+
+    @VisibleForTesting
     public static void replaceLogRedactor(final LogRedactor replacement) {
         logRedactor = replacement;
-    }
-
+    }
+
     @VisibleForTesting
     public static void replaceBundleBuilder(final BundleBuilder replacement) {
         bundleBuilder = replacement;
@@ -223,6 +275,8 @@ public final class AppDependencies {
         anisetteFactory = LocalAnisette::new;
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
+        accessoryMacResolver = new ChaquopyAccessoryMacResolver();
+        accessorySoundTrigger = null;
         logRedactor = new ChaquopyLogRedactor();
         bundleBuilder = new ChaquopyBundleBuilder();
         icloudFactory = AppDependencies::openRealICloud;

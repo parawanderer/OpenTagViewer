@@ -13,11 +13,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import dev.wander.android.opentagviewer.ble.FindMyAdvertisement;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
+import dev.wander.android.opentagviewer.db.repo.model.LastSightingData;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.opentagviewer.db.room.entity.LastBleSighting;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
@@ -25,14 +28,18 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.ChaquopyPlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.python.FetchResult;
 import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 import dev.wander.android.opentagviewer.util.parse.NamingRecordEditor;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
 import dev.wander.android.opentagviewer.util.BeaconLocationReportHasher;
+import dev.wander.android.opentagviewer.util.LocalFixWorthKeeping;
+import dev.wander.android.opentagviewer.util.parse.AccessoryAlignment;
 import dev.wander.android.opentagviewer.util.parse.KeyAlignmentPlist;
 import dev.wander.android.opentagviewer.util.rx.ScanOrder;
+import dev.wander.android.opentagviewer.util.rx.SlowFirstFetch;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -483,6 +490,39 @@ public class BeaconRepository {
                 .subscribeOn(Schedulers.io());
     }
 
+    /**
+     * Whether fetching these accessories means a long key search.
+     *
+     * <p>Asked of the requests that were actually built rather than of everything on screen: the
+     * scheduled fetch skips tags that are ignored or backing off, and an unaligned tag that is
+     * not being fetched should not put a banner up about a wait that is not happening.
+     *
+     * <p>The same {@code observedAtMillis} XPath the scan ordering uses, over a plist already in
+     * memory - see {@link #dueForAScheduledScan}, which explains why this is read rather than
+     * stored in a column.
+     *
+     * @see dev.wander.android.opentagviewer.util.rx.SlowFirstFetch for the arithmetic.
+     */
+    public Observable<Boolean> aFetchOfTheseWouldBeSlow(final List<AccessoryRequest> requests) {
+        return Observable.fromCallable(() -> {
+            final var dao = db.ownedBeaconDao();
+            final List<Long> alignedAt = new ArrayList<>();
+
+            for (final AccessoryRequest request : requests) {
+                final OwnedBeacon row = dao.getById(request.getBeaconId());
+                // **Both, and the later one wins.** The export's record is frozen at import;
+                // the accessory state carries the alignment the last fetch actually reached.
+                // Reading only the record showed the banner on every refresh for anybody whose
+                // export was more than a week old, however recently their tags had updated.
+                alignedAt.add(row == null ? null : SlowFirstFetch.laterOf(
+                        AccessoryAlignment.alignedAtMillis(row.accessoryJson),
+                        KeyAlignmentPlist.observedAtMillis(row.alignmentPlist)));
+            }
+
+            return SlowFirstFetch.isLikely(alignedAt, System.currentTimeMillis());
+        }).subscribeOn(Schedulers.io());
+    }
+
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
         return Observable.fromCallable(() -> {
             if (beaconIdToPlistFallback.isEmpty()) {
@@ -524,6 +564,283 @@ public class BeaconRepository {
                 }
             }
             return out;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Record that a tag was seen advertising at {@code keyIndex}, and keep the alignment it
+     * proves.
+     *
+     * <p><b>A BLE sighting is worth the same as a decrypted location report</b>, and is persisted
+     * the same way: FindMy.py's {@code update_alignment} is how it is told about either, and
+     * {@code accessory_json} is where the result lives. Without this the twelve-hour candidate
+     * range that found the tag is re-derived from scratch on the next scan; with it, the next
+     * scan derives three keys.
+     *
+     * <p><b>Failure is swallowed on purpose.</b> This runs after a sound has already played (or
+     * failed to), and nothing the user asked for depends on it - the cost of losing it is a
+     * wider search next time, not a broken feature. It is emphatically not worth turning a
+     * successful ring into an error toast.
+     */
+    public Completable recordAccessorySighting(
+            final String beaconId, final String mac, final long seenAtUnixMs,
+            final Integer hintIndex) {
+        return Completable.fromRunnable(() -> {
+            final var dao = db.ownedBeaconDao();
+            final OwnedBeacon row = dao.getById(beaconId);
+
+            if (row == null || row.accessoryJson == null) {
+                Log.d(TAG, "Nothing to align for beaconId=" + beaconId + " - no accessory_json");
+                return;
+            }
+
+            final String updated = AppDependencies.accessoryMacResolver()
+                    .recordSeen(row.accessoryJson, mac, seenAtUnixMs, hintIndex);
+
+            if (updated == null) {
+                // Also the ordinary outcome of a secondary-key-only match, not just a failure -
+                // see AccessoryMacResolver#recordSeen. Nothing to log as a problem here.
+                return;
+            }
+
+            dao.updateAccessoryJson(beaconId, updated);
+            Log.d(TAG, "Aligned beaconId=" + beaconId + " from a Bluetooth sighting");
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Keep what a tag just told this phone directly, replacing whatever it last said.
+     *
+     * <p><b>Why it outlives the sighting that produced it.</b> The reading is shown live while the
+     * tag is audible and then ages out, because a signal strength or a "nearby" badge stops being
+     * true the moment the tag is carried off. A battery level does not: a tag that read "low" an
+     * hour ago is still low, and for a user with no Apple device there is no other source that
+     * will ever say so - see {@link LastBleSighting}. So the live display expires and what it
+     * said is kept.
+     *
+     * <p>Takes the fields of a sighting rather than a sighting object, because the one it would
+     * take lives in the {@code ble} package and carries a live RSSI this deliberately does not
+     * store. A parameter list is the honest signature for "these are the parts worth keeping".
+     *
+     * <p><b>Failure is swallowed, like every other write on this path.</b> Losing a reading costs
+     * a screen one row until the tag is next heard, and this runs behind a passive scan the user
+     * did not ask for. Nothing they did may fail because of it.
+     */
+    public Completable storeLastSighting(
+            final String beaconId,
+            final FindMyAdvertisement.BatteryLevel batteryLevel,
+            final int statusByte,
+            final long heardAtUnixMs) {
+        return Completable.fromRunnable(() -> {
+            db.lastBleSightingDao().insert(LastBleSighting.builder()
+                    .beaconId(beaconId)
+                    .heardAt(heardAtUnixMs)
+                    .batteryLevel(batteryLevel.name())
+                    .statusByte(statusByte)
+                    .build());
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Write down where this phone was when it heard the tag, as a location report of its own.
+     *
+     * <p><b>The same table as Apple's reports, on purpose.</b> The map marker, the "last
+     * updated" line, the navigate button, the history list and the CSV export all read from
+     * there; a separate table would mean teaching every one of them about a second source. The
+     * {@code provenance} column is what keeps the two distinguishable - see
+     * {@link LocationReport#provenance}.
+     *
+     * <p><b>It is the phone's position, not the tag's.</b> Hearing a Find My advertisement puts
+     * the tag within roughly ten metres, which is why {@code horizontal_accuracy} is filled from
+     * the fix's own accuracy rather than invented: for a reader, and for anything that compares
+     * two reports, that is the honest width of the claim. It is also usually an order of
+     * magnitude better than a network report, which describes where a stranger's iPhone thought
+     * <i>it</i> was.
+     *
+     * <p><b>Not every sighting earns a row.</b> {@link LocalFixWorthKeeping} decides, because
+     * sightings arrive far faster than positions are worth keeping - a tag beside somebody all
+     * evening would otherwise write hundreds of rows describing one spot, each reverse-geocoded
+     * when shown.
+     *
+     * <p>Failure is swallowed like every other write on the sighting path: this runs behind a
+     * passive scan nobody asked for, and nothing the user did may fail because of it.
+     *
+     * @return the report that was written, or empty when this sighting did not earn a row - so a
+     *         caller can log or test the decision, and can also draw what was just recorded
+     *         without reading it back.
+     */
+    public Observable<Optional<BeaconLocationReport>> recordLocalSighting(
+            final String beaconId,
+            final double latitude,
+            final double longitude,
+            final long accuracyMetres,
+            final long statusByte,
+            final long heardAtUnixMs) {
+
+        return Observable.fromCallable(() -> {
+            final var dao = db.locationReportDao();
+            final LocationReport last = dao.getLastLocalFor(beaconId);
+
+            final boolean keep = LocalFixWorthKeeping.worthKeeping(
+                    last == null ? null : last.latitude,
+                    last == null ? null : last.longitude,
+                    last == null ? null : last.timestamp,
+                    latitude, longitude, heardAtUnixMs);
+
+            if (!keep) {
+                return Optional.<BeaconLocationReport>empty();
+            }
+
+            // Built as the shared model first so the id comes out of the same hasher the network
+            // path uses. It folds in the beacon, the timestamp, the coordinates, the status and
+            // the description, so two sightings of the same tag at the same moment and place
+            // collapse to one row instead of accumulating - and a local row can never collide
+            // with an Apple one, because no Apple report carries this description.
+            final BeaconLocationReport report = BeaconLocationReport.builder()
+                    .publishedAt(heardAtUnixMs)
+                    .description(LOCAL_REPORT_DESCRIPTION)
+                    .timestamp(heardAtUnixMs)
+                    // Apple's confidence byte is a number this app deliberately does not
+                    // interpret - see LocationReportFields. There is nothing honest to put here,
+                    // so it stays zero rather than borrowing a scale that means something else.
+                    .confidence(0)
+                    .latitude(latitude)
+                    .longitude(longitude)
+                    .horizontalAccuracy(accuracyMetres)
+                    .status(statusByte)
+                    .build();
+
+            dao.insertAll(LocationReport.builder()
+                    .hashId(BeaconLocationReportHasher.getSha256HashFor(beaconId, report))
+                    .beaconId(beaconId)
+                    .publishedAt(report.getPublishedAt())
+                    .description(report.getDescription())
+                    .timestamp(report.getTimestamp())
+                    .confidence(report.getConfidence())
+                    .latitude(report.getLatitude())
+                    .longitude(report.getLongitude())
+                    .horizontalAccuracy(report.getHorizontalAccuracy())
+                    .status(report.getStatus())
+                    .lastUpdate(System.currentTimeMillis())
+                    .provenance(LocationReport.PROVENANCE_LOCAL)
+                    .build());
+
+            Log.d(TAG, "Wrote a local position for beaconId=" + beaconId);
+
+            // Handed back rather than announced as a bare boolean so a caller that draws a map
+            // can put this on it without rebuilding the same report from the same inputs and
+            // risking a second, subtly different definition of what a local report looks like.
+            return Optional.of(report);
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * What a locally heard report says in its description field.
+     *
+     * <p>Apple fills this with its own text, so a fixed string here both labels the row in the
+     * debug panel and guarantees the hash of a local row can never match an Apple one.
+     */
+    public static final String LOCAL_REPORT_DESCRIPTION = "Heard over Bluetooth";
+
+    /**
+     * The tags whose owner wants to be warned when they are left behind.
+     *
+     * <p>Returned as the permissions rather than the exceptions because null - nobody has
+     * decided - means no. A tag has to be asked for by name: most tags a person owns are
+     * routinely left somewhere on purpose, and a feature that alarms about all of them until
+     * told otherwise gets switched off wholesale after the second false alarm.
+     *
+     * <p>Only an explicit true counts, so a tag with no options row at all is silent - which is
+     * every tag until somebody flips the switch.
+     */
+    public Observable<Set<String>> getBeaconsWithAlertsOn() {
+        return Observable.fromCallable(() -> {
+            final Set<String> on = new HashSet<>();
+
+            for (final UserBeaconOptions options : db.userBeaconOptionsDao().getAll()) {
+                if (Boolean.TRUE.equals(options.alertOnSeparation)) {
+                    on.add(options.beaconId);
+                }
+            }
+
+            return on;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /** Store whether being left behind is worth a noise for this tag. */
+    public Completable storeAlertOnSeparation(final String beaconId, final boolean alert) {
+        return Completable.fromRunnable(() ->
+                        db.userBeaconOptionsDao().storeAlertOnSeparation(
+                                beaconId, alert, System.currentTimeMillis()))
+                .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Whether being left behind is worth a noise for this tag. Null - undecided - reads as no.
+     */
+    public Observable<Boolean> getAlertOnSeparation(final String beaconId) {
+        return Observable.fromCallable(() -> {
+            final UserBeaconOptions options = db.userBeaconOptionsDao().getById(beaconId);
+            return options != null && Boolean.TRUE.equals(options.alertOnSeparation);
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The key material for every tag worth listening for, keyed by beacon.
+     *
+     * <p>For {@code NearbyScanService}, which has no screen to inherit a loaded model from and
+     * so has to ask. The screens build the same map out of what they already hold.
+     *
+     * <p><b>Retired tags are left out, given-up ones are not.</b> A retired tag is one that has
+     * left the account, so there is nothing to listen for. A tag the network gave up on is the
+     * opposite case: it stopped being findable over Apple's network, and hearing it directly is
+     * exactly what could still find it.
+     *
+     * <p>A tag with no {@code accessory_json} is skipped rather than passed on: without key
+     * material there is nothing to derive an address from, and the watcher would only discard it.
+     */
+    public Observable<Map<String, String>> getAccessoryJsonByBeaconId() {
+        return Observable.fromCallable(() -> {
+            final Map<String, String> byBeaconId = new HashMap<>();
+
+            for (final OwnedBeacon beacon : db.ownedBeaconDao().getAll()) {
+                if (beacon.isRemoved || beacon.accessoryJson == null
+                        || beacon.accessoryJson.isEmpty()) {
+                    continue;
+                }
+                byBeaconId.put(beacon.id, beacon.accessoryJson);
+            }
+
+            return byBeaconId;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * The last thing heard from this tag over Bluetooth, or empty if it never has been.
+     *
+     * <p><b>Empty is also the answer for a battery level this version does not recognise.</b> A
+     * row written by a later build that knows a fifth state would otherwise have to be mapped
+     * onto one of the four here, and every choice available is a wrong reading presented as a
+     * right one. Showing nothing is the only honest option, and the raw byte is still in the row
+     * for anyone debugging it.
+     */
+    public Observable<Optional<LastSightingData>> getLastSighting(final String beaconId) {
+        return Observable.fromCallable(() -> {
+            final LastBleSighting row = db.lastBleSightingDao().getById(beaconId);
+            if (row == null) {
+                return Optional.<LastSightingData>empty();
+            }
+
+            try {
+                return Optional.of(new LastSightingData(
+                        row.heardAt,
+                        FindMyAdvertisement.BatteryLevel.valueOf(row.batteryLevel),
+                        row.statusByte));
+            } catch (final IllegalArgumentException e) {
+                Log.w(TAG, "Ignoring an unrecognised stored battery level '" + row.batteryLevel
+                        + "' for beaconId=" + beaconId);
+                return Optional.<LastSightingData>empty();
+            }
         }).subscribeOn(Schedulers.io());
     }
 
@@ -640,6 +957,10 @@ public class BeaconRepository {
                                     .horizontalAccuracy(locationReport.getHorizontalAccuracy())
                                     .status(locationReport.getStatus())
                                     .lastUpdate(now)
+                                    // Everything arriving here was decrypted from Apple's
+                                    // network. The local path writes its own rows and sets this
+                                    // itself - see recordLocalSighting.
+                                    .provenance(LocationReport.PROVENANCE_APPLE)
                                     .build()
                             ))
                             .toArray(LocationReport[]::new);

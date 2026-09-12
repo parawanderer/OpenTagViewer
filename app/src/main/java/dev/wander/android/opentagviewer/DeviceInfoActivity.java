@@ -4,11 +4,13 @@ import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.View.inflate;
 import static android.widget.Toast.LENGTH_LONG;
+import static android.widget.Toast.LENGTH_SHORT;
 
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -31,6 +33,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.DataBindingUtil;
@@ -38,6 +41,7 @@ import androidx.emoji2.emojipicker.EmojiPickerView;
 import androidx.emoji2.emojipicker.EmojiViewItem;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -45,9 +49,19 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
+import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerResult;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
+import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
 import dev.wander.android.opentagviewer.databinding.ActivityDeviceInfoBinding;
@@ -59,15 +73,20 @@ import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.BeaconData;
+import dev.wander.android.opentagviewer.db.repo.model.LastSightingData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.util.android.CachedPhoneLocation;
+import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
+import dev.wander.android.opentagviewer.util.parse.AccessoryAlignment;
 import dev.wander.android.opentagviewer.util.parse.BatteryLevelDescription;
 import dev.wander.android.opentagviewer.util.parse.BeaconDataParser;
+import dev.wander.android.opentagviewer.util.parse.LocationReportFields;
 import dev.wander.android.opentagviewer.util.rx.WideScanBackoff;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
@@ -82,8 +101,20 @@ import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
 
-public class DeviceInfoActivity extends AppCompatActivity {
+public class DeviceInfoActivity extends AppCompatActivity
+        implements ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = DeviceInfoActivity.class.getSimpleName();
+
+    private static final int PERMISSION_REQUEST_PLAY_SOUND_NEARBY = 1001;
+
+    /**
+     * How often the "Last seen" row is redrawn while the tag is quiet.
+     *
+     * <p>Matched to the coarsest unit {@code DateUtils} is asked for here, a minute: redrawing
+     * faster changes nothing on screen, and redrawing slower would leave the row a minute behind
+     * for someone watching it.
+     */
+    private static final long LAST_SEEN_REFRESH_MS = TimeUnit.MINUTES.toMillis(1);
 
     private static final double DEFAULT_LONGITUDE = 0d;
     private static final double DEFAULT_LATITUDE = 0d;
@@ -123,6 +154,52 @@ public class DeviceInfoActivity extends AppCompatActivity {
     /** The in-flight write to the account, so leaving the screen does not land on dead views. */
     private Disposable accountRename;
 
+    /** The in-flight BLE scan/GATT trigger, so leaving the screen stops it rather than
+     * leaving a scan running or a result landing on dead views. */
+    private Disposable playSoundNearby;
+
+    /** Reused so each new status (searching/connecting/sending/result) replaces the last one
+     * on screen instead of queuing behind it - see {@link #showPlaySoundStatus}. */
+    private Toast playSoundStatusToast;
+
+    /**
+     * Listens for this one tag while the screen is open, to show a battery reading taken off the
+     * tag itself rather than out of the iCloud record.
+     *
+     * <p><b>Its own scan rather than one handed over from the map.</b> Opening this screen
+     * pauses {@code MapsActivity}, which stops that scan, so a sighting passed across would be
+     * stale on arrival - and this screen can also be reached without the map having run at all.
+     */
+    private Disposable nearbyWatchDisposable;
+
+    /**
+     * Hides the live battery row once its last sighting is too old to stand behind - reset by
+     * every new sighting, so the row only ages out when the tag has genuinely gone quiet.
+     *
+     * <p>Without this the row never aged at all: once a tag had been heard, "read from the tag
+     * just now" stayed on screen for hours after the tag left earshot - exactly the staleness
+     * the row exists to be free of. Same clock as the map card's badge:
+     * {@link NearbyTagSightings#FRESH_FOR_MS}.
+     */
+    private Disposable liveBatteryExpiry;
+
+    /** The pending retry after the scan died mid-session - see {@link #onNearbyWatchEnded}. */
+    private Disposable nearbyWatchRetryDisposable;
+
+    /** The in-flight read of the stored sighting - see {@link #showWhatWasHeardOverBluetooth}. */
+    private Disposable lastSightingLookup;
+
+    /**
+     * Redraws the "Last seen" row while the tag is quiet, so its age keeps up with the clock.
+     *
+     * <p>Only runs in that state. While the tag is audible the row reads "just now" and every
+     * advertisement rewrites it anyway; once there is nothing stored the row is not on screen.
+     */
+    private Disposable lastSeenTicker;
+
+    /** The one place a Bluetooth sighting is persisted - see {@link AccessorySightingPersister}. */
+    private AccessorySightingPersister sightingPersister;
+
     private boolean hasNameChanges = false;
 
     @Override
@@ -146,6 +223,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo,
+                new CachedPhoneLocation(new FusedPhoneLocation(this.getApplicationContext())));
 
         this.beaconData = this.beaconRepo.getById(this.beaconId).blockingFirst();
         this.beaconInformation = BeaconDataParser.parse(List.of(this.beaconData)).get(0);
@@ -160,7 +239,7 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 : this.beaconRepo.getImportById(importId).blockingFirst().orElse(null);
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_device_info);
-        WindowPaddingUtil.insertUITopPadding(binding.getRoot());
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
 
         binding.setHandleClickBack(this::handleEndActivity);
         binding.setHandleClickMenu(this::handleClickMenu);
@@ -286,7 +365,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 R.id.settings_debug_naming_record_pairing_date,
                 R.id.settings_debug_naming_record_product_id,
                 R.id.settings_debug_naming_record_system_version,
-                R.id.settings_debug_naming_record_vendor_id
+                R.id.settings_debug_naming_record_vendor_id,
+                R.id.settings_debug_key_alignment
         );
 
         ClipboardManager clipboard = (ClipboardManager)
@@ -580,7 +660,289 @@ public class DeviceInfoActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        this.startWatchingForThisTag();
+        this.showWhatWasHeardOverBluetooth();
+        this.showLeftBehindSwitch();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        this.stopWatchingForThisTag();
+        if (this.leftBehindLookup != null && !this.leftBehindLookup.isDisposed()) {
+            this.leftBehindLookup.dispose();
+        }
+    }
+
+    /**
+     * Listen for this tag while the screen is open, to fill in the live battery row.
+     *
+     * <p>Silent when it cannot run - no permission, Bluetooth off, or an accessory JSON that has
+     * not been backfilled all simply leave the row hidden, which is what it looks like when the
+     * tag is out of earshot anyway.
+     */
+    private void startWatchingForThisTag() {
+        this.stopWatchingForThisTag();
+
+        final String accessoryJson = this.beaconData.getOwnedBeaconInfo().accessoryJson;
+        if (accessoryJson == null || accessoryJson.isEmpty()) {
+            return;
+        }
+
+        this.nearbyWatchDisposable = new NearbyTagWatcher(
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
+                ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .watch(this.getApplicationContext(), Map.of(this.beaconId, accessoryJson))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::showLiveSighting,
+                        error -> Log.w(TAG, "Nearby watch ended for beaconId=" + this.beaconId, error),
+                        this::onNearbyWatchEnded);
+    }
+
+    /**
+     * The scan died mid-session (Bluetooth off, or the platform refused the scan) rather than
+     * being stopped - disposal skips onComplete. Retried every 30 seconds so the live battery
+     * row comes back on its own when the radio does; see {@code MapsActivity}'s twin for the
+     * budget reasoning.
+     */
+    private void onNearbyWatchEnded() {
+        Log.i(TAG, "Nearby watch ended mid-session for beaconId=" + this.beaconId
+                + "; retrying in 30s");
+        this.nearbyWatchRetryDisposable = Observable
+                .timer(30, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.startWatchingForThisTag());
+    }
+
+    private void stopWatchingForThisTag() {
+        if (this.nearbyWatchDisposable != null && !this.nearbyWatchDisposable.isDisposed()) {
+            this.nearbyWatchDisposable.dispose();
+        }
+        this.nearbyWatchDisposable = null;
+        if (this.liveBatteryExpiry != null && !this.liveBatteryExpiry.isDisposed()) {
+            this.liveBatteryExpiry.dispose();
+        }
+        this.liveBatteryExpiry = null;
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+        this.lastSightingLookup = null;
+        if (this.lastSeenTicker != null && !this.lastSeenTicker.isDisposed()) {
+            this.lastSeenTicker.dispose();
+        }
+        this.lastSeenTicker = null;
+        if (this.nearbyWatchRetryDisposable != null
+                && !this.nearbyWatchRetryDisposable.isDisposed()) {
+            this.nearbyWatchRetryDisposable.dispose();
+        }
+        this.nearbyWatchRetryDisposable = null;
+    }
+
+    /**
+     * Shows what the tag is saying right now: heard just now, this strong, this much battery.
+     *
+     * <p>Never falls back to the iCloud value for the battery row, and never merges with it. The
+     * whole reason this section is outside the record's own fields is that it says where its
+     * numbers came from; quietly filling one of them from the other source would defeat that.
+     * The debug row keeps the record's value, with its caveat.
+     */
+    private void showLiveSighting(final NearbyTagSighting sighting) {
+        // A stored reading on its way back from the database would land on top of this one and
+        // relabel a tag we can hear right now as last heard some minutes ago. The live value
+        // always wins, so the read that was going to contradict it is dropped rather than raced.
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+        if (this.lastSeenTicker != null && !this.lastSeenTicker.isDisposed()) {
+            this.lastSeenTicker.dispose();
+        }
+
+        this.binding.setBleLastSeen(this.getString(R.string.seen_just_now));
+        this.binding.setBleSignalStrength(NearbyTagLabel.signalStrengthBars(sighting.getRssi()));
+        this.binding.setBleBatteryLevel(
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+        this.showStatusByteForDebugging(sighting.getStatusByte());
+
+        this.showBluetoothSection(true);
+
+        // Every sighting restarts the expiry, so the section only stops claiming to be current
+        // once the tag has been quiet for the whole window - see the field doc.
+        if (this.liveBatteryExpiry != null && !this.liveBatteryExpiry.isDisposed()) {
+            this.liveBatteryExpiry.dispose();
+        }
+        this.liveBatteryExpiry = Observable
+                .timer(NearbyTagSightings.FRESH_FOR_MS, TimeUnit.MILLISECONDS,
+                        AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.showWhatWasHeardOverBluetooth());
+    }
+
+    /**
+     * Falls back to what the tag last said, with its age, once it has gone quiet.
+     *
+     * <p><b>What the section says when the tag is out of earshot.</b> The live reading expires
+     * because a tag carried away stops being here - see {@link NearbyTagSightings} - but the
+     * battery it reported on the way out is still the best answer anybody has, and for a user
+     * with no Apple device it is the only one: the record's own field is updated by Apple's
+     * devices and stays at "not yet reported" forever otherwise. So the claim is weakened rather
+     * than withdrawn, from "this is the level" to "this is the level when it was last heard".
+     *
+     * <p><b>The signal row goes, the battery row stays.</b> That split is the point of splitting
+     * them. A battery level from an hour ago is still roughly the battery level; a signal
+     * strength from an hour ago describes a distance to a tag that is no longer there, and there
+     * is no wording that makes it useful. So it is withdrawn rather than dated.
+     *
+     * <p>The age on "Last seen" is not decoration either. Without it this is the same trap as the
+     * debug panel's iCloud value: a battery word with no date reads as current, and "full" from a
+     * tag last heard in March is worse than an empty row.
+     *
+     * <p>Hides the whole section when there is nothing stored, which is a tag this phone has
+     * never heard - a new install, or one whose tags have only ever been seen over the network.
+     */
+    private void showWhatWasHeardOverBluetooth() {
+        if (this.lastSightingLookup != null && !this.lastSightingLookup.isDisposed()) {
+            this.lastSightingLookup.dispose();
+        }
+
+        this.lastSightingLookup = this.beaconRepo.getLastSighting(this.beaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(stored -> {
+                    if (stored.isEmpty()) {
+                        this.showBluetoothSection(false);
+                        return;
+                    }
+
+                    final LastSightingData sighting = stored.get();
+                    this.binding.setBleBatteryLevel(this.getString(
+                            NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())));
+                    this.showStatusByteForDebugging(sighting.getStatusByte());
+                    this.showAgeOfLastSighting(sighting.getHeardAtMs());
+                    this.showBluetoothSection(true, false);
+
+                    // "3 minutes ago" is only true for a minute. Nothing else on this screen
+                    // redraws while it sits open, so without a tick the row would freeze at
+                    // whatever it said when the tag went quiet and keep saying it for as long as
+                    // somebody watched - which is precisely the staleness this row exists to
+                    // report rather than commit.
+                    this.lastSeenTicker = Observable
+                            .interval(LAST_SEEN_REFRESH_MS, LAST_SEEN_REFRESH_MS,
+                                    TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+                            .subscribe(tick -> this.showAgeOfLastSighting(
+                                    sighting.getHeardAtMs()));
+                }, error -> Log.w(TAG, "Could not read the last sighting for beaconId="
+                        + this.beaconId, error));
+    }
+
+    /**
+     * Puts the raw status byte the battery reading came out of into the debug panel.
+     *
+     * <p><b>To be measured against, not read as a battery level.</b> The section above decodes
+     * bits 6-7 of this byte per Apple's Table 5-5, which is right for an MFi accessory and wrong
+     * for an AirTag: {@link LocationReportFields} records one advertising {@code 0x90}, which
+     * fails that table's marker and reserved bits, and notes that decoding it anyway reads "low"
+     * for a tag whose own record says full. Every accessory this feature was built against is
+     * third-party, so the reading has never been checked against hardware that does not follow
+     * the specification.
+     *
+     * <p>Rendered by {@link LocationReportFields#status}, deliberately: it is the same rendering
+     * a network report's copy of this byte gets, so the two can be compared directly, and it
+     * appends a Table 5-5 reading only to a byte that actually conforms - which is the question
+     * this row exists to answer.
+     */
+    private void showStatusByteForDebugging(final int statusByte) {
+        this.binding.setBleStatusByte(LocationReportFields.status(statusByte));
+        this.findViewById(R.id.settings_debug_ble_status_byte).setVisibility(VISIBLE);
+    }
+
+    /**
+     * Shows and wires the per-tag left-behind switch.
+     *
+     * <p>Undecided reads as off, so a tag nobody has answered for stays silent - see
+     * {@code UserBeaconOptions.alertOnSeparation}. The switch is only revealed once the answer
+     * has been read, so it cannot flick from a default to the stored value in front of somebody.
+     */
+    private void showLeftBehindSwitch() {
+        if (this.leftBehindLookup != null && !this.leftBehindLookup.isDisposed()) {
+            this.leftBehindLookup.dispose();
+        }
+
+        this.leftBehindLookup = this.beaconRepo.getAlertOnSeparation(this.beaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(warn -> {
+                    this.binding.setWarnIfLeftBehind(warn);
+
+                    final MaterialSwitch toggle = this.findViewById(R.id.device_warn_left_behind);
+                    toggle.setChecked(warn);
+                    toggle.setOnCheckedChangeListener((button, isChecked) ->
+                            this.beaconRepo.storeAlertOnSeparation(this.beaconId, isChecked)
+                                    .subscribe(() -> Log.i(TAG, "Left-behind alerts for beaconId="
+                                                    + this.beaconId + " are now "
+                                                    + (isChecked ? "on" : "off")),
+                                            error -> Log.w(TAG,
+                                                    "Could not store the left-behind choice",
+                                                    error)));
+
+                    this.findViewById(R.id.device_warn_left_behind_row).setVisibility(VISIBLE);
+                    this.findViewById(R.id.device_warn_left_behind_explainer)
+                            .setVisibility(VISIBLE);
+                }, error -> Log.w(TAG, "Could not read the left-behind choice", error));
+    }
+
+    /** The in-flight read of the per-tag left-behind choice. */
+    private Disposable leftBehindLookup;
+
+    /**
+     * Writes the "Last seen" row, e.g. "3 minutes ago", from a wall-clock timestamp.
+     *
+     * <p><b>Under a minute it says "just now" rather than what the formatter returns</b>, which
+     * is "0 minutes ago". That is the reading for the first half-minute after a tag goes quiet -
+     * the live window is thirty seconds - so it is not a rare corner, it is what everybody sees
+     * on the way from hearing the tag to not hearing it. "0 minutes ago" is also not really
+     * English. Asking the formatter for second resolution instead would say "43 seconds ago",
+     * which is a precision this row cannot keep: it redraws once a minute.
+     *
+     * <p>The same words as the live row, and that is honest - the tag really was heard just now.
+     * What separates the two states on screen is the signal row, which is there only while the
+     * reading is live.
+     */
+    private void showAgeOfLastSighting(final long heardAtMs) {
+        final long ageMs = System.currentTimeMillis() - heardAtMs;
+
+        this.binding.setBleLastSeen(ageMs < DateUtils.MINUTE_IN_MILLIS
+                ? this.getString(R.string.seen_just_now)
+                : DateUtils.getRelativeTimeSpanString(
+                        heardAtMs, System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS).toString());
+    }
+
+    /** The section with every row, for a tag being heard right now. */
+    private void showBluetoothSection(final boolean visible) {
+        this.showBluetoothSection(visible, visible);
+    }
+
+    /**
+     * Shows or hides the "Over Bluetooth" section - its divider, its heading and its rows
+     * together, so it never appears as a heading with nothing under it.
+     *
+     * @param signalToo whether the signal row is among them. False once the tag has gone quiet:
+     *                  see {@link #showWhatWasHeardOverBluetooth} for why that one row is
+     *                  withdrawn while the others are merely dated.
+     */
+    private void showBluetoothSection(final boolean visible, final boolean signalToo) {
+        final int visibility = visible ? VISIBLE : GONE;
+
+        this.findViewById(R.id.device_ble_divider).setVisibility(visibility);
+        this.findViewById(R.id.device_ble_header).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_last_seen).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_battery).setVisibility(visibility);
+        this.findViewById(R.id.device_settings_ble_signal)
+                .setVisibility(signalToo ? VISIBLE : GONE);
+    }
+
+    @Override
     protected void onDestroy() {
+        this.stopWatchingForThisTag();
         if (this.hardwareLookup != null && !this.hardwareLookup.isDisposed()) {
             this.hardwareLookup.dispose();
         }
@@ -590,7 +952,140 @@ public class DeviceInfoActivity extends AppCompatActivity {
         if (this.accountRename != null && !this.accountRename.isDisposed()) {
             this.accountRename.dispose();
         }
+        // Here disposing does cancel the underlying work - see BleGattSoundTrigger.trigger's
+        // cancellable, which closes the GATT connection rather than leaving it dangling.
+        if (this.playSoundNearby != null && !this.playSoundNearby.isDisposed()) {
+            this.playSoundNearby.dispose();
+        }
         super.onDestroy();
+    }
+
+    /**
+     * Ask to play this accessory's sound directly over Bluetooth, without going through Apple's
+     * Find My network - see {@code dev.wander.android.opentagviewer.ble}. Only reachable while
+     * the accessory is close enough to answer a BLE scan, unlike the network-based search this
+     * screen otherwise relies on.
+     */
+    private void onClickPlaySoundNearby() {
+        if (!BlePermissions.granted(this)) {
+            Log.d(TAG, "Requesting BLE permission(s) before playing sound nearby");
+            ActivityCompat.requestPermissions(
+                    this, BlePermissions.required(), PERMISSION_REQUEST_PLAY_SOUND_NEARBY);
+            return;
+        }
+        this.startPlaySoundNearby();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            final int requestCode, @androidx.annotation.NonNull final String[] permissions,
+            @androidx.annotation.NonNull final int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != PERMISSION_REQUEST_PLAY_SOUND_NEARBY) return;
+
+        // Re-checked against the same BlePermissions.granted this action gates on elsewhere,
+        // rather than reading grantResults directly - one place decides what "enough" means,
+        // matching the reasoning in BlePermissions' own class doc.
+        if (BlePermissions.granted(this)) {
+            Log.i(TAG, "BLE permission granted; playing sound nearby for beaconId=" + this.beaconId);
+            this.startPlaySoundNearby();
+        } else {
+            Log.i(TAG, "BLE permission refused; not playing sound nearby for beaconId=" + this.beaconId);
+            Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
+        }
+    }
+
+    private void startPlaySoundNearby() {
+        final String accessoryJson = this.beaconData.getOwnedBeaconInfo().accessoryJson;
+
+        this.showPlaySoundStatus(R.string.play_sound_searching, LENGTH_SHORT);
+
+        if (this.playSoundNearby != null && !this.playSoundNearby.isDisposed()) {
+            this.playSoundNearby.dispose();
+        }
+
+        this.playSoundNearby = AppDependencies.accessorySoundTrigger()
+                .playSound(this.getApplicationContext(), accessoryJson)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::handlePlaySoundUpdate,
+                        error -> {
+                            // AccessorySoundTrigger's contract is to never error a failure onto
+                            // this path - see its interface doc - so reaching here means a bug
+                            // in that contract, not an ordinary "not found" or "no permission".
+                            Log.e(TAG, "Unexpected error playing sound for beaconId="
+                                    + this.beaconId, error);
+                            this.showPlaySoundStatus(R.string.play_sound_failed, LENGTH_LONG);
+                        });
+    }
+
+    /**
+     * One item of the play-sound stream: a progress phase (shown and replaced, see
+     * {@link #showPlaySoundStatus}) or the terminal outcome.
+     */
+    private void handlePlaySoundUpdate(final BleSoundTriggerUpdate update) {
+        this.sightingPersister.keepWhatTheSightingProved(this.beaconId, update);
+
+        if (update.getPhase() != BleSoundTriggerPhase.DONE) {
+            this.showPlaySoundStatus(phaseMessageRes(update.getPhase()), LENGTH_SHORT);
+            return;
+        }
+        this.showPlaySoundResult(update.getResult());
+    }
+
+    private static int phaseMessageRes(final BleSoundTriggerPhase phase) {
+        switch (phase) {
+            case CONNECTING:
+                return R.string.play_sound_connecting;
+            case TRIGGERING:
+                return R.string.play_sound_sending;
+            case SCANNING:
+            default:
+                return R.string.play_sound_searching;
+        }
+    }
+
+    private void showPlaySoundResult(final BleSoundTriggerResult result) {
+        Log.d(TAG, "Play sound result for beaconId=" + this.beaconId + ": " + result.getStatus()
+                + (result.getMessage() == null ? "" : " (" + result.getMessage() + ")"));
+
+        final int messageRes;
+        switch (result.getStatus()) {
+            case SUCCESS:
+                messageRes = R.string.play_sound_success;
+                break;
+            case NOT_NEARBY:
+                messageRes = R.string.play_sound_not_nearby;
+                break;
+            case NO_SOUND_SERVICE:
+                messageRes = R.string.play_sound_no_sound_service;
+                break;
+            case NO_CANDIDATE_MACS:
+                messageRes = R.string.play_sound_no_candidate_macs;
+                break;
+            case MISSING_PERMISSION:
+                messageRes = R.string.play_sound_permission_denied;
+                break;
+            case FAILED:
+            default:
+                messageRes = R.string.play_sound_failed;
+                break;
+        }
+        this.showPlaySoundStatus(messageRes, LENGTH_LONG);
+    }
+
+    /**
+     * Cancels whichever status toast is on screen and shows the next one immediately, rather
+     * than queuing behind it. Plain sequential {@code Toast.makeText(...).show()} calls queue
+     * with a fixed display duration each, so "searching" would sit on screen for its whole
+     * duration even after "connecting" was already true - reading as stuck, not as progress.
+     */
+    private void showPlaySoundStatus(final int messageRes, final int duration) {
+        if (this.playSoundStatusToast != null) {
+            this.playSoundStatusToast.cancel();
+        }
+        this.playSoundStatusToast = Toast.makeText(this, messageRes, duration);
+        this.playSoundStatusToast.show();
     }
 
     /**
@@ -726,6 +1221,8 @@ public class DeviceInfoActivity extends AppCompatActivity {
 
             if (menuItem.getItemId() == R.id.device_location_history) {
                 this.redirectToDeviceHistory();
+            } else if (menuItem.getItemId() == R.id.device_play_sound_nearby) {
+                this.onClickPlaySoundNearby();
             } else if (menuItem.getItemId() == R.id.device_delete) {
                 this.onClickDeviceDelete();
             }
@@ -793,6 +1290,29 @@ public class DeviceInfoActivity extends AppCompatActivity {
                 : timestamps.format(new Date(newest)));
 
         this.binding.setBackoffState(this.describeBackoff(timestamps));
+        this.binding.setKeyAlignment(this.describeKeyAlignment(timestamps));
+    }
+
+    /**
+     * Where the next key search starts, and how far the last one got.
+     *
+     * <p><b>Read from the accessory state, not from the export's record.</b> The record is written
+     * once at import; this advances on every fetch, which is what makes it worth showing. A tag
+     * whose row says "None stored" is one whose next fetch searches from the pairing date - tens
+     * of thousands of keys for an old tag - and that is the single most useful thing to know when
+     * somebody reports a fetch that takes minutes or comes back empty.
+     */
+    private String describeKeyAlignment(final SimpleDateFormat timestamps) {
+        final String accessoryJson = this.beaconInformation.getOwnedBeaconAccessoryJson();
+        final Integer index = AccessoryAlignment.alignedIndex(accessoryJson);
+        final Long alignedAt = AccessoryAlignment.alignedAtMillis(accessoryJson);
+
+        if (index == null || alignedAt == null) {
+            return this.getString(R.string.debug_key_alignment_none);
+        }
+
+        return this.getString(
+                R.string.debug_key_alignment_value, index, timestamps.format(new Date(alignedAt)));
     }
 
     private String describeBackoff(final SimpleDateFormat timestamps) {

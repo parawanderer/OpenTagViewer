@@ -556,6 +556,7 @@ public class TheHistoryScreenDrawsTheDayTest {
                     .horizontalAccuracy(83)
                     .status(144)
                     .lastUpdate(at)
+                    .provenance(LocationReport.PROVENANCE_APPLE)
                     .build());
         }
 
