@@ -395,13 +395,16 @@ Mac, or appleid.apple.com:
 | --- | --- |
 | Model | **MacBook Pro** (`MacBookPro18,3`) |
 | Version | **macOS 13.4.1** |
-| Serial Number | **`0PENTAGXPORT`** |
+| Serial Number | **`0PENTAGX` followed by four characters** |
 
 **It is not a Mac and you do not own one of these.** The model and OS come from FindMy.py, which
 has always presented itself as a MacBook Pro and authenticates fine that way; the serial is this
-exporter's, chosen to be legible and deliberately implausible as real hardware. That serial is the
-part to recognise it by — `0PENTAGXPORT` is the exporter, and `0PENTAGVIEWR` is the Android app if
-you also use that.
+exporter's, chosen to be legible and deliberately implausible as real hardware.
+
+**The prefix is the part to recognise it by**, because the last four characters are drawn once on
+this machine and are yours alone: `0PENTAGX…` is the exporter and `0PENTAGV…` is the Android app,
+if you also use that. Installs from before this changed show `0PENTAGXPORT` and `0PENTAGVIEWR`
+exactly, and keep doing so — there is nothing to do about that and no reason to.
 
 **It is one entry, not one per export.** The identity is stable, so running this again reuses it.
 
