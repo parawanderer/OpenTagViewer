@@ -672,9 +672,25 @@ public class MyDevicesListActivity extends AppCompatActivity {
     private void importHistory(@NonNull final Uri uri) {
         this.showHistoryImportProgress();
         Observable.fromCallable(() -> {
-                    final InputStream opened = this.getContentResolver().openInputStream(uri);
+                    // **Opening is READ_FAILED, not an unexpected failure.** A document the user
+                    // picked that has since gone, or a provider that hands back nothing, is an
+                    // ordinary thing for a file picker to produce - and left unwrapped it is not
+                    // a HistoryImportException at all, so historyImportFailed takes it for
+                    // something this app did not anticipate and opens the bug report page. The
+                    // page is for defects here; a missing file is not one.
+                    final InputStream opened;
+                    try {
+                        opened = this.getContentResolver().openInputStream(uri);
+                    } catch (final Exception cannotOpen) {
+                        throw new HistoryImportException(
+                                HistoryImportException.Reason.READ_FAILED,
+                                "The history archive could not be opened",
+                                cannotOpen);
+                    }
                     if (opened == null) {
-                        throw new IOException("The document provider returned no history data");
+                        throw new HistoryImportException(
+                                HistoryImportException.Reason.READ_FAILED,
+                                "The document provider returned no history data");
                     }
                     return AppDependencies.historyImporter(this.getApplicationContext())
                             .importArchive(opened, this::historyImportProgressChanged);
