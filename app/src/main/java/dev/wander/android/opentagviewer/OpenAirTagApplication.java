@@ -10,7 +10,10 @@ import com.google.android.material.color.DynamicColors;
 
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
+import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
+import dev.wander.android.opentagviewer.service.NearbyScanService;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class OpenAirTagApplication extends PyApplication {
     private static final String TAG = OpenAirTagApplication.class.getSimpleName();
@@ -25,6 +28,38 @@ public class OpenAirTagApplication extends PyApplication {
 
         this.setupTheme();
         this.setupSystemColors();
+        this.resumeBackgroundScanIfEnabled();
+    }
+
+    /**
+     * Brings the background scan back after the process was gone.
+     *
+     * <p><b>The setting is the state, and the service is only its consequence.</b> A service does
+     * not survive a reboot, a force-stop or the system reclaiming memory, so without this the
+     * switch would silently stop meaning anything and the only cure would be toggling it off and
+     * on - which reads as the setting having been forgotten.
+     *
+     * <p>Off by default, so this starts nothing for anyone who has not asked. Read
+     * asynchronously because the setting lives in a DataStore and Application#onCreate blocks
+     * the first activity.
+     */
+    private void resumeBackgroundScanIfEnabled() {
+        // Off the main thread: the read hits a DataStore, and this runs before the first
+        // activity is created.
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                final UserSettings settings =
+                        new UserSettingsRepository(UserSettingsDataStore.getInstance(this))
+                                .getUserSettings();
+
+                if (settings.shouldScanInBackground()) {
+                    Log.i(TAG, "Background scanning is on; starting the service");
+                    NearbyScanService.start(this);
+                }
+            } catch (final Exception e) {
+                Log.w(TAG, "Could not read whether to scan in the background", e);
+            }
+        });
     }
 
     /**

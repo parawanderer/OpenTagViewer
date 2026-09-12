@@ -176,6 +176,7 @@ public class LatestReportPerBeaconTest {
                 .horizontalAccuracy(10L)
                 .status(0)
                 .lastUpdate(timestamp)
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build();
     }
 }

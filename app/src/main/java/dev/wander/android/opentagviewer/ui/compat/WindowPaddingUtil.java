@@ -11,20 +11,46 @@ import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class WindowPaddingUtil {
+
     /**
-     * In UIs like Samsung Galaxy S25 Ultra, the top padding under the top list of icons in the UI
-     * (the notifications, time, battery, ...) is absent, which results in a top bar that is too small
+     * Keep a screen's content clear of <b>both</b> system bars.
      *
-     * @param rootView      The view that holds all of the UI for a given activity.
+     * <p><b>The bottom is the one that gets forgotten, and it is the one people notice.</b> The
+     * theme draws under a transparent navigation bar, so anything at the bottom of a screen ends
+     * up beneath it - and unlike a clipped heading, a button underneath the bar is not merely
+     * ugly. It is hard to press, or impossible: the bar takes the touch. Reported on a Samsung
+     * phone as "any button we put at the bottom of the page is barely to not clickable", with a
+     * screenshot of the keychain unlock screen's Unlock button sitting behind the gesture pill.
+     *
+     * <p><b>Both bars in one call, because two calls is what let this happen.</b> There used to
+     * be a top-only helper; it was applied to seven screens and the bottom inset to one, and
+     * nothing about writing the first suggests you owe the second. Anything that pads for the
+     * status bar has the same problem at the other end of the screen, so the top-only version
+     * is gone rather than left available to be called again.
+     *
+     * <p>The view's own padding is kept and the insets are added to it, so a layout that already
+     * asks for breathing room does not lose it - and the values are read once, here, rather than
+     * inside the listener. Insets arrive more than once (a rotation, a keyboard, switching to
+     * three-button navigation), and adding to the current padding each time would grow the gap
+     * on every delivery.
+     *
+     * <p>Not for a screen that deliberately draws edge to edge. The map is the example: it wants
+     * tiles under the bar and pads only the card row above it, with
+     * {@link #insertUIBottomPadding}.
      */
-    public static void insertUITopPadding(View rootView) {
-        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            Insets statusBarInsets = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+    public static void insetForSystemBars(final View view) {
+        final int ownLeft = view.getPaddingLeft();
+        final int ownTop = view.getPaddingTop();
+        final int ownRight = view.getPaddingRight();
+        final int ownBottom = view.getPaddingBottom();
+
+        ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+            final Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(
-                    0,
-                    statusBarInsets.top,
-                    0,
-                    0
+                    ownLeft + bars.left,
+                    ownTop + bars.top,
+                    ownRight + bars.right,
+                    ownBottom + bars.bottom
             );
             return insets;
         });

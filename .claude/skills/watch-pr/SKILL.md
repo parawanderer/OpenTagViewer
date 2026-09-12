@@ -88,7 +88,7 @@ while true; do
     break
   fi
   if [ "$(gh pr view "$PR" --json statusCheckRollup --jq \
-          '[.statusCheckRollup[].status] | all(. == "COMPLETED")' 2>/dev/null)" = "true" ]; then
+          '[.statusCheckRollup[].status] | length > 0 and all(. == "COMPLETED")' 2>/dev/null)" = "true" ]; then
     echo "PR #$PR: all $total checks finished"
     break
   fi
@@ -112,6 +112,22 @@ Why it is shaped this way:
   through a red build, and silence reads as "still running".
 - **`2>/dev/null` on the `gh` calls, but no `|| continue`.** A transient API failure yields an
   empty result and the loop tries again; it must not be able to exit quietly.
+- **`length > 0 and` before the `all`, because `all` on an empty list is `true`.** Without it the
+  loop declares victory the instant the rollup is empty — which is exactly what a freshly pushed
+  commit looks like before GitHub has created its runs, and what a fork PR waiting on
+  *"Approve and run"* looks like indefinitely. It printed `all checks finished` for a PR with
+  **zero** checks, one line after a push, and that reads identically to a green build.
+
+**A fork PR can sit at `action_required` forever, and that is not a failure state.** GitHub gates
+workflow runs on PRs from forks, so `gh run list` shows `completed / action_required` and
+`gh pr checks` says *"no checks reported"*. Nothing is wrong and nothing will happen until a
+maintainer approves:
+
+```bash
+gh run list --limit 5 --json databaseId,headSha,conclusion \
+  --jq '.[] | select(.conclusion=="action_required") | .databaseId'
+gh api -X POST repos/<owner>/<repo>/actions/runs/<id>/approve
+```
 
 ## When it lands
 
