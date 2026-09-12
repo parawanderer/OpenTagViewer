@@ -104,7 +104,10 @@ android {
         // field exists in both variants so code reading it compiles in both.
         buildConfigField("String", "BUILD_COMMIT", "null")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Grants the app's runtime permissions before the first test - see the class, which
+        // explains why an ungranted one hangs the suite rather than failing a test.
+        testInstrumentationRunner =
+            "dev.wander.android.opentagviewer.GrantWhatTheAppAsksForRunner"
 
         // **Do not add `timeout_msec` here.** It works - a hanging test fails at the cap with
         // its own name - but AndroidJUnitRunner pays for it per test, not per hang: with it set
@@ -569,13 +572,19 @@ dependencies {
  * talk to a device - so the caching this disables was never doing anything. Gradle's own error
  * suggests exactly this.
  *
- * The managed-device task is untouched, because `managedDevice/` is not the directory Studio
- * watches.
+ * **This used to exempt the managed-device task**, on the reasoning that `managedDevice/` is not
+ * the directory Studio watches. That was wrong: `testEmulatorDebugAndroidTest` failed with the
+ * identical `Failed to create MD5 hash for file content`, seven seconds in, having run nothing.
+ * Both tasks write results Studio may be holding, and neither can ever be up to date, so both
+ * are untracked now.
  */
-tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }
+tasks.matching {
+    (it.name.startsWith("connected") || it.name.startsWith("testEmulator"))
+        && it.name.endsWith("AndroidTest")
+}
     .configureEach {
         doNotTrackState(
-            "Android Studio holds the connected results directory open on Windows, and an" +
+            "Android Studio holds the instrumented results directories open on Windows, and an" +
                 " instrumented run is never up to date regardless.",
         )
     }
