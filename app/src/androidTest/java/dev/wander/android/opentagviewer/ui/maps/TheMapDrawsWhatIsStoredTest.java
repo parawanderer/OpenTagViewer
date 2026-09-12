@@ -144,6 +144,7 @@ public class TheMapDrawsWhatIsStoredTest {
                 .horizontalAccuracy(83)
                 .status(144)
                 .lastUpdate(1_700_000_000_000L)
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build());
 
         // **Otherwise the startup fetch is skipped.** RefreshPolicy is a process-wide singleton

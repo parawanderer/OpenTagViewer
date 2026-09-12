@@ -54,4 +54,24 @@ public class UserBeaconOptions {
      */
     @ColumnInfo(name = "ui_order")
     public Integer uiOrder;
+
+    /**
+     * Whether to warn when this tag is left behind, or null if the user has not decided.
+     *
+     * <p><b>Null means no.</b> Most tags a person owns are routinely put down on purpose: the
+     * spare key in a drawer, the tag in a car, the one on a bag that lives in the hall. An alert
+     * that fires for all of them until each is switched off individually is a stream of false
+     * alarms, and the thing people switch off after the second one is the whole feature. So a
+     * tag has to be asked for by name, and the switch is the asking.
+     *
+     * <p>Per tag because the answer genuinely differs per tag. Keys and a wallet are worth a
+     * noise; a tag that lives in a car, or on something that is meant to stay behind, would
+     * alert every time its owner walks into the house. One switch for all of them would be
+     * turned off by the first tag that cried wolf, taking the useful ones with it.
+     *
+     * <p>Here rather than on {@code OwnedBeacons} for the reason this whole table exists: it is
+     * the user's decision, and an account refresh must not touch it.
+     */
+    @ColumnInfo(name = "alert_on_separation")
+    public Boolean alertOnSeparation;
 }

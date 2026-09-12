@@ -81,6 +81,15 @@ public class BeaconInformation {
      */
     private final String ownedBeaconPlistRaw;
     /**
+     * Serialized FindMyAccessory/FixedRollingKeyPairAccessory state (JSON) - see
+     * {@code OwnedBeacon.accessoryJson}. Null for a row imported under FindMy 0.7.6 that has not
+     * yet been backfilled from {@link #ownedBeaconPlistRaw}.
+     *
+     * <p>What {@code dev.wander.android.opentagviewer.ble} resolves a current BLE MAC address
+     * from, to recognise this accessory's own advertisement in a scan.
+     */
+    private final String ownedBeaconAccessoryJson;
+    /**
      * {@code 0} or {@code 1} (?)
      * <br><br>
      * Sourced from the primary file: {@code OwnedBeacons/<beacon identifier>.plist}
