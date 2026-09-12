@@ -313,7 +313,7 @@
     <string name="twofactor_apple_took_the_code">Apple이 코드를 받은 뒤 로그인을 끝내지 못했습니다. 코드는 이미 사용되었으므로 새 코드가 필요합니다. 바로 요청하면 거부되기 때문에 잠시 기다린 뒤 요청합니다.</string>
     <string name="twofactor_waiting_seconds">%1$d초 후에 Apple에 새 코드를 요청합니다…</string>
     <string name="twofactor_apple_did_not_recover">Apple이 아직 로그인을 마치지 못하고 있습니다. 이는 Apple 쪽 장애이며, 사용자의 잘못도 코드 문제도 아닙니다.\n\n몇 분 뒤에 다시 시도하세요. 그때 비밀번호가 한 번 거부될 수 있는데, 이것도 같은 장애의 일부이므로 틀렸다고 생각하지 말고 다시 입력하세요.</string>
-    <string name="login_failed_apple_declined">현재 Apple이 로그인을 처리하지 않고 있습니다. Apple ID나 비밀번호가 아니라 Apple 쪽 문제입니다. 보통 몇 분이면 해결되니 잠시 기다렸다가 다시 시도하세요.</string>
+    <string name="login_failed_apple_declined">Apple이 로그인을 거부했습니다. Apple ID나 비밀번호의 문제가 아니라 Apple 쪽의 거부입니다. 잠시 후 다시 시도해 볼 만하지만, 계속 거부된다면 기다리지 말고 로그와 함께 신고해 주세요.</string>
     <string name="icloud_apple_declined_title">지금은 Apple이 응답하지 않습니다</string>
-    <string name="icloud_apple_declined_body">Apple이 응답하지 못한 것이 아니라 요청을 거부했습니다. 계정에는 문제가 없으며 변경된 것도 없습니다. 보통 몇 분이면 해결됩니다.</string>
+    <string name="icloud_apple_declined_body">Apple이 응답하지 못한 것이 아니라 요청을 거부했습니다. 계정에는 문제가 없으며 변경된 것도 없습니다. 잠시 후 다시 시도하고, 계속 거부되면 로그와 함께 신고해 주세요.</string>
 </resources>

@@ -86,16 +86,23 @@ class TestTheHeadingSaysWhatFailed:
 
 
 class TestTheBodySaysWhoseFaultItIsAndWhatToDo:
-    def test_it_does_not_ask_for_a_bug_report(self, window):
+    def test_it_does_not_present_itself_as_a_bug_in_this_program(self, window):
         """
-        The complaint, asserted.
+        The complaint, asserted - and narrower than it first looked.
 
-        This is what the catch-all handler adds, and reaching it is what produced issue #168.
+        What produced #168 was the catch-all handler naming an exception type and linking the
+        issue tracker, so the failure read as a defect here. That is what must not happen.
+
+        **Asking for a report when it keeps happening is a different thing, and is now correct.**
+        Five people have reported this 503 and only one has confirmed it clearing; crishpeen on
+        #168 says every attempt fails, across every 2FA method. A message that only ever says
+        "wait" would have them wait on something that does not pass.
         """
         _title, body = load_failing_with(window, THE_REAL_ONE)
 
-        assert "report" not in body.lower()
         assert "github.com" not in body.lower()
+        assert "please report it with your log" in body.lower(), (
+            "it has to leave a route open for the people it does not clear for")
 
     def test_it_says_the_fault_is_apples(self, window):
         _title, body = load_failing_with(window, THE_REAL_ONE)
