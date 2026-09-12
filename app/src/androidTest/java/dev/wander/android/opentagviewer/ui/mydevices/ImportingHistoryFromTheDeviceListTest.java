@@ -270,6 +270,18 @@ public class ImportingHistoryFromTheDeviceListTest {
         intended(hasComponent(ErrorReportActivity.class.getName()), times(0));
     }
 
+    /**
+     * A file the picker handed back that will not open is the user's situation, not our defect.
+     *
+     * <p><b>This hung the whole suite for thirty minutes.</b> Opening happens in the Activity,
+     * outside {@code importArchive}, so a missing file arrived as a bare {@code IOException} -
+     * not a {@code HistoryImportException} - and {@code historyImportFailed} sent it to the bug
+     * report page. The dialog this waits for never appeared, and {@code inRoot(isDialog())}
+     * against a screen with no dialog is the slow case Espresso retries internally for seconds
+     * at a time. See the note on {@code Eventually} in AGENTS.md.
+     *
+     * <p>So the assertion below is also the assertion that the bug page is <i>not</i> reached.
+     */
     @Test
     public void readFailureUsesTheGenericFailureMessage() {
         final File missing = new File(
