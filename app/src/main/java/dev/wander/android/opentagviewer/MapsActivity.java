@@ -61,6 +61,7 @@ import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.AMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.OsmMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
@@ -190,7 +191,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
-    private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
+    private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 18.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
 
     private IMapProvider mapProvider;
     private GoogleMap map; // 保留用于向后兼容，逐步迁移
@@ -608,6 +609,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onPause();
+        } else if (this.mapProvider instanceof OsmMapProvider) {
+            ((OsmMapProvider) this.mapProvider).onPause();
         }
     }
 
@@ -640,6 +643,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onResume();
+        } else if (this.mapProvider instanceof OsmMapProvider) {
+            ((OsmMapProvider) this.mapProvider).onResume();
         }
     }
 
@@ -838,6 +843,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onDestroy();
+        } else if (this.mapProvider instanceof OsmMapProvider) {
+            ((OsmMapProvider) this.mapProvider).onDestroy();
         }
     }
 

@@ -15,6 +15,7 @@ public class MapProviderFactory {
     
     public static final String PROVIDER_GOOGLE = "google";
     public static final String PROVIDER_AMAP = "amap";
+    public static final String PROVIDER_OSM = "osm";
     
     /**
      * 创建地图提供商实例
@@ -58,6 +59,9 @@ public class MapProviderFactory {
         } else if (PROVIDER_AMAP.equals(providerType)) {
             Log.d(TAG, "Creating AMap provider");
             return new AMapProvider();
+        } else if (PROVIDER_OSM.equals(providerType)) {
+            Log.d(TAG, "Creating OpenStreetMap provider");
+            return new OsmMapProvider();
         } else {
             Log.w(TAG, "Unknown provider type: " + providerType + ", defaulting to Google Maps");
             return new GoogleMapProvider();
