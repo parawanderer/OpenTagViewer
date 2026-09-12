@@ -594,11 +594,12 @@ def describe_apple_declining(error: AppleServiceUnavailableError) -> str:
     """What to tell somebody whose sign-in was refused by Apple rather than by their password."""
     return (
         f"Apple's sign-in service refused the request with HTTP {error.status_code}.\n\n"
-        "This is a fault on Apple's side rather than anything you did. Your Apple ID, your"
-        " password and your verification code are all fine, and nothing was changed or sent."
-        " It usually clears on its own within a few minutes.\n\n"
-        "Wait a little and sign in again. If it is still refusing after ten minutes or so, it"
-        " is worth reporting - but a run of these over a few minutes is ordinary."
+        "Apple declined it rather than anything being wrong with your Apple ID, your password or"
+        " your verification code. Nothing was changed and nothing was sent.\n\n"
+        "Trying again shortly is worth doing - it has cleared by itself for some people. It has"
+        " also been reported as lasting across many attempts, so if it keeps refusing, please"
+        " report it with this log rather than waiting it out. Why it persists for some accounts"
+        " and not others is not yet known."
     )
 
 
@@ -624,13 +625,14 @@ def _apple_failed_after_taking_the_code(error: BaseException) -> SignInInterrupt
     """
     return SignInInterrupted(
         f"Apple accepted your verification code and then failed to finish signing in: {error}\n\n"
-        "This is a fault on Apple's side rather than anything you did, and it clears on its own."
-        " Nothing was changed and nothing was sent.\n\n"
+        "This is a fault on Apple's side rather than anything you did. Nothing was changed and"
+        " nothing was sent.\n\n"
         f"It was given {len(SPENT_CODE_WAITS)} chances to settle - waiting"
         f" {' and then '.join(f'{s}s' for s in SPENT_CODE_WAITS)} - and did not.\n\n"
         "Leave it a few minutes and sign in again. Apple may also refuse the password once while"
         " it settles - that is part of the same hiccup rather than a second problem, and trying"
-        " once more is the answer.",
+        " once more is the answer. If it keeps refusing, please report it with your log: this"
+        " has been seen to last for some accounts, and why is not yet known.",
     )
 
 

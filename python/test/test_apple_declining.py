@@ -91,8 +91,8 @@ class TestWhatTheUserIsTold:
         assert "503" in message
 
     def test_itsaysTheFaultIsApples(self, message):
-        assert "Apple's side" in message
-        assert "rather than anything you did" in message
+        assert "Apple declined it" in message
+        assert "rather than anything being wrong with your Apple ID" in message
 
     def test_itclearsThePasswordAndTheCode(self, message):
         """Otherwise the next thing tried is a password reset, which cannot help."""
@@ -103,14 +103,25 @@ class TestWhatTheUserIsTold:
         """The first question after a failed sign-in to your own Apple account."""
         assert "nothing was changed" in message.lower()
 
-    def test_itsaysWhenReportingWouldBeReasonable(self, message):
+    def test_itasksForAReportWhenItKeepsHappening(self, message):
         """
-        Not "never report this".
+        <b>Not "wait it out", because for at least one person it never cleared.</b>
 
-        A 503 that persists for an hour is worth hearing about; the point is that a run of them
-        over a few minutes is not.
+        Five people have reported this and only @parawanderer has confirmed it resolving.
+        crishpeen on #168 says the opposite: every attempt, every 2FA method, device-identity.json
+        cleared. A message promising it passes would have them wait on something that does not.
         """
-        assert "worth reporting" in message
+        assert "report it with this log" in message
+        assert "not yet known" in message
+
+    def test_itdoesNotPromiseItWillClear(self, message):
+        """
+        The overclaim this replaced.
+
+        The first version said it "usually clears on its own within a few minutes", which was one
+        confirmed recovery presented as a rule.
+        """
+        assert "usually clears" not in message
 
     def test_itdoesNotAskForABugReportOutright(self, message):
         """The behaviour being fixed."""
