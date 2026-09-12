@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 
 /**
  * Writes a tag's location history as CSV.
@@ -55,6 +56,13 @@ public final class HistoryCsvWriter {
             "latitude_exact",
             "longitude_exact",
             "description_present",
+            // **Where the row came from, and it is not a technicality.** An Apple row says a
+            // stranger's iPhone overheard the tag and estimated a position, typically to within
+            // a hundred metres or worse. A `local` row says this phone heard the tag directly,
+            // which puts it within Bluetooth range and records this phone's own position as the
+            // tag's. Unlabelled, the second reads as the first, and the file misrepresents half
+            // of itself to whoever opens it.
+            "provenance",
             // Last because it is for restoring this file, not for reading it in a spreadsheet.
             // Stable identity must live in the contents: display names and filenames can both
             // change, and two tags may have the same one.
@@ -127,6 +135,11 @@ public final class HistoryCsvWriter {
                 Double.toString(report.getLatitude()),
                 Double.toString(report.getLongitude()),
                 Boolean.toString(report.getDescription() != null),
+                // Never blank. Every row read out of the database has one, and a row that
+                // somehow does not is written as what it almost certainly is rather than as
+                // an empty column the restore side would have to guess at.
+                escape(report.getProvenance() == null
+                        ? LocationReport.PROVENANCE_APPLE : report.getProvenance()),
                 escape(beaconId));
     }
 

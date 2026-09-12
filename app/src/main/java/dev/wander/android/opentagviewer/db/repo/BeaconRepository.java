@@ -708,6 +708,7 @@ public class BeaconRepository {
                     .longitude(longitude)
                     .horizontalAccuracy(accuracyMetres)
                     .status(statusByte)
+                    .provenance(LocationReport.PROVENANCE_LOCAL)
                     .build();
 
             dao.insertAll(LocationReport.builder()
@@ -989,6 +990,7 @@ public class BeaconRepository {
                             .longitude(locationReport.longitude)
                             .horizontalAccuracy(locationReport.horizontalAccuracy)
                             .status(locationReport.status)
+                            .provenance(locationReport.provenance)
                             .build()
                 );
             }
@@ -1009,6 +1011,9 @@ public class BeaconRepository {
                     .longitude(locationReport.longitude)
                     .horizontalAccuracy(locationReport.horizontalAccuracy)
                     .status(locationReport.status)
+                    // The export reads this list. A row whose provenance is dropped here is a
+                    // CSV that claims Apple found something this phone did.
+                    .provenance(locationReport.provenance)
                     .build())
                 .collect(Collectors.toList());
         }).subscribeOn(Schedulers.io());

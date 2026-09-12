@@ -60,6 +60,7 @@ import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
@@ -374,7 +375,7 @@ public class ImportingHistoryFromTheDeviceListTest {
         return "2026-08-15T12:34:56Z,2026-08-15 12:34:56Z," + timestamp + ","
                 + latitude + ",4.8951679,12,2,1,2026-08-15T12:35:56Z,"
                 + description + "," + (timestamp + 60_000L) + "," + latitude
-                + ",4.8951679,true," + beaconId;
+                + ",4.8951679,true," + LocationReport.PROVENANCE_APPLE + "," + beaconId;
     }
 
     private void forgetTestData() {
