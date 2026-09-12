@@ -366,6 +366,9 @@ Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Ap
     <string name="twofactor_apple_took_the_code">Apple hat deinen Code angenommen und danach die Anmeldung nicht abschließen können. Der Code ist damit verbraucht, es wird also ein neuer gebraucht – wir warten kurz, bevor wir ihn anfordern, denn sofortiges Anfordern wird abgelehnt.</string>
     <string name="twofactor_waiting_seconds">Neuer Code wird in %1$d s bei Apple angefordert …</string>
     <string name="twofactor_apple_did_not_recover">Apple schließt die Anmeldung weiterhin nicht ab. Das liegt an Apple, nicht an dir und nicht an deinem Code.\n\nVersuche es in ein paar Minuten erneut. Dein Passwort wird dabei möglicherweise einmal abgelehnt – das gehört zum selben Fehler, gib es also einfach noch einmal ein, statt es für falsch zu halten.</string>
+    <string name="login_failed_apple_declined">Apple hat die Anmeldung abgelehnt. Das ist eine Ablehnung durch Apple und kein Problem mit deiner Apple-ID oder deinem Passwort. Ein erneuter Versuch nach kurzer Zeit lohnt sich, aber wenn es weiterhin abgelehnt wird, melde es bitte mit einem Protokoll, statt zu warten.</string>
+    <string name="icloud_apple_declined_title">Apple antwortet gerade nicht</string>
+    <string name="icloud_apple_declined_body">Apple hat die Anfrage abgelehnt, statt gar nicht zu antworten. Mit deinem Account ist alles in Ordnung, und es wurde nichts geändert. Versuche es bald erneut; wenn es weiterhin abgelehnt wird, melde es mit einem Protokoll.</string>
     <string name="import_history">Verlauf importieren</string>
     <string name="history_import_complete_title">Verlaufsimport abgeschlossen</string>
     <string name="history_import_result_counts">Gelesene Zeilen: %1$d\nHinzugefügte Zeilen: %2$d\nBereits vorhanden: %3$d\nFehlerhaft: %4$d\nÜbersprungen (Tag nicht importiert): %5$d</string>

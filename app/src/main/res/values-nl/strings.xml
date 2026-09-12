@@ -366,6 +366,9 @@ Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Appl
     <string name="twofactor_apple_took_the_code">Apple heeft je code geaccepteerd en kon daarna het inloggen niet afronden. De code is dus opgebruikt en er is een nieuwe nodig — we wachten even voordat we die aanvragen, want meteen aanvragen wordt geweigerd.</string>
     <string name="twofactor_waiting_seconds">Over %1$d s wordt een nieuwe code bij Apple aangevraagd…</string>
     <string name="twofactor_apple_did_not_recover">Apple rondt het inloggen nog steeds niet af. Dit ligt aan Apple, niet aan jou en niet aan je code.\n\nProbeer het over een paar minuten opnieuw. Je wachtwoord kan dan één keer worden geweigerd — dat hoort bij dezelfde storing, dus voer het gewoon nog een keer in in plaats van aan te nemen dat het fout is.</string>
+    <string name="login_failed_apple_declined">Apple heeft de aanmelding geweigerd. Dit is een weigering van Apple, geen probleem met je Apple ID of wachtwoord. Het is de moeite waard het zo weer te proberen, maar blijft het geweigerd worden, meld het dan met een logbestand in plaats van af te wachten.</string>
+    <string name="icloud_apple_declined_title">Apple reageert momenteel niet</string>
+    <string name="icloud_apple_declined_body">Apple heeft het verzoek geweigerd in plaats van er niet op te antwoorden. Er is niets mis met je account en er is niets gewijzigd. Probeer het zo opnieuw; blijft het geweigerd worden, meld het dan met een logbestand.</string>
     <string name="import_history">Geschiedenis importeren</string>
     <string name="history_import_complete_title">Geschiedenis geïmporteerd</string>
     <string name="history_import_result_counts">Gelezen rijen: %1$d\nToegevoegde rijen: %2$d\nAl aanwezig: %3$d\nOngeldig: %4$d\nOvergeslagen (tag niet geïmporteerd): %5$d</string>

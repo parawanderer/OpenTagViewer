@@ -43,7 +43,7 @@ from typing import Any
 
 import identity as app_identity
 from exporter import icloud
-from findmy.errors import InvalidCredentialsError
+from findmy.errors import AppleServiceUnavailableError, InvalidCredentialsError
 from findmy.keychain.enrolment import DeviceDescription
 from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
@@ -125,6 +125,20 @@ alongside. Only an accessory - an AirTag, or a Find My-certified tag somebody ma
 naming record as its single source of truth.
 """
 
+REASON_APPLE_DECLINED = "apple_declined"
+"""
+Apple answered and refused to serve. Worth waiting out, and not the user's fault.
+
+**Separate from :data:`REASON_UNKNOWN` because the screen written for unknown says the wrong
+thing.** Unknown shows whatever detail there is, which here is a sentence about Grand Slam and an
+HTTP status - accurate, unreadable, and indistinguishable from a bug in this app. See
+OpenTagViewer#176, where somebody filed exactly that.
+
+Separate from :data:`REASON_CREDENTIALS_REJECTED` for the opposite reason: that one is permanent
+and ends in a forced sign-out. Signing somebody out over a 503 destroys a working session for
+nothing, which is rule 15's failure mode in the expensive direction.
+"""
+
 REASON_UNKNOWN = "unknown"
 """Anything else, with the exception text carried through so a report can be answered."""
 
@@ -175,6 +189,11 @@ def _unexpected(what: str) -> str:
     # next, which the per-site version would not.
     if _needsAFreshSignIn(sys.exc_info()[1]):
         return _failure(REASON_CREDENTIALS_REJECTED, _lastLineOf(detail) or what + " was refused")
+
+    # After the credentials check and before the fallback. Apple declining is neither a dead
+    # session nor a mystery, and it is the one failure here that is worth simply waiting out.
+    if isinstance(sys.exc_info()[1], AppleServiceUnavailableError):
+        return _failure(REASON_APPLE_DECLINED, _lastLineOf(detail) or what + " was declined")
 
     # `str(e)` is empty for several of these - TimeoutError most of all - so the last line of
     # the traceback stands in. It names the exception type, which is not a good message but is

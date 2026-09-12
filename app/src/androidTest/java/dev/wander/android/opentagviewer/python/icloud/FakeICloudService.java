@@ -139,6 +139,22 @@ public final class FakeICloudService implements ICloudService {
         return fake;
     }
 
+    /**
+     * Apple answered and refused to serve, rather than reporting nothing usable.
+     *
+     * <p>Kept apart from {@link #whereTheServiceIsUnsure()} because both reach the retry screen
+     * and they are not the same fact. That one is the keychain service having a bad day; this is
+     * an endpoint returning a 5xx, and it was reaching the screen as UNKNOWN with the HTTP
+     * status on it - issue #176.
+     */
+    public static FakeICloudService whereAppleIsDeclining() {
+        final FakeICloudService fake = new FakeICloudService();
+        fake.optionsFailsWith = new ICloudException(
+                ICloudFailure.APPLE_DECLINED,
+                "The Grand Slam request was refused with HTTP 503.");
+        return fake;
+    }
+
     /** An account with a Mac on it and no tags - the empty fetch, one step later. */
     public static FakeICloudService withNoTagsOnTheAccount() {
         final FakeICloudService fake = new FakeICloudService();

@@ -103,4 +103,44 @@ public class ACodeAppleAlreadyTookTest {
     public void aNonsenseAttemptNumberDoesNotWait() {
         assertEquals(-1, ACodeAppleAlreadyTook.waitBefore(-1));
     }
+
+    /**
+     * The name the fork raises now, which is the one a real 503 arrives as.
+     *
+     * <p><b>Every other test here writes the old name into its own fixture</b>, so all of them
+     * kept passing when FindMy.py started raising a subclass and this stopped matching. A test
+     * that supplies the string it is looking for cannot notice the string changing.
+     */
+    @Test
+    public void a503ArrivingAsTheForksTransientTypeIsRecognised() {
+        assertTrue(ACodeAppleAlreadyTook.spentIt(fromTheBridge(
+                "findmy.errors.AppleServiceUnavailableError: The Grand Slam request was refused"
+                        + " with HTTP 503. This is Apple declining to serve the request rather"
+                        + " than a response this library cannot read, and it usually clears on"
+                        + " its own -- wait and try again.")));
+    }
+
+    /**
+     * And through a wrapper, because that is how it reaches the screen.
+     */
+    @Test
+    public void theforksTypeIsFoundThroughAWrappingException() {
+        final Throwable wrapped = new RuntimeException(
+                "submitCode failed",
+                fromTheBridge("findmy.errors.AppleServiceUnavailableError: refused with HTTP 503"));
+
+        assertTrue(ACodeAppleAlreadyTook.spentIt(wrapped));
+    }
+
+    /**
+     * The old name still counts.
+     *
+     * <p>It covers a protocol failure after the submit that is not a 5xx, which the fork still
+     * reports as the parent type.
+     */
+    @Test
+    public void theolderNameIsStillRecognisedSoTheWideNetSurvives() {
+        assertTrue(ACodeAppleAlreadyTook.spentIt(fromTheBridge(
+                "UnhandledProtocolError: Error response for GSA request: 418")));
+    }
 }

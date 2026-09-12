@@ -61,15 +61,25 @@ public final class ACodeAppleAlreadyTook {
      * code, which is inconvenient and correct.
      *
      * <p>Matched on the name because that is what survives the bridge: the failure arrives from
-     * Chaquopy as a {@code PyException} whose message carries the Python class. FindMy.py folds
-     * every non-OK status into {@code UnhandledProtocolError} with only the number in it, so
-     * there is nothing better to match on until the fork grows a transient-failure type - see the
-     * handover note, which explains why that was left out of the first fix.
+     * Chaquopy as a {@code PyException} whose message carries the Python class.
+     *
+     * <p><b>Two names, and the second one is why this had to change.</b> FindMy.py used to fold
+     * every non-OK status into {@code UnhandledProtocolError}; the fork now raises
+     * {@code AppleServiceUnavailableError} for a 429 or a 5xx, which is a subclass and therefore
+     * invisible to a match on the parent's name. Matching only the old name would have made this
+     * quietly stop firing the moment the pin moved - the recovery would still be here, still
+     * tested, and never reached, because every test in this file writes the old name into its
+     * own fixture.
+     *
+     * <p>The old name is kept alongside it. It still covers a protocol failure after the submit
+     * that is not a 5xx, which is the wide net the paragraph above is about.
      */
     public static boolean spentIt(final Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             final String message = cause.getMessage();
-            if (message != null && message.contains("UnhandledProtocolError")) {
+            if (message != null
+                    && (message.contains("UnhandledProtocolError")
+                        || message.contains("AppleServiceUnavailableError"))) {
                 return true;
             }
             if (cause.getCause() == cause) {
