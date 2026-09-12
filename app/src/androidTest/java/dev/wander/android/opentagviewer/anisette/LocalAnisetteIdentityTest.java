@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
@@ -279,5 +280,86 @@ public class LocalAnisetteIdentityTest {
         // adopting the orphaned device id.
         assertNotEquals(OLD_DEVICE_ID,
                 this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
+    }
+
+    /**
+     * An install from before serials were drawn keeps the one it has been presenting.
+     *
+     * <p>Same shape as the hardware profile, and the same reason: three keys and no serial can
+     * only be an install that has been telling Apple {@code 0PENTAGVIEWR} for its whole life.
+     * Drawing it a new one now registers a <i>second</i> device beside the row the user already
+     * recognises, and may cost them a sign-in - to change a label.
+     */
+    @Test
+    public void anIdentityWrittenBeforeSerialsWereDrawnStillPresentsTheOldOne() {
+        writeTheOldShape();
+
+        assertEquals(AdiDeviceIdentity.LEGACY_SERIAL, subject().serial());
+    }
+
+    /** And it is not back-filled, so it stays distinguishable from a serial that was drawn. */
+    @Test
+    public void thelegacySerialIsNotWrittenBackOverTheOldShape() {
+        writeTheOldShape();
+
+        subject().serial();
+
+        assertNull("writing it back would make an old install look like one that drew it",
+                this.preferences.getString(LocalAnisette.KEY_SERIAL, null));
+    }
+
+    /**
+     * A fresh install draws one, and <b>keeps it</b>.
+     *
+     * <p>The keeping is the part that matters. A serial redrawn per sign-in would add a
+     * device-list entry every time, which is the failure the constant did not have and this
+     * change could easily introduce.
+     */
+    @Test
+    public void afreshInstallDrawsASerialAndThenKeepsIt() {
+        final String drawn = subject().serial();
+
+        assertTrue("a drawn serial has to be recognisable as this app",
+                drawn.startsWith(AdiDeviceIdentity.SERIAL_PREFIX));
+        assertNotEquals("a fresh install is not an install from before this change",
+                AdiDeviceIdentity.LEGACY_SERIAL, drawn);
+        assertEquals("it was stored, so a restart presents the same device",
+                drawn, this.preferences.getString(LocalAnisette.KEY_SERIAL, null));
+        assertEquals("asked twice, answered twice the same", drawn, subject().serial());
+    }
+
+    /** A stored serial is presented unchanged, whatever it is. */
+    @Test
+    public void astoredSerialIsWhatGoesToApple() {
+        writeTheOldShape();
+        assertTrue(this.preferences.edit()
+                .putString(LocalAnisette.KEY_SERIAL, "0PENTAGVK7QX").commit());
+
+        assertEquals("0PENTAGVK7QX", subject().serial());
+    }
+
+    /**
+     * The screen asks read-only, and a screen must not be what decides an install's identity.
+     *
+     * <p>Same contract as {@link LocalAnisette#profileToShow}: opening a page on a device that
+     * has never signed in would otherwise mint and store an identity, fixing what this install
+     * is by having looked at it.
+     */
+    @Test
+    public void showingTheSerialDoesNotMintOne() {
+        assertEquals(AdiDeviceIdentity.LEGACY_SERIAL, LocalAnisette.serialToShow(this.context));
+
+        assertNull("reading it for a label must not write one",
+                this.preferences.getString(LocalAnisette.KEY_SERIAL, null));
+        assertNull(this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
+    }
+
+    /** And once there is one, that is what the screen shows. */
+    @Test
+    public void showingTheSerialShowsTheOneThisInstallWillSend() {
+        final String drawn = subject().serial();
+
+        assertEquals("the screen named a serial Apple never saw for this user",
+                drawn, LocalAnisette.serialToShow(this.context));
     }
 }

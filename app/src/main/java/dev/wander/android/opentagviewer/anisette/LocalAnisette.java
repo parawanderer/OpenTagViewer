@@ -60,6 +60,21 @@ public final class LocalAnisette implements AnisetteSource {
      */
     public static final String KEY_HARDWARE = "hardwareProfile";
 
+    /**
+     * The serial Apple prints against this install's device-list entry.
+     *
+     * <p>Added last, and <b>its absence beside the others is meaningful in the same way</b>: it
+     * marks an install from before serials were drawn per install, which can only have been
+     * presenting {@link AdiDeviceIdentity#LEGACY_SERIAL}. That install keeps it - a new serial
+     * on a working install is a second device-list entry and possibly a sign-in, in exchange for
+     * nothing the user asked for.
+     *
+     * <p>Not back-filled for those installs on read, deliberately. Writing the legacy value here
+     * would make an old install indistinguishable from one that drew that value, and the whole
+     * point of the alphabet excluding {@code I} is that it cannot have drawn it.
+     */
+    public static final String KEY_SERIAL = "serial";
+
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
             "libc++_shared.so", "libstoreservicescore.so");
@@ -283,7 +298,11 @@ public final class LocalAnisette implements AnisetteSource {
                     hardwareFrom(preferences.getString(KEY_HARDWARE, null),
                             AdiDeviceIdentity.Hardware.LEGACY_MAC);
 
-            return new AdiDeviceIdentity(deviceId, adiId, localUser, hardware);
+            // Same argument for the serial, for the same reason: an install with an identity
+            // and no stored serial has been telling Apple it is 0PENTAGVIEWR, and drawing it a
+            // new one now would register a second device beside the row it already has.
+            return new AdiDeviceIdentity(deviceId, adiId, localUser,
+                    serialFrom(preferences), hardware);
         }
 
         final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
@@ -292,6 +311,7 @@ public final class LocalAnisette implements AnisetteSource {
                 .putString(KEY_ADI_ID, fresh.adiIdentifier())
                 .putString(KEY_LOCAL_USER, fresh.localUserUuid())
                 .putString(KEY_HARDWARE, fresh.hardware().name())
+                .putString(KEY_SERIAL, fresh.serial())
                 .apply();
 
         Log.i(TAG, "generated a new device identity as " + fresh.hardware()
@@ -317,6 +337,29 @@ public final class LocalAnisette implements AnisetteSource {
                 context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                         .getString(KEY_HARDWARE, null),
                 AdiDeviceIdentity.Hardware.DEFAULT);
+    }
+
+    /**
+     * The serial this install presents, for showing the user - and nothing else.
+     *
+     * <p><b>Read-only, like {@link #profileToShow}</b>, and for the same reason: a screen must
+     * not be the thing that decides what this install's identity is.
+     *
+     * <p><b>Only ask this where an identity already exists.</b> The screen it is for is the one
+     * shown after a sign-in registered a device, so by then one has been drawn and stored. An
+     * install with nothing stored gets {@link AdiDeviceIdentity#LEGACY_SERIAL}, which is right
+     * for every install that has an identity without a serial and wrong for one that has no
+     * identity at all - but the alternative is minting one to render a label, which fixes the
+     * install's identity by having looked at a page.
+     */
+    public static String serialToShow(final Context context) {
+        return serialFrom(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE));
+    }
+
+    /** The stored serial, or the value an install from before this change has been sending. */
+    private static String serialFrom(final SharedPreferences preferences) {
+        final String stored = preferences.getString(KEY_SERIAL, null);
+        return stored != null && !stored.isEmpty() ? stored : AdiDeviceIdentity.LEGACY_SERIAL;
     }
 
     /**
@@ -366,6 +409,18 @@ public final class LocalAnisette implements AnisetteSource {
      * twice - which is a value Apple has never seen, from a client claiming to be the same
      * installation. See {@code AdiDeviceIdentity.Hardware#localUserHeader}.
      */
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Answerable without ADI, for the same reason as {@link #hardwareProfileJson} - and it
+     * has to be, because a sign-in that fell back to a remote server must present the same
+     * serial as one that did not. The serial is not a property of how Anisette was obtained.
+     */
+    @Override
+    public synchronized String serial() {
+        return currentIdentity().serial();
+    }
+
     @Override
     public synchronized String deviceIdsJson() {
         final AdiDeviceIdentity current = currentIdentity();

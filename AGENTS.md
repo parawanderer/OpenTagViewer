@@ -229,9 +229,24 @@ Four things follow:
   describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
   Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
   never produce.
-- **The serial is a label, and the only field here the user actually sees.** `0PENTAGVIEWR` is
-  confirmed accepted and displayed. Without one, Apple omits the row entirely, leaving an entry
-  with nothing to tell it apart from real hardware.
+- **The serial is a label, and the only field here the user actually sees.** Uppercase
+  alphanumeric, confirmed accepted and displayed. Without one, Apple omits the row entirely,
+  leaving an entry with nothing to tell it apart from real hardware.
+- **It is drawn per install, and the prefix is what carries the recognition.** The app sends
+  `0PENTAGV` plus four characters, the exporter `0PENTAGX` plus four, from an alphabet that
+  leaves out the pairs a person comparing two screens would confuse. **Do not put it back to a
+  constant.** It was one, and that meant a single serial arriving at Apple from thousands of
+  installs, against thousands of different machine identities and Apple IDs, from every continent
+  at once — a shape no real hardware produces, and the leading suspect for the Grand Slam 503s in
+  [#168](https://github.com/parawanderer/OpenTagViewer/issues/168),
+  [#176](https://github.com/parawanderer/OpenTagViewer/issues/176) and
+  [#181](https://github.com/parawanderer/OpenTagViewer/issues/181), one of whom cleared their
+  device identity to no effect — which regenerates the ids and not the serial.
+- **An install that already has one keeps it**, including the installs that predate this and have
+  no stored serial at all: those keep `0PENTAGVIEWR` / `0PENTAGXPORT`. Neither of those can be
+  drawn — both contain a letter the alphabet excludes — so a serial with an `I` or an `O` in it
+  is, by construction, an install from before the change. That is worth preserving when reading a
+  report, and `DrawingTheSerialTest` pins it.
 - **Sending the same value is not the same as sending the same bytes.** Two of these fields are
   transformed on the way out, and only by one side. FindMy.py sends `X-Apple-I-MD-LU` as
   `base64(uid)` and uppercases `X-Mme-Device-Id`; the Java ADI path sends what it is given. So
@@ -242,8 +257,12 @@ Four things follow:
   before believing two paths agree.
 
 **Changing it later adds an entry rather than renaming one**, and may require signing in again,
-so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
-user reading their device list can recognise it — see the wiki.
+so it is not a thing to adjust casually once shipped — which is the whole reason the serial is
+drawn once, on the first run that needs an identity, and then persisted beside the rest of it
+(`LocalAnisette.KEY_SERIAL`, and `device-identity.json` for the exporter). A serial redrawn per
+sign-in would add a device-list entry every time, which is a worse bug than the constant was.
+Document what the app registers as, so a user reading their device list can recognise it — see
+the wiki, which names the prefix rather than a full serial for this reason.
 
 ### 12. A UI change gets a test that inflates it, and one that drives it
 
