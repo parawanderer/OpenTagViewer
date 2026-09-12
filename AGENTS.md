@@ -17,7 +17,7 @@ What that means in practice:
   does not belong. Rule 10 has the test.
 - **Do not carry this register outside the repository.** It is written for agents who need to be
   argued out of breaking something. A pull request review, an issue reply, or anything else a
-  person reads is a different job. See rule 16.
+  person reads is a different job. See rule 17.
 
 ## What this project is
 
@@ -429,7 +429,34 @@ Every one of these is tested twice: `WhichFailuresNeedAFreshSignInTest` on the J
 decision, `EveryPathAsksForAFreshSignInTest` on a device for each caller honouring it. A shared
 predicate does not stop a fourth screen being written that never asks.
 
-### 16. Do not carry this file's voice into anything a person reads
+### 16. A pull request based on anything but `main` runs almost no CI
+
+Every workflow that matters here is gated `pull_request: branches: [ "main" ]` —
+`build-debug.yml`, `static-checks.yml`, `macos-scripts-python.yml`, and with them the APK build,
+the Chaquopy bridge tests, the JVM suite and the whole emulator suite. A PR opened against another
+branch, to stack a change on one still in review, matches none of those filters.
+
+**It does not report as skipped. It reports as green**, because the one workflow with no branch
+filter (`exporter-build-check.yml`) runs, passes, and is the only tick on the page. `gh pr checks`
+prints a single passing line and looks exactly like a small change with a small amount of CI.
+
+This has already happened: a change touching twelve Java files, four Python modules and six test
+classes sat on a PR based on another branch, with one green Windows-binary check and not one line
+of Java compiled anywhere.
+
+**So check what actually ran before believing a PR is green**, and count the checks rather than
+reading the colour:
+
+```bash
+gh pr checks <pr>          # one line is not a passing build, it is an empty one
+gh pr view <pr> --json baseRefName
+```
+
+Stacking is still fine — base it on `main` anyway. The diff carries the other branch's commits
+until that merges, which is cosmetic and collapses on its own; a PR whose base is not `main` buys
+a tidier diff by not being tested.
+
+### 17. Do not carry this file's voice into anything a person reads
 
 **@parawanderer has not read this file**, nor most of `docs/`, most docstrings, or most commit
 messages. Agents wrote them. So an agent reading them cannot tell the maintainer's house style from
