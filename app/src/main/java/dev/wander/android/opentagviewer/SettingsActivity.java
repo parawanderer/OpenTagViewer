@@ -572,6 +572,8 @@ public class SettingsActivity extends AppCompatActivity {
             return this.getString(R.string.map_provider_google);
         } else if ("amap".equals(provider)) {
             return this.getString(R.string.map_provider_amap);
+        } else if ("osm".equals(provider)) {
+            return this.getString(R.string.map_provider_osm);
         }
         return this.getString(R.string.map_provider_google);
     }
@@ -580,13 +582,16 @@ public class SettingsActivity extends AppCompatActivity {
         List<String> providerChoices = new ArrayList<>();
         providerChoices.add(this.getString(R.string.map_provider_google));
         providerChoices.add(this.getString(R.string.map_provider_amap));
-        
+        providerChoices.add(this.getString(R.string.map_provider_osm));
+
         String currentProvider = this.currentSettings.getMapProvider();
         int currentOption = 0; // 默认Google Maps
         if ("amap".equals(currentProvider)) {
             currentOption = 1;
+        } else if ("osm".equals(currentProvider)) {
+            currentOption = 2;
         }
-        
+
         var builder = new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.map_provider)
                 .setPositiveButton(R.string.accept, (dialog, which) -> {
@@ -595,7 +600,8 @@ public class SettingsActivity extends AppCompatActivity {
                     int checkedItemPosition = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
                     
                     if (checkedItemPosition != AdapterView.INVALID_POSITION) {
-                        String selectedProvider = checkedItemPosition == 0 ? "google" : "amap";
+                        String selectedProvider = checkedItemPosition == 0 ? "google"
+                                : checkedItemPosition == 1 ? "amap" : "osm";
                         Log.d(TAG, "Selected map provider: " + selectedProvider);
 
                         // AMap ships with no key: they are issued per developer account and
