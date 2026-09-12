@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Sequence
 
 from findmy import InvalidCredentialsError, LoginState, MobileMeDelegateError, TermsError
-from findmy.errors import UnhandledProtocolError
+from findmy.errors import AppleServiceUnavailableError, UnhandledProtocolError
 from findmy.keychain.recovery import RecoveryError
 
 from exporter import icloud, localsource, prompts, secrets, source, terms
@@ -948,6 +948,12 @@ def _run_and_return(arguments: argparse.Namespace) -> int:
         secrets.SecretError, prompts.PromptForbidden,
     ) as e:
         print(f"\n{e}", file=sys.stderr)
+        return 1
+    except AppleServiceUnavailableError as e:
+        # **Before the UnhandledProtocolError handler below**, which asks for a bug report and a
+        # -vv rerun. A 503 is Apple declining rather than a response this program cannot read;
+        # issue #176 is somebody filing one because nothing said otherwise.
+        print(f"\n{icloud.describe_apple_declining(e)}", file=sys.stderr)
         return 1
     except RecoveryError as e:
         # **Before the handler below, and deliberately not through it.** RecoveryError is an

@@ -10,6 +10,7 @@ import base64
 import NSKeyedUnArchiver
 
 from findmy import FindMyAccessory, MobileMeDelegateError
+from findmy.errors import AppleServiceUnavailableError
 from findmy.accessory import FixedRollingKeyPairAccessory
 from findmy.keys import KeyPairType
 from findmy.reports import (
@@ -458,6 +459,21 @@ generally has neither, and without `pendingTerms`/`acceptTerms` they are stuck o
 screen that keeps refusing them for a reason nothing tells them.
 """
 
+REASON_APPLE_DECLINED = "apple_declined"
+"""
+Apple answered, and refused to serve the request. Not the password, and not the network.
+
+**A 503 from Grand Slam reads as a rejected sign-in to everybody who meets it**, because the only
+thing on screen is a failure at the moment a password was entered. It is neither: nothing was
+wrong with the credentials, nothing was reached and refused on their merits, and it clears on its
+own within minutes. Reported as OpenTagViewer#176, where one account met the same 503 three times
+in three minutes at three different call sites.
+
+Distinguished from :data:`REASON_NETWORK` because the advice differs. A network failure is
+usually the phone's - check the connection. This one is Apple's, and checking anything at this
+end is wasted effort.
+"""
+
 REASON_UNKNOWN = "unknown"
 """Anything else. The detail is shown as-is, because a wrong guess is worse than raw text."""
 
@@ -483,6 +499,13 @@ def classifyLoginFailure(error: BaseException) -> str:
     # accepting terms will not fix it. The desktop CLI makes the same judgement the same way.
     if isinstance(error, MobileMeDelegateError):
         return REASON_TERMS
+
+    # Before the network checks, and not because of ordering hazards - it is a RuntimeError and
+    # collides with none of them. It is here because it reads as the same thing to a user and is
+    # not: Apple answered. Telling somebody to check their connection when their connection is
+    # fine sends them to reset a router over a 503.
+    if isinstance(error, AppleServiceUnavailableError):
+        return REASON_APPLE_DECLINED
 
     if isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
         return REASON_NETWORK

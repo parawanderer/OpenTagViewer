@@ -366,6 +366,9 @@
     <string name="twofactor_apple_took_the_code">Apple はコードを受け付けたあと、サインインを完了できませんでした。コードは使用済みなので新しいものが必要です。すぐに要求しても拒否されるため、少し待ってから要求します。</string>
     <string name="twofactor_waiting_seconds">%1$d 秒後に Apple へ新しいコードを要求します…</string>
     <string name="twofactor_apple_did_not_recover">Apple はまだサインインを完了できていません。これは Apple 側の障害であり、あなたの操作やコードのせいではありません。\n\n数分後にもう一度お試しください。そのときパスワードが一度だけ拒否されることがありますが、これも同じ障害の一部です。間違っていると考えず、もう一度入力してください。</string>
+    <string name="login_failed_apple_declined">Apple がサインインを拒否しました。Apple ID やパスワードの問題ではなく、Apple 側の拒否です。少し時間をおいて再試行する価値はありますが、拒否され続ける場合は待たずにログを添えて報告してください。</string>
+    <string name="icloud_apple_declined_title">現在 Apple が応答していません</string>
+    <string name="icloud_apple_declined_body">Apple は応答しなかったのではなく、要求を拒否しました。アカウントに問題はなく、何も変更されていません。少し後に再試行してください。拒否が続く場合はログを添えて報告してください。</string>
     <string name="import_history">履歴をインポート</string>
     <string name="history_import_complete_title">履歴のインポートが完了しました</string>
     <string name="history_import_result_counts">読み込んだ行: %1$d\n追加した行: %2$d\n既存の行: %3$d\n不正な行: %4$d\nスキップ (タグ未インポート): %5$d</string>

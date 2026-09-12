@@ -54,6 +54,7 @@ from findmy import (
     MobileMeDelegateError,
     TermsError,
 )
+from findmy.errors import AppleServiceUnavailableError
 from findmy.keychain.recovery import RecoveryError
 
 from exporter.icloud import Candidate, ExportSourceError
@@ -395,17 +396,21 @@ class WizardApp(tk.Tk):
                 f"{e}\n\nNothing was changed. You can try again whenever you like.",
             )
             return
+        except AppleServiceUnavailableError as e:
+            # **Before the catch-all below, which offers the issue tracker.** A 503 from Apple is
+            # not a bug in this program, and somebody took that offer up - issue #176, one account
+            # meeting the same 503 at three call sites in three minutes. This catches the failures
+            # raised directly by `log_in`; the ones raised deeper arrive wrapped and are handled
+            # in `_report_unexpected`.
+            logger.info("Apple declined the request: %s", e)
+            messagebox.showerror(
+                "Apple is not accepting sign-ins right now",
+                icloud.describe_apple_declining(e),
+            )
+            return
         except Exception as e:  # noqa: BLE001 - anything else is still the user's problem to see
             logger.exception("Reading accessories failed")
-            messagebox.showerror(
-                "Could not read your accessories",
-                # The type, not just the message: "[Errno 2] No such file or directory" with
-                # nothing else is a real message this produced, and it says nothing about what
-                # was being opened or by whom.
-                f"{type(e).__name__}: {e}\n\n"
-                f"The details are in:\n{log_file()}\n\n"
-                f"If this looks like a bug, please report it with that file:\n{GITHUB_ISSUES_LINK}",
-            )
+            self._report_unexpected(e)
             return
 
         self.candidates = fetched.candidates
@@ -414,6 +419,35 @@ class WizardApp(tk.Tk):
         # under the ticks somebody has already made.
         self.read_button.configure(state="disabled")
         self._show(fetched.skipped)
+
+    def _report_unexpected(self, error: BaseException) -> None:
+        """
+        Say what went wrong when nothing above recognised it.
+
+        **The 503 check here is not redundant with the handler in `_load`.** One raised directly
+        by `log_in` is caught there by type. One raised inside `open_client` is several frames
+        down and arrives wrapped, so it reaches the catch-all instead - which is how issue #176's
+        `request_pet` failure came to offer the issue tracker.
+
+        Its own method because `_load` was already at flake8's complexity limit.
+        """
+        declining = icloud.apple_is_declining(error)
+        if declining is not None:
+            messagebox.showerror(
+                "Apple is not accepting sign-ins right now",
+                icloud.describe_apple_declining(declining),
+            )
+            return
+
+        messagebox.showerror(
+            "Could not read your accessories",
+            # The type, not just the message: "[Errno 2] No such file or directory" with
+            # nothing else is a real message this produced, and it says nothing about what
+            # was being opened or by whom.
+            f"{type(error).__name__}: {error}\n\n"
+            f"The details are in:\n{log_file()}\n\n"
+            f"If this looks like a bug, please report it with that file:\n{GITHUB_ISSUES_LINK}",
+        )
 
     async def _read_local(self, _asker: Asker):
         """The local route needs nothing from the user that macOS does not ask for itself."""

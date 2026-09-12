@@ -100,6 +100,21 @@ public enum ICloudFailure {
      */
     NOT_AN_ACCESSORY,
 
+    /**
+     * Apple answered and refused to serve. Worth waiting out.
+     *
+     * <p><b>Not {@link #CREDENTIALS_REJECTED} and not {@link #UNKNOWN}, and the difference is
+     * expensive in both directions.</b> Treated as rejected credentials it signs somebody out
+     * over a 503, destroying a working session for nothing. Left unknown it reaches a screen
+     * showing an HTTP status and a sentence about Grand Slam, which reads as a bug in this app -
+     * see issue #176, where that is what somebody reported.
+     *
+     * <p>Closest to {@link #SERVICE_UNSURE}, which also means "try later", and kept apart
+     * because that one is about the keychain service reporting nothing usable rather than about
+     * an endpoint declining.
+     */
+    APPLE_DECLINED,
+
     /** Anything else. The detail carries what there is to say. */
     UNKNOWN;
 
@@ -123,6 +138,7 @@ public enum ICloudFailure {
             case "no_such_record": return NO_SUCH_RECORD;
             case "not_unlocked": return NOT_UNLOCKED;
             case "credentials_rejected": return CREDENTIALS_REJECTED;
+            case "apple_declined": return APPLE_DECLINED;
             case "membership_unusable": return MEMBERSHIP_UNUSABLE;
             case "no_such_accessory": return NO_SUCH_ACCESSORY;
             case "not_an_accessory": return NOT_AN_ACCESSORY;

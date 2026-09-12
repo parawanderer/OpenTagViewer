@@ -734,6 +734,13 @@ public class AppleLoginActivity extends AppCompatActivity {
             return this.getString(R.string.login_failed_network);
         }
 
+        // **Before the fallback, which would show "The Grand Slam request was refused with HTTP
+        // 503" verbatim.** That is accurate and reads as a bug in this app, which is how issue
+        // #176 came to be filed. Nothing about the Apple ID or the password is wrong here.
+        if (PythonAccountLoginException.REASON_APPLE_DECLINED.equals(reason)) {
+            return this.getString(R.string.login_failed_apple_declined);
+        }
+
         // Reached when the terms path was tried and produced nothing to accept, so the sentence
         // says what Apple said and then that accepting terms will not fix something else -
         // rather than asserting a cause that has not been established.
