@@ -19,8 +19,11 @@ import dev.wander.android.opentagviewer.ble.BleAccessorySoundTrigger;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.util.android.AddressLookup;
+import dev.wander.android.opentagviewer.util.history.HistoryArchiveImporter;
+import dev.wander.android.opentagviewer.util.history.HistoryImporter;
 
 /**
  * What the sign-in screen depends on, in one place a test can replace.
@@ -122,6 +125,11 @@ public final class AppDependencies {
      */
     private static BundleBuilder bundleBuilder = new ChaquopyBundleBuilder();
 
+    /** Builds the blocking history importer for the My Devices screen. */
+    private static Function<Context, HistoryArchiveImporter> historyImporterFactory =
+            context -> new HistoryImporter(OpenTagViewerDatabase.getInstance(
+                    context.getApplicationContext()));
+
     /**
      * Turns coordinates into something a person recognises.
      *
@@ -216,6 +224,10 @@ public final class AppDependencies {
         return bundleBuilder;
     }
 
+    public static HistoryArchiveImporter historyImporter(final Context context) {
+        return historyImporterFactory.apply(context);
+    }
+
     public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
         return serverTesterFactory.apply(engine);
     }
@@ -264,6 +276,11 @@ public final class AppDependencies {
     }
 
     @VisibleForTesting
+    public static void replaceHistoryImporter(final HistoryArchiveImporter replacement) {
+        historyImporterFactory = context -> replacement;
+    }
+
+    @VisibleForTesting
     public static void replaceAnisette(final Function<UserSettings, AnisetteSource> replacement) {
         anisetteFactory = (context, settings, hasSession) -> replacement.apply(settings);
     }
@@ -279,6 +296,8 @@ public final class AppDependencies {
         accessorySoundTrigger = null;
         logRedactor = new ChaquopyLogRedactor();
         bundleBuilder = new ChaquopyBundleBuilder();
+        historyImporterFactory = context -> new HistoryImporter(
+                OpenTagViewerDatabase.getInstance(context.getApplicationContext()));
         icloudFactory = AppDependencies::openRealICloud;
         geocoderFactory = (context, locale) ->
                 AddressLookup.through(new Geocoder(context, locale));

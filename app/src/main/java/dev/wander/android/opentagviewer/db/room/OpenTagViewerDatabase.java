@@ -12,6 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import dev.wander.android.opentagviewer.db.room.dao.BeaconNamingRecordDao;
 import dev.wander.android.opentagviewer.db.room.dao.LastBleSightingDao;
 import dev.wander.android.opentagviewer.db.room.dao.DailyHistoryFetchRecordDao;
+import dev.wander.android.opentagviewer.db.room.dao.HistoryImportDao;
 import dev.wander.android.opentagviewer.db.room.dao.ImportDao;
 import dev.wander.android.opentagviewer.db.room.dao.LocationReportDao;
 import dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao;
@@ -220,6 +221,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     }
 
     public abstract ImportDao importDao();
+    public abstract HistoryImportDao historyImportDao();
     public abstract BeaconNamingRecordDao beaconNamingRecordDao();
     public abstract OwnedBeaconDao ownedBeaconDao();
     public abstract LocationReportDao locationReportDao();
