@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -167,6 +168,51 @@ public class TagCardLayoutTest {
                         "Amsterdam"));
 
         assertEquals(heights.get(0), heights.get(1));
+    }
+
+    /**
+     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal and the
+     * longest battery word - must not wrap to a second line and grow the row. Built directly
+     * rather than through {@link #measureHeights}, which always writes a fixed string to this
+     * field.
+     */
+    @Test
+    public void theLongestNearbyStatusLineDoesNotMakeItsCardTaller() {
+        final int[] heights = new int[2];
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout baseline = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            final FrameLayout withNearbyStatus = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
+                ((TextView) card.findViewById(R.id.device_name)).setText("Keys");
+                ((TextView) card.findViewById(R.id.device_location)).setText(SHORT_ADDRESS);
+                // Inflated with a null root, so there is no parent-given LayoutParams to read
+                // back - unlike measureHeights, which sets these after row.addView(card).
+                card.setLayoutParams(new ViewGroup.LayoutParams(
+                        CARD_WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+
+            ((TextView) baseline.findViewById(R.id.device_last_update))
+                    .setText("Last Updated: 2 minutes ago");
+            // "critical" (English) / "kritisch" (German) is the longest battery word; five
+            // filled dots is the longest signal reading; three digits covers up to the 30
+            // second freshness window in NearbyTagSightings with room to spare.
+            ((TextView) withNearbyStatus.findViewById(R.id.device_last_update))
+                    .setText("Nearby (●●●●●) · Battery critical");
+
+            for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
+                card.measure(
+                        View.MeasureSpec.makeMeasureSpec(CARD_WIDTH_PX, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            }
+            heights[0] = baseline.getMeasuredHeight();
+            heights[1] = withNearbyStatus.getMeasuredHeight();
+        });
+
+        assertEquals("the nearby status line wrapped and grew the card", heights[0], heights[1]);
     }
 
     /**
@@ -471,17 +517,83 @@ public class TagCardLayoutTest {
      * card's height is fixed by its shortest neighbour - so the failure is a row of icons with
      * the words clipped away, on one card out of four.
      *
-     * <p><b>Ring is not among them, and that is deliberate.</b> Its container is
-     * {@code visibility="gone"} in the layout because the feature does not exist - FindMy.py has
-     * no ring implementation - so it measures nothing. Pinned separately below rather than
-     * quietly skipped here.
+     * <p>Ring is included alongside the other three - see
+     * {@code dev.wander.android.opentagviewer.ble} for what is behind it now.
+     */
+    /**
+     * <b>The four actions are evenly spaced across the row.</b>
+     *
+     * <p>They are laid out with {@code layout_weight="1"} apiece, which makes them equal in
+     * <i>width</i> and says nothing about where they sit: the margins between them are what puts
+     * them on an even pitch, and one container missing a pair of them shifts every gap around it
+     * without changing any width. Ring shipped without its 8dp margins, which pushed the first
+     * gap 8dp wider than the other two - visible on a phone as Location History sitting too far
+     * from Refresh, and invisible to
+     * {@link #everyActionOnTheCardStillHasRoomWithTheWorstContent}, which asks about sizes.
+     *
+     * <p>Measured between the centres of the icons rather than the containers, because the icon
+     * is the thing a person's eye lines up.
+     *
+     * <p><b>The tolerance is in dp, and it is the difference between a test and a nuisance.</b>
+     * Four weighted columns rarely divide a card width exactly, so neighbouring gaps land a
+     * pixel or two apart - measured at 243 and 245 here - and a 1px tolerance fails on that
+     * while proving nothing. A missing margin is 8dp, which is four times this threshold at any
+     * density, so the gap between "rounding" and "the bug" is wide and this sits in it.
      */
     @Test
+    public void theFourActionsAreEvenlySpacedAcrossTheRow() {
+        final int[] centres = new int[4];
+        final int[] iconIds = {
+                R.id.history_icon,
+                R.id.refresh_icon,
+                R.id.perform_ring_icon,
+                R.id.tag_more_icon,
+        };
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            final int width = cardWidthFor(SCREEN_WIDTH_PX);
+            card.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            card.layout(0, 0, width, card.getMeasuredHeight());
+
+            for (int i = 0; i < iconIds.length; i++) {
+                final View icon = card.findViewById(iconIds[i]);
+
+                // **Offsets within the card, not window coordinates.** This card is inflated
+                // with no parent and never attached, so getLocationInWindow has no window to
+                // answer about and reports positions that are all but identical - which came
+                // out as negative gaps rather than as an obvious "this measured nothing".
+                final Rect bounds = new Rect(0, 0, icon.getWidth(), icon.getHeight());
+                card.offsetDescendantRectToMyCoords(icon, bounds);
+                centres[i] = bounds.centerX();
+            }
+        });
+
+        final float density = this.context.getResources().getDisplayMetrics().density;
+        final int roundingSlackPx = Math.round(2 * density);
+
+        final int firstGap = centres[1] - centres[0];
+        for (int i = 1; i < centres.length - 1; i++) {
+            final int gap = centres[i + 1] - centres[i];
+            assertTrue("the gap between action " + i + " and " + (i + 1) + " is " + gap
+                            + "px, but the first gap is " + firstGap + "px - the row is not on an"
+                            + " even pitch, which usually means one container is missing the 8dp"
+                            + " margins the others have",
+                    Math.abs(gap - firstGap) <= roundingSlackPx);
+        }
+    }
+
+    @Test
     public void everyActionOnTheCardStillHasRoomWithTheWorstContent() {
-        final int[][] sizes = new int[3][2];
+        final int[][] sizes = new int[4][2];
         final int[] buttonIds = {
                 R.id.device_history_button_container,
                 R.id.device_refresh_button_container,
+                R.id.device_ring_button_container,
                 R.id.device_more_button_container,
         };
 
@@ -514,7 +626,10 @@ public class TagCardLayoutTest {
 
         // They share the row, so a card that has run out of width shows up as one of them being
         // visibly smaller than the rest rather than as anything failing.
-        final int widest = Math.max(Math.max(sizes[0][0], sizes[1][0]), sizes[2][0]);
+        int widest = 0;
+        for (final int[] size : sizes) {
+            widest = Math.max(widest, size[0]);
+        }
         for (int i = 0; i < buttonIds.length; i++) {
             assertTrue("button " + i + " is " + sizes[i][0] + "px against a widest of " + widest
                             + ", so the row is no longer sharing the width evenly",
@@ -523,16 +638,17 @@ public class TagCardLayoutTest {
     }
 
     /**
-     * <b>Ring is hidden, because there is nothing behind it.</b>
+     * <b>Ring is shown by default, at rest.</b>
      *
-     * <p>{@code onClickRing} logs and returns: FindMy.py cannot ring an accessory, so the
-     * control exists in the layout and is switched off. This is here so that stops being true
-     * on purpose rather than by accident - a stray edit making it visible ships a button that
-     * does nothing at all, which is worse than not offering it.
+     * <p>It used to be {@code visibility="gone"} because nothing implemented it. Now
+     * {@code MapsActivity#onClickRing} does (continuous ping over BLE, see
+     * {@code dev.wander.android.opentagviewer.ble}), so this is the opposite pin from before: a
+     * stray edit hiding it again ships a card silently missing an action, rather than a card
+     * offering one that does nothing.
      */
     @Test
-    public void theRingButtonStaysHiddenWhileThereIsNothingBehindIt() {
-        final int[] visibility = {View.VISIBLE};
+    public void theRingButtonIsShownAtRestByDefault() {
+        final int[] visibility = {View.GONE};
 
         getInstrumentation().runOnMainSync(() -> {
             final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
@@ -540,7 +656,67 @@ public class TagCardLayoutTest {
             visibility[0] = card.findViewById(R.id.device_ring_button_container).getVisibility();
         });
 
-        assertEquals("Ring is showing, but nothing implements it - see MapsActivity#onClickRing",
-                View.GONE, visibility[0]);
+        assertEquals("Ring is hidden, but MapsActivity#onClickRing now implements it",
+                View.VISIBLE, visibility[0]);
+    }
+
+    /** The label at rest, before anyone has tapped it - see {@link TagCardHelper#toggleRingActive}. */
+    @Test
+    public void theRingButtonStartsLabelledRing() {
+        final String[] text = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+            text[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals(this.context.getString(R.string.do_ring), text[0]);
+    }
+
+    /**
+     * <b>{@link TagCardHelper#toggleRingActive} is what MapsActivity calls on tap, and on stop.</b>
+     *
+     * <p>Round-tripped in one test rather than two, because the failure that matters is the
+     * button getting stuck in one state - which only shows up by going there and back.
+     */
+    @Test
+    public void toggleRingActiveSwapsTheLabelBothWays() {
+        final String[] activeText = {null};
+        final String[] inactiveAgainText = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            TagCardHelper.toggleRingActive(card, true);
+            activeText[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+
+            TagCardHelper.toggleRingActive(card, false);
+            inactiveAgainText[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals(this.context.getString(R.string.stop_ringing), activeText[0]);
+        assertEquals(this.context.getString(R.string.do_ring), inactiveAgainText[0]);
+    }
+
+    /**
+     * <b>{@link TagCardHelper#setRingLabel} is what continuous ping updates between taps</b> -
+     * "Scanning...", "Connecting...", "Sending..." - without touching the icon or tint
+     * {@link TagCardHelper#toggleRingActive} owns. See {@code MapsActivity#handleContinuousPingUpdate}.
+     */
+    @Test
+    public void setRingLabelChangesOnlyTheText() {
+        final String[] text = {null};
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            TagCardHelper.setRingLabel(card, "Scanning…");
+            text[0] = ((TextView) card.findViewById(R.id.ringText)).getText().toString();
+        });
+
+        assertEquals("Scanning…", text[0]);
     }
 }

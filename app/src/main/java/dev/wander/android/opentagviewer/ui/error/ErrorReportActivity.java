@@ -26,6 +26,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
+import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.BuildConfig;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
@@ -108,6 +109,11 @@ public class ErrorReportActivity extends AppCompatActivity {
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.activity_error_report);
+        // This screen handled neither bar - it was missed when the others were fixed, because it
+        // never called the old top-only helper either, so there was nothing to find and replace.
+        // Its Close and Share buttons are the last things on a scrolling page, which is exactly
+        // where the navigation bar lands.
+        WindowPaddingUtil.insetForSystemBars(this.findViewById(R.id.error_report_root));
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();

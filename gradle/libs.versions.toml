@@ -40,6 +40,8 @@ amapVersion = "9.8.3"
 # Reads the AES-256 (WinZip) encryption the exporter locks bundles with. java.util.zip cannot
 # decrypt anything at all - not AES, not the legacy ZipCrypto.
 zip4j = "2.11.5"
+# Reads RFC 4180 history exports, including quoted descriptions with embedded newlines.
+commonsCsv = "1.14.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -87,6 +89,7 @@ androidx-emoji-views-helper = { group = "androidx.emoji2", name = "emoji2-views-
 androidx-emoji-picker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emojiPicker" }
 amap-map3d = { group = "com.amap.api", name = "3dmap", version.ref = "amapVersion" }
 zip4j = { group = "net.lingala.zip4j", name = "zip4j", version.ref = "zip4j" }
+commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commonsCsv" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

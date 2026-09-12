@@ -19,9 +19,12 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 
 
+import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.app.Dialog;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.location.Address;
 import android.location.Geocoder;
 import android.net.Uri;
@@ -62,6 +65,7 @@ import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
 import com.google.android.libraries.places.api.Places;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.BufferedWriter;
@@ -80,6 +84,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
@@ -102,6 +107,7 @@ import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.python.PythonDiagnostics;
 import dev.wander.android.opentagviewer.python.LogRedactor;
 import dev.wander.android.opentagviewer.ui.BeaconIcon;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
@@ -110,6 +116,8 @@ import dev.wander.android.opentagviewer.python.PythonAuthService;
 import dev.wander.android.opentagviewer.db.repo.UserDataRepository;
 import dev.wander.android.opentagviewer.ui.maps.TagCardHelper;
 import dev.wander.android.opentagviewer.ui.maps.TagListSwiperHelper;
+import dev.wander.android.opentagviewer.util.android.CachedPhoneLocation;
+import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.util.TagOrder;
@@ -128,9 +136,19 @@ import dev.wander.android.opentagviewer.util.rx.MarkerFocus;
 import dev.wander.android.opentagviewer.util.rx.AccountReadPolicy;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 import dev.wander.android.opentagviewer.util.rx.RxFlows;
+import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerPhase;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerStatus;
+import dev.wander.android.opentagviewer.ble.BleSoundTriggerUpdate;
+import dev.wander.android.opentagviewer.ble.NearbyTagLabel;
+import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
+import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
+import dev.wander.android.opentagviewer.ble.NearbyTagIndex;
+import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 
@@ -141,6 +159,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private static final int RING_PERMISSION_REQUEST_CODE = 2;
+    private static final int NEARBY_PERMISSION_REQUEST_CODE = 3;
 
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
@@ -194,6 +214,60 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private AddressLookup geocoder = null;
 
     private final Map<String, BeaconData> beacons = new ConcurrentHashMap<>();
+
+    /** The beaconId continuous ping is currently running for, or null if it is off. Only one
+     * runs at a time - see {@link #onClickRing}. */
+    private String continuousPingBeaconId;
+
+    /** The in-flight continuous ping loop, so leaving the screen stops the radio work rather
+     * than leaving it running in the background with nothing left to show its state. */
+    private Disposable continuousPingDisposable;
+
+    /** Which tag's ring button asked for BLE permission, so the result callback - which carries
+     * no context of its own - knows what to start once it is granted. */
+    private String ringPermissionRequestBeaconId;
+
+    /**
+     * Tags this phone can hear right now, and how full their batteries say they are.
+     *
+     * <p>Fed by a scan that runs only while this screen is resumed, so it is a display of what
+     * is audible rather than any kind of tracking. Entries age out on their own - see
+     * {@link NearbyTagSightings}.
+     */
+    private final NearbyTagSightings nearbySightings = new NearbyTagSightings();
+
+    /** The in-flight nearby scan, disposed in {@link #onPause()} so the radio stops with the screen. */
+    private Disposable nearbyWatchDisposable;
+
+    /**
+     * Redraws the cards once a second while the nearby scan is running, so a nearby card's
+     * "heard N seconds ago" keeps counting up between sightings instead of only changing when
+     * one arrives.
+     *
+     * <p>A separate ticker rather than something {@link #onTagHeardNearby} drives, because a
+     * sighting fires roughly every one to three seconds while a tag is genuinely in range - so
+     * driving the redraw from sightings alone would repaint the line back to "0s" almost as
+     * often as it changed, and never show the gap growing in between.
+     */
+    private Disposable nearbyStatusTickerDisposable;
+
+    /**
+     * Whether this activity has already asked for the BLE permission the nearby watch needs.
+     *
+     * <p>Never reset for the life of the activity: the system dialog pauses this activity, so
+     * asking again from every {@code onResume} re-prompted the moment the user denied - an
+     * inescapable loop on Android 10 and below, and a silent auto-denied request burned on
+     * every resume above that. Granting from the dialog still takes effect immediately through
+     * {@code onRequestPermissionsResult}; a user who denied can still enable it later through
+     * the system settings, which resumes this activity and passes the granted check directly.
+     */
+    private boolean nearbyBlePermissionRequested;
+
+    /** The pending retry after the scan died mid-session - see {@link #onNearbyWatchEnded}. */
+    private Disposable nearbyWatchRetryDisposable;
+
+    /** The one place a Bluetooth sighting is persisted - see {@link AccessorySightingPersister}. */
+    private AccessorySightingPersister sightingPersister;
 
     /** Location history plus the "can this be drawn" rule. See BeaconLocationHistoryTest. */
     private final BeaconLocationHistory beaconLocations = new BeaconLocationHistory();
@@ -427,6 +501,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
+        // The fetch this screen is about to run is what produces the drift measurement, so
+        // this is a place that starts Python anyway - see PythonDiagnostics.
+        PythonDiagnostics.attach(this);
+
+        this.sightingPersister = new AccessorySightingPersister(this.beaconRepo,
+                new CachedPhoneLocation(new FusedPhoneLocation(this.getApplicationContext())),
+                this::onHeardHere);
 
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -501,6 +582,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     protected void onPause() {
         super.onPause();
 
+        this.stopWatchingForNearbyTags();
+
         if (this.mapProvider != null) {
             IMapProvider.CameraPosition pos = this.mapProvider.getCameraPosition();
             if (pos != null) {
@@ -552,17 +635,206 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // on this screen until the periodic read came round.
         this.rereadTheAccountIfAllowed(true);
         this.reSchedulePeriodicTagLocationRefresher();
-        
+        this.startWatchingForNearbyTags();
+
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onResume();
         }
     }
 
+    /**
+     * <b>Continuous ping stops when the screen does, not when the activity is destroyed.</b>
+     *
+     * <p>Pressing Home does not destroy an activity, so disposing in {@code onDestroy} left the
+     * loop scanning and connecting over Bluetooth with the app in the background - burning the
+     * radio for a sound the user is no longer in a position to hear, and with no way to stop it
+     * short of coming back to this screen. {@code onDestroy} may not run for a long time, or at
+     * all before the process is killed.
+     *
+     * <p><b>{@code onStop} rather than {@code onPause}</b>, which is a different question: pause
+     * fires for a dialog or the notification shade, and someone walking towards a tag by ear
+     * should not lose the ping to a passing notification. Stop means the screen is genuinely
+     * gone.
+     *
+     * <p>Through {@link #stopContinuousPing()} rather than disposing directly, so the card's
+     * button and spinner are reset too - otherwise returning to a stopped loop finds a card
+     * still captioned "Stop" with a spinner that will never move again.
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        this.stopContinuousPing();
+    }
+
+    /**
+     * Listen for the user's own tags for as long as this screen is in front of somebody.
+     *
+     * <p><b>Tied to the screen rather than to a service, deliberately.</b> Nothing here runs in
+     * the background: this starts in {@code onResume} and is disposed in {@code onPause}, so the
+     * radio is on only while a person is looking at the result. That keeps it a display feature
+     * rather than a tracking one, and a scan next to a lit screen costs little beside the screen.
+     *
+     * <p>Silent when it cannot run. No permission, Bluetooth off, or no tags with usable
+     * accessory JSON all mean no sightings, which renders as no badges - the same as hearing
+     * nothing. None of those is worth interrupting somebody looking at a map for.
+     */
+    private void startWatchingForNearbyTags() {
+        this.stopWatchingForNearbyTags();
+
+        // Asked for here rather than left to the ring button: this scan is what feeds the
+        // battery/audible badge on every card, so it wants to be running as soon as the screen
+        // opens, not only once somebody has separately triggered a ring. Silently doing nothing
+        // without permission, as NearbyTagWatcher itself does, would just look like every tag
+        // is permanently out of range.
+        //
+        // Before the empty-list check, so a first launch - where the beacons have not loaded
+        // yet - still asks. And at most once per activity: the system dialog pauses this
+        // activity, so a request fired from every onResume re-prompted the instant the user
+        // denied, a loop with no way out on Android 10 and below.
+        if (!BlePermissions.granted(this)) {
+            if (!this.nearbyBlePermissionRequested) {
+                this.nearbyBlePermissionRequested = true;
+                Log.d(TAG, "Requesting BLE permission(s) to watch for nearby tags");
+                ActivityCompat.requestPermissions(
+                        this, BlePermissions.required(), NEARBY_PERMISSION_REQUEST_CODE);
+            }
+            return;
+        }
+
+        final Map<String, String> accessoryJsonByBeaconId = new HashMap<>();
+        for (final var entry : this.beacons.entrySet()) {
+            final String accessoryJson = entry.getValue().getInfo().getOwnedBeaconAccessoryJson();
+            if (accessoryJson != null && !accessoryJson.isEmpty()) {
+                accessoryJsonByBeaconId.put(entry.getKey(), accessoryJson);
+            }
+        }
+        if (accessoryJsonByBeaconId.isEmpty()) {
+            // Ordinary on a cold start: the beacons load asynchronously and are not here yet.
+            // addBeaconToCurrent starts the watch once they arrive - see there.
+            return;
+        }
+
+        this.nearbyWatchDisposable = new NearbyTagWatcher(
+                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
+                ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        this::onTagHeardNearby,
+                        error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error),
+                        this::onNearbyWatchEnded);
+
+        this.nearbyStatusTickerDisposable = Observable
+                .interval(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.updateBeaconCards());
+    }
+
+    /**
+     * The scan died mid-session rather than being stopped: Bluetooth toggled off, or the
+     * platform refused the scan (e.g. too many scan starts in a short window).
+     *
+     * <p>Cancellation does not come through here - disposing skips onComplete - so this only
+     * runs for genuine mid-session death. Two things then must not keep happening: the
+     * once-per-second ticker redrawing every card for a scan that can no longer produce
+     * sightings, and the badges claiming tags are here based on a radio nobody is listening
+     * to. And one thing must: a retry, or the nearby feature stays dead for the rest of the
+     * session even after Bluetooth comes back. One attempt per 30 seconds is far under the
+     * platform's scan-start budget, and each failed attempt completes again and reschedules,
+     * so it self-heals whenever the radio returns.
+     */
+    private void onNearbyWatchEnded() {
+        Log.i(TAG, "The nearby tag watch ended mid-session; retrying in 30s");
+        this.stopWatchingForNearbyTags();
+        this.updateBeaconCards();
+
+        this.nearbyWatchRetryDisposable = Observable
+                .timer(30, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> this.startWatchingForNearbyTags());
+    }
+
+    private void stopWatchingForNearbyTags() {
+        if (this.nearbyWatchDisposable != null && !this.nearbyWatchDisposable.isDisposed()) {
+            this.nearbyWatchDisposable.dispose();
+        }
+        this.nearbyWatchDisposable = null;
+        if (this.nearbyStatusTickerDisposable != null
+                && !this.nearbyStatusTickerDisposable.isDisposed()) {
+            this.nearbyStatusTickerDisposable.dispose();
+        }
+        this.nearbyStatusTickerDisposable = null;
+        if (this.nearbyWatchRetryDisposable != null
+                && !this.nearbyWatchRetryDisposable.isDisposed()) {
+            this.nearbyWatchRetryDisposable.dispose();
+        }
+        this.nearbyWatchRetryDisposable = null;
+        // Nothing on screen may go on claiming a tag is here once we have stopped listening.
+        this.nearbySightings.clear();
+    }
+
+    /**
+     * Redraws one card when its tag is heard.
+     *
+     * <p>Only that card, and only when it exists: a sighting arrives per advertisement, which is
+     * every second or two per tag, and redrawing the whole row that often would be visible.
+     */
+    private void onTagHeardNearby(final NearbyTagSighting sighting) {
+        this.nearbySightings.record(sighting);
+
+        final FrameLayout card = this.dynamicCardsForTag.get(sighting.getBeaconId());
+        if (card != null) {
+            this.showNearbyStatusOn(card, sighting, System.currentTimeMillis());
+        }
+    }
+
+    /**
+     * How recently a sighting has to have arrived for {@link #showNearbyStatusOn} to light the
+     * pulse dot rather than dim it.
+     *
+     * <p>Under the one-to-three-second gap between advertisements a tag in range genuinely
+     * produces, so the dot visibly lights and dims once per sighting instead of just staying lit
+     * - which is the live-activity read this is for, in place of a number that either sat at
+     * "0s" permanently (driven only by sightings) or needed a second ticker to mean anything.
+     */
+    private static final long PULSE_WINDOW_MS = 1_000L;
+
+    /**
+     * Replaces a card's "last updated" line while its tag is audible, and lights the pulse dot
+     * beside it if a sighting arrived within {@link #PULSE_WINDOW_MS}.
+     *
+     * <p>The line says something different from "last updated two hours ago", which describes
+     * when Apple's network last reported it: a sighting means this phone can hear it right now.
+     * Showing both would need a taller card, and the row is already measured to the pixel - see
+     * {@code TagCardLayoutTest}.
+     *
+     * <p>The line - and the dot with it - go back to the timestamp on their own once the
+     * sighting ages out, because nothing announces that a tag has left; we simply stop hearing
+     * it. See the {@code else} branch in {@code updateBeaconCards} that calls this only when a
+     * fresh sighting exists.
+     */
+    private void showNearbyStatusOn(
+            final FrameLayout card, final NearbyTagSighting sighting, final long nowMs) {
+        final TextView line = card.findViewById(R.id.device_last_update);
+        line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
+                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+
+        // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
+        // callback, before the clock the caller reads has ticked past it.
+        final long msSinceSighting = Math.max(0, nowMs - sighting.getSeenAtMs());
+        final boolean pulsing = msSinceSighting < PULSE_WINDOW_MS;
+
+        final ImageView pulse = card.findViewById(R.id.device_nearby_pulse);
+        pulse.setVisibility(VISIBLE);
+        pulse.setImageTintList(ColorStateList.valueOf(MaterialColors.getColor(card, pulsing
+                ? com.google.android.material.R.attr.colorPrimary
+                : com.google.android.material.R.attr.colorOutlineVariant)));
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+
         // 调用高德地图的生命周期方法
         if (this.mapProvider instanceof AMapProvider) {
             ((AMapProvider) this.mapProvider).onDestroy();
@@ -1272,8 +1544,159 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 });
     }
 
+    /**
+     * Toggle continuous ping (repeated scan + play-sound-nearby, see
+     * {@code AccessorySoundTrigger#playSoundContinuously}) for this card's tag - on until tapped
+     * again, unlike {@code DeviceInfoActivity}'s one-shot "Play Sound Nearby".
+     *
+     * <p>Only one tag at a time: starting it for a different tag stops whichever was running,
+     * since it is one Bluetooth radio and one thing to listen for.
+     */
     public void onClickRing(View view) {
-        Log.i(TAG, "The ring button was clicked");
+        Log.d(TAG, "The ring button was clicked");
+
+        final String beaconId = this.dynamicCardsForTag.entrySet()
+                .stream().filter(kvp -> kvp.getValue().findViewById(R.id.device_ring_button_container) == view)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Click ring event was raised by a Beacon Device's card, but the beaconId could not be found for it!"));
+
+        final boolean wasRunningForThisTag = beaconId.equals(this.continuousPingBeaconId);
+        this.stopContinuousPing();
+        if (wasRunningForThisTag) {
+            return;
+        }
+
+        if (!BlePermissions.granted(this)) {
+            Log.d(TAG, "Requesting BLE permission(s) before starting continuous ping for beaconId=" + beaconId);
+            this.ringPermissionRequestBeaconId = beaconId;
+            ActivityCompat.requestPermissions(this, BlePermissions.required(), RING_PERMISSION_REQUEST_CODE);
+            return;
+        }
+
+        this.startContinuousPing(beaconId);
+    }
+
+    private void startContinuousPing(final String beaconId) {
+        final BeaconData beaconData = this.beacons.get(beaconId);
+        if (beaconData == null) {
+            Log.w(TAG, "Cannot start continuous ping: no loaded data for beaconId=" + beaconId);
+            return;
+        }
+        final String accessoryJson = beaconData.getInfo().getOwnedBeaconAccessoryJson();
+
+        this.continuousPingBeaconId = beaconId;
+        final FrameLayout container = this.dynamicCardsForTag.get(beaconId);
+        if (container != null) {
+            TagCardHelper.toggleRingActive(container, true);
+        }
+
+        this.continuousPingDisposable = AppDependencies.accessorySoundTrigger()
+                .playSoundContinuously(this.getApplicationContext(), accessoryJson)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        update -> this.handleContinuousPingUpdate(beaconId, update),
+                        error -> {
+                            // playSoundContinuously's contract is to never error onto this path -
+                            // see its interface doc - so reaching here means a bug in that
+                            // contract, not an ordinary "not found nearby" or "no permission".
+                            Log.e(TAG, "Continuous ping stopped unexpectedly for beaconId=" + beaconId, error);
+                            this.stopContinuousPing();
+                        });
+    }
+
+    /**
+     * Shows continuous ping's current phase on the card's ring label - "Scanning...",
+     * "Connecting...", "Sending..." - so it reads as active work rather than nothing happening,
+     * without a toast firing every few seconds for as long as it runs.
+     *
+     * <p>Between cycles ({@link BleSoundTriggerPhase#DONE}) a successful write shows "Ringing!"
+     * rather than jumping straight back to "Stop" - the write itself is near-instant, so without
+     * this the sequence reads as scan, connect, done, with no visible moment where it actually
+     * worked. It shows for the whole {@code CONTINUOUS_PING_PAUSE_MS} gap before the next cycle's
+     * scan starts, which is also roughly how long an AirTag's chirp lasts. A not-found or failed
+     * attempt goes back to "Stop" directly and keeps looping - the tag may come into range on
+     * the next cycle. {@link BleSoundTriggerStatus#MISSING_PERMISSION} and
+     * {@link BleSoundTriggerStatus#NO_CANDIDATE_MACS} do not: nothing about waiting and trying
+     * again fixes either, so looping on them is pure battery burn with no chance of succeeding -
+     * this stops the loop and says why instead.
+     */
+    private void handleContinuousPingUpdate(final String beaconId, final BleSoundTriggerUpdate update) {
+        Log.d(TAG, "Continuous ping update for beaconId=" + beaconId + ": " + update.getPhase()
+                + (update.getResult() == null ? "" : " (" + update.getResult().getStatus() + ")"));
+
+        this.sightingPersister.keepWhatTheSightingProved(beaconId, update);
+
+        // A card for a beaconId other than the one this loop is for stopped existing (e.g. the
+        // tag left the visible list) or continuous ping was stopped/switched to another tag
+        // since this update was emitted - either way, there is nothing left to show it on.
+        if (!beaconId.equals(this.continuousPingBeaconId)) {
+            return;
+        }
+
+        if (update.getPhase() == BleSoundTriggerPhase.DONE) {
+            final BleSoundTriggerStatus status = update.getResult().getStatus();
+            if (status == BleSoundTriggerStatus.MISSING_PERMISSION
+                    || status == BleSoundTriggerStatus.NO_CANDIDATE_MACS) {
+                Log.w(TAG, "Stopping continuous ping for beaconId=" + beaconId
+                        + ": unrecoverable status " + status);
+                this.stopContinuousPing();
+                Toast.makeText(this, status == BleSoundTriggerStatus.MISSING_PERMISSION
+                                ? R.string.play_sound_permission_denied
+                                : R.string.play_sound_no_candidate_macs,
+                        LENGTH_LONG).show();
+                return;
+            }
+        }
+
+        final FrameLayout container = this.dynamicCardsForTag.get(beaconId);
+        if (container == null) {
+            return;
+        }
+
+        final int labelRes;
+        switch (update.getPhase()) {
+            case CONNECTING:
+                labelRes = R.string.ring_status_connecting;
+                break;
+            case TRIGGERING:
+                labelRes = R.string.ring_status_triggering;
+                break;
+            case DONE:
+                labelRes = update.getResult().getStatus() == BleSoundTriggerStatus.SUCCESS
+                        ? R.string.ring_status_success
+                        : R.string.stop_ringing;
+                break;
+            case SCANNING:
+            default:
+                labelRes = R.string.ring_status_scanning;
+                break;
+        }
+        TagCardHelper.setRingLabel(container, this.getString(labelRes));
+
+        // The spinner runs for SCANNING/CONNECTING/TRIGGERING and stops at DONE - a label
+        // alone ("Scanning...", "Connecting...") can sit on screen for several seconds with
+        // nothing else moving, which reads as stuck rather than as work in progress.
+        TagCardHelper.setRingLoading(container, update.getPhase() != BleSoundTriggerPhase.DONE);
+    }
+
+    private void stopContinuousPing() {
+        if (this.continuousPingDisposable != null && !this.continuousPingDisposable.isDisposed()) {
+            this.continuousPingDisposable.dispose();
+        }
+        this.continuousPingDisposable = null;
+
+        if (this.continuousPingBeaconId != null) {
+            final FrameLayout container = this.dynamicCardsForTag.get(this.continuousPingBeaconId);
+            if (container != null) {
+                TagCardHelper.toggleRingActive(container, false);
+                // In case this stopped mid-attempt (spinner showing) rather than between
+                // cycles - otherwise the icon stays hidden behind a spinner that will never
+                // update again.
+                TagCardHelper.setRingLoading(container, false);
+            }
+        }
+        this.continuousPingBeaconId = null;
     }
 
     public void onClickMoreForDevice(View view) {
@@ -1580,30 +2003,114 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         var async = new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(this.getApplicationContext()),
                 new AppCryptographyUtil())
-                .get()
+                .state()
                 .firstOrError()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        held -> ICloudSetupOfferDialog.offerIfDue(
-                                this, this.userSettings, held.isPresent(), this::recordICloudOffer),
+                        state -> this.respondToTheMembershipState(state),
                         error -> Log.w(TAG,
                                 "Could not tell whether an account is linked, so not offering"
                                         + " to connect one", error));
     }
 
-    /** Persist the answer, and act on it if they said yes. */
-    private void recordICloudOffer(final boolean accepted) {
-        var async = this.userSettingsRepo.storeUserSettings(this.userSettings)
+    /**
+     * Three situations, and only one of them is the first-time offer.
+     *
+     * <p><b>An account that was connected and can no longer be read is not a new user.</b> The
+     * membership read used to collapse "never joined" and "joined but undecryptable" into the
+     * same empty answer, so a device whose secure storage had moved on was offered the
+     * first-time setup - once, silently - and if that offer was declined the app then behaved
+     * as though iCloud had never been wanted. Nothing said anything was wrong; the account reads
+     * simply stopped working.
+     *
+     * <p>So the broken case gets its own screen, saying what happened and that the tags and
+     * their history are untouched. It is not gated on the one-time flag: this is a fault to fix
+     * rather than a preference to express, and it stops appearing the moment it is fixed.
+     */
+    private void respondToTheMembershipState(final KeychainMembershipRepository.MembershipState state) {
+        switch (state) {
+            case HELD:
+                // Already reading the account. Nothing to offer and nothing wrong.
+                return;
+            case KEYS_GONE:
+                // Explainable and not a fault: the keystore key went away and the data it wrote
+                // stayed. Nothing to report, and something for them to do.
+                Log.w(TAG, "The keystore key for the membership is gone, so telling them to"
+                        + " connect the account again rather than offering it as though new");
+                this.askThemToReconnectTheAccount();
+                return;
+            case UNREADABLE:
+                // **The key is present and it still does not open the data, which is a bug.**
+                // Nothing a user did causes this, so an explanation would be an apology for
+                // something they cannot act on - the report is the useful thing to offer, and
+                // it is the same screen an unexplainable import failure goes to.
+                Log.e(TAG, "The membership is stored and its key is present, and it still does"
+                        + " not decrypt - sending them to make a report");
+                this.startActivity(ErrorReportActivity.intentFor(this,
+                        getString(R.string.error_report_cause_membership_unreadable),
+                        R.string.error_report_body_membership));
+                return;
+            case NONE:
+            default:
+                this.offerICloudSetupTo(false);
+        }
+    }
+
+    private void askThemToReconnectTheAccount() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.icloud_membership_unreadable_title)
+                .setMessage(R.string.icloud_membership_unreadable_message)
+                .setPositiveButton(R.string.icloud_offer_set_up_now,
+                        (dialog, which) -> this.actOnTheICloudOffer(true))
+                .setNegativeButton(R.string.icloud_offer_not_now, (dialog, which) -> { })
+                .show();
+    }
+
+    /**
+     * Ask, and write down that we asked - immediately, and on settings read here.
+     *
+     * <p><b>The prompt was coming back, and this is why.</b> {@code offerIfDue} records the offer
+     * by setting a flag on the settings object it is handed, and that used to be
+     * {@code this.userSettings} - a field {@link #onResume} replaces with a fresh read on every
+     * single resume. So the sequence was: the dialog goes up and marks the object it was given;
+     * the activity resumes and the field becomes a different object, one still saying the offer
+     * was never made; the user answers; and the answer saves *that* object. The flag never
+     * reached storage, and the prompt returned on the next launch, and the next.
+     *
+     * <p>Two changes, and both are needed. The settings are read here rather than taken from the
+     * field, so nothing else can swap the object out underneath the dialog. And the write happens
+     * <b>when the dialog is shown</b>, not when it is answered - the gap between those was the
+     * race, and it also means a dialog dismissed by the activity being destroyed still counts,
+     * which is what {@code offerIfDue} promises.
+     */
+    private void offerICloudSetupTo(final boolean hasLinkedAccount) {
+        final UserSettings settings = this.userSettingsRepo.getUserSettings();
+
+        final Dialog offered = ICloudSetupOfferDialog.offerIfDue(
+                this, settings, hasLinkedAccount, this::actOnTheICloudOffer);
+
+        if (offered == null) {
+            return;
+        }
+
+        // Keeps the field in step for anything else reading it before the next resume. It is the
+        // stored copy that decides this next launch, and that is written below.
+        this.userSettings = settings;
+
+        var async = this.userSettingsRepo.storeUserSettings(settings)
                 .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(() -> {
-                    if (accepted) {
-                        Log.i(TAG, "taking them to connect an iCloud account");
-                        this.fetchFromICloudLauncher.launch(
-                                new Intent(this, FetchFromICloudActivity.class));
-                    }
-                }, error -> Log.e(TAG, "Failed to record the iCloud offer", error));
+                .subscribe(() -> Log.i(TAG, "recorded that the iCloud offer was made"),
+                        error -> Log.e(TAG, "Failed to record the iCloud offer, so it will be"
+                                + " made again on the next launch", error));
+    }
+
+    /** Act on the answer. Recording that it was asked already happened, when it was shown. */
+    private void actOnTheICloudOffer(final boolean accepted) {
+        if (accepted) {
+            Log.i(TAG, "taking them to connect an iCloud account");
+            this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
+        }
     }
 
     private static boolean isAccountRestoreFailure(Throwable t) {
@@ -1696,6 +2203,24 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             }
             this.beacons.put(beaconId, new BeaconData(beacon, Collections.emptyList()));
         });
+
+        // The nearby watch could not start from onResume on a cold launch: it reads
+        // this.beacons, which was still empty because this load runs asynchronously, and
+        // nothing retried once the tags arrived - so the whole session had no pulse, no
+        // Nearby line, and no passive alignment correction until the app was backgrounded
+        // and reopened. Started here, once, when there is finally something to watch for.
+        // Guarded on the disposable so the periodic account refresh, which also lands here,
+        // does not bounce a running scan - Android silently blocks an app that starts scans
+        // too often.
+        if (!newBeaconInformation.isEmpty() && this.nearbyWatchDisposable == null) {
+            // Re-checked on the main thread: this load finishes on a background thread, and by
+            // the time the post runs, onResume may have started the watch already.
+            this.runOnUiThread(() -> {
+                if (this.nearbyWatchDisposable == null && !this.isFinishing()) {
+                    this.startWatchingForNearbyTags();
+                }
+            });
+        }
     }
 
     private synchronized void addBeaconLocationsToCurrent(final Map<String, List<BeaconLocationReport>> newItems) {
@@ -1757,6 +2282,21 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private Observable<List<Address>> reverseGeocode(double latitude, double longitude) {
         return Observable.fromCallable(() -> this.geocoder.getFromLocation(latitude, longitude, 1))
             .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Puts a position this phone just heard onto the map, without waiting for a fetch.
+     *
+     * <p>The map draws from {@link #beaconLocations}, which until now only the network fetch
+     * filled. A tag heard over Bluetooth was therefore written to the database and left off the
+     * screen until the next scheduled refresh - so the map went on showing Apple's older answer
+     * for a tag that was audible in the same room. Merged through the same history object the
+     * fetch uses, so the newer of the two wins on its own and no special case is needed for
+     * which source a position came from.
+     */
+    private void onHeardHere(final String beaconId, final BeaconLocationReport report) {
+        this.beaconLocations.merge(beaconId, List.of(report));
+        this.runOnUiThread(this::showLastDeviceLocations);
     }
 
     private synchronized void showLastDeviceLocations() {
@@ -1891,6 +2431,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         HorizontalScrollView scrollContainer = this.findViewById(R.id.tags_scrollable_area);
         LinearLayout cardsContainer = this.findViewById(R.id.tags_scroll_container);
 
+        // Read once, not per card: it does not change between cards, and BlePermissions.granted
+        // is a real permission check, not a field read.
+        final boolean canRing = BlePermissions.granted(this);
+
         // remove all beacons that had cards that are now gone
         for (var beaconId : this.dynamicCardsForTag.keySet()) {
             if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.isDrawable(beaconId)) {
@@ -1960,6 +2504,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
             v.setLayoutParams(params);
 
+            // The ring button toggles a Bluetooth scan, so it has no honest job to do without
+            // the permission that scan needs - showing it only to have every tap re-ask for
+            // permission would be a worse experience than not showing it. Re-applied on every
+            // redraw rather than once, so a permission grant or revocation while the screen is
+            // open is reflected without needing anything else to notice.
+            final View ringButtonContainer = v.findViewById(R.id.device_ring_button_container);
+            ringButtonContainer.setVisibility(canRing ? VISIBLE : GONE);
+
             // the title
             TextView deviceNameView = v.findViewById(R.id.device_name);
             deviceNameView.setText(beacon.getName());
@@ -1990,14 +2542,23 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 deviceLocation.setText(geoLocation.getAddressLine(0));
             }
 
-            // the last updated time
+            // the last updated time - unless the tag is audible right now, which is both newer
+            // and more useful than when Apple's network last reported it. See
+            // showNearbyStatusOn; a sighting ages out on its own, so this line comes back.
             TextView deviceLastUpdate = v.findViewById(R.id.device_last_update);
-            final var timeAgo = DateUtils.getRelativeTimeSpanString(
-                    lastLocation.getTimestamp(),
-                    now,
-                    DateUtils.MINUTE_IN_MILLIS
-            ).toString();
-            deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+            final NearbyTagSighting heardNow = this.nearbySightings.freshFor(beaconId, now);
+            if (heardNow != null) {
+                this.showNearbyStatusOn(v, heardNow, now);
+            } else {
+                final var timeAgo = DateUtils.getRelativeTimeSpanString(
+                        lastLocation.getTimestamp(),
+                        now,
+                        DateUtils.MINUTE_IN_MILLIS
+                ).toString();
+                deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+                // Nothing live to pulse for once the sighting has aged out.
+                ((ImageView) v.findViewById(R.id.device_nearby_pulse)).setVisibility(GONE);
+            }
 
             // **Put an existing card where it now belongs.** Cards are created once and reused,
             // so a card added before the user rearranged anything keeps its original slot
@@ -2135,6 +2696,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // asking, and asks about whatever it was given.
         return this.beaconRepo.toScheduledAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
                 .doFinally(this::markFetchFinished);
@@ -2144,6 +2706,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
                 .doFinally(this::markFetchFinished);
     }
@@ -2201,6 +2764,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // Not Map.of - see BeaconRepository.plistFallback. A self-generated tag has no plist.
         return this.beaconRepo.toAccessoryRequests(BeaconRepository.plistFallback(beaconId, pList))
                 .doOnSubscribe(__ -> this.markFetchStarted())
+                .doOnNext(this::armLongFetchBannerIfSlow)
                 .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
                 .flatMap(this.beaconRepo::storeFetchResult)
                 .doFinally(this::markFetchFinished);
@@ -2219,11 +2783,51 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * part-way through discards the work for all of them and the next launch starts over.
      */
     private void markFetchStarted() {
+        this.longFetchBannerHandler.post(this.bannerState::fetchStarted);
+    }
+
+    /**
+     * Arms the banner, but only for a batch that is actually going to be slow.
+     *
+     * <p><b>Counting a fetch and warning about one are now separate things.</b> This used to arm
+     * on every fetch that passed six seconds, which on a slow network is most of them - so the
+     * message showed up during loads that finished immediately, and a warning that appears when
+     * nothing is wrong is one people stop reading. The wait it exists for is the key search
+     * described above, and whether that search is long is known before the request goes out: it
+     * depends on how far back the accessory's alignment record starts it.
+     *
+     * <p>Asked of the requests rather than of the tags on screen, because the scheduled fetch
+     * drops tags that are ignored or backing off - an unaligned tag nobody is fetching should
+     * not put up a banner about a wait that is not happening.
+     *
+     * <p>The lookup is a database read and the banner is six seconds away, so there is time; and
+     * it re-checks that a fetch is still in flight before arming, since a quick batch can finish
+     * while the question is being answered.
+     */
+    private void armLongFetchBannerIfSlow(final List<AccessoryRequest> requests) {
+        var async = this.beaconRepo.aFetchOfTheseWouldBeSlow(requests)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        slow -> this.armLongFetchBanner(slow),
+                        // On doubt, warn. Silence through a three-minute wait is the failure
+                        // this mechanism exists to prevent; a banner during a quick fetch is
+                        // merely untidy.
+                        error -> {
+                            Log.w(TAG, "Could not tell whether this fetch will be slow,"
+                                    + " so assuming it might be", error);
+                            this.armLongFetchBanner(true);
+                        });
+    }
+
+    private void armLongFetchBanner(final boolean slow) {
         this.longFetchBannerHandler.post(() -> {
-            if (this.bannerState.fetchStarted()) {
-                this.longFetchBannerHandler.postDelayed(
-                        this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
+            if (!slow || !this.bannerState.isFetching()) {
+                return;
             }
+            this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
+            this.longFetchBannerHandler.postDelayed(
+                    this.showLongFetchBanner, SHOW_LONG_FETCH_BANNER_AFTER_MS);
         });
     }
 
@@ -2318,6 +2922,44 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == RING_PERMISSION_REQUEST_CODE) {
+            final String beaconId = this.ringPermissionRequestBeaconId;
+            this.ringPermissionRequestBeaconId = null;
+
+            // Re-checked against BlePermissions.granted rather than the grantResults array
+            // directly - one place decides what "enough" means, matching DeviceInfoActivity's
+            // own permission flow and BlePermissions' class doc.
+            if (beaconId != null && BlePermissions.granted(this)) {
+                Log.i(TAG, "BLE permission granted; starting continuous ping for beaconId=" + beaconId);
+                this.startContinuousPing(beaconId);
+            } else {
+                Log.i(TAG, "BLE permission refused; not starting continuous ping");
+                Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        if (requestCode == NEARBY_PERMISSION_REQUEST_CODE) {
+            // Re-checked against BlePermissions.granted for the same reason as above: one place
+            // decides what "enough" means.
+            if (BlePermissions.granted(this)) {
+                Log.i(TAG, "BLE permission granted; starting the nearby tag watch");
+                this.startWatchingForNearbyTags();
+            } else {
+                Log.i(TAG, "BLE permission refused; not watching for nearby tags");
+                // Said out loud because the refusal also keeps the ring button hidden (see
+                // updateBeaconCards), and the request fires only once per activity - so with
+                // no toast, someone who taps Deny is left with no visible trace that nearby
+                // and ringing exist, and no in-app path back to them short of the system
+                // settings.
+                Toast.makeText(this, R.string.play_sound_permission_denied, LENGTH_LONG).show();
+            }
+            // The ring button on every card was hidden while this was undecided - see
+            // updateBeaconCards - and needs to be shown or stay hidden depending on the answer.
+            this.updateBeaconCards();
+            return;
+        }
+
         if (requestCode != LOCATION_PERMISSION_REQUEST_CODE) {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
             return;

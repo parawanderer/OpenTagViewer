@@ -16,6 +16,7 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.content.Intent;
 
+import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.NoMatchingRootException;
 import androidx.test.espresso.NoMatchingViewException;
@@ -39,6 +40,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
@@ -207,6 +209,159 @@ public class TheICloudOfferAppearsOnceTest {
         this.letTheMapSettle();
         assertFalse("somebody who said no once must never be asked again",
                 this.theOfferIsShowing());
+    }
+
+    /**
+     * <b>Showing it is what records it, before anybody has answered.</b>
+     *
+     * <p>The class promises that a dialog dismissed by the activity being torn down still counts
+     * as the one time. That only holds if the write happens when the dialog goes up - so this
+     * asserts exactly that, with nothing pressed.
+     */
+    @Test
+    public void theOfferIsRecordedTheMomentItIsShown() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+
+        this.openTheMap();
+        Eventually.check(() -> onView(withText(R.string.icloud_offer_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        Eventually.check(() -> assertTrue(
+                "the offer has to be recorded when it is shown, not when it is answered",
+                this.theOfferHasBeenMade()));
+    }
+
+    /**
+     * <b>A resume while the offer is up must not lose the record of it.</b>
+     *
+     * <p>This is the bug a user hit: the prompt came back days after they had answered it, with
+     * an account already connected. {@code MapsActivity.onResume} re-reads the settings into the
+     * field the dialog had marked, so the marked object was replaced by a fresh one still saying
+     * the offer had never been made - and the answer then saved that. Nothing failed, nothing
+     * logged, and the prompt returned on every launch.
+     *
+     * <p>A resume between showing and answering is not a contrived sequence: it is what happens
+     * when somebody glances at another app and comes back, and it is also the ordinary
+     * onCreate/onResume ordering when the membership lookup answers quickly.
+     *
+     * <p>Confirmed to fail before the fix - the stored flag came back false, and the offer
+     * appeared again on reopening.
+     */
+    @Test
+    public void theOfferSurvivesAResumeWhileItIsOnScreen() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+
+        this.openTheMap();
+        Eventually.check(() -> onView(withText(R.string.icloud_offer_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        // The step that used to swap the settings object out from under the dialog.
+        this.scenario.moveToState(Lifecycle.State.STARTED);
+        this.scenario.moveToState(Lifecycle.State.RESUMED);
+
+        Eventually.check(() -> assertTrue(
+                "a resume while the dialog was up threw away the record that it was offered",
+                this.theOfferHasBeenMade()));
+
+        this.scenario.close();
+        this.openTheMap();
+
+        this.letTheMapSettle();
+        assertFalse("the offer came back after a resume, which is the reported bug",
+                this.theOfferIsShowing());
+    }
+
+    /**
+     * <b>A connection that exists but cannot be read is a fault, not a fresh install.</b>
+     *
+     * <p>The membership read used to answer "empty" both for somebody who had never joined and
+     * for somebody whose stored keys could no longer be decrypted - so a device whose secure
+     * storage had moved on was shown the first-time setup offer, once, and if that was declined
+     * the app behaved from then on as though iCloud had never been wanted. Nothing said anything
+     * was wrong; account reads just stopped working.
+     *
+     * <p>Two claims here, and the second is the one with teeth: they are told what happened, and
+     * their one-and-only first-time offer is <b>not</b> spent on it. Spending it would leave
+     * somebody who dismissed a message they did not understand with no way back to the feature
+     * except a Settings item they have no reason to open.
+     */
+    @Test
+    public void aConnectionWhoseKeyHasGoneAsksThemToReconnect() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+        this.givenAConnection();
+        this.andThenItsKeystoreKeyDisappears();
+
+        this.openTheMap();
+
+        Eventually.check(() -> onView(withText(R.string.icloud_membership_unreadable_title))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+
+        assertFalse("the one-time offer must not be spent on a broken connection",
+                this.theOfferHasBeenMade());
+    }
+
+    /**
+     * <b>And the same situation with the key still present is a bug, so it offers a report.</b>
+     *
+     * <p>The distinction @parawanderer asked for. A key that has gone is somebody's device - an
+     * OS upgrade, a wiped keystore, a transfer tool that copied app data and could not copy
+     * keystore keys - and the useful thing to say is "connect it again". A key that is right
+     * there and still does not open the data is not explainable by any of that, so an
+     * explanation would be an apology for something the user cannot act on, and the report is
+     * what is actually worth offering.
+     */
+    @Test
+    public void aConnectionThatWillNotOpenWithItsOwnKeyOffersABugReport() {
+        this.settingsWhere(settings -> settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL));
+        this.givenAConnection();
+        this.butItsStoredBytesAreDamaged();
+
+        this.openTheMap();
+
+        Eventually.check(() -> intended(hasComponent(ErrorReportActivity.class.getName())));
+
+        assertFalse("a fault must not spend the one-time offer either",
+                this.theOfferHasBeenMade());
+    }
+
+    /** A real membership, written through the real writer, so the ciphertext is genuine. */
+    private void givenAConnection() {
+        this.memberships.store(new KeychainMembership(
+                "{\"peer\":\"invented\"}", "entropy", "PASS-CODE-HERE", "This phone", 1))
+                .blockingAwait();
+    }
+
+    /**
+     * Take the keystore key away and leave the data behind.
+     *
+     * <p>Deleted rather than corrupted, because that is the actual shape of the situation: the
+     * keystore and this app's files have different lifetimes, and it is always the key that
+     * goes. Done explicitly rather than by writing junk and hoping the alias happens not to
+     * exist - an earlier test in the run may well have created it, which would make this assert
+     * the opposite case by accident.
+     */
+    private void andThenItsKeystoreKeyDisappears() {
+        try {
+            final java.security.KeyStore keyStore =
+                    java.security.KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+            keyStore.deleteEntry(
+                    dev.wander.android.opentagviewer.AppKeyStoreConstants.KEYSTORE_ALIAS_KEYCHAIN);
+        } catch (final Exception e) {
+            throw new IllegalStateException("could not take the keystore key away", e);
+        }
+    }
+
+    /** Keep the key, ruin the ciphertext: the combination that should not be possible. */
+    private void butItsStoredBytesAreDamaged() {
+        UserAuthDataStore.getInstance(this.context).updateDataAsync(preferences -> {
+            final androidx.datastore.preferences.core.MutablePreferences mutable =
+                    preferences.toMutablePreferences();
+            mutable.set(UserAuthDataStore.KEYCHAIN_MEMBERSHIP,
+                    new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32});
+            return io.reactivex.rxjava3.core.Single.just(mutable);
+        }).blockingGet();
     }
 
     /**
