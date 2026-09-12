@@ -29,14 +29,89 @@ list and read as one project, while each can be recognised and removed on its ow
 
 from __future__ import annotations
 
+SERIAL_PREFIX = "0PENTAGX"
+"""
+The eight characters every serial this exporter presents begins with.
+
+Recognisability lives here rather than in the whole string. An entry reading `0PENTAGX` followed
+by anything is identifiably this project, which is what stops somebody removing it - see the
+warning above about what removing it costs.
+"""
+
+SERIAL_ALPHABET = "ACDEFGHJKLMNPQRTUVWXY34679"
+"""
+What the four characters after the prefix are drawn from.
+
+Uppercase alphanumeric, which is the shape Apple accepts, with the pairs a person reading a serial
+off one screen and comparing it to another is most likely to confuse left out - no `O` against `0`,
+no `I` or `1`, no `S` against `5`, no `B` against `8`, no `Z` against `2`. The user does not type
+this, but they do compare it, and that is the whole job it has.
+"""
+
 EXPORTER_SERIAL = "0PENTAGXPORT"
 """
-The serial this exporter presents, in `X-Apple-I-SRL-NO`.
+The serial every install presented before this was drawn per install.
 
-Twelve uppercase alphanumeric characters, which is the shape Apple accepts, and deliberately
-implausible as real hardware so that nothing mistakes it for a Mac. It shares its prefix with the
-Android app's `0PENTAGVIEWR` so a user seeing both recognises them as the same project.
+**Kept, and still used**, by anything that already has an identity: changing the serial on an
+install that works costs a second device-list entry and may cost a sign-in, for no benefit to
+somebody who is not affected.
+
+It shares the prefix and the shape of a drawn serial but is **not** one, and cannot be: `PORT`
+contains an `O`, which :data:`SERIAL_ALPHABET` leaves out as a confusable. So a serial with an `O`
+in it is, by construction, an install from before this change - useful when reading a report, and
+the reason this is a named constant rather than a value that happens to come out of the generator.
+
+**Why this stopped being the only one.** It was a constant, so every install of this program,
+everywhere, presented Apple the same serial while presenting a *different* machine identity: one
+serial against thousands of device IDs and thousands of Apple IDs, from every continent, at once.
+Real hardware does not look like that. A 503 from Grand Slam that some accounts never recover from
+- issues #168, #176 and #181 - is consistent with that fingerprint being refused, and one reporter
+cleared their device identity to no effect, which is what would happen if the serial were the part
+being matched on.
+
+That is a hypothesis and is written down as one. It has not been confirmed against Apple, and the
+cheap way to confirm it is exactly this change: an affected user deleting their identity file now
+draws a different serial instead of the same one.
 """
+
+
+def generate_serial() -> str:
+    """
+    A serial for an install that does not have one yet.
+
+    Twelve characters, of which the last four vary - about 450,000 of them, which is not a large
+    space and does not need to be. The point is that two installs are unlikely to share one, not
+    that a serial is unguessable; there is nothing to guess.
+
+    `secrets` rather than `random` for no security reason: it is seeded from the OS, and a program
+    that starts twice in the same second should not be able to draw the same serial twice.
+    """
+    import secrets
+
+    tail = "".join(secrets.choice(SERIAL_ALPHABET) for _ in range(4))
+    return SERIAL_PREFIX + tail
+
+
+def serial_from(stored: dict | None) -> str:
+    """
+    The serial this install should present, given whatever is on disk.
+
+    Three cases, and the middle one is the reason this is a function:
+
+    - **A stored serial**: use it. This is every run after the first.
+    - **A stored identity with no serial**: an install from before serials varied. It keeps
+      :data:`EXPORTER_SERIAL`, because it has been presenting that to Apple and changing it now
+      would re-identify a working install.
+    - **Nothing stored**: a new install, or one whose identity file was deleted. It draws a new
+      one. Deleting the file is therefore the remedy for an account that Apple is refusing, which
+      is a thing a person can do without a new release.
+    """
+    if stored is None:
+        return generate_serial()
+
+    serial = stored.get("serial")
+    return serial if isinstance(serial, str) and serial else EXPORTER_SERIAL
+
 
 DEVICE_NAME = "OpenTagViewer Exporter"
 """

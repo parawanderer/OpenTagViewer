@@ -55,7 +55,7 @@ from findmy.keychain.recovery import RecoveryError
 from findmy.keychain.session import AsyncKeychainSession
 
 from exporter import device
-from exporter.identity import DEVICE_NAME, EXPORTER_SERIAL
+from exporter.identity import DEVICE_NAME, EXPORTER_SERIAL, serial_from
 from opentagviewer_export import AccessoryExport
 from opentagviewer_export.hardware import identify
 
@@ -244,6 +244,17 @@ def make_account(
     """
     stored = device.load(identity_path)
 
+    # **The serial is per install, and this is where that is decided.** A caller that named one
+    # explicitly keeps it - the app passes its own, and tests pin theirs - but the default
+    # identity's placeholder is replaced by whatever this installation has been using, or by a
+    # fresh one if it has never run. See `identity.EXPORTER_SERIAL` for why a constant was wrong.
+    if identity is EXPORTER_IDENTITY:
+        identity = ClientIdentity(
+            serial=serial_from(stored), device_name=identity.device_name)
+
+    # After the substitution above, never before: the provider is what actually sends
+    # `X-Apple-I-SRL-NO`, so building it from the placeholder identity would present the constant
+    # this change exists to stop presenting.
     if provider is None:
         provider = _make_provider(anisette_url, libs_path, stored, identity)
 
@@ -301,7 +312,11 @@ def _make_provider(
         libs_path=libs_path, serial=identity.serial, state_blob=state_blob)
 
 
-def remember(account: AsyncAppleAccount, identity_path: Path | None = None) -> None:
+def remember(
+    account: AsyncAppleAccount,
+    identity_path: Path | None = None,
+    serial: str | None = None,
+) -> None:
     """
     Store this account's device identity, so the next export is the same device.
 
@@ -321,16 +336,25 @@ def remember(account: AsyncAppleAccount, identity_path: Path | None = None) -> N
     the announce was tried, refused, and removed rather than left failing on every fresh install.
 
     **The serial is the label instead**, which is what §13 designed it for: `X-Apple-I-SRL-NO` is
-    sent during sign-in, needs no announce, and `0PENTAGXPORT` is the one field in that row a
-    person can actually read. See :mod:`exporter.identity`.
+    sent during sign-in, needs no announce, and it is the one field in that row a person can
+    actually read. See :mod:`exporter.identity`.
+
+    :param serial: What this run presented, if a caller has some reason to override it. Normally
+        left out, and read off the account - **which is the only source that cannot be wrong.**
+        Re-deriving it from disk instead is subtly broken on the run that matters: a first run has
+        no file, so `serial_from` would draw a *second* serial and store that, and the next run
+        would introduce itself as a different device than the one just registered.
     """
+    if serial is None:
+        serial = account.serial
     # The account's own serialisation, with only the harmless parts taken out of it. It also
     # carries the username, the password and the login state - which is exactly why this picks
     # fields rather than handing the whole mapping to `device.save`.
     state = account.to_json()
 
     device.save(
-        state["ids"]["uid"], state["ids"]["devid"], state["anisette"], identity_path)
+        state["ids"]["uid"], state["ids"]["devid"], state["anisette"], identity_path,
+        serial=serial)
 
 
 MAX_LOGIN_ATTEMPTS = 3
