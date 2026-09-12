@@ -25,12 +25,14 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.util.export.HistoryCsvWriter;
 
 /** Restores an Android history-export ZIP through one blocking interface. */
 public final class HistoryImporter implements HistoryArchiveImporter {
     private static final String BEACON_ID = "beacon_id";
+    private static final String PROVENANCE = "provenance";
 
     private static final CSVFormat CSV = CSVFormat.RFC4180.builder()
             .setHeader()
@@ -193,12 +195,41 @@ public final class HistoryImporter implements HistoryArchiveImporter {
                     .confidence(Long.parseLong(row.get("confidence")))
                     .status(Long.parseLong(row.get("status")))
                     .description(parseDescription(row))
+                    .provenance(parseProvenance(row))
                     .build();
+
+            if (report.getProvenance() == null) {
+                return null;
+            }
 
             return new HistoryImportRow(beaconId, report);
         } catch (IllegalArgumentException error) {
             return null;
         }
+    }
+
+    /**
+     * Where the archive says this row came from, refused if it is not something the app knows.
+     *
+     * <p><b>Refused rather than defaulted.</b> The column is {@code NOT NULL} and everything
+     * that draws a tag reads it, so an unrecognised value is not a cosmetic problem: it reaches
+     * the map, the history and the "last updated" line as a third kind of report that none of
+     * them have a branch for. Returning null here makes the row malformed, which is counted and
+     * reported to the user rather than swallowed.
+     *
+     * <p>The file is trusted about this, and that is a deliberate limit. A hand-edited CSV can
+     * claim a local sighting was Apple's; there is no way to tell from the file, and the
+     * alternative - stamping every restored row as one thing - throws away the true answer for
+     * every ordinary restore in order to defend against somebody editing their own data.
+     */
+    private static String parseProvenance(final CSVRecord row) {
+        final String read = row.get(PROVENANCE);
+
+        if (LocationReport.PROVENANCE_APPLE.equals(read)
+                || LocationReport.PROVENANCE_LOCAL.equals(read)) {
+            return read;
+        }
+        return null;
     }
 
     private static String parseDescription(final CSVRecord row) {

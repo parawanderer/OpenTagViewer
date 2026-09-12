@@ -22,6 +22,7 @@ import java.util.zip.ZipOutputStream;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.util.export.HistoryExportEntry;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.util.export.HistoryCsvWriter;
 import dev.wander.android.opentagviewer.util.export.HistoryZipWriter;
 
@@ -43,6 +44,9 @@ public class HistoryImporterTest {
                 .confidence(2)
                 .status(1)
                 .description("Hiraistraat 9D, \"Amsterdam\"\r\nsecond line")
+                // Deliberately the value that is *not* what a missing column falls back to, so
+                // this cannot pass against a writer or reader that silently defaults it.
+                .provenance(LocationReport.PROVENANCE_LOCAL)
                 .build();
         final ByteArrayOutputStream archive = new ByteArrayOutputStream();
         new HistoryZipWriter(ZoneId.of("Europe/Amsterdam")).write(
@@ -78,6 +82,7 @@ public class HistoryImporterTest {
                 .confidence(2)
                 .status(1)
                 .description(null)
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build();
         final ByteArrayOutputStream archive = new ByteArrayOutputStream();
         new HistoryZipWriter(ZoneId.of("UTC")).write(
@@ -122,16 +127,72 @@ public class HistoryImporterTest {
                 received.get(0).getBeaconId(), received.get(1).getBeaconId());
     }
 
+    /**
+     * A locally heard sighting survives the round trip as one.
+     *
+     * <p>The failure this catches is quiet: restoring it as {@code apple} produces a row the app
+     * will happily draw, claiming Apple's network found a tag that this phone heard itself.
+     */
+    @Test
+    public void alocalSightingIsRestoredAsALocalSighting() throws Exception {
+        final String header = String.join(",", HistoryCsvWriter.requiredHeaders());
+        final List<HistoryImportRow> received = new ArrayList<>();
+
+        importerCapturing(received).importArchive(new ByteArrayInputStream(zip(
+                "Wallet.csv", header + "\r\n"
+                        + row("52.3702157", "heard-here", LocationReport.PROVENANCE_LOCAL)
+                        + "\r\n")));
+
+        assertEquals(LocationReport.PROVENANCE_LOCAL,
+                received.get(0).getReport().getProvenance());
+    }
+
+    /**
+     * An unrecognised provenance is a malformed row, not a row with a surprising column.
+     *
+     * <p>The column is {@code NOT NULL} and every screen that draws a tag reads it, so a third
+     * value reaches all of them as a kind of report none has a branch for.
+     */
+    @Test
+    public void arowClaimingSomethingElseEntirelyIsRefused() throws Exception {
+        final String header = String.join(",", HistoryCsvWriter.requiredHeaders());
+        final List<HistoryImportRow> received = new ArrayList<>();
+
+        final HistoryImportResult result = importerCapturing(received).importArchive(
+                new ByteArrayInputStream(zip("Wallet.csv", header + "\r\n"
+                        + row("52.3702157", "odd", "somewhere-else") + "\r\n"
+                        + row("52.3702157", "fine") + "\r\n")));
+
+        assertEquals(1, result.getRowsMalformed());
+        assertEquals(1, result.getRowsAdded());
+        assertEquals("fine", received.get(0).getReport().getDescription());
+    }
+
+    /** An archive from before the column existed is not importable, and says so. */
+    @Test
+    public void anArchiveWithNoProvenanceColumnIsRefusedAsInvalid() throws Exception {
+        final String header = String.join(",", HistoryCsvWriter.requiredHeaders())
+                .replace(",provenance", "");
+        final String withoutIt = row("52.3702157", "old").replace(",apple,", ",");
+
+        final HistoryImportException refused = assertThrows(HistoryImportException.class,
+                () -> importerCapturing(new ArrayList<>()).importArchive(
+                        new ByteArrayInputStream(
+                                zip("Wallet.csv", header + "\r\n" + withoutIt + "\r\n"))));
+
+        assertEquals(HistoryImportException.Reason.INVALID_ARCHIVE, refused.getReason());
+    }
+
     @Test
     public void headerOrderAndExtraColumnsDoNotChangeTheContract() throws Exception {
         final String csv = "beacon_id,description,status,confidence,horizontal_accuracy_m,"
                 + "description_present,longitude,longitude_exact,latitude,latitude_exact,"
                 + "published_at_utc,published_at_epoch_ms,timestamp_epoch_ms,timestamp_local,"
-                + "timestamp_utc,future_column\r\n"
+                + "timestamp_utc,provenance,future_column\r\n"
                 + BEACON_ID + ",somewhere,1,2,12,true,4.8951679,4.895167912345678,"
                 + "52.3702157,52.37021571234567,2026-08-15T12:35:56Z,"
                 + (RECORDED_AT + 60_000L) + "," + RECORDED_AT + ","
-                + "2026-08-15 14:34:56+02:00,2026-08-15T12:34:56Z,ignored\r\n";
+                + "2026-08-15 14:34:56+02:00,2026-08-15T12:34:56Z,apple,ignored\r\n";
 
         final HistoryImportResult result = importerCapturing(new ArrayList<>()).importArchive(
                 new ByteArrayInputStream(zip("Wallet.csv", csv)));
@@ -252,11 +313,16 @@ public class HistoryImporterTest {
     }
 
     private static String row(final String latitude, final String description) {
+        return row(latitude, description, LocationReport.PROVENANCE_APPLE);
+    }
+
+    private static String row(
+            final String latitude, final String description, final String provenance) {
         return "2026-08-15T12:34:56Z,2026-08-15 14:34:56+02:00,"
                 + RECORDED_AT + "," + latitude + ",4.8951679,12,2,1,"
                 + "2026-08-15T12:35:56Z," + description + ","
                 + (RECORDED_AT + 60_000L) + "," + latitude + ",4.8951679,true,"
-                + BEACON_ID;
+                + provenance + "," + BEACON_ID;
     }
 
     private static byte[] zip(final String name, final String contents) throws Exception {

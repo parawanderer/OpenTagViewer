@@ -149,6 +149,9 @@ public class HistoryImportTest {
                 .confidence(1)
                 .status(0)
                 .description(description)
+                // The archive these tests build goes through the real writer, so every row needs
+                // the column the reader now requires - see HistoryCsvWriter.HEADERS.
+                .provenance(LocationReport.PROVENANCE_APPLE)
                 .build();
     }
 

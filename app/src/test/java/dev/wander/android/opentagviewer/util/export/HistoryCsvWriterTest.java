@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 
 /**
  * The CSV a user opens in a spreadsheet.
@@ -46,7 +47,34 @@ public class HistoryCsvWriterTest {
                 .horizontalAccuracy(12)
                 .confidence(2)
                 .status(1)
-                .description("Amsterdam");
+                .description("Amsterdam")
+                .provenance(LocationReport.PROVENANCE_APPLE);
+    }
+
+    /**
+     * A locally heard sighting is labelled as one in the file somebody opens.
+     *
+     * <p>Without it the CSV puts this phone's own positions - accurate to Bluetooth range, and
+     * derived from where the <i>phone</i> was - among Apple's network estimates with nothing to
+     * tell them apart, which is what the column on {@code LocationReport} exists to prevent.
+     */
+    @Test
+    public void alocallyHeardSightingSaysSoInTheFile() throws IOException {
+        final String csv = write(List.of(
+                report().provenance(LocationReport.PROVENANCE_LOCAL).build()));
+        final String[] lines = csv.split("\r\n");
+        final int column = List.of(HistoryCsvWriter.HEADERS).indexOf("provenance");
+
+        assertEquals(LocationReport.PROVENANCE_LOCAL, lines[1].split(",")[column]);
+    }
+
+    @Test
+    public void anAppleReportSaysThatInstead() throws IOException {
+        final String csv = write(List.of(report().build()));
+        final String[] lines = csv.split("\r\n");
+        final int column = List.of(HistoryCsvWriter.HEADERS).indexOf("provenance");
+
+        assertEquals(LocationReport.PROVENANCE_APPLE, lines[1].split(",")[column]);
     }
 
     private static String write(final List<BeaconLocationReport> reports) throws IOException {

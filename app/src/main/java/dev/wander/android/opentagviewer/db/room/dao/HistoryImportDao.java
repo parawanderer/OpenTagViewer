@@ -83,6 +83,13 @@ public interface HistoryImportDao {
                     .horizontalAccuracy(row.getReport().getHorizontalAccuracy())
                     .status(row.getReport().getStatus())
                     .lastUpdate(now)
+                    // **Not defaulted, and not optional.** The column is NOT NULL, so a row
+                    // built without this is refused by Room and takes the whole transaction with
+                    // it - which is how the archive restores nothing and reports an error the
+                    // user cannot act on. The value comes off the CSV; see
+                    // HistoryImporter.parseProvenance for why a row without a readable one never
+                    // reaches here.
+                    .provenance(row.getReport().getProvenance())
                     .build();
 
             if (this.insert(stored) == -1L) {

@@ -1,5 +1,7 @@
 package dev.wander.android.opentagviewer.data.model;
 
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
+
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -65,4 +67,18 @@ public class BeaconLocationReport {
      * Status byte of the accessory as recorded by a device, as an integer.
      */
     private long status;
+
+    /**
+     * Where this report came from: {@link LocationReport#PROVENANCE_APPLE} or
+     * {@link LocationReport#PROVENANCE_LOCAL}.
+     *
+     * <p><b>On the model and not only on the row, because the history export reads this.</b> The
+     * CSV is handed to a person, and a position this phone worked out for itself sitting
+     * unlabelled among Apple's is a file that misrepresents where half of it came from - see the
+     * field on the entity, which says the same thing from the other side.
+     *
+     * <p>Null only on a report that has not been through the database. Everything read out of it
+     * carries one, because the column is {@code NOT NULL}.
+     */
+    private String provenance;
 }
