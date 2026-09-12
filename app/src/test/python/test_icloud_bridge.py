@@ -27,6 +27,7 @@ import pytest
 from findmy.errors import InvalidCredentialsError, UnauthorizedError
 
 import icloud_bridge
+import identity as app_identity
 from exporter import icloud
 from cryptography.hazmat.primitives.asymmetric import ec
 from findmy.keychain.join import JoinedPeer
@@ -169,7 +170,7 @@ class FakeAsyncAccount:
     than composed - a path that invents its own makes one client look like several.
     """
 
-    serial = "0PENTAGVIEWR"
+    serial = "0PENTAGVK7QX"
     identity = SimpleNamespace(
         model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
         os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0")
@@ -239,15 +240,39 @@ class TestTheIdentityItPresents:
     A default here would present `0PENTAGXPORT` from a phone - the desktop exporter's serial -
     and the two programs would share one device-list entry that neither could be removed from
     without breaking the other.
+
+    **The serial is the session's, not a constant.** It is drawn per install now, and a restored
+    session keeps whatever established it - so a constant here would be right for a fresh install
+    and wrong for every other one, in the field CloudKit writes into the escrow record.
     """
 
-    def test_it_is_this_app_and_not_the_exporter(self):
-        assert icloud_bridge.APP_IDENTITY.serial == "0PENTAGVIEWR"
-        assert icloud_bridge.APP_IDENTITY != icloud.EXPORTER_IDENTITY
+    def test_it_is_the_serial_this_session_presents(self):
+        identity = icloud_bridge.appIdentity(FakeAsyncAccount())
+
+        assert identity.serial == FakeAsyncAccount.serial
+
+    def test_it_is_not_the_exporters(self):
+        assert icloud_bridge.appIdentity(FakeAsyncAccount()) != icloud.EXPORTER_IDENTITY
 
     def test_the_cloudkit_name_is_set_rather_than_left_to_the_library(self):
-        assert icloud_bridge.APP_IDENTITY.device_name
-        assert icloud_bridge.APP_IDENTITY.device_name != icloud.EXPORTER_IDENTITY.device_name
+        identity = icloud_bridge.appIdentity(FakeAsyncAccount())
+
+        assert identity.device_name
+        assert identity.device_name != icloud.EXPORTER_IDENTITY.device_name
+
+    def test_a_session_that_cannot_say_names_this_app_anyway(self):
+        """
+        Never the library's `0FINDMYPY001`, which is the one thing worse than a stale serial.
+
+        The record would be written under a name that says nothing about what put it there, on
+        an account the user then has to recognise it in.
+        """
+        class Mute:
+            @property
+            def serial(self):
+                raise RuntimeError("FindMy.py moved")
+
+        assert icloud_bridge.appIdentity(Mute()).serial == app_identity.LEGACY_SERIAL
 
     def test_it_is_what_reaches_open_client(self, loop, monkeypatch):
         seen = {}
@@ -257,9 +282,11 @@ class TestTheIdentityItPresents:
             return FakeClient()
 
         monkeypatch.setattr(icloud, "open_client", fake_open_client)
-        icloud_bridge.openSession(FakeAccount(loop)).open()
+        session = icloud_bridge.openSession(FakeAccount(loop))
+        session.open()
 
-        assert seen["identity"] is icloud_bridge.APP_IDENTITY
+        assert seen["identity"].serial == FakeAsyncAccount.serial
+        assert seen["identity"] is session._identity
 
 
 class TestWhatCanBeRecoveredFrom:
@@ -283,7 +310,7 @@ class TestWhatCanBeRecoveredFrom:
         """
         made = session(FakeClient(FakeOptions([
             FakeRecord("F2LX9Q"),
-            FakeRecord(icloud_bridge.APP_IDENTITY.serial, name="OpenTagViewer"),
+            FakeRecord(FakeAsyncAccount.serial, name="OpenTagViewer"),
             FakeRecord("C02XK"),
         ])))
 
@@ -301,11 +328,11 @@ class TestWhatCanBeRecoveredFrom:
         """
         made = session(FakeClient(FakeOptions([
             FakeRecord("F2LX9Q"),
-            FakeRecord(icloud_bridge.APP_IDENTITY.serial),
+            FakeRecord(FakeAsyncAccount.serial),
         ])))
         made.recoveryOptions()
 
-        answer = json.loads(made.unlock(icloud_bridge.APP_IDENTITY.serial, "123456"))
+        answer = json.loads(made.unlock(FakeAsyncAccount.serial, "123456"))
 
         assert not answer["ok"]
 
@@ -317,7 +344,7 @@ class TestWhatCanBeRecoveredFrom:
         from, then presenting a list with nothing in it.
         """
         made = session(FakeClient(FakeOptions(
-            [FakeRecord(icloud_bridge.APP_IDENTITY.serial)], trustworthy=True)))
+            [FakeRecord(FakeAsyncAccount.serial)], trustworthy=True)))
 
         answer = json.loads(made.recoveryOptions())
 
@@ -742,7 +769,7 @@ class TestJoiningTheAccount:
         made.join("a-passcode")
 
         device = made.client.joinedWith.device
-        assert device.serial == "0PENTAGVIEWR"
+        assert device.serial == FakeAsyncAccount.serial
         assert device.model == "iPhone17,1"
         assert device.build == "22B83"
         assert made.client.joinedWith.os_version == "18.1"

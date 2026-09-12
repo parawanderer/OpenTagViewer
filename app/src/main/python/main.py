@@ -221,7 +221,7 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
         was dropped.
 
         That is not hypothetical: writing only the type and the URL meant a session established
-        as `0PENTAGVIEWR` came back as FindMy.py's `0FINDMYPY001` on the next launch, and one
+        as this app's serial came back as FindMy.py's `0FINDMYPY001` on the next launch, and one
         established as a MacBookPro13,2 came back as a MacBookPro18,3. Two names and two machines
         for one session, which is exactly what rule 11 exists to prevent.
 
@@ -297,7 +297,7 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
     try:
         # A new sign-in, so this is the one place the app's own identity is used. Everything
         # restored from a stored account keeps whatever it was established with - see
-        # identity.identityForRestore, and the warning on identity.APP_SERIAL.
+        # identity.identityForRestore, and the warning on identity.LEGACY_SERIAL.
         #
         # The machine half comes from Java, which persists it per install: an install from
         # before there was a choice keeps the Mac its ADI was provisioned with, and a fresh one

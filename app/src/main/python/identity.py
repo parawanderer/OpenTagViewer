@@ -39,16 +39,28 @@ part the library - a MacBook Pro 18,3 on macOS 13.1, a release that does not exi
 first turns that into a visible fallback instead of an invisible hybrid.
 """
 
-APP_SERIAL = "0PENTAGVIEWR"
+LEGACY_SERIAL = "0PENTAGVIEWR"
 """
-The serial a new session presents, in `X-Apple-I-SRL-NO`.
+The serial every install presented before this was drawn per install.
 
 Twelve uppercase alphanumeric characters, which is the shape Apple accepts, and deliberately
 implausible as real hardware so nothing mistakes it for a Mac. It shares its prefix with the
 exporter's `0PENTAGXPORT` so a user seeing both recognises them as the same project.
 
-Without this a session presents FindMy.py's default, `0FINDMYPY001` - which names the library
-rather than the program, in the one place the user ever looks.
+Without a serial at all a session presents FindMy.py's default, `0FINDMYPY001` - which names the
+library rather than the program, in the one place the user ever looks. So this is the fallback
+when Java cannot be asked, not an absence of one.
+
+**Java owns the live value now, and this is not a copy of it.** It was a constant on both sides,
+pinned equal by `IdentityBridgeTest`; a serial drawn per install cannot be pinned that way, and
+a second copy of it is exactly what rule 11 is about. `appSerial` asks. See
+`AdiDeviceIdentity.LEGACY_SERIAL` for why a constant was wrong: one serial against thousands of
+machine identities and Apple IDs is not a shape real hardware produces, and it is the leading
+suspect for the 503s in issues #168, #176 and #181.
+
+**An install that has one keeps it**, which is why this value still goes out at all: an install
+from before the change has been presenting it, and drawing it a new serial now would register a
+second device in that user's account.
 """
 
 APP_CLOUDKIT_DEVICE_NAME = "OpenTagViewer"
@@ -61,7 +73,7 @@ account's beacon records, and it is not optional: `AsyncCloudKitClient` takes a 
 client that set nothing here would be named by the library instead. That is the same
 second-identity problem as the serial, one layer down.
 
-Distinct from the exporter's `OpenTagViewer Exporter` for the same reason `APP_SERIAL` is
+Distinct from the exporter's `OpenTagViewer Exporter` for the same reason this app's serial is
 distinct from `0PENTAGXPORT`: two programs, two devices, deliberately.
 """
 
@@ -73,7 +85,7 @@ distinct from `0PENTAGXPORT`: two programs, two devices, deliberately.
 # so for the installed base it does not work, and getting it to work means those users signing
 # in again. Not worth a re-login for a label.
 #
-# The serial carries the recognisability on its own: an entry reading `0PENTAGVIEWR` is
+# The serial carries the recognisability on its own: an entry reading `0PENTAGV...` is
 # identifiable as software the user installed, which is the thing that stops them removing it.
 # The row is still titled after the claimed model, and that is accepted.
 
@@ -122,6 +134,35 @@ def hardwareProfile(localAnisette: Any) -> DeviceIdentity | None:
     return DeviceIdentity.from_json(payload)
 
 
+def appSerial(localAnisette: Any) -> str:
+    """
+    The serial this install presents, **read from Java rather than decided here**.
+
+    It is drawn once, on the first run that needs an identity, and stored in the same
+    SharedPreferences as the rest of the device identity - so an install that already had one
+    keeps it, and an install from before serials were drawn keeps `LEGACY_SERIAL`. Java is the
+    only side that can answer that, which is why this asks rather than holding a value.
+
+    Falls back to `LEGACY_SERIAL` when there is nothing to ask or the answer is unusable. That
+    is the value the install most likely already has, and it is in any case better than letting
+    FindMy.py name itself `0FINDMYPY001` in the one field the user reads.
+    """
+    if localAnisette is None:
+        return LEGACY_SERIAL
+
+    try:
+        serial = str(localAnisette.serial())
+    except Exception:
+        print(f"Could not read this installation's serial from Java: {traceback.format_exc()}")
+        return LEGACY_SERIAL
+
+    if not serial:
+        print("Java gave an empty serial - presenting the one every older install presents.")
+        return LEGACY_SERIAL
+
+    return serial
+
+
 def identityForNewSession(localAnisette: Any) -> dict:
     """
     The identity a **new** sign-in presents: this app's serial, and Java's machine.
@@ -129,15 +170,16 @@ def identityForNewSession(localAnisette: Any) -> dict:
     Only for a new sign-in. Everything restored from a stored account keeps whatever it was
     established with - see `identityForRestore`, and the warning at the top of this module.
 
-    The two halves are not the same kind of thing, which is why only one of them is asked for.
-    The serial is a label, chosen by this app and free to be the same on every install. The
-    machine is not a choice at all: it has to match what this particular install already told
-    Apple during ADI provisioning, so it is read rather than decided.
+    Both halves are read from Java, and for the same reason: both are per install. The machine
+    has to match what this particular install already told Apple during ADI provisioning, and
+    the serial has to be the one this install has been presenting - a serial that changed
+    between sign-ins would register a second device in the user's account rather than reusing
+    the row they already have.
 
     Returns keyword arguments for the provider, so a library that grows another identity field
     fails loudly here instead of silently dropping it.
     """
-    kwargs: dict = {"serial": APP_SERIAL}
+    kwargs: dict = {"serial": appSerial(localAnisette)}
 
     identity = hardwareProfile(localAnisette)
     if identity is not None:
@@ -186,12 +228,46 @@ def deviceIdsForNewSession(localAnisette: Any) -> dict:
     return ids
 
 
+def serialOfSession(asyncAccount: Any) -> str:
+    """
+    The serial the session in hand **is already presenting**, read off its own provider.
+
+    Not `appSerial`, and the difference is the whole point. A session signed in before serials
+    were drawn - or before any of this - is bound to whatever established it, and CloudKit has
+    to be told the same thing: the escrow record this app writes carries the serial, and the
+    picker recognises its own record by matching on it. Asking Java would give the serial this
+    install *would* draw today, which for a restored session is a different device.
+
+    `BaseAppleAccount.serial` is public API and says the same thing this does - one value
+    describes one device, and a path sending a different one registers a second. So it is read
+    rather than reconstructed from the provider underneath it.
+
+    Falls back to `LEGACY_SERIAL` when the account cannot answer. That is wrong in the same small
+    way it has always been wrong for everyone - the app's own escrow record stops being filtered
+    out of the recovery picker, which shows one tile nobody can use - and it is better than
+    defaulting the identity, which would put `0FINDMYPY001` on the record.
+    """
+    try:
+        serial = asyncAccount.serial
+    except Exception:
+        print(
+            "Could not read the serial off this session, so CloudKit will be told"
+            f" {LEGACY_SERIAL}: {traceback.format_exc()}")
+        return LEGACY_SERIAL
+
+    if not isinstance(serial, str) or not serial:
+        print(f"This session has no serial, so CloudKit will be told {LEGACY_SERIAL}.")
+        return LEGACY_SERIAL
+
+    return serial
+
+
 def identityForRestore(previous: Any) -> dict:
     """
     The identity a *restored* account should keep: whatever it already had.
 
     **Not this app's.** A session signed in before any of this was bound to FindMy.py's
-    defaults, and handing it `APP_SERIAL` now would present Apple with a different machine on
+    defaults, and handing it this app's serial now would present Apple with a different machine on
     an existing session - a sign-in for the user, and a second device-list entry they did not
     ask for. The gain would be a nicer name on an entry they have already learned to recognise.
 

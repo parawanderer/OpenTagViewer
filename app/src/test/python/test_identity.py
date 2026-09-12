@@ -50,12 +50,26 @@ UID = "9E1D0C4B-77A2-4E3F-8D51-2B6A0F9C3D74"
 DEVID = "1A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9"
 
 
+DRAWN_SERIAL = "0PENTAGVK7QX"
+"""
+A serial only the generator could have produced, standing in for a real install's.
+
+Not `LEGACY_SERIAL`, deliberately: a fake answering the old constant would let every assertion
+below pass against code that ignored the bridge and fell back, which is the regression these
+tests exist for. `IEWR` contains an `I` and the alphabet does not, so the two cannot be confused.
+"""
+
+
 class Bridge:
     """A local-Anisette bridge that works."""
 
-    def __init__(self, profile=None, ids=None):
+    def __init__(self, profile=None, ids=None, serial=DRAWN_SERIAL):
         self._profile = IPHONE if profile is None else profile
         self._ids = {"uid": UID, "devid": DEVID} if ids is None else ids
+        self._serial = serial
+
+    def serial(self):
+        return self._serial
 
     def deviceIdsJson(self):
         return json.dumps(self._ids)
@@ -86,20 +100,58 @@ class Unavailable(Bridge):
         return "no libraries"
 
 
-class TestTheIdentityANewSessionPresents:
-    def test_the_serial_is_the_apps_own_and_not_the_librarys(self):
-        assert identity.APP_SERIAL == "0PENTAGVIEWR"
-        assert identity.APP_SERIAL != CLIENT_SERIAL
+class TestTheSerialThisInstallPresents:
+    """
+    Java draws it once per install and stores it; this side asks rather than deciding.
 
-    def test_the_serial_is_the_shape_apple_accepts(self):
-        assert len(identity.APP_SERIAL) == 12
-        assert identity.APP_SERIAL.isalnum()
-        assert identity.APP_SERIAL.upper() == identity.APP_SERIAL
+    The constant it replaced went to every install of this app in the world at once, against
+    thousands of different machine identities - see `AdiDeviceIdentity.LEGACY_SERIAL`.
+    """
 
-    def test_the_serial_is_not_the_exporters(self):
+    def test_it_is_whatever_java_says_this_install_drew(self):
+        assert identity.appSerial(Bridge()) == DRAWN_SERIAL
+
+    def test_it_is_not_the_librarys(self):
+        assert identity.appSerial(Bridge()) != CLIENT_SERIAL
+
+    def test_the_legacy_value_is_still_what_an_older_install_presents(self):
+        """
+        Java returns it for an install that has an identity and no stored serial.
+
+        That install has been telling Apple this for its whole life, and a new serial now would
+        register a second device beside the row the user already has.
+        """
+        assert identity.appSerial(Bridge(serial=identity.LEGACY_SERIAL)) == identity.LEGACY_SERIAL
+        assert identity.LEGACY_SERIAL == "0PENTAGVIEWR"
+
+    def test_the_legacy_value_is_the_shape_apple_accepts(self):
+        assert len(identity.LEGACY_SERIAL) == 12
+        assert identity.LEGACY_SERIAL.isalnum()
+        assert identity.LEGACY_SERIAL.upper() == identity.LEGACY_SERIAL
+
+    def test_it_is_not_the_exporters(self):
         # Two installs, two entries, each removable without breaking the other.
-        assert identity.APP_SERIAL != "0PENTAGXPORT"
-        assert identity.APP_SERIAL[:5] == "0PENT"
+        assert identity.appSerial(Bridge()) != "0PENTAGXPORT"
+        assert identity.appSerial(Bridge())[:5] == "0PENT"
+
+    def test_a_bridge_that_cannot_answer_falls_back_rather_than_failing_the_login(self):
+        class Broken(Bridge):
+            def serial(self):
+                raise RuntimeError("no such method")
+
+        assert identity.appSerial(Broken()) == identity.LEGACY_SERIAL
+
+    def test_an_empty_answer_is_not_passed_on(self):
+        """An empty serial would let FindMy.py name the device-list row `0FINDMYPY001`."""
+        assert identity.appSerial(Bridge(serial="")) == identity.LEGACY_SERIAL
+
+    def test_no_bridge_at_all_still_names_this_app(self):
+        assert identity.appSerial(None) == identity.LEGACY_SERIAL
+
+
+class TestTheIdentityANewSessionPresents:
+    def test_the_serial_is_the_one_this_install_drew(self):
+        assert identity.identityForNewSession(Bridge())["serial"] == DRAWN_SERIAL
 
     def test_the_machine_is_whichever_one_java_says_this_install_is(self):
         """
@@ -133,7 +185,7 @@ class TestTheIdentityANewSessionPresents:
                 **identity.identityForNewSession(bridge),
             )
 
-            assert provider.serial == identity.APP_SERIAL
+            assert provider.serial == DRAWN_SERIAL
             assert provider.identity == DeviceIdentity(**IPHONE)
 
     def test_a_legacy_install_signing_in_again_presents_the_mac_it_provisioned_with(self):
@@ -151,14 +203,14 @@ class TestTheIdentityANewSessionPresents:
         assert kwargs["identity"] == DeviceIdentity(**LEGACY_MAC)
         assert kwargs["identity"].platform == "<MacBookPro13,2> <macOS;13.1;22C65>"
 
-    def test_the_serial_is_the_apps_even_for_a_legacy_install(self):
+    def test_the_serial_is_this_installs_even_for_a_legacy_machine_profile(self):
         """
-        The serial is a label and the machine is not, so they are not gated together.
+        The two are stored together and read together, but they are not the same question.
 
-        A new sign-in gets a new device-list entry whatever happens, so there is nothing to
-        preserve by withholding a recognisable name from it.
+        An install can be a `LEGACY_MAC` and still have drawn a serial - the profile records what
+        ADI was provisioned as, the serial records what Apple prints on the row.
         """
-        assert identity.identityForNewSession(Bridge(LEGACY_MAC))["serial"] == identity.APP_SERIAL
+        assert identity.identityForNewSession(Bridge(LEGACY_MAC))["serial"] == DRAWN_SERIAL
 
 
 class TestTheIdsANewSessionIntroducesItselfWith:
@@ -256,7 +308,7 @@ class TestWhenJavaCannotBeAsked:
 
     def test_no_bridge_at_all_imposes_nothing(self):
         assert identity.hardwareProfile(None) is None
-        assert identity.identityForNewSession(None) == {"serial": identity.APP_SERIAL}
+        assert identity.identityForNewSession(None) == {"serial": identity.LEGACY_SERIAL}
         assert identity.deviceIdsForNewSession(None) == {}
 
     def test_a_bridge_that_cannot_give_ids_lets_the_library_mint_its_own(self):
@@ -351,14 +403,14 @@ class TestARestoredSessionKeepsWhatItHad:
         established = DeviceIdentity(**IPHONE)
         previous = RemoteAnisetteProvider(
             "https://example.invalid",
-            serial=identity.APP_SERIAL,
+            serial=DRAWN_SERIAL,
             identity=established,
         )
 
         carried = identity.identityForRestore(previous)
         replacement = main.LocalAnisetteProvider(Bridge(), "https://example.invalid", **carried)
 
-        assert replacement.serial == identity.APP_SERIAL
+        assert replacement.serial == DRAWN_SERIAL
         assert replacement.identity == established
 
     def test_a_restore_never_asks_java_what_this_install_is(self):
@@ -464,7 +516,7 @@ class TestWhatSurvivesBeingStored:
 
     A field left out of it is not defaulted, it is **reverted** - silently, on a session Apple
     has already bound to the value that was dropped. Both of these shipped: a session established
-    as `0PENTAGVIEWR` came back as `0FINDMYPY001`, and one established as a MacBookPro13,2 came
+    with a drawn serial came back as `0FINDMYPY001`, and one established as a MacBookPro13,2 came
     back as FindMy.py's MacBookPro18,3.
     """
 
@@ -473,11 +525,11 @@ class TestWhatSurvivesBeingStored:
     def _stored(self):
         return main.LocalAnisetteProvider(
             Bridge(), "https://example.invalid",
-            serial=identity.APP_SERIAL, identity=self.MAC,
+            serial=DRAWN_SERIAL, identity=self.MAC,
         ).to_json()
 
     def test_the_serial_the_session_was_established_with_survives(self):
-        assert self._stored()["serial"] == identity.APP_SERIAL
+        assert self._stored()["serial"] == DRAWN_SERIAL
 
     def test_the_machine_it_was_established_as_survives(self):
         assert self._stored()["identity"] == self.MAC.to_json()
@@ -485,7 +537,7 @@ class TestWhatSurvivesBeingStored:
     def test_a_restored_provider_presents_both_again(self):
         restored = RemoteAnisetteProvider.from_json(self._stored())
 
-        assert restored.serial == identity.APP_SERIAL
+        assert restored.serial == DRAWN_SERIAL
         assert restored.identity == self.MAC
 
     def test_and_identityForRestore_then_carries_them_onward(self):
@@ -498,7 +550,7 @@ class TestWhatSurvivesBeingStored:
 
         carried = identity.identityForRestore(restored)
 
-        assert carried["serial"] == identity.APP_SERIAL
+        assert carried["serial"] == DRAWN_SERIAL
         assert carried["identity"] == self.MAC
 
     def test_a_provider_that_imposed_nothing_writes_nothing(self):

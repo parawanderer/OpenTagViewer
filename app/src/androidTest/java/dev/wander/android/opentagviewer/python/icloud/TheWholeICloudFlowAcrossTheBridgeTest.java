@@ -21,6 +21,7 @@ import org.junit.runner.RunWith;
 
 import java.util.List;
 
+import dev.wander.android.opentagviewer.anisette.AdiDeviceIdentity;
 import dev.wander.android.opentagviewer.python.PythonAppleAccount;
 
 /**
@@ -168,6 +169,10 @@ public class TheWholeICloudFlowAcrossTheBridgeTest {
      * <p>Rule 11: the serial is what distinguishes peers in the trust circle, and the only field
      * of this the user actually sees - in a list next to a <i>Remove from Account</i> button. A
      * path that composed its own would register a second device.
+     *
+     * <p><b>The session's serial, not a constant.</b> Serials are drawn per install, so the value
+     * asserted here is one only the generator could produce - code that ignored the session and
+     * fell back to {@link AdiDeviceIdentity#LEGACY_SERIAL} would fail rather than look right.
      */
     @Test
     public void thejoinCarriesTheAppsOwnSerial() {
@@ -175,8 +180,8 @@ public class TheWholeICloudFlowAcrossTheBridgeTest {
         this.service.unlock(A_SERIAL, THE_RIGHT_PASSCODE).blockingAwait();
         this.service.join("an-escrow-passcode").blockingFirst();
 
-        assertEquals("the peer was registered under something other than the app's serial",
-                "0PENTAGVIEWR", this.reached("joinedSerial"));
+        assertEquals("the peer was registered under something other than this session's serial",
+                "0PENTAGVK7QX", this.reached("joinedSerial"));
     }
 
     /**

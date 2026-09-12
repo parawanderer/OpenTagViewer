@@ -17,7 +17,7 @@ What that means in practice:
   does not belong. Rule 10 has the test.
 - **Do not carry this register outside the repository.** It is written for agents who need to be
   argued out of breaking something. A pull request review, an issue reply, or anything else a
-  person reads is a different job. See rule 16.
+  person reads is a different job. See rule 17.
 
 ## What this project is
 
@@ -239,9 +239,9 @@ Four things follow:
 
   **Today that is always `LEGACY_MAC`.** `Hardware.DEFAULT` is it, a fresh install gets it, and
   `IPHONE` is built and deliberately not chosen — see `generate()`. So every entry this project
-  registers currently appears as a `MacBookPro` on macOS 13.1, and the serial `0PENTAGVIEWR` is
-  the only thing distinguishing it from real hardware. The exporter is separately a MacBook Pro
-  on macOS 13.4.1, FindMy.py's own default, with serial `0PENTAGXPORT`.
+  registers currently appears as a `MacBookPro` on macOS 13.1, and the serial is the only thing
+  distinguishing it from real hardware. The exporter is separately a MacBook Pro on macOS 13.4.1,
+  FindMy.py's own default.
 
   Changing which profile a fresh install gets is not a cosmetic edit: it registers a *second*
   device rather than renaming the first, for anybody who reinstalls. That is why `IPHONE` exists
@@ -250,9 +250,24 @@ Four things follow:
   describe one real release ([findmy-export §2.2](./docs/findmy-export/01-authentication.md)).
   Claiming a Mac in one string and an iPhone in another is a contradiction Apple's own clients
   never produce.
-- **The serial is a label, and the only field here the user actually sees.** `0PENTAGVIEWR` is
-  confirmed accepted and displayed. Without one, Apple omits the row entirely, leaving an entry
-  with nothing to tell it apart from real hardware.
+- **The serial is a label, and the only field here the user actually sees.** Uppercase
+  alphanumeric, confirmed accepted and displayed. Without one, Apple omits the row entirely,
+  leaving an entry with nothing to tell it apart from real hardware.
+- **It is drawn per install, and the prefix is what carries the recognition.** The app sends
+  `0PENTAGV` plus four characters, the exporter `0PENTAGX` plus four, from an alphabet that
+  leaves out the pairs a person comparing two screens would confuse. **Do not put it back to a
+  constant.** It was one, and that meant a single serial arriving at Apple from thousands of
+  installs, against thousands of different machine identities and Apple IDs, from every continent
+  at once — a shape no real hardware produces, and the leading suspect for the Grand Slam 503s in
+  [#168](https://github.com/parawanderer/OpenTagViewer/issues/168),
+  [#176](https://github.com/parawanderer/OpenTagViewer/issues/176) and
+  [#181](https://github.com/parawanderer/OpenTagViewer/issues/181), one of whom cleared their
+  device identity to no effect — which regenerates the ids and not the serial.
+- **An install that already has one keeps it**, including the installs that predate this and have
+  no stored serial at all: those keep `0PENTAGVIEWR` / `0PENTAGXPORT`. Neither of those can be
+  drawn — both contain a letter the alphabet excludes — so a serial with an `I` or an `O` in it
+  is, by construction, an install from before the change. That is worth preserving when reading a
+  report, and `DrawingTheSerialTest` pins it.
 - **Sending the same value is not the same as sending the same bytes.** Two of these fields are
   transformed on the way out, and only by one side. FindMy.py sends `X-Apple-I-MD-LU` as
   `base64(uid)` and uppercases `X-Mme-Device-Id`; the Java ADI path sends what it is given. So
@@ -263,8 +278,12 @@ Four things follow:
   before believing two paths agree.
 
 **Changing it later adds an entry rather than renaming one**, and may require signing in again,
-so it is not a thing to adjust casually once shipped. Document what the app registers as, so a
-user reading their device list can recognise it — see the wiki.
+so it is not a thing to adjust casually once shipped — which is the whole reason the serial is
+drawn once, on the first run that needs an identity, and then persisted beside the rest of it
+(`LocalAnisette.KEY_SERIAL`, and `device-identity.json` for the exporter). A serial redrawn per
+sign-in would add a device-list entry every time, which is a worse bug than the constant was.
+Document what the app registers as, so a user reading their device list can recognise it — see
+the wiki, which names the prefix rather than a full serial for this reason.
 
 ### 12. A UI change gets a test that inflates it, and one that drives it
 
@@ -431,7 +450,34 @@ Every one of these is tested twice: `WhichFailuresNeedAFreshSignInTest` on the J
 decision, `EveryPathAsksForAFreshSignInTest` on a device for each caller honouring it. A shared
 predicate does not stop a fourth screen being written that never asks.
 
-### 16. Do not carry this file's voice into anything a person reads
+### 16. A pull request based on anything but `main` runs almost no CI
+
+Every workflow that matters here is gated `pull_request: branches: [ "main" ]` —
+`build-debug.yml`, `static-checks.yml`, `macos-scripts-python.yml`, and with them the APK build,
+the Chaquopy bridge tests, the JVM suite and the whole emulator suite. A PR opened against another
+branch, to stack a change on one still in review, matches none of those filters.
+
+**It does not report as skipped. It reports as green**, because the one workflow with no branch
+filter (`exporter-build-check.yml`) runs, passes, and is the only tick on the page. `gh pr checks`
+prints a single passing line and looks exactly like a small change with a small amount of CI.
+
+This has already happened: a change touching twelve Java files, four Python modules and six test
+classes sat on a PR based on another branch, with one green Windows-binary check and not one line
+of Java compiled anywhere.
+
+**So check what actually ran before believing a PR is green**, and count the checks rather than
+reading the colour:
+
+```bash
+gh pr checks <pr>          # one line is not a passing build, it is an empty one
+gh pr view <pr> --json baseRefName
+```
+
+Stacking is still fine — base it on `main` anyway. The diff carries the other branch's commits
+until that merges, which is cosmetic and collapses on its own; a PR whose base is not `main` buys
+a tidier diff by not being tested.
+
+### 17. Do not carry this file's voice into anything a person reads
 
 **@parawanderer has not read this file**, nor most of `docs/`, most docstrings, or most commit
 messages. Agents wrote them. So an agent reading them cannot tell the maintainer's house style from
