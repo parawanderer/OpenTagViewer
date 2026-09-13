@@ -9,6 +9,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
@@ -193,10 +194,17 @@ public class ACodeAppleTookAndThenFailedOnTest {
                 .check(matches(isDisplayed())));
 
         // Back to the method list, then in again and fail a second time.
+        //
+        // **Scoped to what is on screen.** The code screen's "sent to ... +44 ******1234" label
+        // stays in the hierarchy behind the method list, so matching on the number alone finds
+        // two views the second time round and Espresso refuses. It works the first time only
+        // because that label has not been rendered yet.
+        final org.hamcrest.Matcher<android.view.View> theSmsOption =
+                allOf(withText(containsString(FakeAppleAuthService.PHONE_ONE)), isDisplayed());
+
         onView(withId(R.id.twofactorauthchoice_back_button)).perform(click());
-        Eventually.check(() -> onView(withText(containsString(FakeAppleAuthService.PHONE_ONE)))
-                .check(matches(isDisplayed())));
-        onView(withText(containsString(FakeAppleAuthService.PHONE_ONE))).perform(click());
+        Eventually.check(() -> onView(theSmsOption).check(matches(isDisplayed())));
+        onView(theSmsOption).perform(click());
         this.submitTheCode();
 
         Eventually.check(() -> onView(withId(R.id.verification_code_error_message))
