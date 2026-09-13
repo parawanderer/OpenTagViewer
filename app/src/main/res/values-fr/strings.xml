@@ -387,4 +387,5 @@ Aucun historique n’a été importé et les données déjà enregistrées n’o
     <string name="error_report_body_login">La connexion n\'a pas abouti. Le journal ci-dessous indique quelle étape a échoué et ce qui a été renvoyé, ce qui explique presque toujours le problème.
 
 Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer. Si l\'échec persiste, un rapport accompagné de ce journal permet de corriger le problème.</string>
+    <string name="login_failed_apple_asked_to_wait">Apple a refusé la connexion et demande d\'attendre %1$s avant de réessayer. C\'est un refus d\'Apple, pas un problème avec votre identifiant ou votre mot de passe.</string>
 </resources>

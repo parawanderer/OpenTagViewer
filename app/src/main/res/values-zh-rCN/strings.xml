@@ -387,4 +387,5 @@
     <string name="error_report_body_login">登录未能完成。下面的日志会说明哪一步失败以及返回了什么，原因通常就在其中。
 
 如果只是 Apple 拒绝了请求，先等一会儿再试。若持续失败，附上此日志的报告才能让问题得到修复。</string>
+    <string name="login_failed_apple_asked_to_wait">Apple 拒绝了此次登录，并要求等待 %1$s 后再试。这是 Apple 的拒绝，不是你的 Apple ID 或密码有问题。</string>
 </resources>

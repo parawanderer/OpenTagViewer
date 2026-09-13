@@ -387,4 +387,5 @@
     <string name="error_report_body_login">サインインが完了しませんでした。下のログには、どの手順で失敗し、何が返されたかが記録されています。原因はたいていそこにあります。
 
 Appleが要求を拒否しただけなら、少し待ってからもう一度お試しください。それでも失敗する場合は、このログを添えて報告すると修正できます。</string>
+    <string name="login_failed_apple_asked_to_wait">Apple がサインインを拒否し、再試行まで %1$s 待つよう求めています。Apple ID やパスワードの問題ではなく、Apple 側の拒否です。</string>
 </resources>

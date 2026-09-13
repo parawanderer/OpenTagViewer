@@ -48,6 +48,7 @@ import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
+import dev.wander.android.opentagviewer.util.HowLongToWait;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
 /**
@@ -345,6 +346,37 @@ public class AppleLoginFlowTest {
                 not(withText(containsString("503")))));
         onView(withId(R.id.login_error_message_text)).check(matches(
                 not(withText(containsString("Grand Slam")))));
+    }
+
+    /**
+     * <b>When Apple names a wait, the screen gives it rather than "try again shortly".</b>
+     *
+     * <p>A {@code Retry-After} on the refusal, carried across the bridge. The test above is the
+     * other half - no header, which is every refusal observed so far - and it pins that no number
+     * is invented then.
+     */
+    @Test
+    public void aWaitAppleNamedIsShownRoundedUp() {
+        this.apple = FakeAppleAuthService.appleAsksToWait(90);
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        final android.content.Context context = getInstrumentation().getTargetContext();
+        final java.util.Locale locale = context.getResources().getConfiguration().getLocales().get(0);
+
+        // The device's ICU, not a string this test composed: 90 seconds is two minutes, not one.
+        assertEquals("2 minutes", HowLongToWait.of(90).describe(java.util.Locale.ENGLISH));
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
+                withText(context.getString(R.string.login_failed_apple_asked_to_wait,
+                        HowLongToWait.of(90).describe(locale))))));
+
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_apple_declined)))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(containsString("429")))));
     }
 
     /**
