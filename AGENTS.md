@@ -258,11 +258,15 @@ Four things follow:
   leaves out the pairs a person comparing two screens would confuse. **Do not put it back to a
   constant.** It was one, and that meant a single serial arriving at Apple from thousands of
   installs, against thousands of different machine identities and Apple IDs, from every continent
-  at once — a shape no real hardware produces, and the leading suspect for the Grand Slam 503s in
-  [#168](https://github.com/parawanderer/OpenTagViewer/issues/168),
-  [#176](https://github.com/parawanderer/OpenTagViewer/issues/176) and
-  [#181](https://github.com/parawanderer/OpenTagViewer/issues/181), one of whom cleared their
-  device identity to no effect — which regenerates the ids and not the serial.
+  at once — a shape no real hardware produces, and worth not sending on that basis alone.
+
+  **It had nothing to do with the Grand Slam 503s, and this rule claimed it did.** That guess was
+  written into four files before anyone tested it. The actual cause was Apple's edge refusing any
+  request whose `X-MMe-Client-Info` names `com.apple.dt.Xcode` — see rule 18. Serials were
+  eliminated on the way there: a drawn one, the old constant, and upstream FindMy.py's bare `0`
+  were all refused identically, and a QEMU macOS VM signs in happily with a fabricated `C02…`
+  serial that is **not even unique across installs**. Apple does not appear to check the serial at
+  all.
 - **An install that already has one keeps it**, including the installs that predate this and have
   no stored serial at all: those keep `0PENTAGVIEWR` / `0PENTAGXPORT`. Neither of those can be
   drawn — both contain a letter the alphabet excludes — so a serial with an `I` or an `O` in it
@@ -489,6 +493,39 @@ constraint it does not understand, and the argument is the payload.
 **A person reading a pull request review is a different job.** State the finding, the file and line,
 and the fix. The same goes for issue replies and anything else sent to a contributor or a reporter.
 
+### 18. When everything breaks at once, it is probably not yours
+
+On 2026-09-13 every sign-in failed with HTTP 503 from Grand Slam. An afternoon went into
+eliminating the serial, the device ids, the ADI provisioning, three networks, two Apple IDs, two
+machines and finally unmodified upstream FindMy.py — before anyone looked sideways.
+
+**The answer had been published two days earlier**, by AltStore, in
+[altstoreio/AltStore#1790](https://github.com/altstoreio/AltStore/pull/1790): Apple's edge refuses
+any POST to `gsa.apple.com/grandslam/GsService2` whose `X-MMe-Client-Info` names
+`com.apple.dt.Xcode`, before a credential is examined. It answers a 190-byte HTML page from
+`Server: Apple` rather than a GSA plist, which arrives as 503 and reads like an outage. Naming
+`com.apple.akd` — the daemon that really makes this call on macOS — is answered normally.
+
+```bash
+curl -so /dev/null -w '%{http_code}\n' -X POST --data-binary t \
+  -H 'X-MMe-Client-Info: <Mac14,2> <macOS;15.7.5;24G624> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>' \
+  https://gsa.apple.com/grandslam/GsService2      # 503
+
+  ... (com.apple.akd/1.0)> ...                    # 401, i.e. it arrived
+```
+
+**So check the neighbours first.** This project shares an authentication path with AltStore,
+SideStore, Macless Haystack, OpenBubbles and every Anisette server, because they all copied it
+from the same place. When something that worked yesterday fails for everybody, half an hour
+reading those trackers is worth more than a day of bisecting this repository. The reverse holds
+too: a breakage only *our* users see is ours, and the neighbours will be quiet.
+
+**And instrument the call site, not one that looks like it.** The Xcode identifier was tested and
+cleared early — by patching the Anisette header builder, while `_gsa_request` sets
+`X-MMe-Client-Info` from `self._anisette.client` at a separate call site. The patched header never
+reached the wire, the request still failed, and that false negative sent the investigation away
+from the right answer for hours. A test that changes a value next to the one being sent proves
+nothing; print what actually goes out, or assert on the source line that composes it.
 
 ---
 
