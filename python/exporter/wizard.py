@@ -466,10 +466,14 @@ class WizardApp(tk.Tk):
             # Said before the password is asked for, and naming the entry as it will appear: the
             # model and OS come from FindMy.py, which presents as a MacBook Pro, so somebody told
             # only the serial goes looking for a Mac they own.
+            #
+            # **Read off the account rather than written here.** Serials are drawn per install, so
+            # a literal names a device this user does not have, and they go looking for it and
+            # conclude the entry belongs to somebody else.
             asker.ask(lambda: messagebox.showinfo(
                 "Signing in registers a device",
                 "Signing in adds an entry to your Apple account's device list: a MacBook Pro on"
-                " macOS 13.4.1, serial 0PENTAGXPORT.\n\n"
+                f" macOS 13.4.1, serial {account.serial}.\n\n"
                 "That is this program, not a Mac you own. You can remove it at any time at"
                 " account.apple.com under Devices, from any browser.",
             ))
