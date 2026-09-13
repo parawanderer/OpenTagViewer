@@ -585,17 +585,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
                 // undo loading and allow user to try again, basically. Backwards, because
                 // that is what it is: the step the user just left, handed back to them.
-                this.hideLoading();
-                this.showPage(R.id.login_maininfo_container, Direction.BACK);
-                emailOrPhoneInput.setEnabled(true);
-                passwordInput.setEnabled(true);
-                loginButton.setClickable(true);
-
-                FrameLayout loginErrorMessage = this.findViewById(R.id.login_error_container);
-                loginErrorMessage.setVisibility(VISIBLE);
-
-                TextView loginErrorText = this.findViewById(R.id.login_error_message_text);
-                loginErrorText.setText(this.describeLoginFailure(error));
+                //
+                // **Through showLoginFailure rather than inline.** This block did the same five
+                // things by hand, and the copy drifted the moment that method grew a sixth -
+                // recording the failure so the Export logs button can name it. The report opened
+                // saying `cause=unknown`, which reads as the button being broken rather than as
+                // one of two paths having been missed.
+                this.showLoginFailure(error);
             });
     }
 
