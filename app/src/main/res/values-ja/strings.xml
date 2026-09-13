@@ -382,4 +382,5 @@
     <string name="error_report_body_history_import">選択したファイルから履歴を復元できず、アプリはその原因を特定できませんでした。そのため、同じファイルでもう一度試しても解決しない可能性があります。
 
 履歴はインポートされず、すでに保存されているデータも変更されていません。</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
 </resources>

@@ -520,6 +520,9 @@ dependencies {
     // 参考文档：https://lbs.amap.com/api/android-sdk/gettingstarted
     // 注意：3D地图SDK已包含定位功能，无需单独引入location SDK
     implementation(libs.amap.map3d)
+    // OpenStreetMap via osmdroid: no API key, direct dependency (unlike AMap, which is loaded
+    // reflectively for licensing reasons this library has none of).
+    implementation(libs.osmdroid.android)
     implementation(libs.zip4j)
     implementation(libs.commons.csv)
 

@@ -127,6 +127,7 @@
     <string name="map_provider">Map Provider</string>
     <string name="map_provider_google">Google Maps</string>
     <string name="map_provider_amap">高德地图 (AMap)</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
     <string name="amap_api_key" translatable="false">AMap API Key</string>
     <string name="amap_api_key_explanation">AMap requires each user to supply their own API key. Register one at lbs.amap.com, choosing "Android SDK" as the platform, and paste it here.</string>
     <string name="amap_copy_registration_details">Copy package name and SHA1</string>

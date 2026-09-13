@@ -173,14 +173,15 @@ public class SharedMainSettingsManager {
 
         String[] providerLabels = new String[] {
                 this.context.getString(R.string.map_provider_google),
-                this.context.getString(R.string.map_provider_amap)
+                this.context.getString(R.string.map_provider_amap),
+                this.context.getString(R.string.map_provider_osm)
         };
 
         mapProviderDropdown.setSimpleItems(providerLabels);
         this.setupCurrentMapProviderPretty();
 
         mapProviderDropdown.setOnItemClickListener((parent, view, position, id) -> {
-            final String selectedProvider = position == 1 ? "amap" : "google";
+            final String selectedProvider = position == 1 ? "amap" : position == 2 ? "osm" : "google";
             final String selectedLabel = parent.getItemAtPosition(position).toString();
             mapProviderDropdown.setText(selectedLabel, false);
             mapProviderDropdown.clearFocus();
@@ -197,6 +198,8 @@ public class SharedMainSettingsManager {
         final String provider = this.currentUserSettings.getMapProvider();
         final int labelRes = "amap".equals(provider)
                 ? R.string.map_provider_amap
+                : "osm".equals(provider)
+                ? R.string.map_provider_osm
                 : R.string.map_provider_google;
         mapProviderDropdown.setText(this.context.getString(labelRes), false);
     }

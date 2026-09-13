@@ -382,4 +382,5 @@
     <string name="error_report_body_history_import">선택한 파일에서 기록을 복원할 수 없었으며 앱에서 그 원인을 확인할 수 없습니다. 따라서 같은 파일로 다시 시도해도 해결되지 않을 수 있습니다.
 
 기록을 가져오지 않았으며 이미 저장된 데이터도 변경되지 않았습니다.</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
 </resources>

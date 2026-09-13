@@ -382,4 +382,5 @@ Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Appl
     <string name="error_report_body_history_import">De app kon de geschiedenis uit het gekozen bestand niet herstellen en kan niet bepalen waarom — opnieuw proberen met hetzelfde bestand helpt daarom mogelijk niet.
 
 Er is geen geschiedenis geïmporteerd en eerder opgeslagen gegevens zijn niet gewijzigd.</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
 </resources>
