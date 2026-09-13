@@ -4,13 +4,25 @@
       "login": "parawanderer",
       "profileUrl": "https://github.com/parawanderer",
       "avatar": "parawanderer.png",
-      "commits": 608
+      "commits": 634
+    },
+    {
+      "login": "ubrt",
+      "profileUrl": "https://github.com/ubrt",
+      "avatar": "ubrt.png",
+      "commits": 51
     },
     {
       "login": "SadGare",
       "profileUrl": "https://github.com/SadGare",
       "avatar": "sadgare.png",
       "commits": 4
+    },
+    {
+      "login": "hamza-lzr",
+      "profileUrl": "https://github.com/hamza-lzr",
+      "avatar": "hamza-lzr.png",
+      "commits": 2
     },
     {
       "login": "jamorenom",
