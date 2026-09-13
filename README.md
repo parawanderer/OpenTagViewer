@@ -100,6 +100,15 @@ To get started with the repo, see:
 
 📐 **[AGENTS.md](./AGENTS.md)**: the rules a change has to satisfy migrations, Anisette, API keys, attribution. Written for automated contributors, but contains useful information for people too (best queried via a coding assistant rather than read directly).
 
+### Bluetooth and hardware
+
+The app works without these, but they are the open questions for anyone with a tag and a Bluetooth sniffer:
+
+- [#201](https://github.com/parawanderer/OpenTagViewer/issues/201): playing a sound on a tag that is still near its owner
+- [#166](https://github.com/parawanderer/OpenTagViewer/issues/166): registering an AirTag without an iPhone or iPad
+
+What is known so far is collected in [docs/owner-connected-tags.md](./docs/owner-connected-tags.md), and everything on the topic is labelled [`@hardware`](https://github.com/parawanderer/OpenTagViewer/issues?q=label%3A%40hardware).
+
 ### Credits
 
 - [UI Icons](https://fonts.google.com/icons?icon.query=warn&icon.set=Material+Icons) by Google
