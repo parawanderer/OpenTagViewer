@@ -109,13 +109,15 @@ public final class AdiDeviceIdentity {
      * <p><b>Why this stopped being the only one.</b> It was a constant, so every install of this
      * app anywhere presented Apple the same serial while presenting a <i>different</i> machine
      * identity: one serial against thousands of device ids and thousands of Apple IDs, from every
-     * continent, at once. Real hardware does not look like that. The 503s from Grand Slam that
-     * some accounts never recover from - issues #168, #176 and #181 - are consistent with that
-     * fingerprint being refused, and one reporter cleared their device identity to no effect,
-     * which is what would happen if the serial were the part being matched on.
+     * continent, at once. Real hardware does not look like that, and a fingerprint nothing real
+     * produces is worth not sending whether or not anything is matching on it.
      *
-     * <p>That is a hypothesis and is written down as one. It has not been confirmed against
-     * Apple, and the cheap way to confirm it is exactly this change.
+     * <p><b>It does not explain the 503s, and this file used to claim it did.</b> Issues #168,
+     * #176 and #181 were Apple's edge refusing any request whose {@code X-MMe-Client-Info} names
+     * {@code com.apple.dt.Xcode} - see AGENTS.md rule 18. Serials were eliminated on the way
+     * there: a drawn one, the old constant, and upstream FindMy.py's bare {@code 0} were all
+     * refused identically, and a QEMU macOS VM signs in with a fabricated {@code C02...} serial
+     * that is not even unique across installs. Apple does not appear to look at it at all.
      */
     public static final String LEGACY_SERIAL = "0PENTAGVIEWR";
 
