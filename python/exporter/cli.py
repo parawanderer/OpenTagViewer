@@ -480,9 +480,15 @@ async def sign_in(arguments: argparse.Namespace):
 
     # Named as it will actually appear. The model and OS come from FindMy.py, which presents as a
     # MacBook Pro, so somebody who was only told the serial goes looking for a device they own.
+    #
+    # **Read off the account rather than written here.** Serials are drawn per install, so a
+    # literal in this sentence names a device the user does not have and will not find - which is
+    # worse than saying nothing, because they go looking and conclude the entry is somebody
+    # else's. The same mistake as the screen this replaced in the Android app.
     print("\nSigning in registers this exporter as a device on your Apple account. It appears in",
           file=sys.stderr)
-    print("your device list as a MacBook Pro on macOS 13.4.1, serial 0PENTAGXPORT - that is this",
+    print("your device list as a MacBook Pro on macOS 13.4.1, serial "
+          f"{account.serial} - that is this",
           file=sys.stderr)
     print("program, not a Mac you own. Remove it any time at account.apple.com > Devices.\n",
           file=sys.stderr)
