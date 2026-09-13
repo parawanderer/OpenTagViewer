@@ -51,7 +51,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     # Nothing in this pipeline rewrites VERSION in python/exporter/version.py: the tag names the
     # artifact, and the app keeps whatever was committed. So a tag that disagrees with the
@@ -73,7 +73,7 @@ jobs:
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
@@ -180,10 +180,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ matrix.arch }})
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
@@ -387,7 +387,7 @@ jobs:
         echo "UPLOAD_PATH=${{ github.workspace }}/output/$ASSET" >> $GITHUB_ENV
 
     - name: Upload PyInstaller Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ env.UPLOAD_ASSET }}
         path: ${{ env.UPLOAD_PATH }}
