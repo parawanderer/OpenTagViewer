@@ -191,7 +191,20 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private static final long WAIT_BEFORE_REFETCH = 1000 * 60; // 1 MINUTE
 
-    private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 18.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
+    /**
+     * The zoom a tag opens at when the provider has no opinion.
+     *
+     * <p>Kept as the fallback for a null provider only. The live value is
+     * {@link IMapProvider#initialZoom()}, because the number means different things on different
+     * tile pyramids - see there.
+     */
+    private static final float CAMERA_ON_MAP_INITIAL_ZOOM = 16.0f; // see: https://developers.google.com/maps/documentation/android-sdk/views#zoom
+
+    /** The current provider's opening zoom, or the default when there is no provider yet. */
+    private float initialZoom() {
+        return this.mapProvider != null
+                ? this.mapProvider.initialZoom() : CAMERA_ON_MAP_INITIAL_ZOOM;
+    }
 
     private IMapProvider mapProvider;
     private GoogleMap map; // 保留用于向后兼容，逐步迁移
@@ -606,11 +619,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
         
-        // 调用高德地图的生命周期方法
-        if (this.mapProvider instanceof AMapProvider) {
-            ((AMapProvider) this.mapProvider).onPause();
-        } else if (this.mapProvider instanceof OsmMapProvider) {
-            ((OsmMapProvider) this.mapProvider).onPause();
+        // Whichever provider this is, and this screen does not ask which: the callback is on
+        // IMapProvider with a default no-op, so a provider that needs it overrides and one that
+        // does not says nothing. See rule 7 - this was three instanceof chains, and every new
+        // provider grew a fourth arm on each of them.
+        if (this.mapProvider != null) {
+            this.mapProvider.onPause();
         }
     }
 
@@ -640,11 +654,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         this.reSchedulePeriodicTagLocationRefresher();
         this.startWatchingForNearbyTags();
 
-        // 调用高德地图的生命周期方法
-        if (this.mapProvider instanceof AMapProvider) {
-            ((AMapProvider) this.mapProvider).onResume();
-        } else if (this.mapProvider instanceof OsmMapProvider) {
-            ((OsmMapProvider) this.mapProvider).onResume();
+        // Whichever provider this is, and this screen does not ask which: the callback is on
+        // IMapProvider with a default no-op, so a provider that needs it overrides and one that
+        // does not says nothing. See rule 7 - this was three instanceof chains, and every new
+        // provider grew a fourth arm on each of them.
+        if (this.mapProvider != null) {
+            this.mapProvider.onResume();
         }
     }
 
@@ -840,11 +855,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     protected void onDestroy() {
         super.onDestroy();
 
-        // 调用高德地图的生命周期方法
-        if (this.mapProvider instanceof AMapProvider) {
-            ((AMapProvider) this.mapProvider).onDestroy();
-        } else if (this.mapProvider instanceof OsmMapProvider) {
-            ((OsmMapProvider) this.mapProvider).onDestroy();
+        // Whichever provider this is, and this screen does not ask which: the callback is on
+        // IMapProvider with a default no-op, so a provider that needs it overrides and one that
+        // does not says nothing. See rule 7 - this was three instanceof chains, and every new
+        // provider grew a fourth arm on each of them.
+        if (this.mapProvider != null) {
+            this.mapProvider.onDestroy();
         }
     }
 
@@ -1042,7 +1058,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             this.mapProvider.animateCamera(
                                     location.getLatitude(),
                                     location.getLongitude(),
-                                    CAMERA_ON_MAP_INITIAL_ZOOM,
+                                    this.initialZoom(),
                                     null
                             );
                         }
@@ -2375,7 +2391,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         if (this.currentMarkers.size() == 1) {
             // for the first marker, navigate to it smoothly on the map!
-            this.goToBeaconOnMap(beaconId, CAMERA_ON_MAP_INITIAL_ZOOM);
+            this.goToBeaconOnMap(beaconId, this.initialZoom());
         }
     }
 
@@ -2426,7 +2442,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             } else {
                 // 使用当前缩放级别
                 IMapProvider.CameraPosition currentPos = this.mapProvider.getCameraPosition();
-                float currentZoom = currentPos != null ? currentPos.getZoom() : CAMERA_ON_MAP_INITIAL_ZOOM;
+                float currentZoom = currentPos != null ? currentPos.getZoom() : this.initialZoom();
                 this.mapProvider.animateCamera(lat, lon, currentZoom, null);
             }
         } catch (Exception e) {

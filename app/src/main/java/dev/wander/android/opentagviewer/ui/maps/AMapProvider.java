@@ -606,6 +606,7 @@ public class AMapProvider implements IMapProvider {
     /**
      * 在Activity的onResume中调用
      */
+    @Override
     public void onResume() {
         if (mapView != null) {
             try {
@@ -620,6 +621,7 @@ public class AMapProvider implements IMapProvider {
     /**
      * 在Activity的onPause中调用
      */
+    @Override
     public void onPause() {
         if (mapView != null) {
             try {
@@ -634,6 +636,7 @@ public class AMapProvider implements IMapProvider {
     /**
      * 在Activity的onDestroy中调用
      */
+    @Override
     public void onDestroy() {
         if (mapView != null) {
             try {
