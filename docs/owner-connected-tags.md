@@ -69,6 +69,56 @@ So **unauthorised ringing (any passer-by) and authorised ringing (the owner, tag
 different protocols**, and only the first is a simple GATT write. Anyone starting here should
 assume the GATT path does not cover the case they care about.
 
+### Two control points, and what each one is gated on
+
+**[#193](https://github.com/parawanderer/OpenTagViewer/issues/193)** (@LiamJ74) is the first
+capture of the authorised path on a **third-party** Find My accessory, a RAVEMEN ABF01 bike finder,
+and it shows that for these accessories the owner path is a GATT write too. It just isn't the
+characteristic the unauthorised path uses.
+
+| Characteristic | Role | Opcodes | Gated on |
+| --- | --- | --- | --- |
+| `4F860003` | non-owner control point | `01 00 03` start, `01 01 03` stop | an **unencrypted** link, and the accessory being **separated** from its owner |
+| `4F860002` | configuration control point, the owner's | `01 00 02` start, `01 01 02` stop, `01 09 02` get status | a link **encrypted** with the owner's bond key |
+
+What #193 established, from an iPhone HCI trace and a `sysdiagnose` whose `locationd` names each
+write:
+
+- **The iPhone rings its own accessory through `4F860002`**, in the order status query
+  (`01 09 02`, "HE(T) Get Multi Status"), start (`01 00 02`, "HE(T) Play Sound Sequence"), and
+  stop (`01 01 02`, "HE(T) Stop Sound") about 2.7 seconds later.
+- **It encrypts the link first**: `HCI_LE_Start_Encryption` right after connecting, with the same
+  LTK across sessions and EDIV and Rand both zero, and no SMP exchange. Zero EDIV and Rand is what an
+  LE Secure Connections bond looks like on reconnection, so this reads as an existing bond being
+  resumed rather than anything exotic.
+- **The same writes from Android, unencrypted, are acknowledged and play nothing.** Replicated
+  byte-for-byte, in order, each gated on the previous write's callback.
+- **Android's public API cannot encrypt with a supplied LTK.** `createBond()` negotiates a new
+  key. The rooted route, BlueZ on the internal controller with the key loaded through `btmgmt`,
+  failed at `btattach` because that kernel lacks the `N_HCI` line discipline
+  (`CONFIG_BT_HCIUART`).
+
+**Why the unencrypted write is ignored** is visible in a vendor Find My SDK,
+[`J-MOGI/BT_SDK` `ble_fmy.c`](https://github.com/J-MOGI/BT_SDK/blob/903fc1863b6f91e4cb9b6b09cc38cc4c5e8593b9/apps/spp_and_le/examples/findmy/ble_fmy.c#L433-L448):
+a paired accessory treats every connection as a non-owner, with `4F860002` disabled, until
+encryption succeeds, and then switches it to owner mode. The comment beside that switch says that
+different phones on the paired Apple ID can also encrypt successfully, so **the bond key belongs
+to the account, not to one phone**. Where the account keeps it, and whether anything this app
+exports contains it, is not known.
+
+**And why #139 has worked at all.** The non-owner path is gated on separation, not encryption. The
+[DULT accessory protocol draft](https://datatracker.ietf.org/doc/html/draft-ietf-dult-accessory-protocol-00)
+says Sound_Start and Sound_Stop "SHALL only be available to the platform when the accessory is in
+the separated state", over an unencrypted connection, and answered with Invalid_command otherwise.
+Every test in #193 had the owner's iPhone next to the accessory, which is the one state in which
+that write cannot work, and it is the same trap stek29 hit above. For a user of this app with no
+Apple device near their tag, separated is the normal state.
+
+Not yet tested: #193's accessory, with every device on its Apple ID out of range, answering the
+`4F860003` write. That would confirm the non-owner path covers most of what users here need. Read
+the Command_Response indication on `4F860003` rather than listening for a sound. The
+tracking issue is **[#201](https://github.com/parawanderer/OpenTagViewer/issues/201)**.
+
 **[FindMy.py #211 — feat: Play sound on accessories](https://github.com/malmeloo/FindMy.py/pull/211)**
 malmeloo's experimental branch (`feat/accessory-communication`), still a draft. His own note is
 that he *"cannot get it to work reliably"* and suspects his Linux Bluetooth stack. This is the
@@ -89,10 +139,13 @@ authorised path actually looks like.
 
 **[seemoo-lab/AirGuard](https://github.com/seemoo-lab/AirGuard)** — Kotlin, Apache-2.0, ~2.5k stars
 An Android anti-stalking app that scans for nearby Find My accessories. **malmeloo states in #88
-that AirGuard supports ringing**, and that Apple's own Android app likely does too. If that is
-right, it is an existence proof that this is doable from Android without a jailbreak, and its
-source is the obvious place to look. *(Not verified line-by-line — worth confirming before relying
-on it.)*
+that AirGuard supports ringing**, and that Apple's own Android app likely does too. It does, and
+through the **non-owner** path only: its
+[`AppleFindMy.kt`](https://github.com/seemoo-lab/AirGuard/blob/7f71a37d0776acc5f0e8d3046d3daaf8b71ad58d/app/src/main/java/de/seemoo/at_tracking_detection/database/models/device/types/AppleFindMy.kt#L478-L492)
+writes `01 00 03` to `4F860003`, or `0x0300` to the DULT characteristic where an accessory has
+one. That fits its purpose: the trackers it rings are travelling with somebody who is not their
+owner, which is to say separated. So it is an existence proof for the separated case, and says
+nothing about the owner-nearby one.
 
 **Apple's "Tracker Detect" for Android** — same claim, closed source, but it demonstrably interacts
 with tags it does not own.
@@ -135,6 +188,8 @@ protection was reverse engineered.
   **[#139](https://github.com/parawanderer/OpenTagViewer/pull/139) is directly affected by stek29's finding**: if the GATT path only covers the unauthorised
   command, then the owner-nearby case — the one that matters when your own tag is next to you —
   is a different protocol.
+- **[#193](https://github.com/parawanderer/OpenTagViewer/issues/193)** (@LiamJ74) — the owner-path capture summarised under [Two control points](#two-control-points-and-what-each-one-is-gated-on).
+- **[#201](https://github.com/parawanderer/OpenTagViewer/issues/201)** — the tracking issue for ringing a tag that is near its owner.
 - **[#17](https://github.com/parawanderer/OpenTagViewer/issues/17)** — the original "Play Sound" request, and where @ubrt's work started.
 - **[#131](https://github.com/parawanderer/OpenTagViewer/issues/131)** — locating the owner's own iPhones, iPads and Macs. A different mechanism again (those
   self-report to iCloud), but it is the other half of "why does this app show less than Apple's".
