@@ -9,17 +9,23 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
+import android.widget.TextView;
 import android.app.Instrumentation.ActivityResult;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.After;
 import org.junit.Before;
@@ -28,6 +34,7 @@ import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.AppleLoginActivity;
 import dev.wander.android.opentagviewer.Eventually;
+import dev.wander.android.opentagviewer.util.rx.ACodeAppleAlreadyTook;
 import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
@@ -159,6 +166,81 @@ public class ACodeAppleTookAndThenFailedOnTest {
 
         assertEquals("signing in again was not needed and must not happen",
                 1, this.apple.timesCalled("login"));
+    }
+
+    /**
+     * <b>Going back and failing again leaves one countdown, not two.</b>
+     *
+     * <p>The countdown is a {@code Handler} that re-posts itself every second, and the pages of
+     * this screen are views inside one activity - so pressing back is not a destroy, and nothing
+     * cancelled it. A second failure started a second countdown, both wrote to the same error
+     * line every second, and the user watched two timers disagree.
+     *
+     * <p><b>The visible half is the lesser one.</b> On reaching zero the orphan calls
+     * {@code requestCode}, asking Apple for a fresh code from a screen the user has left, for a
+     * method they may no longer have chosen. That is unobservable here - the waits are 60s and
+     * 120s - which is exactly why the assertion below is on the number instead.
+     *
+     * <p><b>How it catches it:</b> the first failure counts down from
+     * {@code WAITS_MS[0]} and the second from {@code WAITS_MS[1]}, so an orphaned first timer
+     * writes values around 60 into a line that should be showing about 120. Sampling the text and
+     * requiring it to stay near the second wait separates the two without waiting for either.
+     */
+    @Test
+    public void goingBackAndFailingAgainDoesNotLeaveASecondCountdownRunning() throws Exception {
+        this.getToTheCodeBoxAndSubmit();
+
+        Eventually.check(() -> onView(withId(R.id.verification_code_error_message))
+                .check(matches(isDisplayed())));
+
+        // Back to the method list, then in again and fail a second time.
+        //
+        // **Scoped to what is on screen.** The code screen's "sent to ... +44 ******1234" label
+        // stays in the hierarchy behind the method list, so matching on the number alone finds
+        // two views the second time round and Espresso refuses. It works the first time only
+        // because that label has not been rendered yet.
+        final org.hamcrest.Matcher<android.view.View> theSmsOption =
+                allOf(withText(containsString(FakeAppleAuthService.PHONE_ONE)), isDisplayed());
+
+        onView(withId(R.id.twofactorauthchoice_back_button)).perform(click());
+        Eventually.check(() -> onView(theSmsOption).check(matches(isDisplayed())));
+        onView(theSmsOption).perform(click());
+        this.submitTheCode();
+
+        Eventually.check(() -> onView(withId(R.id.verification_code_error_message))
+                .check(matches(isDisplayed())));
+
+        final long secondWait = ACodeAppleAlreadyTook.WAITS_MS[1] / 1000L;
+        final long firstWait = ACodeAppleAlreadyTook.WAITS_MS[0] / 1000L;
+        final long floor = secondWait - ((secondWait - firstWait) / 2L);
+
+        // Sampled rather than checked once: with two timers alive the line alternates, so a
+        // single look can land on the right value and pass against the bug.
+        for (int sample = 0; sample < 6; sample++) {
+            final Integer shown = this.secondsShown();
+            if (shown != null) {
+                assertTrue("the error line showed " + shown + "s, which is the first countdown"
+                                + " still running underneath the second - expected about "
+                                + secondWait + "s",
+                        shown > floor);
+            }
+            Thread.sleep(500L);
+        }
+    }
+
+    /** The number in the countdown line, or null when it is not showing one. */
+    private Integer secondsShown() {
+        final CharSequence[] text = new CharSequence[1];
+        this.scenario.onActivity(activity -> {
+            final TextView line = activity.findViewById(R.id.verification_code_error_message);
+            text[0] = line == null ? null : line.getText();
+        });
+
+        if (text[0] == null) {
+            return null;
+        }
+        final Matcher digits = Pattern.compile("\\d+").matcher(text[0].toString());
+        return digits.find() ? Integer.valueOf(digits.group()) : null;
     }
 
     private void getToTheCodeBoxAndSubmit() {
