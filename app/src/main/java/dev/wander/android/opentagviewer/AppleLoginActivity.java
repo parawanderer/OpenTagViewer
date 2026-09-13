@@ -1023,6 +1023,14 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.twoFactorEntryManager.clear();
         final FrameLayout twoFactorErrorMessage = this.findViewById(R.id.verification_code_error_msg_container);
         twoFactorErrorMessage.setVisibility(GONE); // re-show it later if relevant...
+
+        // **The countdown belongs to the screen being left.** Leaving it running does two
+        // things, and the visible one is the lesser: a second failure starts a second
+        // countdown, both tick into the same error line, and the user watches two timers
+        // disagree. The worse one is silent - on reaching zero it asks Apple for a fresh code
+        // from a screen the user is no longer on, for a method they may no longer have chosen.
+        this.stopWaitingForApple();
+
         this.show2FAChoiceScreen(Direction.BACK);
     }
 
@@ -1077,6 +1085,7 @@ public class AppleLoginActivity extends AppCompatActivity {
         Log.i(TAG, "Apple took the code and then failed; waiting " + wait
                 + "ms before asking for a new one");
         errorText.setText(R.string.twofactor_apple_took_the_code);
+        this.stopWaitingForApple();
         this.countDownThenAskForANewCode(wait, errorBox, errorText);
     }
 
@@ -1117,10 +1126,21 @@ public class AppleLoginActivity extends AppCompatActivity {
                 1000L);
     }
 
+    /**
+     * Stop any countdown waiting out a spent code.
+     *
+     * <p>Called wherever the 2FA code screen is left or restarted, because the countdown is
+     * <b>not</b> tied to the activity lifecycle - these are pages inside one activity, so going
+     * back is not a destroy and nothing else cancels it.
+     */
+    private void stopWaitingForApple() {
+        this.waitingForApple.removeCallbacksAndMessages(null);
+    }
+
     @Override
     protected void onDestroy() {
         // Or a countdown outlives the screen and writes to views that are gone.
-        this.waitingForApple.removeCallbacksAndMessages(null);
+        this.stopWaitingForApple();
         super.onDestroy();
     }
 
