@@ -454,9 +454,12 @@ Every one of these is tested twice: `WhichFailuresNeedAFreshSignInTest` on the J
 decision, `EveryPathAsksForAFreshSignInTest` on a device for each caller honouring it. A shared
 predicate does not stop a fourth screen being written that never asks.
 
-### 16. A pull request based on anything but `main` runs almost no CI
+### 16. A green pull request here is often an empty one
 
-Every workflow that matters here is gated `pull_request: branches: [ "main" ]` —
+Two independent filters decide whether a workflow runs, and **a PR that matches neither reports
+as passing rather than as skipped.** Both have already happened, on the same day.
+
+**The base branch.** Every workflow that matters is gated `pull_request: branches: [ "main" ]` —
 `build-debug.yml`, `static-checks.yml`, `macos-scripts-python.yml`, and with them the APK build,
 the Chaquopy bridge tests, the JVM suite and the whole emulator suite. A PR opened against another
 branch, to stack a change on one still in review, matches none of those filters.
@@ -465,9 +468,18 @@ branch, to stack a change on one still in review, matches none of those filters.
 filter (`exporter-build-check.yml`) runs, passes, and is the only tick on the page. `gh pr checks`
 prints a single passing line and looks exactly like a small change with a small amount of CI.
 
-This has already happened: a change touching twelve Java files, four Python modules and six test
-classes sat on a PR based on another branch, with one green Windows-binary check and not one line
-of Java compiled anywhere.
+A change touching twelve Java files, four Python modules and six test classes sat on a PR based on
+another branch, with one green Windows-binary check and not one line of Java compiled anywhere.
+
+**The paths.** The same workflows are filtered to `app/**`, `scripts/**`, `gradle/**`,
+`pyrightconfig.json` and `.flake8`. **`.github/**` matches none of them**, so a change to the
+workflows themselves runs neither the build nor the static checks — and neither does a change to
+`docs/`, `AGENTS.md`, or `.claude/`. Merging does not rescue it either: the `push` trigger carries
+the same filters, so a workflow edit is first exercised by whoever next touches `app/`, which is a
+long way from the change that broke it.
+
+That one bit on a bump of four GitHub Actions across eight workflow files. The only check that ran
+was `exporter-build-check.yml`, and only because the PR happened to edit that file.
 
 **So check what actually ran before believing a PR is green**, and count the checks rather than
 reading the colour:
@@ -475,6 +487,15 @@ reading the colour:
 ```bash
 gh pr checks <pr>          # one line is not a passing build, it is an empty one
 gh pr view <pr> --json baseRefName
+```
+
+**For a change CI will not reach, run it by hand.** `build-debug.yml`, `static-checks.yml`,
+`check-adi-libraries.yml` and `update-contributors.yml` all carry `workflow_dispatch`, and it
+takes a ref — so the real jobs can be run against the branch before it merges:
+
+```bash
+gh workflow run "Generate APK (Debug)" --ref <branch>
+gh workflow run "Static checks" --ref <branch>
 ```
 
 Stacking is still fine — base it on `main` anyway. The diff carries the other branch's commits
