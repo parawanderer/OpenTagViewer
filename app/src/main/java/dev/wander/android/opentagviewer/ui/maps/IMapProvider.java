@@ -152,6 +152,44 @@ public interface IMapProvider {
      * @return 地图View
      */
     View getMapView();
+
+    /**
+     * The zoom this provider opens a tag at.
+     *
+     * <p><b>Per provider, because a zoom level is not a distance.</b> The number is an index into
+     * whatever tile pyramid the provider draws, and two providers at the same index do not
+     * necessarily show the same amount of street - so one value shared across all of them means
+     * one of them is wrong, and which one depends on who last tuned it.
+     *
+     * <p>Google's scale is the reference (level 16 is "streets"), so that is the default and
+     * nothing that was working changes by this existing.
+     */
+    default float initialZoom() {
+        return 16.0f;
+    }
+
+    /**
+     * Forwarded from the hosting activity, for providers whose map view needs the callback.
+     *
+     * <p><b>Default no-ops so that a provider which does not care says nothing</b>, and - the
+     * actual point - so the activity never asks which provider it has. It used to: three
+     * {@code instanceof AMapProvider} blocks, one per callback, and the next provider added
+     * copied them. That is the branching {@code IMapProvider} exists to prevent (AGENTS.md rule
+     * 7), and a new implementation should need no edit in {@code MapsActivity} at all.
+     *
+     * <p>AMap's SDK requires all three; osmdroid requires resume and pause; Google's
+     * {@code MapView} is managed by the fragment and requires none.
+     */
+    default void onResume() {
+    }
+
+    /** See {@link #onResume()}. */
+    default void onPause() {
+    }
+
+    /** See {@link #onResume()}. */
+    default void onDestroy() {
+    }
     
     /**
      * 地图就绪回调接口
