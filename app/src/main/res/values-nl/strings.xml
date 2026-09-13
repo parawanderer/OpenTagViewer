@@ -383,4 +383,8 @@ Je tags en hun locatiegeschiedenis blijven ongemoeid, en er is niets uit je Appl
 
 Er is geen geschiedenis geïmporteerd en eerder opgeslagen gegevens zijn niet gewijzigd.</string>
     <string name="map_provider_osm">OpenStreetMap</string>
+    <string name="login_export_logs">Logboeken exporteren</string>
+    <string name="error_report_body_login">Aanmelden is niet gelukt. Het logboek hieronder vermeldt welke stap is mislukt en wat er terugkwam; dat is bijna altijd het deel dat het verklaart.
+
+Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen het eerste om te doen. Blijft het mislukken, dan maakt een melding met dit logboek het oplosbaar.</string>
 </resources>

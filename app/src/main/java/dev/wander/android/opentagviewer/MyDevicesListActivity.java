@@ -583,17 +583,8 @@ public class MyDevicesListActivity extends AppCompatActivity {
         // **The cause, not the wrapper.** Rx wraps what a `map` throws, so `describe(error)` here
         // would put "RuntimeException" on the page and bury the sentence the reporter needs.
         this.startActivity(ErrorReportActivity.intentFor(
-                this, ErrorReportActivity.describe(rootOf(error)),
+                this, ErrorReportActivity.describe(ErrorReportActivity.rootOf(error)),
                 R.string.error_report_body_export));
-    }
-
-    /** The innermost cause, which is the one that says what actually happened. */
-    private static Throwable rootOf(final Throwable error) {
-        Throwable cause = error;
-        while (cause.getCause() != null && cause.getCause() != cause) {
-            cause = cause.getCause();
-        }
-        return cause;
     }
 
     private void exportHistoryForSelection() {
@@ -744,7 +735,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 || failure.getReason() == HistoryImportException.Reason.UNEXPECTED) {
             this.startActivity(ErrorReportActivity.intentFor(
                     this,
-                    ErrorReportActivity.describe(rootOf(error)),
+                    ErrorReportActivity.describe(ErrorReportActivity.rootOf(error)),
                     R.string.error_report_body_history_import));
             return;
         }
