@@ -383,4 +383,8 @@ Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Ap
 
 Es wurde kein Verlauf importiert und bereits gespeicherte Daten wurden nicht geändert.</string>
     <string name="map_provider_osm">OpenStreetMap</string>
+    <string name="login_export_logs">Protokolle exportieren</string>
+    <string name="error_report_body_login">Die Anmeldung ist nicht durchgekommen. Das Protokoll unten nennt den fehlgeschlagenen Schritt und die Antwort darauf – meist genau der Teil, der es erklärt.
+
+Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es erneut zu versuchen. Schlägt es weiterhin fehl, macht ein Bericht mit diesem Protokoll es behebbar.</string>
 </resources>

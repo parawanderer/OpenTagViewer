@@ -416,4 +416,8 @@ Your tags and their location history are not affected, and nothing was removed f
     <string name="error_report_body_history_import">The app could not restore history from the file you picked, and cannot say why — so trying again with the same file may not help.
 
 No history was imported and nothing already stored was changed.</string>
+    <string name="login_export_logs">Export logs</string>
+    <string name="error_report_body_login">Signing in did not get through. The log below says which step failed and what came back, which is almost always the part that explains it.
+
+If Apple simply refused the request, waiting and trying again is worth doing first. If it keeps failing, a report with this log attached is what makes it fixable.</string>
 </resources>

@@ -131,16 +131,42 @@
                     android:visibility="invisible"
                     tools:visibility="visible">
 
-                    <TextView
-                        android:id="@+id/login_error_message_text"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/nunito_medium"
-                        android:padding="8dp"
-                        android:text="@string/login_failed_x"
-                        android:textColor="?attr/colorOnErrorContainer"
-                        android:textSize="14sp"
-                        tools:visibility="visible" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/login_error_message_text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_medium"
+                            android:padding="8dp"
+                            android:text="@string/login_failed_x"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:textSize="14sp"
+                            tools:visibility="visible" />
+
+                        <!--
+                            **The only way off this screen with a log in hand.** A sign-in failure
+                            never reached the error report page, so the one screen whose failures
+                            need diagnosing was the one screen that could not produce evidence -
+                            short of adb on a second machine. Opens the report page as its own
+                            activity, so closing it comes straight back here with the error still
+                            showing.
+                        -->
+                        <Button
+                            android:id="@+id/login_error_export_logs"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:layout_marginEnd="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:text="@string/login_export_logs"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            app:strokeColor="?attr/colorOnErrorContainer" />
+                    </LinearLayout>
                 </FrameLayout>
 
                 <com.google.android.material.textfield.TextInputLayout

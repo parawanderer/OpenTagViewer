@@ -93,6 +93,22 @@ public class ErrorReportActivity extends AppCompatActivity {
      * exactly this string and two of them writing it slightly differently makes two reports of
      * one bug look like two bugs.
      */
+    /**
+     * The innermost cause, which is the one that says what actually happened.
+     *
+     * <p>Here beside {@link #describe} because every caller of that needs this first, and for a
+     * reason that is easy to miss: Rx wraps what a {@code map} throws, so describing the error as
+     * it arrives puts "RuntimeException" on the page and buries the sentence the reporter needs.
+     * Two screens writing their own copy of this is two reports of one bug looking like two.
+     */
+    public static Throwable rootOf(final Throwable error) {
+        Throwable cause = error;
+        while (cause != null && cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
+    }
+
     public static String describe(final Throwable error) {
         if (error == null) {
             return "unknown";
