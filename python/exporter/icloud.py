@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import math
 import uuid
 from io import BytesIO
 from pathlib import Path
@@ -615,7 +616,22 @@ def apple_is_declining(error: BaseException) -> AppleServiceUnavailableError | N
 
 
 def describe_apple_declining(error: AppleServiceUnavailableError) -> str:
-    """What to tell somebody whose sign-in was refused by Apple rather than by their password."""
+    """
+    What to tell somebody whose sign-in was refused by Apple rather than by their password.
+
+    **Apple's own wait comes first when it named one**, from a `Retry-After` header, because it
+    is the only reliable advice there is. No refusal from Grand Slam has been seen carrying one,
+    so the usual message is the one without it - and that one invents no number.
+    """
+    if error.retry_after is not None:
+        return (
+            f"Apple's sign-in service refused the request with HTTP {error.status_code}, and asked"
+            f" for {_a_wait_a_person_reads(error.retry_after)} before trying again.\n\n"
+            "Apple declined it rather than anything being wrong with your Apple ID, your password"
+            " or your verification code. Nothing was changed and nothing was sent.\n\n"
+            "Signing in again sooner than that is likely to be refused the same way."
+        )
+
     return (
         f"Apple's sign-in service refused the request with HTTP {error.status_code}.\n\n"
         "Apple declined it rather than anything being wrong with your Apple ID, your password or"
@@ -625,6 +641,18 @@ def describe_apple_declining(error: AppleServiceUnavailableError) -> str:
         " report it with this log rather than waiting it out. Why it persists for some accounts"
         " and not others is not yet known."
     )
+
+
+def _a_wait_a_person_reads(seconds: float) -> str:
+    """Seconds, minutes or hours, rounded up so nobody is told to come back too early."""
+    whole = max(0, math.ceil(seconds))
+    if whole < 60:
+        amount, unit = whole, "second"
+    elif whole < 2 * 60 * 60:
+        amount, unit = math.ceil(whole / 60), "minute"
+    else:
+        amount, unit = math.ceil(whole / (60 * 60)), "hour"
+    return f"{amount} {unit}{'' if amount == 1 else 's'}"
 
 
 def _apple_failed_after_taking_the_code(error: BaseException) -> SignInInterrupted:
