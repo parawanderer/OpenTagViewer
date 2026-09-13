@@ -382,4 +382,5 @@ Deine Tags und ihr Standortverlauf sind davon nicht betroffen, und aus deinem Ap
     <string name="error_report_body_history_import">Die App konnte den Verlauf aus der ausgewählten Datei nicht wiederherstellen und kann nicht feststellen, warum — ein erneuter Versuch mit derselben Datei hilft daher möglicherweise nicht.
 
 Es wurde kein Verlauf importiert und bereits gespeicherte Daten wurden nicht geändert.</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
 </resources>

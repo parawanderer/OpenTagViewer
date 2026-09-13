@@ -382,4 +382,5 @@ Your tags and their location history are not affected, and nothing was removed f
     <string name="error_report_body_history_import">The app could not restore history from the file you picked, and cannot say why — so trying again with the same file may not help.
 
 No history was imported and nothing already stored was changed.</string>
+    <string name="map_provider_osm">OpenStreetMap</string>
 </resources>

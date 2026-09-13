@@ -405,6 +405,20 @@ public class OsmMapProvider implements IMapProvider {
     }
 
     /** Called from the activity's onResume - osmdroid needs this to resume tile loading. */
+    /**
+     * Two levels closer in than Google's default.
+     *
+     * <p>osmdroid indexes the same standard tile pyramid, but the tiles it draws carry less
+     * label and building detail per level, so the reference level 16 opens on a view that reads
+     * as further out than the same number does on Google's. This is a judgement about what the
+     * user sees rather than a correction to the number.
+     */
+    @Override
+    public float initialZoom() {
+        return 18.0f;
+    }
+
+    @Override
     public void onResume() {
         if (this.mapView != null) {
             this.mapView.onResume();
@@ -412,6 +426,7 @@ public class OsmMapProvider implements IMapProvider {
     }
 
     /** Called from the activity's onPause - osmdroid needs this to release tile resources. */
+    @Override
     public void onPause() {
         if (this.mapView != null) {
             this.mapView.onPause();
@@ -419,6 +434,7 @@ public class OsmMapProvider implements IMapProvider {
     }
 
     /** Called from the activity's onDestroy. */
+    @Override
     public void onDestroy() {
         if (this.myLocationOverlay != null) {
             this.myLocationOverlay.disableMyLocation();
