@@ -55,6 +55,16 @@ public class PythonAccountLoginException extends RuntimeException {
      */
     private final transient PyObject account;
 
+    /**
+     * Seconds Apple asked for before another attempt, or null when it did not say.
+     *
+     * <p><b>Null is the usual value, and means unknown rather than "retry now".</b> It comes from
+     * a {@code Retry-After} header, and no refusal from Grand Slam has been seen carrying one -
+     * so nothing may substitute a number for it. When present, it is the only reliable advice
+     * there is about how long to leave it.
+     */
+    private final Double retryAfterSeconds;
+
     public PythonAccountLoginException(String message) {
         this(message, REASON_UNKNOWN);
     }
@@ -64,21 +74,29 @@ public class PythonAccountLoginException extends RuntimeException {
     }
 
     public PythonAccountLoginException(String message, String reason, PyObject account) {
+        this(message, reason, account, null);
+    }
+
+    public PythonAccountLoginException(
+            String message, String reason, PyObject account, Double retryAfterSeconds) {
         super(message);
         this.reason = reason == null || reason.isBlank() ? REASON_UNKNOWN : reason;
         this.account = account;
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 
     public PythonAccountLoginException(String message, Throwable cause) {
         super(message, cause);
         this.reason = REASON_UNKNOWN;
         this.account = null;
+        this.retryAfterSeconds = null;
     }
 
     public PythonAccountLoginException(Throwable cause) {
         super(cause);
         this.reason = REASON_UNKNOWN;
         this.account = null;
+        this.retryAfterSeconds = null;
     }
 
     /** Which kind of failure this was, for choosing what to show. Never null. */
@@ -89,6 +107,11 @@ public class PythonAccountLoginException extends RuntimeException {
     /** The account to agree to terms with, or null. See {@link #REASON_TERMS}. */
     public PyObject getAccount() {
         return this.account;
+    }
+
+    /** How long Apple asked the user to wait, in seconds, or null. See the field. */
+    public Double getRetryAfterSeconds() {
+        return this.retryAfterSeconds;
     }
 
     /** Whether this is a terms failure that can actually be recovered from in the app. */

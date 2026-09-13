@@ -69,10 +69,14 @@ public final class PythonAuthService {
                 // agreeing needs. Null for every other reason, which is what stops it being
                 // stored in a state that fails every later fetch (issues #43 and #119).
                 final var pendingAccount = resultMap.get("account");
+                // Present only when Apple named a wait, which it has not yet been seen to do.
+                // Absent is carried as null, never as zero - zero would read as "retry now".
+                final var retryAfter = resultMap.get("retryAfterSeconds");
                 throw new PythonAccountLoginException(
                         errorMessage,
                         reason == null ? null : reason.toString(),
-                        pendingAccount);
+                        pendingAccount,
+                        retryAfter == null ? null : retryAfter.toDouble());
             }
 
             // need to do an annoying conversion here...
