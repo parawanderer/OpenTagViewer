@@ -383,4 +383,8 @@ Vos tags et leur historique de position ne sont pas touchés, et rien n’a ét�
     <string name="error_report_body_history_import">L’application n’a pas pu restaurer l’historique depuis le fichier sélectionné et ne peut pas en déterminer la raison — réessayer avec le même fichier risque donc de ne pas fonctionner.
 
 Aucun historique n’a été importé et les données déjà enregistrées n’ont pas été modifiées.</string>
+    <string name="login_export_logs">Exporter les journaux</string>
+    <string name="error_report_body_login">La connexion n\'a pas abouti. Le journal ci-dessous indique quelle étape a échoué et ce qui a été renvoyé, ce qui explique presque toujours le problème.
+
+Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer. Si l\'échec persiste, un rapport accompagné de ce journal permet de corriger le problème.</string>
 </resources>

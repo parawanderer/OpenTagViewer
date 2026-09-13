@@ -383,4 +383,8 @@
 
 未匯入任何歷史記錄，已儲存的資料也沒有變更。</string>
     <string name="map_provider_osm">OpenStreetMap</string>
+    <string name="login_export_logs">匯出日誌</string>
+    <string name="error_report_body_login">登入未能完成。下方的日誌會說明哪一步失敗以及回傳了什麼，原因通常就在其中。
+
+如果只是 Apple 拒絕了請求，先等一會兒再試。若持續失敗，附上此日誌的回報才能讓問題獲得修正。</string>
 </resources>
