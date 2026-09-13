@@ -73,6 +73,7 @@ import dev.wander.android.opentagviewer.ui.login.StepTransition;
 import dev.wander.android.opentagviewer.ui.login.StepTransition.Direction;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
+import dev.wander.android.opentagviewer.util.HowLongToWait;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.rx.ACodeAppleAlreadyTook;
@@ -762,6 +763,15 @@ public class AppleLoginActivity extends AppCompatActivity {
         // 503" verbatim.** That is accurate and reads as a bug in this app, which is how issue
         // #176 came to be filed. Nothing about the Apple ID or the password is wrong here.
         if (PythonAccountLoginException.REASON_APPLE_DECLINED.equals(reason)) {
+            // Apple's own wait replaces the "try again shortly" advice when it named one - it is
+            // the only reliable answer to "how long". It usually has not, and then nothing here
+            // invents a number: a guess too short is refused again.
+            final Double wait = ((PythonAccountLoginException) error).getRetryAfterSeconds();
+            if (wait != null) {
+                return this.getString(R.string.login_failed_apple_asked_to_wait,
+                        HowLongToWait.of(wait).describe(
+                                this.getResources().getConfiguration().getLocales().get(0)));
+            }
             return this.getString(R.string.login_failed_apple_declined);
         }
 

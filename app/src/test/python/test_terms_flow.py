@@ -308,33 +308,6 @@ class TestAgreeing:
         assert not json.loads(main.acceptTerms(account, "iCloud"))["ok"]
 
 
-class FakeSigningIn:
-    """An account whose `login` raises, for driving `loginSync`'s failure path."""
-
-    def __init__(self, raising: BaseException) -> None:
-        self._raising = raising
-        self.login_state = LoginState.LOGGED_OUT
-
-    def login(self, email: str, password: str):
-        raise self._raising
-
-
-@pytest.fixture
-def signingIn(monkeypatch):
-    """`loginSync`, with the Anisette and identity machinery stubbed out."""
-
-    def attempt(raising: BaseException):
-        account = FakeSigningIn(raising)
-        monkeypatch.setattr(main, "AppleAccount", lambda *a, **k: account)
-        monkeypatch.setattr(main, "_anisetteProvider", lambda *a, **k: object())
-        monkeypatch.setattr(main.app_identity, "identityForNewSession", lambda _: {})
-        monkeypatch.setattr(main.app_identity, "deviceIdsForNewSession", lambda _: {})
-
-        return account, main.loginSync("someone@example.com", "hunter2", "https://ani.example")
-
-    return attempt
-
-
 class TestTheAccountSurvivesLongEnoughToAgree:
     """
     The seam the screen depends on, and the one that is easy to leave out.

@@ -126,3 +126,52 @@ class TestWhatTheUserIsTold:
     def test_itdoesNotAskForABugReportOutright(self, message):
         """The behaviour being fixed."""
         assert "github.com" not in message.lower()
+
+
+class TestWhenAppleNamesAWait:
+    """
+    **Absent is the observed case and the one that has to stay honest.** No refusal from Grand
+    Slam has been seen with a `Retry-After` header, so everything above - the message without a
+    wait - is what people actually read. This is for the day Apple says how long.
+    """
+
+    @staticmethod
+    def told(seconds: float) -> str:
+        return icloud.describe_apple_declining(
+            AppleServiceUnavailableError(429, "The Grand Slam request", retry_after=seconds),
+        )
+
+    def test_itsaysHowLongAppleAskedFor(self):
+        assert "asked for 2 minutes before trying again" in self.told(90)
+
+    def test_itkeepsTheStatusAndClearsTheCredentials(self):
+        message = self.told(90)
+
+        assert "429" in message
+        assert "password" in message
+        assert "nothing was changed" in message.lower()
+
+    def test_itdropsTheAdviceToTryAgainShortly(self):
+        """Apple has just said when. "Shortly" would contradict it."""
+        assert "shortly" not in self.told(90)
+
+    @pytest.mark.parametrize(("seconds", "said"), [
+        (0, "0 seconds"),
+        (1, "1 second"),
+        (59.2, "1 minute"),
+        (60, "1 minute"),
+        (61, "2 minutes"),
+        (7199, "120 minutes"),
+        (7200, "2 hours"),
+        (7201, "3 hours"),
+    ])
+    def test_itroundsUpNeverDown(self, seconds, said):
+        """Told to come back too early, a person is refused again and trusts the number less."""
+        assert f"asked for {said} before" in self.told(seconds)
+
+    def test_withoutOneItNamesNoWaitAtAll(self):
+        """No invented number when the header was absent."""
+        message = icloud.describe_apple_declining(a_503())
+
+        assert "asked for" not in message
+        assert "minute" not in message

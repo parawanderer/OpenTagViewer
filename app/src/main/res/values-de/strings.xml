@@ -387,4 +387,5 @@ Es wurde kein Verlauf importiert und bereits gespeicherte Daten wurden nicht ge�
     <string name="error_report_body_login">Die Anmeldung ist nicht durchgekommen. Das Protokoll unten nennt den fehlgeschlagenen Schritt und die Antwort darauf – meist genau der Teil, der es erklärt.
 
 Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es erneut zu versuchen. Schlägt es weiterhin fehl, macht ein Bericht mit diesem Protokoll es behebbar.</string>
+    <string name="login_failed_apple_asked_to_wait">Apple hat die Anmeldung abgelehnt und bittet, %1$s bis zum nächsten Versuch zu warten. Das ist eine Ablehnung durch Apple und kein Problem mit deiner Apple-ID oder deinem Passwort.</string>
 </resources>

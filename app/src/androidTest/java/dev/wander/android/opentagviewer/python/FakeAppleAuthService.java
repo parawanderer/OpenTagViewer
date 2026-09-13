@@ -130,9 +130,27 @@ public final class FakeAppleAuthService implements AppleAuthService {
                 new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
         fake.loginFailsWith = new PythonAccountLoginException(
                 "The Grand Slam request was refused with HTTP 503. This is Apple declining to"
-                        + " serve the request rather than a response this library cannot read,"
-                        + " and it usually clears on its own -- wait and try again.",
+                        + " serve the request rather than a response this library cannot read."
+                        + " Waiting and trying again may help.",
                 PythonAccountLoginException.REASON_APPLE_DECLINED);
+        return fake;
+    }
+
+    /**
+     * Apple declining, and saying how long to leave it - a {@code Retry-After} on the refusal.
+     *
+     * <p><b>Not yet seen from Grand Slam</b>, which is why {@link #appleIsDeclining()} carries no
+     * wait: that is the case people actually meet. This is the one where Apple names a time.
+     */
+    public static FakeAppleAuthService appleAsksToWait(final double seconds) {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "The Grand Slam request was refused with HTTP 429. This is Apple declining to"
+                        + " serve the request rather than a response this library cannot read.",
+                PythonAccountLoginException.REASON_APPLE_DECLINED,
+                null,
+                seconds);
         return fake;
     }
 

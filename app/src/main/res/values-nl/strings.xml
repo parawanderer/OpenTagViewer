@@ -387,4 +387,5 @@ Er is geen geschiedenis geïmporteerd en eerder opgeslagen gegevens zijn niet ge
     <string name="error_report_body_login">Aanmelden is niet gelukt. Het logboek hieronder vermeldt welke stap is mislukt en wat er terugkwam; dat is bijna altijd het deel dat het verklaart.
 
 Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen het eerste om te doen. Blijft het mislukken, dan maakt een melding met dit logboek het oplosbaar.</string>
+    <string name="login_failed_apple_asked_to_wait">Apple heeft de aanmelding geweigerd en vraagt %1$s te wachten voor je het opnieuw probeert. Dit is een weigering van Apple, geen probleem met je Apple ID of wachtwoord.</string>
 </resources>
