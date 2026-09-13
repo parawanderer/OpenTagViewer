@@ -285,8 +285,19 @@ class TestKeyFilesReachTheBundle:
 class FakeAccount:
     """Enough of an `AsyncAppleAccount` for the sign-in flow: it can be closed, and it says so."""
 
+    SERIAL = "0PENTAGXK7QX"
+    """
+    A drawn serial, deliberately not `0PENTAGXPORT`.
+
+    The notice printed before the password prompt used to write the constant into the sentence by
+    hand, and this fake had no `serial` at all - so nothing could tell the difference between the
+    sentence naming the account and the sentence naming a literal. It named a literal for as long
+    as serials were constant, and kept naming it afterwards.
+    """
+
     def __init__(self) -> None:
         self.closed = False
+        self.serial = FakeAccount.SERIAL
 
     async def close(self) -> None:
         self.closed = True
@@ -347,6 +358,23 @@ class TestRememberingTheDevice:
     that happens to share a serial - next to a button offering to remove a device the user does
     not recognise. See `exporter.device`.
     """
+
+    def test_the_notice_names_the_serial_this_run_presents(self, apple, capsys):
+        """
+        The sentence shown before the password prompt tells the user what to look for.
+
+        **It used to be a literal**, written when every install shared one serial and left there
+        when they stopped. A user on a drawn serial was told to look for `0PENTAGXPORT`, would not
+        find it in their device list, and would reasonably conclude the entry they did find
+        belonged to somebody else - which is the belief that gets it removed, taking the session
+        with it. The same defect was fixed on the Android side's registered-device screen.
+        """
+        asyncio.run(cli.sign_in(signing_in()))
+
+        notice = capsys.readouterr().err
+
+        assert FakeAccount.SERIAL in notice
+        assert "0PENTAGXPORT" not in notice
 
     def test_an_ordinary_sign_in_is_remembered(self, apple):
         # The path almost every run takes, and the one that was storing nothing: the call sat in
