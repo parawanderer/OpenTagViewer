@@ -383,4 +383,8 @@
 
 履歴はインポートされず、すでに保存されているデータも変更されていません。</string>
     <string name="map_provider_osm">OpenStreetMap</string>
+    <string name="login_export_logs">ログを書き出す</string>
+    <string name="error_report_body_login">サインインが完了しませんでした。下のログには、どの手順で失敗し、何が返されたかが記録されています。原因はたいていそこにあります。
+
+Appleが要求を拒否しただけなら、少し待ってからもう一度お試しください。それでも失敗する場合は、このログを添えて報告すると修正できます。</string>
 </resources>

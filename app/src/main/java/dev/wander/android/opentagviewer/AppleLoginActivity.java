@@ -33,6 +33,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 import androidx.databinding.DataBindingUtil;
 
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -263,6 +264,9 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.passwordInput = this.findViewById(R.id.password_input_field);
         this.loginButton = this.findViewById(R.id.login_button_main);
         this.twoFactorAuthChoiceBackButton = this.findViewById(R.id.twofactorauthchoice_back_button);
+
+        this.findViewById(R.id.login_error_export_logs)
+                .setOnClickListener(v -> this.openTheReportPageForTheLoginFailure());
 
         this.findViewById(R.id.login_terms_agree_button)
                 .setOnClickListener(v -> this.onAgreeToTerms());
@@ -581,17 +585,13 @@ public class AppleLoginActivity extends AppCompatActivity {
 
                 // undo loading and allow user to try again, basically. Backwards, because
                 // that is what it is: the step the user just left, handed back to them.
-                this.hideLoading();
-                this.showPage(R.id.login_maininfo_container, Direction.BACK);
-                emailOrPhoneInput.setEnabled(true);
-                passwordInput.setEnabled(true);
-                loginButton.setClickable(true);
-
-                FrameLayout loginErrorMessage = this.findViewById(R.id.login_error_container);
-                loginErrorMessage.setVisibility(VISIBLE);
-
-                TextView loginErrorText = this.findViewById(R.id.login_error_message_text);
-                loginErrorText.setText(this.describeLoginFailure(error));
+                //
+                // **Through showLoginFailure rather than inline.** This block did the same five
+                // things by hand, and the copy drifted the moment that method grew a sixth -
+                // recording the failure so the Export logs button can name it. The report opened
+                // saying `cause=unknown`, which reads as the button being broken rather than as
+                // one of two paths having been missed.
+                this.showLoginFailure(error);
             });
     }
 
@@ -698,6 +698,15 @@ public class AppleLoginActivity extends AppCompatActivity {
                 });
     }
 
+    /**
+     * The failure the error box is currently showing, for the report page to name.
+     *
+     * <p>Kept rather than re-derived: {@link #describeLoginFailure} produces a sentence for a
+     * person, and the report page wants the exception - class and message - which is a different
+     * string and the one worth pasting into an issue.
+     */
+    private Throwable lastLoginFailure;
+
     /** Hand the sign-in step back to the user with the failure on it. */
     private void showLoginFailure(final Throwable error) {
         this.hideLoading();
@@ -707,9 +716,24 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.findViewById(R.id.password_input_field).setEnabled(true);
         this.findViewById(R.id.login_button_main).setClickable(true);
 
+        this.lastLoginFailure = error;
         this.findViewById(R.id.login_error_container).setVisibility(VISIBLE);
         ((TextView) this.findViewById(R.id.login_error_message_text))
                 .setText(this.describeLoginFailure(error));
+    }
+
+    /**
+     * Open the report page on the failure just shown.
+     *
+     * <p><b>A separate activity on purpose.</b> Closing it returns here with the error box still
+     * up and the typed Apple ID still in place, so looking at the log costs the user nothing -
+     * which matters because the alternative was a second machine running adb.
+     */
+    private void openTheReportPageForTheLoginFailure() {
+        this.startActivity(ErrorReportActivity.intentFor(
+                this,
+                ErrorReportActivity.describe(ErrorReportActivity.rootOf(this.lastLoginFailure)),
+                R.string.error_report_body_login));
     }
 
     /**

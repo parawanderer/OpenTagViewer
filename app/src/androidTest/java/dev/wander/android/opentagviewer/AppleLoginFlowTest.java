@@ -25,6 +25,8 @@ import android.app.Instrumentation.ActivityResult;
 import android.os.SystemClock;
 
 import androidx.test.core.app.ActivityScenario;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
+import static org.hamcrest.Matchers.allOf;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
@@ -42,6 +44,7 @@ import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 
@@ -340,6 +343,50 @@ public class AppleLoginFlowTest {
                 not(withText(containsString("503")))));
         onView(withId(R.id.login_error_message_text)).check(matches(
                 not(withText(containsString("Grand Slam")))));
+    }
+
+    /**
+     * <b>A failed sign-in can produce a log without a second machine.</b>
+     *
+     * <p>The report page was reachable from the map and the device list and from nowhere else, so
+     * the one screen whose failures most need diagnosing was the one screen that could not hand a
+     * user any evidence. Anyone whose sign-in failed had adb on a laptop or had nothing.
+     *
+     * <p>Asserted on the cause reaching the page rather than merely on the page opening: the
+     * point is that the report names the failure that was on screen, and an intent that opened a
+     * blank report would pass a check that only looked at the component.
+     */
+    @Test
+    public void afailedSignInOffersTheLogWithoutADeveloperMachine() {
+        this.apple = FakeAppleAuthService.rejectsTheSignIn("Bad password");
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_export_logs))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.login_error_export_logs)).perform(click());
+
+        Eventually.check(() -> intended(allOf(
+                hasComponent(ErrorReportActivity.class.getName()),
+                hasExtra(ErrorReportActivity.EXTRA_CAUSE, containsString("Bad password")))));
+    }
+
+    /**
+     * And it is only offered once there is something to report.
+     *
+     * <p>A button sitting under an empty error box invites a log of a sign-in that has not been
+     * attempted, which is a report with nothing in it.
+     */
+    @Test
+    public void thelogButtonIsNotOfferedBeforeAnythingHasFailed() {
+        this.apple = FakeAppleAuthService.rejectsTheSignIn("Bad password");
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+
+        onView(withId(R.id.login_error_export_logs)).check(matches(not(isDisplayed())));
     }
 
     /** A rejected code says so, and gives the boxes back rather than stranding them. */

@@ -383,4 +383,8 @@
 
 未导入任何历史记录，已存储的数据也没有更改。</string>
     <string name="map_provider_osm">OpenStreetMap</string>
+    <string name="login_export_logs">导出日志</string>
+    <string name="error_report_body_login">登录未能完成。下面的日志会说明哪一步失败以及返回了什么，原因通常就在其中。
+
+如果只是 Apple 拒绝了请求，先等一会儿再试。若持续失败，附上此日志的报告才能让问题得到修复。</string>
 </resources>
