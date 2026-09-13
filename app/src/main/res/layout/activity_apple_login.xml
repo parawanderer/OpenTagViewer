@@ -120,15 +120,22 @@
                 android:visibility="gone"
                 tools:visibility="gone">
 
+                <!--
+                    **`gone` until something fails, never `invisible`.** An invisible view still
+                    takes its full height, so the empty box sat between the title and the fields
+                    as a blank band - and grew when the Export logs button went inside it. The code
+                    only ever sets VISIBLE on a failure and GONE on success, so gone is also the
+                    state it was always meant to start in.
+                -->
                 <FrameLayout
                     android:id="@+id/login_error_container"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="8dp"
                     android:background="@drawable/layout_rounded_less"
                     android:backgroundTint="?attr/colorErrorContainer"
-                    android:visibility="invisible"
+                    android:visibility="gone"
                     tools:visibility="visible">
 
                     <LinearLayout

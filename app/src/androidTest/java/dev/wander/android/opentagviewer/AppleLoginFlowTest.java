@@ -9,6 +9,7 @@ import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
@@ -28,6 +29,7 @@ import androidx.test.core.app.ActivityScenario;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
 import static org.hamcrest.Matchers.allOf;
 import androidx.test.espresso.intent.Intents;
+import androidx.test.espresso.matcher.ViewMatchers;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
@@ -387,6 +389,26 @@ public class AppleLoginFlowTest {
         launch();
 
         onView(withId(R.id.login_error_export_logs)).check(matches(not(isDisplayed())));
+    }
+
+    /**
+     * <b>The empty error box takes no room.</b>
+     *
+     * <p>It started as {@code invisible}, which hides a view but keeps its height, so before any
+     * failure there was a blank band between the title and the fields - one that grew when the
+     * Export logs button went inside the box, which is when somebody noticed. Asserted as
+     * {@code GONE} specifically, because {@code not(isDisplayed())} is equally true of an
+     * invisible view and would have passed against the gap.
+     */
+    @Test
+    public void theemptyErrorBoxTakesNoRoomBeforeAnythingHasFailed() {
+        this.apple = FakeAppleAuthService.rejectsTheSignIn("Bad password");
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+
+        onView(withId(R.id.login_error_container))
+                .check(matches(withEffectiveVisibility(ViewMatchers.Visibility.GONE)));
     }
 
     /** A rejected code says so, and gives the boxes back rather than stranding them. */
