@@ -420,4 +420,5 @@ No history was imported and nothing already stored was changed.</string>
     <string name="error_report_body_login">Signing in did not get through. The log below says which step failed and what came back, which is almost always the part that explains it.
 
 If Apple simply refused the request, waiting and trying again is worth doing first. If it keeps failing, a report with this log attached is what makes it fixable.</string>
+    <string name="login_failed_apple_asked_to_wait">Apple refused the sign-in and asked for %1$s before trying again. This is Apple declining, not a problem with your Apple ID or password.</string>
 </resources>

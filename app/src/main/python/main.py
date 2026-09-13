@@ -362,6 +362,11 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
             "reason": reason,
         }
 
+        # Absent rather than zero when Apple did not say, because zero reads as "retry now".
+        wait = appleAskedToWait(e)
+        if wait is not None:
+            failure["retryAfterSeconds"] = wait
+
         # **The account survives a terms failure, and only a terms failure.**
         #
         # Authentication itself worked here - it is the delegate exchange after it that did not
@@ -465,9 +470,13 @@ Apple answered, and refused to serve the request. Not the password, and not the 
 
 **A 503 from Grand Slam reads as a rejected sign-in to everybody who meets it**, because the only
 thing on screen is a failure at the moment a password was entered. It is neither: nothing was
-wrong with the credentials, nothing was reached and refused on their merits, and it clears on its
-own within minutes. Reported as OpenTagViewer#176, where one account met the same 503 three times
-in three minutes at three different call sites.
+wrong with the credentials, and nothing was reached and refused on their merits. Reported as
+OpenTagViewer#176, where one account met the same 503 three times in three minutes at three
+different call sites.
+
+**It does not reliably clear on its own**, so nothing on screen promises that. The 503s of
+September 2026 were Apple refusing the Xcode client identifier, and lasted until the client
+changed; a 429 has been seen to outlast a reinstall.
 
 Distinguished from :data:`REASON_NETWORK` because the advice differs. A network failure is
 usually the phone's - check the connection. This one is Apple's, and checking anything at this
@@ -519,6 +528,20 @@ def classifyLoginFailure(error: BaseException) -> str:
         return REASON_NETWORK
 
     return REASON_UNKNOWN
+
+
+def appleAskedToWait(error: BaseException) -> float | None:
+    """
+    Seconds Apple asked for before another attempt, or None when it did not say.
+
+    **None is the usual answer.** It comes from a `Retry-After` header, and no refusal from Grand
+    Slam has been seen carrying one - so the screen treats None as "unknown" and says nothing
+    about a wait, rather than inventing one. When Apple does name a time it is the only reliable
+    advice available, which is why it is carried at all.
+    """
+    if isinstance(error, AppleServiceUnavailableError):
+        return error.retry_after
+    return None
 
 
 def describeLoginFailure(error: BaseException) -> str:
