@@ -109,13 +109,23 @@ public final class AdiDeviceIdentity {
      * <p><b>Why this stopped being the only one.</b> It was a constant, so every install of this
      * app anywhere presented Apple the same serial while presenting a <i>different</i> machine
      * identity: one serial against thousands of device ids and thousands of Apple IDs, from every
-     * continent, at once. Real hardware does not look like that. The 503s from Grand Slam that
-     * some accounts never recover from - issues #168, #176 and #181 - are consistent with that
-     * fingerprint being refused, and one reporter cleared their device identity to no effect,
-     * which is what would happen if the serial were the part being matched on.
+     * continent, at once. Real hardware does not look like that, and a fingerprint nothing real
+     * produces is worth not sending whether or not anything is matching on it.
      *
-     * <p>That is a hypothesis and is written down as one. It has not been confirmed against
-     * Apple, and the cheap way to confirm it is exactly this change.
+     * <p><b>It does not explain the 503s, and this file used to claim it did.</b> Issues #168,
+     * #176 and #181 were attributed to it while this change was being written. On 2026-09-13 the
+     * hypothesis was tested against an account Apple was actively refusing and eliminated in
+     * stages - a drawn serial, fresh {@code uid} and {@code devid}, fresh ADI provisioning, three
+     * network locations, a second unrelated Apple ID, a second machine, and finally unmodified
+     * upstream FindMy.py, which cannot send a custom serial at all and sends
+     * {@code X-Apple-I-SRL-NO: 0}. Every one of them was refused.
+     *
+     * <p>It is an Apple-side change affecting this whole class of client - see
+     * {@code malmeloo/FindMy.py#268}, opened 2026-09-11, and the matching report against
+     * OpenHaystack, which shares no code with either.
+     *
+     * <p><b>So do not tell an affected user a new serial will help them</b>, and do not re-derive
+     * the hypothesis from the paragraph above: it was reasonable, it was tested, and it was wrong.
      */
     public static final String LEGACY_SERIAL = "0PENTAGVIEWR";
 

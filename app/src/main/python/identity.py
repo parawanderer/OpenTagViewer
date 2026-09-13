@@ -55,8 +55,8 @@ when Java cannot be asked, not an absence of one.
 pinned equal by `IdentityBridgeTest`; a serial drawn per install cannot be pinned that way, and
 a second copy of it is exactly what rule 11 is about. `appSerial` asks. See
 `AdiDeviceIdentity.LEGACY_SERIAL` for why a constant was wrong: one serial against thousands of
-machine identities and Apple IDs is not a shape real hardware produces, and it is the leading
-suspect for the 503s in issues #168, #176 and #181.
+machine identities and Apple IDs is not a shape real hardware produces. It is **not** the cause of
+the 503s in #168, #176 and #181 - that was tested and eliminated; see the Java constant.
 
 **An install that has one keeps it**, which is why this value still goes out at all: an install
 from before the change has been presenting it, and drawing it a new serial now would register a

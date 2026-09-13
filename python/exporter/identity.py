@@ -64,14 +64,23 @@ the reason this is a named constant rather than a value that happens to come out
 **Why this stopped being the only one.** It was a constant, so every install of this program,
 everywhere, presented Apple the same serial while presenting a *different* machine identity: one
 serial against thousands of device IDs and thousands of Apple IDs, from every continent, at once.
-Real hardware does not look like that. A 503 from Grand Slam that some accounts never recover from
-- issues #168, #176 and #181 - is consistent with that fingerprint being refused, and one reporter
-cleared their device identity to no effect, which is what would happen if the serial were the part
-being matched on.
+Real hardware does not look like that, and a fingerprint nothing real produces is worth not
+sending whether or not anything is currently matching on it.
 
-That is a hypothesis and is written down as one. It has not been confirmed against Apple, and the
-cheap way to confirm it is exactly this change: an affected user deleting their identity file now
-draws a different serial instead of the same one.
+**It does not explain the 503s, and it was wrong to say it did.** Issues #168, #176 and #181 were
+attributed to this while the change was being written. They are not it. On 2026-09-13 the
+hypothesis was tested against an account Apple was actively refusing, and eliminated in stages: a
+freshly drawn serial was refused, so were fresh `uid` and `devid`, so was fresh ADI provisioning,
+so were three network locations, so was a second unrelated Apple ID, so was a second machine - and
+so was **unmodified upstream FindMy.py**, which cannot send a custom serial at all and defaults to
+`X-Apple-I-SRL-NO: 0`.
+
+It is an Apple-side change affecting this whole class of client:
+`malmeloo/FindMy.py#268`, opened 2026-09-11 - "Something changed on Apple's side, not sure what
+yet" - with a matching report against OpenHaystack, a separate implementation.
+
+So this change is kept on its own merits and claims nothing about the 503s. Do not tell an
+affected user that a new serial will help them.
 """
 
 

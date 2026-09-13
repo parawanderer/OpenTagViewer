@@ -258,11 +258,21 @@ Four things follow:
   leaves out the pairs a person comparing two screens would confuse. **Do not put it back to a
   constant.** It was one, and that meant a single serial arriving at Apple from thousands of
   installs, against thousands of different machine identities and Apple IDs, from every continent
-  at once — a shape no real hardware produces, and the leading suspect for the Grand Slam 503s in
-  [#168](https://github.com/parawanderer/OpenTagViewer/issues/168),
-  [#176](https://github.com/parawanderer/OpenTagViewer/issues/176) and
-  [#181](https://github.com/parawanderer/OpenTagViewer/issues/181), one of whom cleared their
-  device identity to no effect — which regenerates the ids and not the serial.
+  at once — a shape no real hardware produces, and worth not sending on that basis alone.
+- **It does not fix the Grand Slam 503s, and this rule used to say it probably did.** That claim
+  was written into three files and a pull request before anyone tested it. On 2026-09-13 it was
+  tested against an account Apple was actively refusing and eliminated in stages: a drawn serial,
+  fresh `uid` and `devid`, fresh ADI provisioning, three network locations, a second unrelated
+  Apple ID, a second machine, and finally **unmodified upstream FindMy.py**, which has no serial
+  parameter at all and sends `X-Apple-I-SRL-NO: 0`. Every one was refused with 503.
+
+  It is an Apple-side change hitting this whole class of client —
+  [malmeloo/FindMy.py#268](https://github.com/malmeloo/FindMy.py/issues/268), opened 2026-09-11
+  ("Something changed on Apple's side, not sure what yet"), with a matching report against
+  OpenHaystack, which shares no code with either. **So do not tell a reporter that upgrading
+  helps**, and do not re-derive the hypothesis from the bullet above: it was reasonable, it was
+  tested, and it was wrong. `ICloudFailures` and rule 15 are what this project can actually do
+  about it — say plainly that Apple declined, and do not send anybody to the bug tracker.
 - **An install that already has one keeps it**, including the installs that predate this and have
   no stored serial at all: those keep `0PENTAGVIEWR` / `0PENTAGXPORT`. Neither of those can be
   drawn — both contain a letter the alphabet excludes — so a serial with an `I` or an `O` in it
