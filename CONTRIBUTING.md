@@ -375,6 +375,20 @@ python scripts/update_adi_stub_symbols.py           # regenerate
 python scripts/update_adi_stub_symbols.py --check   # what CI runs weekly
 ```
 
+### Is Apple's edge refusing us?
+
+`check-gsa-edge.yml` asks daily. To ask from your own connection, which is what to do before
+acting on a red run, since CI runners come from datacenter addresses:
+
+```bash
+pip install -r app/src/test/python/requirements.txt
+python scripts/check_gsa_edge.py   # exit 0 fine, 1 refused, 2 unreachable
+```
+
+It sends each hardware profile in `AdiDeviceIdentity.java` and the exporter's identity, composed by
+the pinned FindMy.py, plus a control naming Xcode that the edge is expected to refuse. No account is
+involved. See AGENTS.md rule 18 for why this exists.
+
 ### Wiki screenshots (skipped by default)
 
 `WikiScreenshotsTest`, `WikiScreenshotsFromTheMapTest` and `WikiScreenshotsOfSigningInTest`
@@ -767,6 +781,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
 | `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
+| `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
 `:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
