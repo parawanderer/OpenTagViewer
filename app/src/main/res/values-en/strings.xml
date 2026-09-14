@@ -388,4 +388,5 @@ No history was imported and nothing already stored was changed.</string>
 
 If Apple simply refused the request, waiting and trying again is worth doing first. If it keeps failing, a report with this log attached is what makes it fixable.</string>
     <string name="login_failed_apple_asked_to_wait">Apple refused the sign-in and asked for %1$s before trying again. This is Apple declining, not a problem with your Apple ID or password.</string>
+    <string name="login_try_remote_anisette">Try a remote server</string>
 </resources>

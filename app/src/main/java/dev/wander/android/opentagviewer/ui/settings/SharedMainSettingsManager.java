@@ -301,6 +301,20 @@ public class SharedMainSettingsManager {
      */
     public static void applyLoginAnisetteFallback(final View root, final AnisetteStatus status,
                                                   final boolean remoteWasChosen) {
+        applyLoginAnisetteFallback(root, status, remoteWasChosen, false);
+    }
+
+    /**
+     * @param forceShow reveal the server field even when local Anisette is working. The one
+     *                  caller that sets this is the login screen after a sign-in was refused by
+     *                  Apple (a 429 or a 503): local Anisette produced fine and Apple still said
+     *                  no, so the only thing left to change here is the machine identity a server
+     *                  would present instead. Without this the field stays hidden on exactly the
+     *                  READY device that needs it, because READY is the state it hides itself in.
+     */
+    public static void applyLoginAnisetteFallback(final View root, final AnisetteStatus status,
+                                                  final boolean remoteWasChosen,
+                                                  final boolean forceShow) {
         if (root == null) {
             return;
         }
@@ -311,15 +325,18 @@ public class SharedMainSettingsManager {
         }
 
         final AnisetteStatus.State state = status.state();
-        final boolean signInNeedsAServer = state != AnisetteStatus.State.READY
-                && state != AnisetteStatus.State.CHECKING;
+        final boolean signInNeedsAServer = forceShow
+                || (state != AnisetteStatus.State.READY
+                        && state != AnisetteStatus.State.CHECKING);
 
         remoteSection.setVisibility(signInNeedsAServer ? VISIBLE : GONE);
 
         // Only explained when it appeared unbidden. PENDING means nothing has been tried yet,
-        // so there is nothing to explain either.
+        // so there is nothing to explain either - and a device forced here by a refused sign-in
+        // did not fail locally, so there is nothing to blame it for.
         final boolean explain = signInNeedsAServer
                 && !remoteWasChosen
+                && !forceShow
                 && state != AnisetteStatus.State.PENDING;
 
         final View reason = root.findViewById(R.id.anisetteLoginFallbackReason);
