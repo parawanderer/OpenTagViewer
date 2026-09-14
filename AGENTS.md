@@ -535,6 +535,10 @@ curl -so /dev/null -w '%{http_code}\n' -X POST --data-binary t \
   ... (com.apple.akd/1.0)> ...                    # 401, i.e. it arrived
 ```
 
+**`check-gsa-edge.yml` now asks the edge daily and on every PR**, with exactly the headers the
+app and the exporter send, and opens an issue when one is refused. It would have caught this before
+the first report. `python scripts/check_gsa_edge.py` asks from your own connection.
+
 **So check the neighbours first.** This project shares an authentication path with AltStore,
 SideStore, Macless Haystack, OpenBubbles and every Anisette server, because they all copied it
 from the same place. When something that worked yesterday fails for everybody, half an hour
