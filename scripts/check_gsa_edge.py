@@ -211,6 +211,14 @@ def probes(profiles: list[Profile]) -> list[Probe]:
 
 def fetch(probe: Probe) -> Answer:
     """Make one request, retrying a failure to connect but never a refusal."""
+    # **Apple's own root, as the library trusts it.** gsa.apple.com chains to Apple's private
+    # root CA, which macOS trusts and a Linux runner's store does not - so the first CI run of
+    # this failed certificate verification on every probe while passing on a Mac. FindMy.py
+    # bundles that root, pinned by hash; using its context keeps verification on and trusts
+    # exactly what the shipped library trusts.
+    from findmy.util.tls import apple_trust_context
+
+    tls = apple_trust_context()
     error = "no attempt made"
     for attempt in range(ATTEMPTS):
         request = urllib.request.Request(
@@ -220,7 +228,7 @@ def fetch(probe: Probe) -> Answer:
             method=probe.method,
         )
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+            with urllib.request.urlopen(request, timeout=TIMEOUT_S, context=tls) as response:
                 return _answer(response.status, response.headers, response.read())
         except urllib.error.HTTPError as e:
             return _answer(e.code, e.headers, e.read())
