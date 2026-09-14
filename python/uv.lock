@@ -659,7 +659,7 @@ wheels = [
 [[package]]
 name = "findmy"
 version = "0.10.1"
-source = { git = "https://github.com/parawanderer/FindMy.py?rev=bcb078761085c078eadac477da39a4c85b1f3a44#bcb078761085c078eadac477da39a4c85b1f3a44" }
+source = { git = "https://github.com/parawanderer/FindMy.py?rev=07c919bc14bb5af542a530f9663ce2fc79d15d06#07c919bc14bb5af542a530f9663ce2fc79d15d06" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anisette" },
@@ -1032,7 +1032,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "findmy", git = "https://github.com/parawanderer/FindMy.py?rev=bcb078761085c078eadac477da39a4c85b1f3a44" },
+    { name = "findmy", git = "https://github.com/parawanderer/FindMy.py?rev=07c919bc14bb5af542a530f9663ce2fc79d15d06" },
     { name = "pycryptodome", specifier = "==3.22.0" },
     { name = "pyyaml", specifier = "==6.0.2" },
     { name = "pyzipper", specifier = "==0.4.0" },
