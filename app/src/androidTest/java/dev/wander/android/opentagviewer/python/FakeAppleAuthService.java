@@ -40,6 +40,16 @@ public final class FakeAppleAuthService implements AppleAuthService {
     private final List<AuthMethod> authMethods;
 
     private RuntimeException loginFailsWith;
+
+    /**
+     * How many of the next login calls {@link #loginFailsWith} applies to; -1 means every one.
+     *
+     * <p>-1 is the default so the existing factories, which set {@link #loginFailsWith} and touch
+     * nothing else, keep failing forever. A positive count fails that many attempts and then
+     * succeeds, which is how a transient refusal - Apple's 429 clearing - is modelled.
+     */
+    private int loginFailuresRemaining = -1;
+
     private RuntimeException codeFailsWith;
 
     /** Every call, in order, so a test can assert on what was asked and how often. */
@@ -92,6 +102,23 @@ public final class FakeAppleAuthService implements AppleAuthService {
     /** Already trusted: signing in completes without a second factor. */
     public static FakeAppleAuthService signsInImmediately() {
         return new FakeAppleAuthService(LOGIN_STATE.LOGGED_IN, null);
+    }
+
+    /**
+     * Apple refuses the first sign-in with a 429, then serves the next - the transient throttle.
+     *
+     * <p>Drives the remote-Anisette escape hatch: the first attempt is refused so the button
+     * appears, and the retry after switching to a server succeeds. It fails as
+     * {@code APPLE_DECLINED}, the reason the button is gated on.
+     */
+    public static FakeAppleAuthService declinesOnceThenSignsIn() {
+        final FakeAppleAuthService fake = new FakeAppleAuthService(LOGIN_STATE.LOGGED_IN, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "The Grand Slam request was refused with HTTP 429. This is Apple declining to"
+                        + " serve the request rather than a response this library cannot read.",
+                PythonAccountLoginException.REASON_APPLE_DECLINED);
+        fake.loginFailuresRemaining = 1;
+        return fake;
     }
 
     /** The password is wrong, or Apple is unreachable. */
@@ -185,7 +212,10 @@ public final class FakeAppleAuthService implements AppleAuthService {
         this.anisetteUsed = localAnisette;
         this.serverUrlUsed = anisetteServerUrl;
 
-        if (this.loginFailsWith != null) {
+        if (this.loginFailsWith != null && this.loginFailuresRemaining != 0) {
+            if (this.loginFailuresRemaining > 0) {
+                this.loginFailuresRemaining--;
+            }
             return Observable.error(this.loginFailsWith);
         }
 

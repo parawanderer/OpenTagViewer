@@ -388,4 +388,5 @@
 
 如果只是 Apple 拒絕了請求，先等一會兒再試。若持續失敗，附上此日誌的回報才能讓問題獲得修正。</string>
     <string name="login_failed_apple_asked_to_wait">Apple 拒絕了此次登入，並要求等待 %1$s 後再試。這是 Apple 的拒絕，不是你的 Apple ID 或密碼有問題。</string>
+    <string name="login_try_remote_anisette">嘗試遠端伺服器</string>
 </resources>

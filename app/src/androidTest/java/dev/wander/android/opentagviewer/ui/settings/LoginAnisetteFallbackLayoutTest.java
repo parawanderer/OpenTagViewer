@@ -136,14 +136,36 @@ public class LoginAnisetteFallbackLayoutTest {
         assertEquals(View.GONE, view(R.id.anisetteLoginFallbackReason).getVisibility());
     }
 
+    /**
+     * Forced on even though local Anisette works, and without blaming the device.
+     *
+     * <p>The case a refused sign-in reaches: local produced fine, Apple still said no, and the
+     * user asked to try a server. READY hides the field, so this is the only thing that brings it
+     * back - and it must not say the device failed, because it did not.
+     */
+    @Test
+    public void aRefusedSignInCanForceTheFieldOnAReadyDevice() {
+        apply(AnisetteStatus.of(FakeAnisetteSource.ready()), false, true);
+
+        assertEquals("the user asked for the server after Apple refused them",
+                View.VISIBLE, view(R.id.anisetteRemoteSection).getVisibility());
+        assertEquals("the device did not fail, so there is nothing to explain",
+                View.GONE, view(R.id.anisetteLoginFallbackReason).getVisibility());
+    }
+
     private void apply(final AnisetteStatus status) {
         apply(status, false);
     }
 
     private void apply(final AnisetteStatus status, final boolean remoteWasChosen) {
+        apply(status, remoteWasChosen, false);
+    }
+
+    private void apply(final AnisetteStatus status, final boolean remoteWasChosen,
+                       final boolean forceShow) {
         getInstrumentation().runOnMainSync(() ->
                 SharedMainSettingsManager.applyLoginAnisetteFallback(
-                        this.screen, status, remoteWasChosen));
+                        this.screen, status, remoteWasChosen, forceShow));
     }
 
     private View view(final int id) {
