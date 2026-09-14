@@ -34,6 +34,7 @@ from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
 from exporter import icloud, localsource, source, terms
 from exporter.asyncui import Asker, Cancelled, run_with_progress
+from exporter.certs import ensure_ca_bundle
 from exporter.codes import (
     VERIFICATION_CODE_LENGTH,
     is_verification_code,
@@ -1611,5 +1612,10 @@ if __name__ == "__main__":
 
     configure_logging()
     logger.info("Starting %s", APP_TITLE)
+
+    # Before any request: a frozen build on a bare system has no trust store, and sign-in
+    # succeeds against Apple's pinned root only to fail at the next public host. See
+    # exporter.certs and issue #206.
+    ensure_ca_bundle()
 
     WizardApp().mainloop()
