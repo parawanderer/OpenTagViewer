@@ -49,6 +49,7 @@ from exporter.custom_tags import (
     suggested_name,
 )
 from exporter.icloud import Candidate, ExportSourceError
+from exporter.certs import ensure_ca_bundle
 from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION, describe_build
 from opentagviewer_export import (
     ExportError,
@@ -920,6 +921,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
 
     configure_logging(arguments.verbose)
+
+    # Before any request: a frozen build on a bare system has no trust store, and the first
+    # thing that needs one is the mobileme login right after the code. See exporter.certs.
+    ensure_ca_bundle()
 
     if arguments.non_interactive:
         prompts.forbid_prompting()
