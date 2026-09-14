@@ -35,7 +35,7 @@ import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
         UserBeaconOptions.class,
         LastBleSighting.class
     },
-    version = 9
+    version = 10
 )
 public abstract class OpenTagViewerDatabase extends RoomDatabase {
     private static OpenTagViewerDatabase INSTANCE = null;
@@ -197,6 +197,28 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
     };
 
     /**
+     * v9 -> v10: indexes {@code LocationReport} by {@code beacon_id} first.
+     *
+     * <p><b>An index swap, so nothing moves and nothing can be lost.</b> The old index led with
+     * {@code hash_id}, which is the primary key and therefore already indexed, and buried
+     * {@code beacon_id} in second place - where SQLite will not use it for the foreign-key check
+     * and no query in {@code LocationReportDao} can use it either. Every one of them filters on
+     * {@code beacon_id}, and most then order by {@code timestamp}.
+     *
+     * <p>The old index is dropped rather than kept beside the new one: it answered nothing the
+     * primary key does not already answer, and an index nothing reads is still an index every
+     * insert maintains - on the table that grows fastest.
+     */
+    public static final Migration MIGRATION_9_10 = new Migration(9, 10) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("DROP INDEX IF EXISTS `index_LocationReport_hash_id_beacon_id_timestamp`");
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_LocationReport_beacon_id_timestamp`"
+                    + " ON `LocationReport` (`beacon_id`, `timestamp`)");
+        }
+    };
+
+    /**
      * The database file's name, which is also read directly - see
      * {@code OpenAirTagApplication.isFirstRun()}, which uses the file's presence to tell a new
      * user from a returning one before anything has opened the database.
@@ -213,7 +235,7 @@ public abstract class OpenTagViewerDatabase extends RoomDatabase {
                     DATABASE_NAME)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                             MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
-                            MIGRATION_8_9)
+                            MIGRATION_8_9, MIGRATION_9_10)
                     .build();
         }
 

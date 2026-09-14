@@ -228,3 +228,16 @@ jobs:
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) debug generated
           path: ${{ env.main_project_module }}/build/outputs/apk/debug/
+
+      # Room writes these during the build, and rule 1 requires the new one to be committed with
+      # the migration that produced it. They are generated, so somebody without an Android
+      # toolchain cannot produce one at all - and the version bump is exactly the change most
+      # likely to be written by somebody who cannot build. Published so it can be taken from here
+      # and committed. Always, so a failed run that still got far enough is not a dead end.
+      - name: Upload the exported Room schemas
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: room-schemas
+          path: ${{ env.main_project_module }}/schemas/
+          if-no-files-found: warn

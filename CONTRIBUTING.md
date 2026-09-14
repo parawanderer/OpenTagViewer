@@ -774,7 +774,7 @@ run regardless: each AES entry carries a fresh random salt.
 | Workflow | When | What |
 | --- | --- | --- |
 | `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, string tooling tests. Seconds, no Android |
-| `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK |
+| `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK. Also publishes the generated Room schemas as `room-schemas`, so a version bump made without an Android toolchain can still commit the JSON rule 1 requires |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
