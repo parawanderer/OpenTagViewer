@@ -61,6 +61,7 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Reading the tags on the signed-in Apple account, instead of importing a zip.
@@ -110,6 +111,18 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     public static final String RESULT_WANTS_FILE_IMPORT = "wantsFileImport";
 
     private ICloudService icloud;
+
+    /**
+     * Every subscription this screen starts, disposed in {@link #onDestroy}.
+     *
+     * <p><b>Because the chains dereference {@link #icloud}, and onDestroy nulls it.</b> A
+     * subscription left running after the activity is gone reaches its next stage, reads a
+     * null {@code icloud}, and dies with an NPE the flow reports as UNKNOWN - which under
+     * test is a spurious failure indistinguishable from an empty screen (issue #198), and in
+     * production is background work against a session that has already been closed. Disposing
+     * on destroy stops the chain before it can touch anything torn down.
+     */
+    private final CompositeDisposable inFlight = new CompositeDisposable();
 
     private List<RecoverableDevice> devices = List.of();
 
@@ -253,6 +266,9 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // Before closing the session: a chain still in flight would otherwise reach its
+        // next stage and dereference the icloud field this method is about to null.
+        this.inFlight.dispose();
         if (this.icloud != null) {
             this.icloud.close();
             this.icloud = null;
@@ -296,10 +312,10 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         // **The passcode is asked for once, ever.** If this app already joined, it reads as the
         // member it is; only a first run, or a membership the account no longer honours, reaches
         // the device list at all.
-        var async = this.icloud.open()
+        this.inFlight.add(this.icloud.open()
                 .andThen(this.membershipRepo.get().firstOrError())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::continueWith, this::showFailure);
+                .subscribe(this::continueWith, this::showFailure));
     }
 
     private void continueWith(final Optional<KeychainMembership> membership) {
@@ -314,10 +330,10 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
         this.showWaiting(R.string.icloud_loading_importing);
 
-        var async = this.icloud.resume(membership.get().getPeerJson())
+        this.inFlight.add(this.icloud.resume(membership.get().getPeerJson())
                 .andThen(this.icloud.fetch())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::importEverything, this::onStoredMembershipFailed);
+                .subscribe(this::importEverything, this::onStoredMembershipFailed));
     }
 
     /**
@@ -338,22 +354,22 @@ public class FetchFromICloudActivity extends AppCompatActivity {
 
         Log.w(TAG, "The stored membership no longer reads the account; asking again");
         // Forgotten, or every later run retries keys the account has stopped honouring.
-        var async = this.membershipRepo.forget()
+        this.inFlight.add(this.membershipRepo.forget()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::askForADevice,
                         forgetFailed -> {
                             Log.e(TAG, "Could not forget the membership", forgetFailed);
                             this.askForADevice();
-                        });
+                        }));
     }
 
     private void askForADevice() {
         this.showWaiting(R.string.icloud_loading_looking_for_devices);
 
-        var async = this.icloud.recoveryOptions()
+        this.inFlight.add(this.icloud.recoveryOptions()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(devices -> this.showDevices(devices, Direction.FORWARD),
-                        this::showFailure);
+                        this::showFailure));
     }
 
     private void showDevices(
@@ -418,13 +434,13 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         // stretch the user is deliberately not allowed to walk out of. See onBackWithin.
         this.anUnlockIsInFlight = true;
 
-        var async = this.icloud.unlock(this.chosenDevice.getSerial(), passcode)
+        this.inFlight.add(this.icloud.unlock(this.chosenDevice.getSerial(), passcode)
                 .andThen(this.icloud.join(EscrowPasscode.generate()))
                 .flatMapCompletable(this.membershipRepo::store)
                 .andThen(this.icloud.fetch())
                 .observeOn(AndroidSchedulers.mainThread())
                 .doFinally(() -> this.anUnlockIsInFlight = false)
-                .subscribe(this::importEverything, this::onUnlockFailed);
+                .subscribe(this::importEverything, this::onUnlockFailed));
     }
 
     /**
@@ -478,14 +494,14 @@ public class FetchFromICloudActivity extends AppCompatActivity {
             wanted.add(accessory.getBeaconId());
         }
 
-        var async = this.icloud.records(wanted)
+        this.inFlight.add(this.icloud.records(wanted)
                 .flatMap(this.beaconRepo::refreshAccountBeacons)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(held -> {
                     Log.i(TAG, "Holding " + held.size() + " beacons for the account");
                     this.importedSomething = true;
                     this.showResults(fetched);
-                }, this::showFailure);
+                }, this::showFailure));
     }
 
     private void showResults(final ICloudFetch fetched) {
@@ -650,7 +666,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         final TextView lead = this.findViewById(R.id.icloud_registered_lead);
         lead.setVisibility(GONE);
 
-        var async = new UserAuthRepository(
+        this.inFlight.add(new UserAuthRepository(
                 UserAuthDataStore.getInstance(this.getApplicationContext()),
                 new AppCryptographyUtil())
                 .getUserAuth()
@@ -671,7 +687,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
                             lead.setText(this.getString(R.string.icloud_registered_lead, email));
                             lead.setVisibility(VISIBLE);
                         },
-                        error -> Log.w(TAG, "No account name for the device note", error));
+                        error -> Log.w(TAG, "No account name for the device note", error)));
     }
 
     /** Whatever went wrong, on the screen written for it. */
