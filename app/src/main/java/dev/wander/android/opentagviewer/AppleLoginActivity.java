@@ -177,6 +177,16 @@ public class AppleLoginActivity extends AppCompatActivity {
      */
     private AnisetteStatus localAnisetteStatus = AnisetteStatus.pending();
 
+    /**
+     * Set when the user, after Apple refused a sign-in, asked to try a remote Anisette server.
+     *
+     * <p>Forces the server field visible on the setup step even though local Anisette is working,
+     * and tells {@link #onClickToLoginAccount} to persist remote mode and rebuild the Anisette
+     * source when they go on - so the next attempt actually goes through the server rather than
+     * the cached local ADI. Cleared once that switch is made.
+     */
+    private boolean forceAnisetteServerField = false;
+
     private TextInputEditText emailOrPhoneInput;
 
     private TextInputEditText passwordInput;
@@ -268,6 +278,8 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.findViewById(R.id.login_error_export_logs)
                 .setOnClickListener(v -> this.openTheReportPageForTheLoginFailure());
+        this.findViewById(R.id.login_error_try_remote_anisette)
+                .setOnClickListener(v -> this.onClickTryRemoteAnisette());
 
         this.findViewById(R.id.login_terms_agree_button)
                 .setOnClickListener(v -> this.onAgreeToTerms());
@@ -504,7 +516,10 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         // When Anisette comes from this device the server field is not even on screen, so
         // there is nothing to validate and nothing that could stop somebody getting past here.
-        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
+        // The exception is a user who asked for the server after Apple refused them: local is
+        // READY, but they are here to leave it, so they take the server path below instead.
+        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY
+                && !this.forceAnisetteServerField) {
             this.getUiState().setCurrentPage(PAGE.LOGIN);
             this.showAccountLoginAuthOptions(Direction.FORWARD);
             return;
@@ -522,6 +537,15 @@ public class AppleLoginActivity extends AppCompatActivity {
         }
 
         this.testAndSaveAnisetteUrl(currentInput, () -> {
+            // A device forced here had working local Anisette, so unless the mode is switched the
+            // sign-in would go straight back to it - the cached ADI wins. Persisting remote and
+            // rebuilding the source is what makes the next attempt actually use the server.
+            if (this.forceAnisetteServerField) {
+                this.getUserSettings().setAnisetteMode(UserSettings.ANISETTE_REMOTE);
+                this.saveSettings();
+                this.localAnisette = AppDependencies.anisette(this, this.getUserSettings(), false);
+                this.forceAnisetteServerField = false;
+            }
             this.getUiState().setCurrentPage(PAGE.LOGIN);
             this.showAccountLoginAuthOptions(Direction.FORWARD);
         });
@@ -721,6 +745,31 @@ public class AppleLoginActivity extends AppCompatActivity {
         this.findViewById(R.id.login_error_container).setVisibility(VISIBLE);
         ((TextView) this.findViewById(R.id.login_error_message_text))
                 .setText(this.describeLoginFailure(error));
+
+        // Offer the server route only when Apple itself refused the sign-in - a 429 or 503 -
+        // and not for a wrong password or a dead network, where a different Anisette identity
+        // changes nothing. That is the one failure where local Anisette worked and Apple still
+        // said no, so switching the machine identity a server presents is the thing left to try.
+        final String reason = error instanceof PythonAccountLoginException
+                ? ((PythonAccountLoginException) error).getReason()
+                : PythonAccountLoginException.REASON_UNKNOWN;
+        this.findViewById(R.id.login_error_try_remote_anisette).setVisibility(
+                PythonAccountLoginException.REASON_APPLE_DECLINED.equals(reason) ? VISIBLE : GONE);
+    }
+
+    /**
+     * Take a refused sign-in to the server-configuration step, with the server field forced on.
+     *
+     * <p>The field hides itself when local Anisette works, which is the state this device is in -
+     * so {@link #forceAnisetteServerField} is what brings it back, and {@link #onClickToLoginAccount}
+     * reads the same flag to persist remote mode when the user proceeds. There is no Settings to
+     * send them to instead: it is behind the sign-in this cannot complete.
+     */
+    private void onClickTryRemoteAnisette() {
+        Log.d(TAG, "Login was refused by Apple; offering the remote Anisette server route");
+        this.forceAnisetteServerField = true;
+        this.findViewById(R.id.login_error_container).setVisibility(GONE);
+        this.showInitialWelcomeConfOptions(SETUP_STATUS.NO_SERVER_CONFIGURED, Direction.BACK);
     }
 
     /**
@@ -918,9 +967,14 @@ public class AppleLoginActivity extends AppCompatActivity {
                 this.findViewById(android.R.id.content),
                 this.localAnisetteStatus,
                 userSettings.hasChosenAnisetteMode()
-                        && !userSettings.usesLocalAnisette(false));
+                        && !userSettings.usesLocalAnisette(false),
+                this.forceAnisetteServerField);
 
-        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY) {
+        // Skipped when forced here by a refused sign-in: local Anisette is READY, but the user is
+        // on this step precisely to switch away from it, so the server they choose has to be
+        // tested and the Next button gated on it exactly as it is for a device that has no choice.
+        if (this.localAnisetteStatus.state() == AnisetteStatus.State.READY
+                && !this.forceAnisetteServerField) {
             // Nothing is going to ask a server for anything, so testing one would be a network
             // request whose only possible effect is to block the button below it.
             this.setCurrentStepText(R.string.welcome, direction);

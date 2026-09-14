@@ -162,6 +162,27 @@
                             activity, so closing it comes straight back here with the error still
                             showing.
                         -->
+                        <!--
+                            Shown only when Apple refused the sign-in itself (a 429 or 503),
+                            never for a wrong password. Local Anisette works on this device and
+                            Apple still said no, so the one thing left to try is signing in
+                            through a server, which presents a different machine identity. The
+                            server field is otherwise unreachable here - Settings is behind the
+                            login this cannot get past. `gone` until that specific failure.
+                        -->
+                        <Button
+                            android:id="@+id/login_error_try_remote_anisette"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:layout_marginEnd="8dp"
+                            android:text="@string/login_try_remote_anisette"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:visibility="gone"
+                            app:strokeColor="?attr/colorOnErrorContainer"
+                            tools:visibility="visible" />
+
                         <Button
                             android:id="@+id/login_error_export_logs"
                             style="?attr/materialButtonOutlinedStyle"
