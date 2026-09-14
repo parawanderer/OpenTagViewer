@@ -1,0 +1,104 @@
+name: Check Apple's sign-in edge
+
+# Asks Apple's edge whether it still lets this project's sign-in and provisioning requests through,
+# using exactly the headers the app and the exporter send. No account is involved.
+#
+# In September 2026 the edge began refusing any Grand Slam request naming Xcode, and sign-in was
+# broken for every user for days before anyone knew why - nothing here had changed, Apple had.
+# See AGENTS.md rule 18 and scripts/check_gsa_edge.py.
+#
+# On every pull request as well as on a schedule, and deliberately without path filters: it is a
+# handful of requests and a few seconds, and a PR is when someone is looking. An Apple-side block
+# turning an unrelated PR red is the point rather than noise - nothing that signs in works then.
+
+on:
+  schedule:
+    # Daily rather than weekly like the ADI check: a sign-in block breaks every user at once.
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # The pinned FindMy.py, so the check composes headers the way the shipped library does.
+      - name: Install the pinned FindMy.py
+        run: python -m pip install -r app/src/test/python/requirements.txt
+
+      - name: Test the check itself
+        run: python -m pytest scripts/test/test_check_gsa_edge.py -v
+
+      - name: Ask Apple's edge
+        id: check
+        run: |
+          set +e
+          python scripts/check_gsa_edge.py > report.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+
+      # Exit code 1 only: one of this project's identities was refused. Exit code 2 means the runner
+      # could not reach Apple at all, which fails the run below but is not worth an issue.
+      - name: Open an issue if Apple refused us
+        if: github.event_name == 'schedule' && steps.check.outputs.exit_code == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --state open --label gsa-edge --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open for this. Adding a comment instead."
+            gh issue comment "$existing" --body-file - <<EOF
+          Still refused as of $(date -u +%Y-%m-%d).
+
+          \`\`\`
+          $(cat report.txt)
+          \`\`\`
+          EOF
+            exit 0
+          fi
+
+          gh label create gsa-edge --color B60205 \
+            --description "Apple's edge refuses a request this project sends" \
+            2>/dev/null || true
+
+          gh issue create \
+            --title "Apple's edge is refusing this project's sign-in requests" \
+            --label gsa-edge \
+            --body-file - <<EOF
+          The scheduled check in \`.github/workflows/check-gsa-edge.yml\` found that Apple's edge
+          refuses at least one request this project sends, with an HTML page rather than a Grand
+          Slam answer.
+
+          \`\`\`
+          $(cat report.txt)
+          \`\`\`
+
+          **Confirm it from a home connection first.** CI runners come from datacenter addresses,
+          which can meet per-address limits users do not:
+
+          \`\`\`bash
+          pip install -r app/src/test/python/requirements.txt
+          python scripts/check_gsa_edge.py
+          \`\`\`
+
+          **If it reproduces,** sign-in (or ADI provisioning, for a \`provisioning bag\` line) is
+          likely failing for users. Before bisecting this repository, read the trackers of the
+          projects that share this authentication path - AltStore, SideStore, Macless Haystack,
+          OpenBubbles, the Anisette servers. The last time, the answer had been published there
+          two days earlier. See AGENTS.md rule 18.
+          EOF
+
+      - name: Fail if anything was not as expected
+        if: steps.check.outputs.exit_code != '0'
+        run: exit 1

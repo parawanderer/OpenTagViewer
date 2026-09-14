@@ -8,6 +8,7 @@
 [![Exporter tests](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml/badge.svg?branch=main)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/macos-scripts-python.yml)
 [![Release](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml/badge.svg)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/build-release.yml)
 [![Apple's ADI libraries](https://github.com/parawanderer/OpenTagViewer/actions/workflows/check-adi-libraries.yml/badge.svg)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/check-adi-libraries.yml)
+[![Apple's sign-in edge](https://github.com/parawanderer/OpenTagViewer/actions/workflows/check-gsa-edge.yml/badge.svg)](https://github.com/parawanderer/OpenTagViewer/actions/workflows/check-gsa-edge.yml)
 [![Project Status: Inactive](https://www.repostatus.org/badges/latest/inactive.svg)](https://www.repostatus.org/#inactive)
 
 
