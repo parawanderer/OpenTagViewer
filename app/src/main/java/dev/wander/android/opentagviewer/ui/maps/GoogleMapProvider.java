@@ -330,6 +330,18 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
         if (googleMap == null) return;
         googleMap.getUiSettings().setMyLocationButtonEnabled(enabled);
     }
+
+    @Override
+    public void setMyLocationEnabled(boolean enabled) {
+        if (googleMap == null) return;
+        try {
+            googleMap.setMyLocationEnabled(enabled);
+        } catch (final SecurityException e) {
+            // The caller checks the permission before asking, so this is the race where it was
+            // revoked in between. Not worth taking the map down for.
+            Log.w(TAG, "No location permission, so the position dot stays off", e);
+        }
+    }
     
     @Override
     public void setRotateGesturesEnabled(boolean enabled) {
