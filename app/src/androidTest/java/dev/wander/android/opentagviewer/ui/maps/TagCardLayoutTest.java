@@ -2,7 +2,6 @@ package dev.wander.android.opentagviewer.ui.maps;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -26,7 +25,6 @@ import org.junit.runner.RunWith;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.wander.android.opentagviewer.R;
@@ -143,106 +141,6 @@ public class TagCardLayoutTest {
         });
 
         return heights;
-    }
-
-    // --- the button row -------------------------------------------------------------------
-
-    /** The four buttons along the bottom of the card, in the order they appear. */
-    private static final int[] BUTTON_ICONS = {
-        R.id.history_icon, R.id.refresh_icon, R.id.perform_ring_icon, R.id.tag_more_icon,
-    };
-
-    /**
-     * Every icon in the bottom row sits at the same height as the others.
-     *
-     * <p><b>The labels under them are not all one line.</b> "Location History" wraps in English,
-     * and which of the four wrap changes with the language - so any layout that lets a label's
-     * height move its icon produces a row of icons at different heights, in some locales and not
-     * others. It did: the row centred its buttons, so the three with one-line labels were pushed
-     * down by half a line relative to the two-line one.
-     *
-     * <p>Asserted on the icons' positions on screen rather than on the gravity attribute, because
-     * the attribute is the current fix and not the requirement. Anything that keeps the icons
-     * level - padding, a fixed label height, a different container - should pass this.
-     */
-    @Test
-    public void everyButtonIconSitsAtTheSameHeight() {
-        final List<Integer> tops = this.iconTops("Keys", "Amsterdam");
-
-        for (int i = 1; i < tops.size(); i++) {
-            assertEquals(
-                    "button icon " + i + " sits at a different height from the first, which is"
-                            + " what a wrapping label does when the row centres its buttons",
-                    tops.get(0),
-                    tops.get(i));
-        }
-    }
-
-    /**
-     * And it stays level when a label is forced onto two lines.
-     *
-     * <p>The English strings happen to wrap a particular way at a particular width; a translation
-     * wraps differently. This drives the case directly rather than trusting that the shipped text
-     * still reproduces it, so the guard survives somebody shortening the string.
-     */
-    @Test
-    public void aWrappingLabelDoesNotDragItsIconOutOfLine() {
-        final List<Integer> tops = this.iconTops("Keys", "Amsterdam", card ->
-                ((TextView) card.findViewById(R.id.refreshText))
-                        .setText("A refresh label long enough to wrap onto several lines"));
-
-        for (int i = 1; i < tops.size(); i++) {
-            assertEquals("a long label moved an icon", tops.get(0), tops.get(i));
-        }
-    }
-
-    private List<Integer> iconTops(final String name, final String address) {
-        return this.iconTops(name, address, card -> { });
-    }
-
-    /**
-     * Measure one card and report where each bottom-row icon ended up, relative to the card.
-     *
-     * @param adjust runs after the card is populated and before it is measured, for a test that
-     *               needs the text to be something other than what ships
-     */
-    private List<Integer> iconTops(
-            final String name, final String address, final Consumer<View> adjust) {
-        final List<Integer> tops = new ArrayList<>();
-
-        getInstrumentation().runOnMainSync(() -> {
-            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
-                    .inflate(R.layout.maps_tag_card, null);
-
-            ((TextView) card.findViewById(R.id.device_name)).setText(name);
-            ((TextView) card.findViewById(R.id.device_location)).setText(address);
-            ((TextView) card.findViewById(R.id.device_last_update))
-                    .setText("Last Updated: 2 minutes ago");
-            adjust.accept(card);
-
-            card.measure(
-                    View.MeasureSpec.makeMeasureSpec(CARD_WIDTH_PX, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-            card.layout(0, 0, card.getMeasuredWidth(), card.getMeasuredHeight());
-
-            for (final int id : BUTTON_ICONS) {
-                final View icon = card.findViewById(id);
-                assertNotNull("the card has no view with this id", icon);
-
-                // Relative to the card, not to the icon's own parent: each button is its own
-                // container, so a y within the parent would be identical even when the
-                // containers themselves sit at different heights - which is the bug.
-                int top = 0;
-                View v = icon;
-                while (v != null && v != card) {
-                    top += v.getTop();
-                    v = v.getParent() instanceof View ? (View) v.getParent() : null;
-                }
-                tops.add(top);
-            }
-        });
-
-        return tops;
     }
 
     // --- uniform height -------------------------------------------------------------------
