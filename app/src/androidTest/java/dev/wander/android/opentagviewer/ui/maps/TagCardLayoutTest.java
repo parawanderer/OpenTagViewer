@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ui.maps;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -25,6 +26,7 @@ import org.junit.runner.RunWith;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.wander.android.opentagviewer.R;
@@ -141,6 +143,106 @@ public class TagCardLayoutTest {
         });
 
         return heights;
+    }
+
+    // --- the button row -------------------------------------------------------------------
+
+    /** The four buttons along the bottom of the card, by the icon each one holds. */
+    private static final int[] BUTTON_ICONS = {
+        R.id.history_icon, R.id.refresh_icon, R.id.perform_ring_icon, R.id.tag_more_icon,
+    };
+
+    /**
+     * Every button's circle sits at the same height as the others.
+     *
+     * <p><b>The labels under them are not all one line.</b> "Location History" wraps in English,
+     * and which of the four wrap changes with the language - so a row that lets a label's height
+     * move its button produces circles at different heights in some locales and not others. It
+     * did: the row centred its buttons, so the three with one-line labels were pushed down by
+     * half a line relative to the two-line one.
+     *
+     * <p><b>Measured on the circles, not on the icons inside them</b>, and that distinction is the
+     * whole reason this test was wrong the first time it was written. The icons are deliberately
+     * different sizes - 28dp for history, 20dp for refresh, 18dp for ring and more - and each is
+     * centred in its 40dp circle, so their own top edges differ by design and always will. An
+     * assertion on the icons fails on a correctly aligned row, which is exactly what happened.
+     */
+    @Test
+    public void everyButtonCircleSitsAtTheSameHeight() {
+        final List<Integer> tops = this.circleTops(card -> { });
+
+        for (int i = 1; i < tops.size(); i++) {
+            assertEquals(
+                    "button circle " + i + " sits at a different height from the first, which is"
+                            + " what a wrapping label does when the row centres its buttons",
+                    tops.get(0),
+                    tops.get(i));
+        }
+    }
+
+    /**
+     * And it stays level when a label is forced onto two lines.
+     *
+     * <p>The English strings happen to wrap a particular way at a particular width; a translation
+     * wraps differently. Driving the case directly means the guard survives somebody shortening
+     * the string, rather than passing because nothing wraps any more.
+     */
+    @Test
+    public void aWrappingLabelDoesNotDragItsButtonOutOfLine() {
+        final List<Integer> tops = this.circleTops(card ->
+                ((TextView) card.findViewById(R.id.refreshText))
+                        .setText("A refresh label long enough to wrap onto several lines"));
+
+        for (int i = 1; i < tops.size(); i++) {
+            assertEquals("a long label moved a button", tops.get(0), tops.get(i));
+        }
+    }
+
+    /**
+     * Measure one card and report where each button's circle ended up, relative to the card.
+     *
+     * @param adjust runs after the card is populated and before it is measured, for a test that
+     *               needs the text to be something other than what ships
+     */
+    private List<Integer> circleTops(final Consumer<View> adjust) {
+        final List<Integer> tops = new ArrayList<>();
+
+        getInstrumentation().runOnMainSync(() -> {
+            final FrameLayout card = (FrameLayout) LayoutInflater.from(this.context)
+                    .inflate(R.layout.maps_tag_card, null);
+
+            ((TextView) card.findViewById(R.id.device_name)).setText("Keys");
+            ((TextView) card.findViewById(R.id.device_location)).setText("Amsterdam");
+            ((TextView) card.findViewById(R.id.device_last_update))
+                    .setText("Last Updated: 2 minutes ago");
+            adjust.accept(card);
+
+            card.measure(
+                    View.MeasureSpec.makeMeasureSpec(CARD_WIDTH_PX, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            card.layout(0, 0, card.getMeasuredWidth(), card.getMeasuredHeight());
+
+            for (final int id : BUTTON_ICONS) {
+                final View icon = card.findViewById(id);
+                assertNotNull("the card has no view with this id", icon);
+
+                // The circle is the icon's parent: a 40dp FrameLayout with no id of its own.
+                final View circle = (View) icon.getParent();
+
+                // Relative to the card, not to the circle's own parent: each button is its own
+                // container, so a y within the parent would be identical even when the containers
+                // themselves sit at different heights - which is the bug.
+                int top = 0;
+                View v = circle;
+                while (v != null && v != card) {
+                    top += v.getTop();
+                    v = v.getParent() instanceof View ? (View) v.getParent() : null;
+                }
+                tops.add(top);
+            }
+        });
+
+        return tops;
     }
 
     // --- uniform height -------------------------------------------------------------------

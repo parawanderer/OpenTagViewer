@@ -163,11 +163,24 @@
 
             </LinearLayout>
 
+            <!--
+                **`top`, not `center`.** Each of these four buttons is an icon circle above a
+                label, and the labels are not all one line: "Location History" wraps in English,
+                and which of them wrap changes with the language. Centring made the row as tall as
+                its tallest button and then centred the shorter ones inside it, so their circles
+                sat half a line lower than the wrapping one.
+
+                Aligning to the top puts every circle at the same y whatever the labels do.
+                Asserted by TagCardLayoutTest#everyButtonCircleSitsAtTheSameHeight - on the
+                circles, because the icons inside them are deliberately different sizes (28dp for
+                history, 20dp for refresh, 18dp for the other two) and so their own tops differ by
+                design.
+            -->
             <LinearLayout
                 android:id="@+id/tag_bottom_menu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
+                android:gravity="top|center_horizontal"
                 android:orientation="horizontal"
                 android:paddingTop="4dp"
                 android:paddingBottom="10dp">
