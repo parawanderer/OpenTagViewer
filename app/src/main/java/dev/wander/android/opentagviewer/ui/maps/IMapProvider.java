@@ -123,6 +123,22 @@ public interface IMapProvider {
      * @param enabled true为可见
      */
     void setMyLocationButtonEnabled(boolean enabled);
+
+    /**
+     * Show the device's own position on the map, as a dot or the provider's equivalent.
+     *
+     * <p><b>Deliberately not a default method.</b> This is the one the activity was calling on
+     * the {@code GoogleMap} object directly, around this interface - so it worked on Google Maps
+     * and silently did nothing on every other provider, which is exactly the branch rule 7 exists
+     * to prevent. Leaving it abstract means a new provider has to answer the question rather than
+     * inherit a no-op and look finished.
+     *
+     * <p>The caller is responsible for holding a location permission first; a provider that is
+     * handed {@code true} without one should fail quietly rather than throw into the map.
+     *
+     * @param enabled true to show the device's position
+     */
+    void setMyLocationEnabled(boolean enabled);
     
     /**
      * 设置旋转手势是否可用

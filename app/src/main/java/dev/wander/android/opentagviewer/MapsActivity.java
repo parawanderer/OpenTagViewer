@@ -58,6 +58,7 @@ import dev.wander.android.opentagviewer.ui.login.TwoFactorAgainOverlay;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.settings.ICloudSetupOfferDialog;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
+import dev.wander.android.opentagviewer.ui.maps.MapContainer;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapMarker;
@@ -551,8 +552,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // 根据用户设置创建地图提供商
         String mapProviderType = this.userSettings.getMapProvider();
+
+        // **Before the new provider touches it.** Changing provider calls recreate(), and the
+        // FragmentManager restores Google's map fragment into this container while a plain view
+        // added by osmdroid or AMap is not restored - so without this, switching away from Google
+        // left the old map in place with the new one beside it, and only a full restart applied
+        // the setting. See MapContainer.
+        MapContainer.clear(this, R.id.map);
+
         IMapProvider tempProvider = MapProviderFactory.create(mapProviderType);
-        
+
         // 初始化地图（注意：this.mapProvider 仅在 onMapReady 后赋值，避免初始化竞态）
         tempProvider.initialize(this, R.id.map, this);
     }
@@ -2904,9 +2913,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         if (ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
             Log.i(TAG, "Enabling 'my location' related UI features...");
-            // 注意：抽象接口可能不支持setMyLocationEnabled，这里保留向后兼容
-            if (this.map != null) {
-                this.map.setMyLocationEnabled(true);
+            // **Through the provider, because `map` is only set for Google Maps.** This used to
+            // call the GoogleMap object directly, so the dot showing where you are appeared on
+            // Google Maps and on no other provider - see IMapProvider#setMyLocationEnabled and
+            // rule 7.
+            if (this.mapProvider != null) {
+                this.mapProvider.setMyLocationEnabled(true);
             }
 
             // This UI button is only available if the user enables own location permissions.
