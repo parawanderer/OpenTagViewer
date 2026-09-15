@@ -44,3 +44,15 @@ scripts/plist_explorer.ipynb
 
 # Local throwaway signing key for release builds. Never a real one.
 *.jks
+
+# Bundles the exporter writes. `python/` is where it runs from, so an export lands here whenever
+# anybody tries the wizard or the CLI - and one was committed by a `git add -A` that swept it up
+# with an unrelated change.
+#
+# **A bundle is not a build artefact.** It holds key material for somebody's real AirTags, and
+# that material cannot be revoked: the only way to withdraw an exported accessory is to unpair it.
+# So this is not about repository tidiness.
+#
+# The fixtures under app/src/androidTest/assets/ are deliberately tracked and unaffected: they are
+# built by scripts/make_*_fixture.py from invented keys, not from anyone's account.
+python/*.zip
