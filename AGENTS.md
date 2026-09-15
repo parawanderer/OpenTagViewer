@@ -552,6 +552,34 @@ reached the wire, the request still failed, and that false negative sent the inv
 from the right answer for hours. A test that changes a value next to the one being sent proves
 nothing; print what actually goes out, or assert on the source line that composes it.
 
+### 19. The fork has pull requests too, and nobody is looking at them
+
+`parawanderer/FindMy.py` is where every Apple-protocol fix lands, and it accepts pull requests
+like any other repository. **Nothing in this project's routine surfaces them.** Notifications for
+a fork go to the fork, the tracker people watch is this one, and `gh pr list` run here shows
+nothing from there. So a contribution can sit open for days while the same problem is worked on
+from scratch in this repository.
+
+That is not hypothetical. On 2026-09-14 the GSA `429` was diagnosed from first principles over a
+day — eliminating the device identity, the network, the ADI provisioning and the headers one at a
+time — and the answer was already sitting in
+[parawanderer/FindMy.py#3](https://github.com/parawanderer/FindMy.py/pull/3), open since the 12th,
+with the same diagnosis and a working fix. A second pull request, #4, had been open just as long
+and was equally unseen.
+
+**So look, before starting.** It costs one command:
+
+```bash
+gh pr list --repo parawanderer/FindMy.py
+gh issue list --repo parawanderer/FindMy.py
+```
+
+Worth running before any investigation into Apple's protocol, before moving the pin (rule 14), and
+whenever something that worked yesterday stops working — which is the same moment rule 18 says to
+read the neighbours' trackers. The fork is the nearest neighbour of all, and the only one where
+somebody may have already written the patch.
+
+
 ---
 
 ## Building and testing
