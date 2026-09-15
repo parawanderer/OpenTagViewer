@@ -163,11 +163,22 @@
 
             </LinearLayout>
 
+            <!--
+                **`top`, not `center`, and the labels are why.** These four buttons are an icon
+                above a label, and the labels are not all one line: "Location History" wraps in
+                English, and which of them wrap changes with the language. Centring made the row
+                as tall as its tallest button and then centred the shorter ones inside it, which
+                pushed their icons down by half a line - so the icons sat at four different
+                heights depending on how the text happened to wrap.
+
+                Aligning to the top puts every icon at the same y, whatever the labels below them
+                do. Asserted by TagCardLayoutTest#everyButtonIconSitsAtTheSameHeight.
+            -->
             <LinearLayout
                 android:id="@+id/tag_bottom_menu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
+                android:gravity="top|center_horizontal"
                 android:orientation="horizontal"
                 android:paddingTop="4dp"
                 android:paddingBottom="10dp">
