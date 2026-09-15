@@ -163,9 +163,21 @@ message about the zip rather than about a code. Publish an exporter that locks b
 that app is out, and every bundle written that day is unopenable by whoever receives it, and the
 recipient is the one person in that transaction who chose none of it and can fix none of it.
 
-**So the wizard's lock is currently defaulted off**, in `wizard.py`'s `lock_bundle`, and
-`test_wizard_bundle_locking.py` asserts that. Flip it in the same change that raises the minimum
-app version, not before and not separately.
+**The wizard's lock is defaulted on**, in `wizard.py`'s `lock_bundle`, and
+`test_wizard_bundle_locking.py` asserts that.
+
+**It was flipped on before app 1.1.0 was published, which is not what the paragraph above
+describes, and the exception is worth understanding rather than copying.** The ordering exists to
+protect the recipient — the person who chose neither the exporter nor its version. In September
+2026 there was no such person left to protect: Apple's edge had begun refusing every client that
+named `com.apple.dt.Xcode`, which is every app release up to and including 1.0.5, so those
+installs could not sign in at all and an unlocked bundle bought their owner nothing. A locked
+bundle was not unopenable *forever*, only until 1.1.0 — the same release that made the app work
+again in the first place. So locking early cost nobody anything.
+
+Read that as a statement about how narrow the exception was, not as licence. The rule's condition
+is a working older app in somebody's hands, and it was discharged by Apple breaking every one of
+them, not by a judgement that recipients matter less than convenience.
 
 **A gate on the format must not hold back unrelated fixes.** This nearly happened: the fix for
 [#140](https://github.com/parawanderer/OpenTagViewer/issues/140) — where every share comes back

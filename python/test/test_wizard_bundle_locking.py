@@ -1,16 +1,13 @@
 """
 The wizard can lock the bundles it writes, and shows the code once.
 
-**The default is off, and it is off for a reason that will expire.** A locked bundle can only be
-opened by app 1.1.0 or newer; anything older fails with a message about the zip rather than about
-a code. The person who meets that failure is the recipient, who chose neither the exporter nor its
-version - so until 1.1.0 is *released*, not merely built, locking by default would break exports
-for the one party who can do nothing about it.
+**The default is on, now that app 1.1.0 is released.** A locked bundle can only be opened by that
+version or newer; anything older fails with a message about the zip rather than about a code, and
+the person who meets that failure is the recipient - who chose neither the exporter nor its
+version. That is why this waited for the app rather than shipping alongside it.
 
-**These tests assert the default in both directions on purpose.** Nothing caught the previous flip
-in either direction, so the value has changed twice with no test noticing. When app 1.1.0 ships and
-the default goes back on, `test_the_checkbox_starts_unticked` is the test that should fail and be
-inverted - deliberately, in the same change, rather than discovered later.
+**These tests assert the default in both directions on purpose.** The value moved twice with no
+test noticing either time, which is how it came to be wrong in the first place.
 
 The code is the part with a permanent cost. It is not stored anywhere and cannot be recovered, so
 a bundle written without the user being shown its code is a bundle nobody can ever open.
@@ -71,10 +68,9 @@ class TestTheDefault:
     infrastructure, so on is where this belongs eventually. It is not there yet.
     """
 
-    def test_the_checkbox_starts_unticked(self, window):
-        assert window.lock_bundle.get() is False, (
-            "locking by default writes bundles that no released app can open. Flip this only in"
-            " the change that raises the minimum app version - see AGENTS.md rule 9"
+    def test_the_checkbox_starts_ticked(self, window):
+        assert window.lock_bundle.get() is True, (
+            "the default is on now that app 1.1.0 is released and can open a locked bundle"
         )
 
     def test_a_bundle_is_written_with_a_code(self, window, bundle, tmp_path):
