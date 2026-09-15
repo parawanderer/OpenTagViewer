@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 APP_TITLE = f"OpenTagViewer AirTag Exporter {VERSION}"
 
