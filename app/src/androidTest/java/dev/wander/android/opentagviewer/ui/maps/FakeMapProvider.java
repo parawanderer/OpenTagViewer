@@ -275,6 +275,19 @@ public class FakeMapProvider implements IMapProvider {
     public void setMyLocationButtonEnabled(final boolean enabled) {
     }
 
+    /** Recorded rather than ignored: whether the dot was asked for is the thing under test. */
+    private boolean myLocationEnabled = false;
+
+    @Override
+    public void setMyLocationEnabled(final boolean enabled) {
+        this.myLocationEnabled = enabled;
+    }
+
+    /** Whether this provider was asked to show the device's own position. */
+    public boolean isMyLocationEnabled() {
+        return this.myLocationEnabled;
+    }
+
     @Override
     public void setRotateGesturesEnabled(final boolean enabled) {
     }
