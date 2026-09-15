@@ -85,6 +85,13 @@ public class OsmMapProvider implements IMapProvider {
         this.mapView = new MapView(activity);
         this.mapView.setTileSource(TileSourceFactory.MAPNIK);
         this.mapView.setMultiTouchControls(true);
+
+        // **osmdroid draws its own +/- buttons, and this app has no room for them.** They sit at
+        // the bottom of the map, which is where the tag cards are, so they render underneath the
+        // cards - visible, overlapping, and not reachable to tap. Google and AMap are configured
+        // without their equivalents too, so turning these off is what makes the providers agree.
+        this.mapView.getZoomController().setVisibility(
+                org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER);
         this.controller = this.mapView.getController();
 
         this.copyrightOverlay = new CopyrightOverlay(activity);
@@ -333,8 +340,18 @@ public class OsmMapProvider implements IMapProvider {
 
     @Override
     public void setMyLocationButtonEnabled(boolean enabled) {
-        // osmdroid has no built-in button of its own the way Google/AMap do; this toggles the
-        // location dot/overlay itself, which is the closest equivalent this library offers.
+        // **Nothing to toggle, and deliberately not the dot.** osmdroid has no built-in button of
+        // its own the way Google and AMap do - the app draws its own (`button_my_location`) - so
+        // there is nothing here to show or hide.
+        //
+        // This used to move the location overlay instead, which read as reasonable and meant the
+        // dot was governed by a method about a button: MapsActivity turns the button off at
+        // startup, so on this provider that turned the dot off and nothing ever turned it back
+        // on. The map simply never showed where you were. The dot is setMyLocationEnabled.
+    }
+
+    @Override
+    public void setMyLocationEnabled(boolean enabled) {
         if (this.mapView == null) return;
         if (enabled) {
             if (this.myLocationOverlay == null) {

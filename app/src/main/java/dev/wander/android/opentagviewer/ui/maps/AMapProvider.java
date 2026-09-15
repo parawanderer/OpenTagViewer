@@ -555,6 +555,23 @@ public class AMapProvider implements IMapProvider {
     }
     
     @Override
+    public void setMyLocationEnabled(boolean enabled) {
+        if (aMap == null) return;
+        try {
+            // Reflection, like everything else here: AMap is loaded at runtime only when the user
+            // supplies a key, so this class must compile and run without its types on the path.
+            Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
+            java.lang.reflect.Method setMyLocationEnabled =
+                    aMapClass.getMethod("setMyLocationEnabled", boolean.class);
+            setMyLocationEnabled.invoke(aMap, enabled);
+        } catch (Exception e) {
+            // Includes the SecurityException a revoked permission raises. The map is still usable
+            // without the dot, so this is reported and not thrown.
+            Log.e(TAG, "Failed to set my location enabled", e);
+        }
+    }
+
+    @Override
     public void setRotateGesturesEnabled(boolean enabled) {
         if (aMap == null) return;
         try {
