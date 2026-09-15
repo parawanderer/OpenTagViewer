@@ -26,7 +26,17 @@ import lombok.Builder;
                         onDelete = ForeignKey.CASCADE
                 )
         },
-        indices = @Index(value = {"hash_id", "beacon_id", "timestamp"})
+        // **`beacon_id` leads, and that is the whole point.** SQLite only uses an index for a
+        // foreign-key check when the referencing column is leftmost, so the old
+        // `{hash_id, beacon_id, timestamp}` served the key not at all - every change to
+        // OwnedBeacons scanned this table, which holds every position ever recorded for every
+        // tag. Room says so on every build.
+        //
+        // It served the queries no better. `hash_id` is the primary key, so leading with it
+        // duplicated an index SQLite maintains anyway, while every query in LocationReportDao
+        // filters on `beacon_id` and most then order by `timestamp` - none of which that index
+        // could answer.
+        indices = @Index(value = {"beacon_id", "timestamp"})
 )
 public class LocationReport {
     /**
