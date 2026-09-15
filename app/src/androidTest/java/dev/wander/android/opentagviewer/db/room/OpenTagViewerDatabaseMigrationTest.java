@@ -18,6 +18,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Regression tests for the v1 → v2 database upgrade.
@@ -641,6 +643,105 @@ public class OpenTagViewerDatabaseMigrationTest {
             assertEquals("local", cursor.getString(0));
             assertEquals(8, cursor.getInt(1));
         }
+    }
+
+    /**
+     * v9 to v10 swaps the index and touches no row.
+     *
+     * <p>The old index led with {@code hash_id}, the primary key, and buried {@code beacon_id}
+     * second - where SQLite will not use it for the foreign-key check, so every change to
+     * OwnedBeacons scanned this whole table. Room warned about it on every build.
+     *
+     * <p>Asserted on the index list rather than only on a row count, because a migration that
+     * silently kept both indexes would preserve every row and still leave the table paying for
+     * one nothing reads.
+     */
+    @Test
+    public void migrate9To10_swapsTheIndexAndKeepsEveryReport() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 5)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV5(db, BEACON_ID, 1L, BEACON_PLIST, false);
+            insertLocationReport(db, "hash-1", BEACON_ID, 1700000000000L);
+            insertLocationReport(db, "hash-2", BEACON_ID, 1700000060000L);
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, OpenTagViewerDatabase.MIGRATION_5_6);
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, OpenTagViewerDatabase.MIGRATION_6_7);
+        helper.runMigrationsAndValidate(TEST_DB, 8, true, OpenTagViewerDatabase.MIGRATION_7_8);
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, OpenTagViewerDatabase.MIGRATION_8_9);
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 10, true, OpenTagViewerDatabase.MIGRATION_9_10);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("an index swap must not cost a single report", 2, cursor.getInt(0));
+        }
+
+        final List<String> indexes = indexesOn(db, "LocationReport");
+        assertTrue("the foreign key's own index is what this migration exists to create",
+                indexes.contains("index_LocationReport_beacon_id_timestamp"));
+        assertFalse("the old index answered nothing the primary key does not, so it goes",
+                indexes.contains("index_LocationReport_hash_id_beacon_id_timestamp"));
+    }
+
+    /**
+     * The whole ladder, because users skip releases.
+     *
+     * <p>Somebody upgrading from the first version runs every migration in one go, and that path
+     * is the one nothing else covers - each test above starts partway up.
+     */
+    @Test
+    public void migrate1To10_directUpgradePreservesEverything() throws IOException {
+        try (SupportSQLiteDatabase db = helper.createDatabase(TEST_DB, 1)) {
+            insertImport(db, 1L);
+            insertOwnedBeaconV1(db, "beacon-a", 1L, BEACON_PLIST, false);
+            insertLocationReport(db, "hash-1", "beacon-a", 1700000000000L);
+            insertUserBeaconOptions(db, "beacon-a", "Wallet", "\uD83D\uDC5B");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(
+                TEST_DB, 10, true,
+                OpenTagViewerDatabase.MIGRATION_1_2,
+                OpenTagViewerDatabase.MIGRATION_2_3,
+                OpenTagViewerDatabase.MIGRATION_3_4,
+                OpenTagViewerDatabase.MIGRATION_4_5,
+                OpenTagViewerDatabase.MIGRATION_5_6,
+                OpenTagViewerDatabase.MIGRATION_6_7,
+                OpenTagViewerDatabase.MIGRATION_7_8,
+                OpenTagViewerDatabase.MIGRATION_8_9,
+                OpenTagViewerDatabase.MIGRATION_9_10);
+
+        try (Cursor cursor = db.query("SELECT COUNT(*) FROM LocationReport")) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("location history lost on a direct v1 to v10 upgrade", 1, cursor.getInt(0));
+        }
+
+        try (Cursor cursor = db.query(
+                "SELECT ui_name FROM UserBeaconOptions WHERE beacon_id = ?",
+                new Object[] {"beacon-a"})) {
+            assertTrue("the user's nickname did not survive nine migrations", cursor.moveToFirst());
+            assertEquals("Wallet", cursor.getString(0));
+        }
+
+        assertTrue("the ladder must end on the index v10 defines",
+                indexesOn(db, "LocationReport")
+                        .contains("index_LocationReport_beacon_id_timestamp"));
+    }
+
+    /** Index names on a table, ignoring the ones SQLite makes for itself. */
+    private static List<String> indexesOn(final SupportSQLiteDatabase db, final String table) {
+        final List<String> names = new ArrayList<>();
+        try (Cursor cursor = db.query(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?",
+                new Object[] {table})) {
+            while (cursor.moveToNext()) {
+                final String name = cursor.getString(0);
+                if (name != null && !name.startsWith("sqlite_autoindex")) {
+                    names.add(name);
+                }
+            }
+        }
+        return names;
     }
 
     /**
