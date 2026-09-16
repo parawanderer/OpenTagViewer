@@ -197,8 +197,11 @@ public class FetchFromAccountSettingTest {
         onView(withId(R.id.settings_fetch_from_account)).perform(click());
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
 
-        // Settings has to end for its own result to be readable, the same way the map ends it.
-        this.scenario.onActivity(Activity::finish);
+        // **Backed out, not finished.** Calling finish() directly skips handleEndActivity(),
+        // which is the method that sets the result at all - so the test reported RESULT_CANCELED
+        // and said the flag had been dropped, for a screen that was never asked to report one.
+        // Espresso's back goes through onBackPressed and therefore through the real exit.
+        androidx.test.espresso.Espresso.pressBackUnconditionally();
 
         // ActivityScenario.getResult() hands back Instrumentation.ActivityResult, the same type
         // the stub above is built from.
@@ -231,7 +234,7 @@ public class FetchFromAccountSettingTest {
         onView(withId(R.id.settings_fetch_from_account)).perform(click());
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
 
-        this.scenario.onActivity(Activity::finish);
+        androidx.test.espresso.Espresso.pressBackUnconditionally();
 
         final android.content.Intent data = this.scenario.getResult().getResultData();
         if (data != null) {
