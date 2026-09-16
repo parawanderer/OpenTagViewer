@@ -78,6 +78,32 @@ jobs:
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY || 'maps_key_default_value' }}" > secrets.properties
 
+      # **So every debug APK this repository publishes is signed by the same key.**
+      #
+      # A runner has no ~/.android/debug.keystore, so AGP generates one per run. That makes each
+      # debug APK unupgradeable over the last (INSTALL_FAILED_UPDATE_INCOMPATIBLE, and with
+      # allowBackup false an uninstall destroys the tester's imported beacons), and it makes the
+      # Maps SHA-1 restriction impossible to satisfy, which is why maps rendered blank here and
+      # not locally.
+      #
+      # Absent secret is not fatal: a fork without it falls back to the generated key and still
+      # builds, which is the behaviour a fork wants.
+      #
+      # Passed through `env` rather than interpolated into the script: the `secrets` context is
+      # not available in a step-level `if` at all, and a `${{ }}` inside a run block puts the
+      # value on the command line, where a shell trace or an injected newline can expose it.
+      - name: Write the shared debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "No DEBUG_KEYSTORE_BASE64 secret; AGP will generate a debug key for this run."
+            echo "APKs from this run cannot be installed over ones from another."
+            exit 0
+          fi
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/debug-keystore.jks
+          echo "Debug keystore written, $(wc -c < app/debug-keystore.jks) bytes"
+
       # KVM is required for a hardware-accelerated emulator; without it the run times out.
       - name: Enable KVM
         run: |
@@ -196,6 +222,32 @@ jobs:
       - name: Inject secrets.properties
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY || 'maps_key_default_value' }}" > secrets.properties
+
+      # **So every debug APK this repository publishes is signed by the same key.**
+      #
+      # A runner has no ~/.android/debug.keystore, so AGP generates one per run. That makes each
+      # debug APK unupgradeable over the last (INSTALL_FAILED_UPDATE_INCOMPATIBLE, and with
+      # allowBackup false an uninstall destroys the tester's imported beacons), and it makes the
+      # Maps SHA-1 restriction impossible to satisfy, which is why maps rendered blank here and
+      # not locally.
+      #
+      # Absent secret is not fatal: a fork without it falls back to the generated key and still
+      # builds, which is the behaviour a fork wants.
+      #
+      # Passed through `env` rather than interpolated into the script: the `secrets` context is
+      # not available in a step-level `if` at all, and a `${{ }}` inside a run block puts the
+      # value on the command line, where a shell trace or an injected newline can expose it.
+      - name: Write the shared debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "No DEBUG_KEYSTORE_BASE64 secret; AGP will generate a debug key for this run."
+            echo "APKs from this run cannot be installed over ones from another."
+            exit 0
+          fi
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/debug-keystore.jks
+          echo "Debug keystore written, $(wc -c < app/debug-keystore.jks) bytes"
 
       # No stub wheel to validate any more: it is generated from app/stubs/unicorn/ by
       # generateUnicornStubWheel during the build, rather than being checked in.
