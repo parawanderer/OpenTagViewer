@@ -92,6 +92,34 @@ public final class FindMyAdvertisement {
         return new FindMyAdvertisement(state, batteryLevelOf(status), status);
     }
 
+    /**
+     * Bits 6-7 of the status byte, read as a battery level.
+     *
+     * <p><b>Read on sight, unlike the same byte in a location report.</b>
+     * {@code LocationReportFields} decodes its copy only when the whole byte conforms to Apple's
+     * Table 5-5 - bit 5 set, reserved bits clear - because an AirTag's does not, and decoding a
+     * non-conforming byte against that table produces a confident wrong answer. That gate is not
+     * applied here, and the difference is deliberate rather than an oversight:
+     *
+     * <ul>
+     *   <li><b>Only these two bits are used, not the rest of the table.</b> The reserved bits an
+     *       AirTag sets wrongly are the ones this does not look at.</li>
+     *   <li><b>The one published observation of a real AirTag agrees.</b> Adam Catley's teardown
+     *       records {@code 0x10}, whose bits 6-7 are {@code 0b00} - "full", for a working tag.
+     *       Consistent, if only just: one data point at one battery level.</li>
+     *   <li><b>There is no alternative for these users.</b> The battery on the account record is
+     *       written by Apple's own devices, so for somebody without one it is years old or, as
+     *       with both tags this was developed against, never written at all. See
+     *       {@code LastBleSighting}.</li>
+     * </ul>
+     *
+     * <p><b>So this is what the tag claimed, not a measurement, and nobody has checked the
+     * mapping against tags at known levels.</b> That is the experiment worth doing: sit down with
+     * several accessories at several charge levels and write down what each one emits. Until
+     * somebody has, a reading here that disagrees with a fresh battery is as likely to be this
+     * decoder as the cell - which is exactly how it was queried. The raw byte is kept on the
+     * advertisement so a bug report can quote it instead of only this reading.
+     */
     private static BatteryLevel batteryLevelOf(final int statusByte) {
         switch ((statusByte >> 6) & 0b11) {
             case 0b01: return BatteryLevel.MEDIUM;

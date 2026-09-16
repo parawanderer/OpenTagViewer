@@ -114,6 +114,15 @@ import lombok.NoArgsConstructor;
  * with several kinds of tag at several battery levels and writing down what each one emits. The
  * gate below exists so that the app stays useful and silent in the meantime, instead of guessing.
  *
+ * <p><b>The live Bluetooth path does read two of these bits, and that is not a contradiction of
+ * the paragraph above.</b> {@code FindMyAdvertisement.batteryLevelOf} takes bits 6-7 off an
+ * advertisement this phone heard itself, and never consults the rest of the table - so the
+ * reserved bits an AirTag sets wrongly are the ones it does not look at. It also has no
+ * alternative: the battery on the account record is written by Apple's devices, so for a user
+ * without one it is years old or never written. What is refused here is decoding a
+ * non-conforming byte <i>as though the whole table applied</i>, which is a different claim.
+ * Neither reading has been checked against a tag at a known charge level.
+ *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is
  * annotated as what the beacon <i>claimed</i>, never as a measurement. Every value carries decimal,
