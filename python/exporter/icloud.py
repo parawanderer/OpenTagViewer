@@ -37,7 +37,7 @@ from findmy import (
     SmsSecondFactorMethod,
     TrustedDeviceSecondFactorMethod,
 )
-from findmy.errors import AppleServiceUnavailableError, UnhandledProtocolError
+from findmy.errors import AppleServiceUnavailableError, MobileMeDelegateError, UnhandledProtocolError
 from findmy.accessory import _extract_serial_from_stable_id  # noqa: PLC2701 - see _candidate
 from findmy.cloudkit.beacons import (
     AsyncBeaconStore,
@@ -69,6 +69,49 @@ _LOCATE_WINDOW = timedelta(days=7)
 
 class ExportSourceError(Exception):
     """Raised when the account cannot produce what an export needs."""
+
+
+def not_a_terms_problem(error: MobileMeDelegateError) -> str | None:
+    """
+    Explain a delegate failure that terms cannot account for, or None when they still might.
+
+    **The response has two independent error channels, and terms arrive on only one of them.**
+    `localizedError` is where a response explains itself in words; the delegate's own `status`
+    fails separately from it. So a failure carrying no `localizedError` at all is not a terms
+    problem, and going on to fetch the terms in order to discover that costs a round trip and
+    tells the person nothing they can use.
+
+    **What it is instead is not established, so this offers rather than asserts.** Every client
+    sharing this sign-in path meets it on Apple IDs that have never been used with an Apple
+    device, and the advice that circulates is to fill the account out at appleid.apple.com --
+    dchristl/macless-haystack#84, #86 and #87, where the same delegate status arrives both with
+    this "server problem" wording and with "Account limit reached". That is somebody else's
+    finding rather than ours, and it is repeated here because it is the only remedy anybody has.
+
+    **Apple's own text says to try later, and this deliberately contradicts it.** Across those
+    clients it does not clear on its own, so repeating Apple's advice sends somebody to retry an
+    unchanged sign-in indefinitely.
+
+    :param error: The delegate failure, as raised by the sign-in.
+    :return: A message to show instead of the terms flow, or None to let the terms flow run.
+    """
+    if error.localized_error is not None:
+        return None
+
+    # `status_message` is where this response does its explaining, and it is the only evidence a
+    # bug report about it can carry - so it is quoted rather than paraphrased. It can be absent,
+    # in which case the whole error is the best available description.
+    said = error.status_message or str(error)
+
+    return (
+        "Signing in worked - your password and your code were both accepted - and then Apple"
+        " would not open iCloud for this account.\n\n"
+        f"This is not about terms of service. Apple said:\n\n  {said}\n\n"
+        "Other programs that sign in this way meet this on Apple IDs that have never been used"
+        " with an Apple device. Signing in at https://appleid.apple.com and completing the"
+        " account details - adding a payment method, which is not charged - is what usually"
+        " clears it. Waiting, despite what Apple's message says, generally does not."
+    )
 
 
 @dataclass(frozen=True)

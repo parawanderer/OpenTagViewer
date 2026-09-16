@@ -58,7 +58,7 @@ from findmy import (
 from findmy.errors import AppleServiceUnavailableError
 from findmy.keychain.recovery import RecoveryError
 
-from exporter.icloud import Candidate, ExportSourceError
+from exporter.icloud import Candidate, ExportSourceError, not_a_terms_problem
 from exporter.version import (
     APP_TITLE,
     EXPORT_VIA_WIZARD,
@@ -1148,6 +1148,14 @@ async def _accept_pending_terms(parent: tk.Tk, account, asker: Asker, error) -> 
     :raises TermsDeclined: If any document is rejected. Nothing is sent for it, and no later
         document is shown.
     """
+    # **Before fetching, because for this shape there is nothing to fetch.** A delegate failure
+    # that named no `localizedError` is not about terms, so asking Apple which terms are pending
+    # can only come back empty - and the report that produced this, OpenTagViewer#221, is
+    # somebody being walked to that empty answer and left to work out what it meant.
+    refusal = not_a_terms_problem(error)
+    if refusal is not None:
+        raise ExportSourceError(refusal)
+
     try:
         documents = await account.fetch_terms()
     except TermsError as e:

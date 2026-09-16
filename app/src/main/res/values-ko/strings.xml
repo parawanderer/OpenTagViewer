@@ -389,4 +389,5 @@
 Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시도해 보세요. 계속 실패한다면 이 로그를 첨부해 신고하면 해결할 수 있습니다.</string>
     <string name="login_failed_apple_asked_to_wait">Apple이 로그인을 거부했으며, 다시 시도하기 전에 %1$s 기다려 달라고 요청했습니다. Apple ID나 비밀번호의 문제가 아니라 Apple 쪽의 거부입니다.</string>
     <string name="login_try_remote_anisette">원격 서버 시도</string>
+    <string name="login_failed_icloud_refused">비밀번호와 인증 코드는 통과했지만, 그 뒤에 Apple이 이 계정의 iCloud를 열어 주지 않았습니다. 약관과는 관계가 없습니다. 같은 방식으로 로그인하는 다른 앱에서도 Apple 기기에서 한 번도 사용한 적이 없는 Apple ID에서 이런 일이 보고되며, appleid.apple.com에 로그인해 결제 수단 추가처럼 계정 정보를 채우면 대개 해결됩니다. 기다리는 것만으로는 보통 해결되지 않습니다.</string>
 </resources>

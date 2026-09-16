@@ -389,4 +389,5 @@
 如果只是 Apple 拒绝了请求，先等一会儿再试。若持续失败，附上此日志的报告才能让问题得到修复。</string>
     <string name="login_failed_apple_asked_to_wait">Apple 拒绝了此次登录，并要求等待 %1$s 后再试。这是 Apple 的拒绝，不是你的 Apple ID 或密码有问题。</string>
     <string name="login_try_remote_anisette">尝试远程服务器</string>
+    <string name="login_failed_icloud_refused">密码和验证码都通过了，但随后 Apple 没有为此账户开放 iCloud。这与服务条款无关。以同样方式登录的其他应用也报告，从未在 Apple 设备上使用过的 Apple ID 会出现这种情况；登录 appleid.apple.com 并补全账户信息——例如添加付款方式——通常就能解决。仅仅等待通常没有用。</string>
 </resources>

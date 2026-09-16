@@ -389,4 +389,5 @@ Es wurde kein Verlauf importiert und bereits gespeicherte Daten wurden nicht ge�
 Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es erneut zu versuchen. Schlägt es weiterhin fehl, macht ein Bericht mit diesem Protokoll es behebbar.</string>
     <string name="login_failed_apple_asked_to_wait">Apple hat die Anmeldung abgelehnt und bittet, %1$s bis zum nächsten Versuch zu warten. Das ist eine Ablehnung durch Apple und kein Problem mit deiner Apple-ID oder deinem Passwort.</string>
     <string name="login_try_remote_anisette">Remote-Server versuchen</string>
+    <string name="login_failed_icloud_refused">Dein Passwort und dein Code wurden akzeptiert, danach hat Apple iCloud für dieses Konto nicht freigegeben. Es geht dabei nicht um Nutzungsbedingungen. Andere Apps, die sich auf diesem Weg anmelden, sehen das bei Apple-IDs, die noch nie mit einem Apple-Gerät verwendet wurden, und sich bei appleid.apple.com anzumelden und die Kontodaten zu vervollständigen — etwa eine Zahlungsmethode hinzuzufügen — behebt es meistens. Bloßes Warten hilft in der Regel nicht.</string>
 </resources>

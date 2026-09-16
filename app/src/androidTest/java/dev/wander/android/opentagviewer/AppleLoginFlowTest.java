@@ -349,6 +349,45 @@ public class AppleLoginFlowTest {
     }
 
     /**
+     * <b>iCloud being refused for the account is not reported as terms of service.</b>
+     *
+     * <p><b>Issue #221.</b> Apple took the password and the code, then its {@code mobileme}
+     * delegate refused the account on its own {@code status} with nothing on the
+     * {@code localizedError} channel terms arrive on. Every delegate failure was classified as
+     * terms pending, so the reporter - whose terms were fine, as iCloud on the web confirmed -
+     * was sent to a document list with nothing in it and told to accept something.
+     *
+     * <p>Asserted on four wrong turns, because each sends somebody somewhere different: not the
+     * terms sentence, not "Apple declined" (which says to wait, and here waiting does not work),
+     * not the raw delegate text, and the Anisette-server offer stays hidden - a different machine
+     * identity changes nothing about an account Apple will not open.
+     */
+    @Test
+    public void icloudBeingRefusedIsNotReportedAsTermsOfService() {
+        this.apple = FakeAppleAuthService.icloudIsRefusedForTheAccount();
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        final android.content.Context context = getInstrumentation().getTargetContext();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
+                withText(context.getString(R.string.login_failed_icloud_refused)))));
+
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_terms)))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_apple_declined)))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(containsString("com.apple.mobileme")))));
+
+        // The server route is for a refused sign-in, and this sign-in was not refused.
+        onView(withId(R.id.login_error_try_remote_anisette))
+                .check(matches(not(isDisplayed())));
+    }
+
+    /**
      * <b>When Apple names a wait, the screen gives it rather than "try again shortly".</b>
      *
      * <p>A {@code Retry-After} on the refusal, carried across the bridge. The test above is the
