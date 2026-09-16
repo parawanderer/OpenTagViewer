@@ -447,7 +447,7 @@ chaquopy {
             // wheel for desktop platforms and a pure-Python `py3-none-any` one as well.
             // There is no Android wheel, so pip falls back to the pure-Python build - which
             // is correct but markedly slower. The messages here are small enough not to care.
-            install("git+https://github.com/parawanderer/FindMy.py@d956fc8b2679be56b0f4b0053940c5091fc0f1bb")
+            install("git+https://github.com/parawanderer/FindMy.py@7969003ca785658369b650f75d9e7ca519566bf6")
 
             install("NSKeyedUnArchiver==1.5")
 
