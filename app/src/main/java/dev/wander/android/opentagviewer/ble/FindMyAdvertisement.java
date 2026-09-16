@@ -104,35 +104,36 @@ public final class FindMyAdvertisement {
      * <ul>
      *   <li><b>Only these two bits are used, not the rest of the table.</b> The reserved bits an
      *       AirTag sets wrongly are the ones this does not look at.</li>
-     *   <li><b>Two real AirTags, side by side, differ in exactly these two bits and nowhere
-     *       else.</b> Observed on 2026-09-16 by @parawanderer, from the history of two tags on
-     *       one account: {@code 0x10} = {@code 0b00010000} on the tag reading full, {@code 0x50}
-     *       = {@code 0b01010000} on the tag reading medium. Bits 6-7 are {@code 0b00} and
-     *       {@code 0b01}; every other bit is identical, including the two an AirTag sets against
-     *       Table 5-5.
+     *   <li><b>Two real AirTags, watched across a battery change, move in exactly these two bits
+     *       and nowhere else.</b> Observed by @parawanderer on 2026-09-16, over both Bluetooth
+     *       and the Find My network:
      *
-     *       <p>That is the useful shape of the result. The non-conforming remainder is a
-     *       constant - an AirTag signature, not a battery field - so the objection to decoding
-     *       this byte does not reach bits 6-7, and the levels come out in the order Table 5-5
-     *       gives. Adam Catley's teardown independently records {@code 0x10} on a working
-     *       tag.</li>
+     *       <pre>
+     *   0x90 = 0b10010000   both tags, cells months old     bits 6-7 = 0b10  Low
+     *   0x50 = 0b01010000   one tag, cell just replaced     bits 6-7 = 0b01  Medium
+     *   0x10 = 0b00010000   the other, cell just replaced   bits 6-7 = 0b00  Full
+     *       </pre>
+     *
+     *       <p>Three of the four states, with bit 4 set and bit 5 clear throughout - the two an
+     *       AirTag sets against Table 5-5. A remainder that does not change across three battery
+     *       states is a signature, not a field, so the objection to decoding this byte does not
+     *       reach bits 6-7. They fall in the order the table gives, downward as a cell ages and
+     *       upward when it is replaced. Catley's teardown independently records {@code 0x10}.</li>
      *   <li><b>There is no alternative for these users.</b> The battery on the account record is
      *       written by Apple's own devices, so for somebody without one it is years old or, as
      *       with both tags this was developed against, never written at all. See
      *       {@code LastBleSighting}.</li>
      * </ul>
      *
-     * <p><b>What that does not establish is whether the tag is right.</b> These bits are what the
-     * accessory says about itself, and the observation above shows only that two tags in
-     * different states say different things in the expected order. It does not calibrate the
-     * words: nothing here knows what charge "medium" corresponds to, and a tag samples its cell
-     * on its own schedule, so a freshly replaced battery can keep reporting the old one's level
-     * for a while. A tag that reads medium on a new cell is therefore not evidence of a bug in
-     * this decoder - which is the question that produced this note.
+     * <p><b>What it still does not establish is what the four words are worth.</b> Nothing here
+     * calibrates them: "medium" on a cell replaced minutes earlier is the tag's own opinion, and
+     * whether that reflects a weak cell, a measurement the tag has not retaken, or a scale that
+     * simply does not start at "full" is unknown. Only {@code 0b11}, critically low, has not
+     * been seen at all.
      *
-     * <p>Still wanted, and now a smaller job than it was: the same two bits read off tags whose
-     * actual charge is known, to attach numbers to the four words. The raw byte is kept on the
-     * advertisement so any such report can quote it rather than only this reading.
+     * <p>Still wanted, and a much smaller job than before: these bits read off tags whose actual
+     * charge is known, to attach numbers to the words. The raw byte is kept on the advertisement
+     * so any such report can quote it rather than only this reading.
      */
     private static BatteryLevel batteryLevelOf(final int statusByte) {
         switch ((statusByte >> 6) & 0b11) {

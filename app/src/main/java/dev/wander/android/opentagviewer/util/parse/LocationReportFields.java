@@ -97,8 +97,19 @@ import lombok.NoArgsConstructor;
  * it observes is {@code 0x90}: bit 5 clear where the specification requires it set, and reserved
  * bit 4 set. Adam Catley's teardown records a real AirTag advertising {@code 0x10}, which breaks
  * the same two rules. The specification governs third-party MFi accessories; AirTag is Apple's own
- * hardware and predates it. Decoding {@code 0x90} against Table 5-5 anyway yields "battery Low"
- * for a tag whose own record reads Full - a confident, wrong answer, which is worse than none.
+ * hardware and predates it.
+ *
+ * <p><b>This paragraph used to end by saying that decoding {@code 0x90} yields "battery Low" for
+ * a tag whose record reads Full, and offering that as the proof that the byte lies. It was the
+ * wrong way round.</b> @parawanderer's two tags read {@code 0x90} for months on cells that had
+ * not been changed in as long, over both Bluetooth and the Find My network; replacing the
+ * batteries moved them to {@code 0x10} and {@code 0x50}. "Low" was correct. What was stale was
+ * the accessory record saying Full - written by Apple's own devices, of which this user has
+ * none, so it had never been updated at all.
+ *
+ * <p>Worth keeping the correction visible rather than quietly deleting the claim: it was written
+ * confidently, it was load-bearing for the decision below, and the thing that disproved it was
+ * somebody changing two batteries and looking.
  *
  * <p><b>And the byte is not trustworthy even when it is well-formed.</b> Caesar Creek Software's
  * write-up of this network puts it plainly: "it's supposed to indicate the battery level and
@@ -122,12 +133,19 @@ import lombok.NoArgsConstructor;
  * without one it is years old or never written. What is refused here is decoding a
  * non-conforming byte <i>as though the whole table applied</i>, which is a different claim.
  *
- * <p>Two AirTags on one account, read on 2026-09-16, support the narrower reading: {@code 0x10}
- * on the one reporting full and {@code 0x50} on the one reporting medium - identical in every
- * bit except 6 and 7, including the two that break this table. So the non-conforming remainder
- * looks like a fixed AirTag signature rather than a field, and bits 6-7 move with the battery in
- * the order Table 5-5 gives. What no observation yet fixes is what the four words mean in charge
- * terms, or whether the tag re-measures promptly after a cell is changed.
+ * <p>Two AirTags on one account, watched across a battery change on 2026-09-16, give three of
+ * the four states - and the same remainder every time:
+ *
+ * <pre>
+ *   0x90 = 0b10010000   both tags, on cells months old        bits 6-7 = 0b10  Low
+ *   0x50 = 0b01010000   one tag, cell just replaced           bits 6-7 = 0b01  Medium
+ *   0x10 = 0b00010000   the other, cell just replaced         bits 6-7 = 0b00  Full
+ * </pre>
+ *
+ * <p>Bit 4 is set and bit 5 clear in all three - the two that break this table - while only bits
+ * 6-7 move, and they move in the order Table 5-5 gives, downward as the cell ages and upward
+ * when it is replaced. A remainder constant across three battery states is a signature rather
+ * than a field. Catley's teardown independently records {@code 0x10}.
  *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is
