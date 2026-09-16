@@ -97,6 +97,11 @@ class FakeClient:
         self.renameError = None
         self.entered = False
         self.exited = False
+        # How many times the next refusable call answers with a refusal before working, and a
+        # tally of how many times each was actually attempted. Used by the retry tests.
+        self.refusals = 0
+        self.attempts: dict[str, int] = {}
+        self.retryAfter: float | None = None
 
     async def __aenter__(self):
         self.entered = True
@@ -107,7 +112,16 @@ class FakeClient:
         return False
 
     async def recovery_options(self, *, refresh: bool = False):
+        self._refuseIfTold("recovery_options")
         return self._options
+
+    def _refuseIfTold(self, what: str) -> None:
+        """Count the attempt, and refuse the first `self.refusals` of them."""
+        from findmy.errors import AppleServiceUnavailableError  # noqa: PLC0415
+
+        self.attempts[what] = self.attempts.get(what, 0) + 1
+        if self.attempts[what] <= self.refusals:
+            raise AppleServiceUnavailableError(429, what, self.retryAfter)
 
     # `unlock` recovers explicitly now - `session.recover` then `client.resume` - because the
     # peer a recovery yields is what sponsors a join, and `client.unlock` keeps it to itself.
@@ -116,6 +130,7 @@ class FakeClient:
         return self
 
     async def recover(self, record, passcode):
+        self._refuseIfTold("recover")
         self.unlockedWith.append((record.serial, passcode))
         if self._unlockError is not None:
             raise self._unlockError
@@ -128,6 +143,7 @@ class FakeClient:
         return []
 
     async def join(self, peer, *, passcode, device, os_version):
+        self._refuseIfTold("join")
         self.joinedWith = SimpleNamespace(
             peer=peer, passcode=passcode, device=device, os_version=os_version)
         if self._joinError is not None:
@@ -1196,3 +1212,114 @@ class TestASignInThatNoLongerWorks:
             answer = json.loads(icloud_bridge._unexpected("reading the account's accessories"))
 
         assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
+
+
+class TestRefusalsThatClearOnTheirOwn:
+    """
+    Apple refuses the occasional request on a fresh connection and answers the next one.
+
+    Measured in OpenTagViewer#226, and met twice in one sitting on the account-setup screen -
+    both times cleared by pressing "Try Again". So the app was asking somebody to do by hand,
+    twice, what it can do in a second.
+
+    **The interesting tests here are the ones about what is *not* retried.** A retry is only
+    safe on a call that can be made twice, and two of these cannot.
+    """
+
+    @pytest.fixture(autouse=True)
+    def dontActuallyWait(self, monkeypatch):
+        """Record the waits instead of sleeping them, so the suite stays fast."""
+        self.waited: list[float] = []
+        monkeypatch.setattr(icloud_bridge.time, "sleep", self.waited.append)
+
+    def test_one_refusal_is_retried_rather_than_shown(self, session):
+        client = FakeClient()
+        client.refusals = 1
+        made = session(client)
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert answer["ok"], "a refusal that clears on its own reached the screen"
+        assert client.attempts["recovery_options"] == 2
+        assert self.waited == [1.0]
+
+    def test_it_gives_up_rather_than_retrying_forever(self, session):
+        # A refusal that does not clear is a real one, and the screen has to say so. The
+        # September 2026 edge block lasted days; four seconds of patience must not hide it.
+        client = FakeClient()
+        client.refusals = 99
+        made = session(client)
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert not answer["ok"]
+        assert answer["reason"] == icloud_bridge.REASON_APPLE_DECLINED
+        assert client.attempts["recovery_options"] == 3, "expected two retries, and no more"
+        assert self.waited == [1.0, 3.0]
+
+    def test_a_wait_apple_names_is_honoured_over_the_backoff(self, session):
+        client = FakeClient()
+        client.refusals = 1
+        client.retryAfter = 2.5
+        made = session(client)
+
+        assert json.loads(made.recoveryOptions())["ok"]
+        assert self.waited == [2.5], "Apple's own number beats the backoff"
+
+    def test_a_long_wait_is_shown_rather_than_sat_through(self, session):
+        """
+        A header asking for a minute is information for the person, not something to block on.
+
+        Surfaced immediately, with nothing slept, so the screen can say how long.
+        """
+        client = FakeClient()
+        client.refusals = 1
+        client.retryAfter = 600.0
+        made = session(client)
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert not answer["ok"]
+        assert answer["reason"] == icloud_bridge.REASON_APPLE_DECLINED
+        assert self.waited == [], "the screen was blocked on a wait Apple asked for"
+        assert client.attempts["recovery_options"] == 1
+
+    def test_a_join_is_never_retried(self, session):
+        """
+        **`join` writes.** It enrols an escrow record and adds this app to the trust circle, and
+        its own docstring says a timeout does not establish that nothing was sent. A second
+        attempt can therefore enrol a second record - and duplicate records are the noise the
+        recovery picker already has to filter out.
+
+        So a refusal here reaches the screen on the first one, and the user decides.
+        """
+        client = FakeClient()
+        made = session(client)
+        made.recoveryOptions()
+        assert json.loads(made.unlock("F2LX9Q", "123456"))["ok"]
+
+        client.refusals = 1
+        answer = json.loads(made.join("a-generated-passcode"))
+
+        assert not answer["ok"]
+        assert client.attempts["join"] == 1, "a write was retried"
+        assert self.waited == []
+
+    def test_recovering_with_a_passcode_is_never_retried(self, session):
+        """
+        **Escrow attempts are capped, and the cap is unknown.**
+
+        `exporter.icloud.unlock` puts it plainly: the decision to spend another attempt is
+        always the user's, because exhausting them is not recoverable from here. That stays
+        true when the thing spending the attempt is a retry loop rather than a person.
+        """
+        client = FakeClient()
+        made = session(client)
+        made.recoveryOptions()
+
+        client.refusals = 1
+        answer = json.loads(made.unlock("F2LX9Q", "123456"))
+
+        assert not answer["ok"]
+        assert client.attempts["recover"] == 1, "a capped attempt was spent by a retry"
+        assert self.waited == []

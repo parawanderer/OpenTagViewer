@@ -38,6 +38,7 @@ import base64
 import json
 import plistlib
 import sys
+import time
 import traceback
 from typing import Any
 
@@ -128,6 +129,30 @@ here would change what Find My shows for it in one place and leave every other c
 something else. The app nicknames those locally instead, and keeps showing the real name
 alongside. Only an accessory - an AirTag, or a Find My-certified tag somebody made - has the
 naming record as its single source of truth.
+"""
+
+APPLE_RETRY_BACKOFF_SECONDS = (1.0, 3.0)
+"""
+How long to wait before each retry of a refusal that clears on its own.
+
+**Two retries, because one refusal in the middle of a flow is what users actually meet.** Apple's
+edge refuses the occasional request on a fresh connection and answers the next one normally - see
+OpenTagViewer#226, where a probe measured it directly and the app met it twice in one sitting on
+the account-setup screen. Both times pressing "Try Again" worked, which is the whole argument:
+the app is asking somebody to do by hand, twice, what it can do in a second.
+
+Four seconds of extra patience in total. That cannot hide a real outage - the September 2026
+edge block lasted days and would still arrive at the screen - and it is short enough that the
+loading indicator already on screen covers it.
+"""
+
+APPLE_RETRY_CEILING_SECONDS = 5.0
+"""
+The longest wait this will sit through when Apple names one in `Retry-After`.
+
+Apple's own number beats any guess, but a header asking for a minute is information for the
+person rather than something to block a screen on. Past this, the refusal is surfaced with the
+wait attached, which is what `REASON_APPLE_DECLINED` already knows how to show.
 """
 
 REASON_APPLE_DECLINED = "apple_declined"
@@ -337,6 +362,56 @@ class ICloudSession:
         self._sponsor: Any = None
         self._candidates: dict[str, Any] = {}
 
+    def _awaiting(self, makeCall, what: str):
+        """
+        Run an async call, retrying the refusals that clear on their own.
+
+        **A factory, not a coroutine.** A coroutine can only be awaited once, so a retry needs
+        something that can build a fresh one - passing `self._client.fetch()` here would raise
+        on the second attempt instead of retrying.
+
+        **Only `AppleServiceUnavailableError`, which is a 429 or a 5xx.** Everything else is
+        either the user's problem or a real fault, and retrying it wastes a person's time
+        producing the same answer. Apple's own `Retry-After` wins when it sends one, up to
+        :data:`APPLE_RETRY_CEILING_SECONDS`; past that the refusal is surfaced with the wait
+        attached, because a screen that silently blocks for a minute is worse than one that
+        says how long.
+
+        **Never wrap a call that writes.** `join` enrols an escrow record and its own docstring
+        is explicit that a timeout does not establish that nothing was sent, so a second attempt
+        can enrol twice. `session.recover` spends one of a capped and unrecoverable number of
+        passcode attempts - `exporter.icloud.unlock` says the decision to spend another is
+        always the user's, and that is still true when the caller is a retry loop. Reads only:
+        opening the client, listing what can be recovered from, resuming, and fetching.
+
+        :param makeCall: Returns a fresh coroutine each time it is called.
+        :param what: Named in the log, so a retry is visible in a bug report.
+        """
+        attempts = len(APPLE_RETRY_BACKOFF_SECONDS) + 1
+
+        for attempt in range(attempts):
+            try:
+                return self._loop.run_until_complete(makeCall())
+            except AppleServiceUnavailableError as refused:
+                if attempt == attempts - 1:
+                    raise
+
+                wait = refused.retry_after
+                if wait is None:
+                    wait = APPLE_RETRY_BACKOFF_SECONDS[attempt]
+                elif wait > APPLE_RETRY_CEILING_SECONDS:
+                    # Apple named a wait longer than anybody should stare at a spinner for.
+                    raise
+
+                print(
+                    f"iCloud bridge: Apple refused {what} with"
+                    f" {refused.status_code}; retrying in {wait}s"
+                    f" ({attempt + 1} of {attempts - 1})")
+                time.sleep(wait)
+
+        # Unreachable: the last attempt either returns or raises.
+        raise AssertionError("the retry loop fell through")
+
     def open(self) -> str:
         """
         Open the Find My client, which is a keychain session and a CloudKit client.
@@ -347,9 +422,10 @@ class ICloudSession:
             return json.dumps({"ok": True})
 
         try:
-            client = self._loop.run_until_complete(
-                icloud.open_client(self._async, self._identity))
-            self._loop.run_until_complete(client.__aenter__())
+            client = self._awaiting(
+                lambda: icloud.open_client(self._async, self._identity),
+                "opening the Find My client")
+            self._awaiting(client.__aenter__, "starting the keychain session")
             self._client = client
 
             return json.dumps({"ok": True})
@@ -375,7 +451,9 @@ class ICloudSession:
             return _failure(REASON_NOT_SIGNED_IN, "The Find My client is not open.")
 
         try:
-            options = self._loop.run_until_complete(self._client.recovery_options())
+            options = self._awaiting(
+                self._client.recovery_options,
+                "asking what this account can be recovered from")
         except Exception:
             return _unexpected("asking what this account can be recovered from")
 
@@ -473,7 +551,8 @@ class ICloudSession:
             # is the whole reason this app unlocks at all - so it has to survive the call.
             peer = self._loop.run_until_complete(
                 self._client.session.recover(record, passcode))
-            self._loop.run_until_complete(self._client.resume(peer))
+            self._awaiting(
+                lambda: self._client.resume(peer), "resuming the keychain session")
             self._sponsor = peer
 
             return json.dumps({"ok": True})
@@ -577,7 +656,8 @@ class ICloudSession:
 
         try:
             peer = JoinedPeer.from_json(json.loads(peerJson))
-            self._loop.run_until_complete(self._client.resume(peer))
+            self._awaiting(
+                lambda: self._client.resume(peer), "resuming the keychain session")
 
             print(f"iCloud bridge: reading as {peer.peer_id}, with no passcode")
 
@@ -611,7 +691,8 @@ class ICloudSession:
             return _failure(REASON_NOT_SIGNED_IN, "The Find My client is not open.")
 
         try:
-            fetched = self._loop.run_until_complete(icloud.fetch(self._client))
+            fetched = self._awaiting(
+                lambda: icloud.fetch(self._client), "reading the account's accessories")
         except Exception:
             return _unexpected("reading the account's accessories")
 
