@@ -395,11 +395,19 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         this.handleSendToLogin();
                         return;
                     }
-                    // Both want the same thing - a full rebuild. The tags live in memory here
-                    // and that model is what decides both what is drawn and what is fetched,
-                    // so showing or hiding the owner's devices is not a redraw.
+                    // All three want the same thing - a full rebuild. The tags live in memory
+                    // here and that model is what decides both what is drawn and what is
+                    // fetched, so showing or hiding the owner's devices is not a redraw.
+                    //
+                    // The third is an iCloud import started from Settings. Reached from the map
+                    // or the device list, that screen's result comes straight back and is acted
+                    // on; reached through Settings it was dropped, so freshly imported tags were
+                    // missing from the map and sat in the device list reading "No last location
+                    // known" until the app was closed and reopened.
                     if (data != null && (data.getBooleanExtra("mapProviderChanged", false)
-                            || data.getBooleanExtra("shownDevicesChanged", false))) {
+                            || data.getBooleanExtra("shownDevicesChanged", false)
+                            || data.getBooleanExtra(
+                                    FetchFromICloudActivity.RESULT_IMPORTED, false))) {
                         this.recreate();
                     }
                 }
