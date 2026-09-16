@@ -93,6 +93,17 @@ public class FetchFromAccountSettingTest {
         this.scenario = ActivityScenario.launch(SettingsActivity.class);
     }
 
+    /**
+     * The same screen, launched so that {@code getResult()} is allowed to answer.
+     *
+     * <p>{@code ActivityScenario.getResult()} throws unless the scenario was created with
+     * {@code launchActivityForResult}, which is not a detail that shows up until it runs - the
+     * ordinary {@code launch} compiles against it perfectly happily.
+     */
+    private void openSettingsExpectingAResult() {
+        this.scenario = ActivityScenario.launchActivityForResult(SettingsActivity.class);
+    }
+
     /** As if the app had already joined the account's keychain. */
     private void givenTheAccountIsAlreadyLinked() {
         this.memberships.store(new KeychainMembership(
@@ -179,7 +190,7 @@ public class FetchFromAccountSettingTest {
         intending(hasComponent(FetchFromICloudActivity.class.getName()))
                 .respondWith(new ActivityResult(Activity.RESULT_OK, imported));
 
-        this.openSettings();
+        this.openSettingsExpectingAResult();
 
         Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
                 .check(matches(isDisplayed())));
@@ -189,8 +200,9 @@ public class FetchFromAccountSettingTest {
         // Settings has to end for its own result to be readable, the same way the map ends it.
         this.scenario.onActivity(Activity::finish);
 
-        final androidx.test.core.app.ActivityScenario.Result<SettingsActivity> result =
-                this.scenario.getResult();
+        // ActivityScenario.getResult() hands back Instrumentation.ActivityResult, the same type
+        // the stub above is built from.
+        final ActivityResult result = this.scenario.getResult();
 
         assertEquals("Settings must report OK so the map looks at the data at all",
                 Activity.RESULT_OK, result.getResultCode());
@@ -212,7 +224,7 @@ public class FetchFromAccountSettingTest {
      */
     @Test
     public void backingOutOfItDoesNotClaimAnImport() {
-        this.openSettings();
+        this.openSettingsExpectingAResult();
 
         Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
                 .check(matches(isDisplayed())));
