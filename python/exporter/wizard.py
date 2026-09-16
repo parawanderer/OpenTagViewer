@@ -248,24 +248,29 @@ class WizardApp(tk.Tk):
         self.confirm_button = ttk.Button(buttons, text="Export…", command=self._export, state="disabled")
         self.confirm_button.grid(row=0, column=4)
 
-        # **On by default, and the default is the whole point.** A bundle holds key material that
-        # cannot be revoked - the only way to withdraw an exported accessory is to unpair it - and
-        # it then travels through a mail account or a chat app and outlives the conversation by
-        # years, sitting in a backup long after everyone has forgotten it is there. Whoever most
-        # needs the lock is whoever would never go looking for a checkbox to turn it on.
+        # **There is no "Lock with a code" checkbox here, and removing it was the point.**
         #
-        # Off until app 1.1.0 was released, because nothing older can decrypt a locked bundle at
-        # all and the person who met that failure was the recipient. That app is out, so this is
-        # back on - see AGENTS.md rule 9 for why the two releases are ordered.
+        # A bundle holds key material that cannot be revoked - the only way to withdraw an
+        # exported accessory is to unpair it - and it then travels through a mail account or a
+        # chat app and outlives the conversation by years, sitting in a backup long after
+        # everyone has forgotten it is there.
         #
-        # The opt-out stays for the recipient still running something older, which is most of them
-        # on any given day after a release.
-        self.lock_bundle = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            buttons,
-            text="Lock with a code",
-            variable=self.lock_bundle,
-        ).grid(row=1, column=4, sticky="e", pady=(6, 0))
+        # It was a ticked checkbox, which is one idle click away from an unlocked bundle, and
+        # that click has been made: a user sent @parawanderer their tags in an unlocked zip.
+        # Not as an attack and not through ignorance of the consequences - it is simply what an
+        # unticked box in a corner produces, eventually, from somebody hurrying. The person best
+        # served by the lock is exactly the person who would untick it to make an error message
+        # go away.
+        #
+        # The escape hatch lives on the CLI, as `--no-password`, and that is deliberate rather
+        # than an oversight here. Somebody who found a flag, read what it does and typed it has
+        # demonstrably chosen an unlocked bundle. Somebody clicking through a window has not, and
+        # giving both the same affordance treats those as the same decision.
+        #
+        # The ordering argument that once justified an opt-out is spent: see AGENTS.md rule 9.
+        # It protected a recipient running an app too old to open a locked bundle, and no such
+        # recipient exists - every release up to 1.0.5 is refused at sign-in by Apple's edge, so
+        # an unlocked bundle buys its owner nothing.
 
     def _save_logs(self) -> None:
         """
@@ -783,20 +788,26 @@ class WizardApp(tk.Tk):
 
     def _write_it(self, bundle: ExportBundle, path: str, count: int) -> bool:
         """
-        Write the zip, lock it unless told otherwise, and say what happened.
+        Write the zip, always locked, and say what happened.
 
-        **Locked by default, which it was not until app 1.1.0 existed.** What blocked it was
-        release ordering rather than a missing feature: before zip4j the app could not decrypt
-        anything at all, so a locked bundle was a file nobody\'s installed app could open, and the
-        people worst affected were recipients, who did not choose the exporter\'s version and
-        could not fix it from their side.
+        **Always, with no way to ask otherwise from this window.** It was a ticked checkbox until
+        app 1.1.0 shipped and then briefly afterwards, and what the checkbox actually produced
+        was unlocked bundles: one idle click, on the control that decides whether irrevocable key
+        material travels in the clear. Somebody has already sent their tags to a stranger that
+        way. See the comment where the checkbox used to be built.
 
-        1.1.0 reads them, so the default flips. The checkbox stays for the versions before it.
+        Release ordering was what once justified an opt-out - before zip4j the app could not
+        decrypt anything, so a locked bundle was a file no recipient could open. That is spent:
+        1.1.0 reads them, and every release before it is refused at sign-in by Apple regardless.
+
+        `exporter.cli` keeps `--no-password` for the case that genuinely needs it. The difference
+        is not the capability but who is asking: a flag somebody looked up is a decision, a box
+        in the corner of a window is not.
 
         :returns: whether the window should close. False leaves it open on a failure, so the
             export can be retried without starting over.
         """
-        passcode = generate_passcode() if self.lock_bundle.get() else None
+        passcode = generate_passcode()
 
         try:
             write_zip(bundle, path, password=passcode)
@@ -812,15 +823,10 @@ class WizardApp(tk.Tk):
             messagebox.showerror("That bundle could not be written", str(e))
             return False
 
-        if passcode is None:
-            messagebox.showinfo(
-                "Exported",
-                f"{count} accessory(s) written to:\n{path}\n\n"
-                "This bundle is not locked. Anyone who has the file can locate these tags, and"
-                " that cannot be undone.",
-            )
-        else:
-            _show_the_code(self, path, count, passcode)
+        # No unlocked branch: `generate_passcode` always returns one, so there is no path from
+        # this window to a bundle without a code, and nothing here has to explain what an
+        # unlocked bundle means. The CLI's `--no-password` still has that explanation.
+        _show_the_code(self, path, count, passcode)
 
         return True
 
