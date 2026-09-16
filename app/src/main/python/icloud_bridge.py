@@ -44,7 +44,11 @@ from typing import Any
 import identity as app_identity
 from exporter import icloud
 from exporter.identity import written_by_opentagviewer
-from findmy.errors import AppleServiceUnavailableError, InvalidCredentialsError
+from findmy.errors import (
+    AppleServiceUnavailableError,
+    InvalidCredentialsError,
+    UnauthorizedError,
+)
 from findmy.keychain.enrolment import DeviceDescription
 from findmy.keychain.join import JoinedPeer
 from findmy.keychain.recovery import RecoveryError
@@ -228,13 +232,32 @@ def _needsAFreshSignIn(error: BaseException | None) -> bool:
     the app's most ordinary auth failure arriving as `UNKNOWN` and being offered a retry that
     cannot work. The string is checked narrowly, and `account.py` raises it in exactly one place.
 
-    **`UnauthorizedError` is deliberately not here.** It means two different things depending on
-    where it came from - `request_pet` raises it when a second factor is being demanded, which the
-    app answers by asking for a code rather than signing out, while CloudKit raises the same type
-    for a genuine 401. Treating a 2FA prompt as a dead session would cost somebody a sign-in they
-    did not need, so it stays unclassified until the two can be told apart.
+    **`UnauthorizedError` counts, but only the CloudKit half of it.** The type means two opposite
+    things depending on where it came from: `request_pet` raises it when a second factor is being
+    demanded, which the app answers with a code rather than a sign-out, while CloudKit raises the
+    same type for a genuine 401 on a token that has expired. Treating a 2FA prompt as a dead
+    session would cost somebody a sign-in they did not need, which is why this was left
+    unclassified for a long time.
+
+    **Leaving it unclassified turned out to cost more.** A dead CloudKit token reached the screen
+    as `UNKNOWN`, which is the retry screen - and retrying re-runs the identical call, so the
+    Settings button that reconnects the account led to the same failure every time with no way
+    back. Not a misleading message: a dead end, in the one flow whose whole job is recovering
+    from this. Reported in issue #225.
+
+    **The two are distinguishable, and narrowly.** Both CloudKit 401 sites in
+    `findmy/cloudkit/client.py` open with "CloudKit rejected the" and both go on to say to log in
+    again; the `request_pet` ones are about re-authentication ending in the wrong state and share
+    no wording with them. Matching a message is unpleasant for the same reasons the `ValueError`
+    above is, and is done for the same reason - the alternative is a screen nobody can leave.
     """
     if _isCausedBy(error, InvalidCredentialsError):
+        return True
+
+    # Narrow on purpose: the prefix both CloudKit sites share, and nothing broader. A bare
+    # `UnauthorizedError` check here would swallow the 2FA demand as well and sign people out
+    # mid-flow.
+    if _isCausedBy(error, UnauthorizedError) and _saysAnyOf(error, ("CloudKit rejected the",)):
         return True
 
     # `not self._username or not self._password` in `_gsa_authenticate`, which is reached by
