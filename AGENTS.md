@@ -218,6 +218,7 @@ Skills carry the longer version of a workflow, so this file can stay short:
 | `.claude/skills/device-screenshots/` | rendering the UI on the managed device and reading it cheaply |
 | `.claude/skills/watch-pr/` | watching a pushed PR's checks through to a verdict, and acting on it |
 | `.claude/skills/watch-gradle-tests/` | watching a backgrounded emulator suite to a verdict, and telling the silent hangs apart |
+| `.claude/skills/investigating-bug-reports/` | reading an issue completely — every comment, every image — before diagnosing or replying |
 
 The test for whether it belongs here rather than in a comment: would somebody hit it *before*
 reading the code that explains it? Anisette's machine-identity binding is the example — it
@@ -591,6 +592,49 @@ whenever something that worked yesterday stops working — which is the same mom
 read the neighbours' trackers. The fork is the nearest neighbour of all, and the only one where
 somebody may have already written the patch.
 
+### 20. Look at the pictures. People report bugs in screenshots
+
+**This app's error messages arrive on a phone screen, so that is how they get reported.** The issue
+template has a log field and a "what happened" field, and both are routinely empty while a
+screenshot carries the entire diagnosis — because pasting a screenshot is one gesture and capturing
+a log is a menu, a file and a judgement about what to redact.
+
+**`gh` hands you the URL and not the picture, and nothing in the JSON says the picture mattered.**
+An `<img>` tag in a body reads as decoration next to prose, which is exactly when it is not. So a
+report whose fields are blank is not a report with nothing in it; it is one where everything is in
+the attachment.
+
+Download it, then read it. The `Read` tool renders an image, but only from a local path:
+
+```bash
+curl -sL -o /tmp/shot.png "https://github.com/user-attachments/assets/<id>"
+# then Read that path
+```
+
+**`.claude/skills/investigating-bug-reports/` has the whole procedure** — pulling the full thread
+including comments, listing every attachment *with the post and sentence it belongs to*, and
+reasoning about the cause only once all of it has been read. Use it for anything more involved than
+one screenshot on one body.
+
+**Earned on [#221](https://github.com/parawanderer/OpenTagViewer/issues/221)**, where the log field
+was empty and a reply was drafted asking the reporter to go and capture one. The screenshot already
+had it: the full `MobileMeDelegateError`, `status=1`, and the `status-message` string that
+identified the cause — which was neither of the two things guessed at before anyone looked. The
+cost of not looking is not a slower diagnosis, it is asking somebody to send you a thing they have
+already sent you, and then reasoning from a guess while you wait.
+
+**Three things follow once you are looking at them:**
+
+- **A screenshot is evidence, so read what it actually says rather than what the title says it
+  says.** The title on #221 named a symptom; the pixels named a status code and quoted Apple.
+- **Including when the evidence contradicts our own error text.** The app told that reporter the
+  problem was terms of service, because `classifyLoginFailure` maps every `MobileMeDelegateError`
+  to that. The response in the screenshot carried no `localizedError` at all, which is the channel
+  terms arrive on. A message a program prints is a hypothesis somebody wrote in advance; what the
+  server returned is the evidence, and they are allowed to disagree.
+- **Assume it holds personal data, and do not repeat it back.** Reporters redact unevenly — #221's
+  had a phone number blacked out by hand, and the pixels either side of it were not. Quote the
+  error text, never the surrounding screen, and never re-upload the image.
 
 ---
 
