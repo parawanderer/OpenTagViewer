@@ -43,6 +43,7 @@ from typing import Any
 
 import identity as app_identity
 from exporter import icloud
+from exporter.identity import written_by_opentagviewer
 from findmy.errors import AppleServiceUnavailableError, InvalidCredentialsError
 from findmy.keychain.enrolment import DeviceDescription
 from findmy.keychain.join import JoinedPeer
@@ -363,16 +364,21 @@ class ICloudSession:
         # that has no screen and no lock. There is no answer to that question: the escrow
         # passcode was generated, never shown, and is not the user's to know.
         #
-        # Matched on the serial this session presents, which is the one place this app's
-        # identity is written (rule 11) - not on the name, which Apple does not carry for this
-        # entry, nor on a literal, which would be a second copy of the identity to keep in step.
+        # **Matched on the prefix, not on the serial this session happens to present.** It was
+        # the latter, and that was only ever correct while every install presented one constant.
+        # Serials are drawn per install now, so an equality test drops this install's record and
+        # leaves every other record this project wrote sitting in the picker: the one from before
+        # a reinstall, the desktop exporter's, and one more per trust-circle join. They are
+        # exactly as unusable as the one that was being filtered, and there are more of them.
+        #
+        # Not matched on the name, which Apple does not carry for this entry.
         #
         # Filtered here rather than in the screen so the count below is honest: an account whose
-        # only recoverable record is this app's has nothing the user can recover from, and
-        # should be told so rather than shown one unusable tile.
+        # only recoverable records are this project's has nothing the user can recover from, and
+        # should be told so rather than shown unusable tiles.
         self._records = [
             record for record in options.recoverable
-            if record.serial != self._identity.serial
+            if not written_by_opentagviewer(record.serial)
         ]
 
         if not self._records:

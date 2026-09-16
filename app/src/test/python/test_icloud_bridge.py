@@ -318,6 +318,67 @@ class TestWhatCanBeRecoveredFrom:
 
         assert [d["serial"] for d in answer["devices"]] == ["F2LX9Q", "C02XK"]
 
+    def test_records_from_other_installs_of_this_project_are_dropped_too(self, session):
+        """
+        **The case an equality check missed, and the reason this matches the prefix.**
+
+        The filter compared against the serial the current session presents. That was correct
+        only while every install presented one constant; serials are drawn per install now, so
+        it dropped this install's record and left every other one of ours on the list - the one
+        from before a reinstall, the desktop exporter's, and one more per trust-circle join.
+
+        All of them are exactly as unusable as the record that was being filtered, and there
+        are more of them. None has a passcode anybody has ever seen.
+        """
+        made = session(FakeClient(FakeOptions([
+            FakeRecord("F2LX9Q"),
+            FakeRecord(FakeAsyncAccount.serial),   # this session's own
+            FakeRecord("0PENTAGVQ4WM"),            # the app, before a reinstall
+            FakeRecord("0PENTAGXR7KD"),            # the desktop exporter
+            FakeRecord("0PENTAGVIEWR"),            # the app, before serials were drawn
+            FakeRecord("0PENTAGXPORT"),            # the exporter, likewise
+            FakeRecord("C02XK"),
+        ])))
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert [d["serial"] for d in answer["devices"]] == ["F2LX9Q", "C02XK"]
+
+    def test_a_real_device_is_not_dropped_for_looking_a_bit_like_ours(self, session):
+        """
+        The other direction, which matters more than it looks.
+
+        A filter that is too eager hides hardware the user *can* unlock with, and the symptom
+        is "this app cannot see my Mac" - far worse than an extra unusable tile. Only the two
+        eight-character prefixes count, and nothing shorter or merely similar.
+        """
+        made = session(FakeClient(FakeOptions([
+            FakeRecord("0PENTAG"),       # short of the prefix
+            FakeRecord("0PENTAHV1234"),  # one letter off
+            FakeRecord("PENTAGV1234"),   # missing the leading zero
+            FakeRecord("X0PENTAGV123"),  # prefix present, but not at the start
+        ])))
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert [d["serial"] for d in answer["devices"]] == [
+            "0PENTAG", "0PENTAHV1234", "PENTAGV1234", "X0PENTAGV123",
+        ]
+
+    def test_a_record_with_no_serial_is_kept_rather_than_guessed_at(self, session):
+        """
+        The escrow schema is unstable enough that a record can carry no serial at all.
+
+        Dropping those would hide a real device on the strength of a missing field. Keeping one
+        costs an entry the user can look at and decide about; dropping it costs them the only
+        recovery path they had.
+        """
+        made = session(FakeClient(FakeOptions([FakeRecord(None), FakeRecord("F2LX9Q")])))
+
+        answer = json.loads(made.recoveryOptions())
+
+        assert [d["serial"] for d in answer["devices"]] == [None, "F2LX9Q"]
+
     def test_it_cannot_be_unlocked_with_either(self, session):
         """
         Dropped from the records, not merely from the listing.

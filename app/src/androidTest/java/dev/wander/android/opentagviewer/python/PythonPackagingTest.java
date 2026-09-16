@@ -245,6 +245,45 @@ public class PythonPackagingTest {
     }
 
     /**
+     * The serial prefixes Python filters on are the ones Java actually presents.
+     *
+     * <p><b>This literal is duplicated, and that is the whole reason for this test.</b> Python
+     * needs both prefixes to keep this project's escrow records out of the recovery picker -
+     * its own and the exporter's - and it cannot read the Java constant at import time. So
+     * {@code exporter.identity.APP_SERIAL_PREFIX} is a second copy of
+     * {@link AdiDeviceIdentity#SERIAL_PREFIX}, and a copy nothing compares is a copy that
+     * drifts.
+     *
+     * <p>Drift here is silent and nasty: change the Java prefix alone and every serial this app
+     * draws stops being recognised as its own, so its escrow records reappear in the picker
+     * asking the user for a passcode that was generated and never shown. Nothing fails, and the
+     * only symptom is on an account nobody testing has.
+     *
+     * <p>Asserted in both directions against the drawn serial rather than only as string
+     * equality, so a prefix that is right and a generator that stopped using it also fails.
+     */
+    @Test
+    public void thepythonSideFiltersOnThePrefixJavaActuallyPresents() {
+        final PyObject identity = Python.getInstance().getModule("exporter.identity");
+
+        assertEquals("Python's copy of the app's serial prefix has drifted from Java's",
+                AdiDeviceIdentity.SERIAL_PREFIX,
+                identity.get("APP_SERIAL_PREFIX").toString());
+
+        // And a serial this app actually draws is recognised by the Python predicate.
+        final String drawn = AdiDeviceIdentity.generate().serial();
+        assertTrue("a drawn serial must start with the prefix it is filtered by",
+                drawn.startsWith(AdiDeviceIdentity.SERIAL_PREFIX));
+        assertTrue("Python does not recognise a serial this app draws as its own",
+                identity.callAttr("written_by_opentagviewer", drawn).toBoolean());
+
+        // The legacy constant too, since installs predating drawn serials still present it.
+        assertTrue("Python must still recognise the pre-drawn constant",
+                identity.callAttr("written_by_opentagviewer",
+                        AdiDeviceIdentity.LEGACY_SERIAL).toBoolean());
+    }
+
+    /**
      * The shared package's own tests are not shipped either.
      *
      * <p>They came along at first, because the include pattern that picks up the package picks

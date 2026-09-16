@@ -49,6 +49,7 @@ from exporter.custom_tags import (
     suggested_name,
 )
 from exporter.icloud import Candidate, ExportSourceError, not_a_terms_problem
+from exporter.identity import written_by_opentagviewer
 from exporter.certs import ensure_ca_bundle
 from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION, describe_build
 from opentagviewer_export import (
@@ -567,7 +568,19 @@ async def unlock(client, arguments: argparse.Namespace) -> bool:
     """
     options = await client.recovery_options()
 
-    if not options.recoverable:
+    # **This project's own records are dropped, not offered.** Joining the trust circle writes an
+    # escrow record beside the user's real hardware, and asking for "the screen-lock passcode" of
+    # a program that has no screen has no answer - the passcode was generated and never shown.
+    #
+    # Filtered once, here, rather than at the picker: every count and message below has to be
+    # about what the user can actually recover from, or an account holding nothing but our own
+    # records reports options it cannot use.
+    recoverable = [
+        record for record in options.recoverable
+        if not written_by_opentagviewer(record.serial)
+    ]
+
+    if not recoverable:
         print("\nNo record on this account can currently be recovered from.", file=sys.stderr)
         if not options.viability_is_trustworthy:
             print("Nothing was reported usable at all, which reads as a service having a bad day", file=sys.stderr)
@@ -577,10 +590,10 @@ async def unlock(client, arguments: argparse.Namespace) -> bool:
     print("\nUnlocking needs the screen-lock passcode of one of your Apple devices -", file=sys.stderr)
     print("its PIN or login password, not your Apple ID password.\n", file=sys.stderr)
 
-    chosen = _pick_device(options.recoverable, arguments.device) or options.recoverable[
+    chosen = _pick_device(recoverable, arguments.device) or recoverable[
         await ask_choice(
             "Which device's passcode do you have?",
-            [record.describe() for record in options.recoverable],
+            [record.describe() for record in recoverable],
         )
     ]
 
