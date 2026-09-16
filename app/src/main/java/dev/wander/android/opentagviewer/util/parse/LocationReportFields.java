@@ -147,6 +147,18 @@ import lombok.NoArgsConstructor;
  * when it is replaced. A remainder constant across three battery states is a signature rather
  * than a field. Catley's teardown independently records {@code 0x10}.
  *
+ * <p><b>The gate below stays anyway, and not because of the claim just corrected.</b> Asked
+ * directly, on 2026-09-16, @parawanderer's answer was that this is debug metadata and does not
+ * need decoding. That is the reason to keep in mind, because it does not depend on any of the
+ * protocol argument above: this row exists so somebody can quote what arrived, the raw byte is
+ * certainly right, and a label beside it would be the app's opinion competing with the tag's
+ * own on a screen meant for evidence. The battery reading people act on is on the map, from the
+ * live advertisement, where it is one word and not a bit pattern.
+ *
+ * <p>Written down because the paragraph above removed a justification without removing the
+ * decision. Anybody reading "the 0x90 objection was wrong" and concluding that this should now
+ * decode is following an argument nobody made.
+ *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is
  * annotated as what the beacon <i>claimed</i>, never as a measurement. Every value carries decimal,
