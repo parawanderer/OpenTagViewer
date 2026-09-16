@@ -48,7 +48,7 @@ from exporter.custom_tags import (
     suggested_identifier,
     suggested_name,
 )
-from exporter.icloud import Candidate, ExportSourceError
+from exporter.icloud import Candidate, ExportSourceError, not_a_terms_problem
 from exporter.certs import ensure_ca_bundle
 from exporter.version import EXPORT_VIA_CLI, GITHUB_ISSUES_LINK, VERSION, describe_build
 from opentagviewer_export import (
@@ -519,6 +519,14 @@ async def sign_in(arguments: argparse.Namespace):
                 announce=_say,
             )
         except MobileMeDelegateError as e:
+            # **First, because for this shape the offer below is a dead end.** A delegate failure
+            # naming no `localizedError` is not about terms, so fetching them can only come back
+            # empty - and OpenTagViewer#221 is somebody being walked to that empty answer.
+            refusal = not_a_terms_problem(e)
+            if refusal is not None:
+                print(f"\n{refusal}\n", file=sys.stderr)
+                raise ExportSourceError("Apple would not open iCloud for this account.") from None
+
             # Authentication itself worked; the exchange that follows it did not. Unaccepted terms
             # are the one cause of that with a remedy here, and which error value means "terms
             # pending" is not established - so this says what Apple said and then offers, rather
