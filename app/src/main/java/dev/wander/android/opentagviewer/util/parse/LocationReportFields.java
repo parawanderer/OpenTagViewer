@@ -121,7 +121,13 @@ import lombok.NoArgsConstructor;
  * alternative: the battery on the account record is written by Apple's devices, so for a user
  * without one it is years old or never written. What is refused here is decoding a
  * non-conforming byte <i>as though the whole table applied</i>, which is a different claim.
- * Neither reading has been checked against a tag at a known charge level.
+ *
+ * <p>Two AirTags on one account, read on 2026-09-16, support the narrower reading: {@code 0x10}
+ * on the one reporting full and {@code 0x50} on the one reporting medium - identical in every
+ * bit except 6 and 7, including the two that break this table. So the non-conforming remainder
+ * looks like a fixed AirTag signature rather than a field, and bits 6-7 move with the battery in
+ * the order Table 5-5 gives. What no observation yet fixes is what the four words mean in charge
+ * terms, or whether the tag re-measures promptly after a cell is changed.
  *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is

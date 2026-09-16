@@ -104,21 +104,35 @@ public final class FindMyAdvertisement {
      * <ul>
      *   <li><b>Only these two bits are used, not the rest of the table.</b> The reserved bits an
      *       AirTag sets wrongly are the ones this does not look at.</li>
-     *   <li><b>The one published observation of a real AirTag agrees.</b> Adam Catley's teardown
-     *       records {@code 0x10}, whose bits 6-7 are {@code 0b00} - "full", for a working tag.
-     *       Consistent, if only just: one data point at one battery level.</li>
+     *   <li><b>Two real AirTags, side by side, differ in exactly these two bits and nowhere
+     *       else.</b> Observed on 2026-09-16 by @parawanderer, from the history of two tags on
+     *       one account: {@code 0x10} = {@code 0b00010000} on the tag reading full, {@code 0x50}
+     *       = {@code 0b01010000} on the tag reading medium. Bits 6-7 are {@code 0b00} and
+     *       {@code 0b01}; every other bit is identical, including the two an AirTag sets against
+     *       Table 5-5.
+     *
+     *       <p>That is the useful shape of the result. The non-conforming remainder is a
+     *       constant - an AirTag signature, not a battery field - so the objection to decoding
+     *       this byte does not reach bits 6-7, and the levels come out in the order Table 5-5
+     *       gives. Adam Catley's teardown independently records {@code 0x10} on a working
+     *       tag.</li>
      *   <li><b>There is no alternative for these users.</b> The battery on the account record is
      *       written by Apple's own devices, so for somebody without one it is years old or, as
      *       with both tags this was developed against, never written at all. See
      *       {@code LastBleSighting}.</li>
      * </ul>
      *
-     * <p><b>So this is what the tag claimed, not a measurement, and nobody has checked the
-     * mapping against tags at known levels.</b> That is the experiment worth doing: sit down with
-     * several accessories at several charge levels and write down what each one emits. Until
-     * somebody has, a reading here that disagrees with a fresh battery is as likely to be this
-     * decoder as the cell - which is exactly how it was queried. The raw byte is kept on the
-     * advertisement so a bug report can quote it instead of only this reading.
+     * <p><b>What that does not establish is whether the tag is right.</b> These bits are what the
+     * accessory says about itself, and the observation above shows only that two tags in
+     * different states say different things in the expected order. It does not calibrate the
+     * words: nothing here knows what charge "medium" corresponds to, and a tag samples its cell
+     * on its own schedule, so a freshly replaced battery can keep reporting the old one's level
+     * for a while. A tag that reads medium on a new cell is therefore not evidence of a bug in
+     * this decoder - which is the question that produced this note.
+     *
+     * <p>Still wanted, and now a smaller job than it was: the same two bits read off tags whose
+     * actual charge is known, to attach numbers to the four words. The raw byte is kept on the
+     * advertisement so any such report can quote it rather than only this reading.
      */
     private static BatteryLevel batteryLevelOf(final int statusByte) {
         switch ((statusByte >> 6) & 0b11) {
