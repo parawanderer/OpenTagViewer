@@ -49,9 +49,20 @@ import lombok.NoArgsConstructor;
  * <p><b>It only means anything for a tag read from an Apple account.</b> The field is updated by
  * Apple's own devices as they see the accessory, so a tag imported from a zip carries whatever
  * value was true when the export was made and never changes it again - possibly years ago. This
- * is why nothing outside the debug panel uses any of it. Anyone who wants to put a battery icon
- * on the device list should read this note first, and should probably only do it for account
- * tags.
+ * is why nothing outside the device information page uses any of it. Anyone who wants to put a
+ * battery icon on the device list should read this note first, and should probably only do it
+ * for account tags.
+ *
+ * <p><b>There is a second battery reading in this app, and it is not this one.</b> The badge on
+ * the map's tag cards - "Nearby · Battery …" - comes from the tag's own Bluetooth advertisement
+ * via {@code FindMyAdvertisement.BatteryLevel}, heard directly by this phone, and it has nothing
+ * to do with this field or this scale. They disagree routinely and both can be right: this one
+ * is what Apple last recorded, that one is what the tag said just now. Somebody reading the
+ * screen sees one word and no indication of which.
+ *
+ * <p>Worth knowing before answering a question about either. The values are not comparable -
+ * this field reserves 0 for "not reported" and so runs 1-4, while the advertisement's two bits
+ * run 0-3 - and neither has been validated against a tag at a known charge level.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BatteryLevelDescription {

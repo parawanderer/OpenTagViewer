@@ -57,6 +57,60 @@ public final class WindowPaddingUtil {
     }
 
     /**
+     * For a screen whose bottom edge belongs to something that has to reach it.
+     *
+     * <p><b>A bottom sheet is the case this exists for.</b> Padding the root's bottom shortens
+     * everything inside it, so the sheet stops above the navigation bar and the activity's own
+     * background shows through underneath - a strip in the window's colour, below a sheet in the
+     * sheet's colour, which reads as a rendering fault rather than as padding. The history
+     * screen shipped that way: a grey sheet, its last row clipped, and a white band under it.
+     *
+     * <p><b>Both views are arguments because one of them always gets forgotten otherwise.</b>
+     * That is not hypothetical - see {@link #insetForSystemBars(View)}, which exists in that
+     * shape because a top-only helper was applied to seven screens and the matching bottom call
+     * to one. A caller here cannot pad the top and quietly skip the bottom: there is nowhere to
+     * put the omission.
+     *
+     * <p>{@code content} is padded rather than the sheet itself, so the sheet's background still
+     * runs to the bottom of the screen. Give it {@code clipToPadding="false"} when it scrolls,
+     * or the padding becomes a dead band the list cannot use instead of somewhere the last row
+     * can scroll into.
+     *
+     * @param root    Gets the status bar, and the left and right insets. Not the bottom.
+     * @param content Gets the bottom inset, added to whatever padding it already asks for.
+     */
+    public static void insetForSystemBars(final View root, final View content) {
+        final int rootLeft = root.getPaddingLeft();
+        final int rootTop = root.getPaddingTop();
+        final int rootRight = root.getPaddingRight();
+        final int rootBottom = root.getPaddingBottom();
+
+        final int contentLeft = content.getPaddingLeft();
+        final int contentTop = content.getPaddingTop();
+        final int contentRight = content.getPaddingRight();
+        final int contentBottom = content.getPaddingBottom();
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            final Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            v.setPadding(
+                    rootLeft + bars.left,
+                    rootTop + bars.top,
+                    rootRight + bars.right,
+                    rootBottom
+            );
+            content.setPadding(
+                    contentLeft,
+                    contentTop,
+                    contentRight,
+                    contentBottom + bars.bottom
+            );
+
+            return insets;
+        });
+    }
+
+    /**
      * Keeps a bottom-anchored view clear of the navigation bar.
      *
      * <p>Activities that go edge to edge with

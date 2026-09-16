@@ -92,6 +92,49 @@ public final class FindMyAdvertisement {
         return new FindMyAdvertisement(state, batteryLevelOf(status), status);
     }
 
+    /**
+     * Bits 6-7 of the status byte, read as a battery level.
+     *
+     * <p><b>Read on sight, unlike the same byte in a location report.</b>
+     * {@code LocationReportFields} decodes its copy only when the whole byte conforms to Apple's
+     * Table 5-5 - bit 5 set, reserved bits clear - because an AirTag's does not, and decoding a
+     * non-conforming byte against that table produces a confident wrong answer. That gate is not
+     * applied here, and the difference is deliberate rather than an oversight:
+     *
+     * <ul>
+     *   <li><b>Only these two bits are used, not the rest of the table.</b> The reserved bits an
+     *       AirTag sets wrongly are the ones this does not look at.</li>
+     *   <li><b>Two real AirTags, watched across a battery change, move in exactly these two bits
+     *       and nowhere else.</b> Observed by @parawanderer on 2026-09-16, over both Bluetooth
+     *       and the Find My network:
+     *
+     *       <pre>
+     *   0x90 = 0b10010000   both tags, cells months old     bits 6-7 = 0b10  Low
+     *   0x50 = 0b01010000   one tag, cell just replaced     bits 6-7 = 0b01  Medium
+     *   0x10 = 0b00010000   the other, cell just replaced   bits 6-7 = 0b00  Full
+     *       </pre>
+     *
+     *       <p>Three of the four states, with bit 4 set and bit 5 clear throughout - the two an
+     *       AirTag sets against Table 5-5. A remainder that does not change across three battery
+     *       states is a signature, not a field, so the objection to decoding this byte does not
+     *       reach bits 6-7. They fall in the order the table gives, downward as a cell ages and
+     *       upward when it is replaced. Catley's teardown independently records {@code 0x10}.</li>
+     *   <li><b>There is no alternative for these users.</b> The battery on the account record is
+     *       written by Apple's own devices, so for somebody without one it is years old or, as
+     *       with both tags this was developed against, never written at all. See
+     *       {@code LastBleSighting}.</li>
+     * </ul>
+     *
+     * <p><b>What it still does not establish is what the four words are worth.</b> Nothing here
+     * calibrates them: "medium" on a cell replaced minutes earlier is the tag's own opinion, and
+     * whether that reflects a weak cell, a measurement the tag has not retaken, or a scale that
+     * simply does not start at "full" is unknown. Only {@code 0b11}, critically low, has not
+     * been seen at all.
+     *
+     * <p>Still wanted, and a much smaller job than before: these bits read off tags whose actual
+     * charge is known, to attach numbers to the words. The raw byte is kept on the advertisement
+     * so any such report can quote it rather than only this reading.
+     */
     private static BatteryLevel batteryLevelOf(final int statusByte) {
         switch ((statusByte >> 6) & 0b11) {
             case 0b01: return BatteryLevel.MEDIUM;

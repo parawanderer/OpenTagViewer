@@ -12,6 +12,10 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.hamcrest.Matchers.allOf;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
 import android.app.Instrumentation.ActivityResult;
@@ -89,6 +93,17 @@ public class FetchFromAccountSettingTest {
         this.scenario = ActivityScenario.launch(SettingsActivity.class);
     }
 
+    /**
+     * The same screen, launched so that {@code getResult()} is allowed to answer.
+     *
+     * <p>{@code ActivityScenario.getResult()} throws unless the scenario was created with
+     * {@code launchActivityForResult}, which is not a detail that shows up until it runs - the
+     * ordinary {@code launch} compiles against it perfectly happily.
+     */
+    private void openSettingsExpectingAResult() {
+        this.scenario = ActivityScenario.launchActivityForResult(SettingsActivity.class);
+    }
+
     /** As if the app had already joined the account's keychain. */
     private void givenTheAccountIsAlreadyLinked() {
         this.memberships.store(new KeychainMembership(
@@ -151,5 +166,80 @@ public class FetchFromAccountSettingTest {
         onView(withId(R.id.settings_fetch_from_account)).perform(click());
 
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
+    }
+
+    /**
+     * <b>And what that screen brought back is passed on, so the map rebuilds.</b>
+     *
+     * <p>The map reads its tags once, when it is created, and holds them in memory. Reaching the
+     * account flow from here goes map, settings, iCloud - so coming back resumes the map instead
+     * of recreating it, and freshly imported tags were absent from it entirely. They showed in
+     * the device list as "No last location known", which reads as a fetch that failed rather
+     * than a screen that never learned they exist. Closing and reopening the app fixed it, which
+     * is the giveaway that nothing was wrong with the data.
+     *
+     * <p>{@code FetchFromICloudActivity} always set {@link FetchFromICloudActivity#RESULT_IMPORTED};
+     * the map and the device list both act on it when they start that screen themselves. This
+     * screen used {@code startActivity}, which discards the result, so the one route through
+     * Settings was the one route that dropped it.
+     */
+    @Test
+    public void whatTheAccountScreenImportedIsPassedBackToWhoeverOpenedSettings() {
+        final android.content.Intent imported = new android.content.Intent();
+        imported.putExtra(FetchFromICloudActivity.RESULT_IMPORTED, true);
+        intending(hasComponent(FetchFromICloudActivity.class.getName()))
+                .respondWith(new ActivityResult(Activity.RESULT_OK, imported));
+
+        this.openSettingsExpectingAResult();
+
+        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.settings_fetch_from_account)).perform(click());
+        Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
+
+        // **Backed out, not finished.** Calling finish() directly skips handleEndActivity(),
+        // which is the method that sets the result at all - so the test reported RESULT_CANCELED
+        // and said the flag had been dropped, for a screen that was never asked to report one.
+        // Espresso's back goes through onBackPressed and therefore through the real exit.
+        androidx.test.espresso.Espresso.pressBackUnconditionally();
+
+        // ActivityScenario.getResult() hands back Instrumentation.ActivityResult, the same type
+        // the stub above is built from.
+        final ActivityResult result = this.scenario.getResult();
+
+        assertEquals("Settings must report OK so the map looks at the data at all",
+                Activity.RESULT_OK, result.getResultCode());
+        assertNotNull("nothing came back, so the map has nothing to act on",
+                result.getResultData());
+        assertTrue("the import was not passed on, so the map never rebuilds and the tags stay"
+                        + " invisible until the app is restarted",
+                result.getResultData()
+                        .getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false));
+    }
+
+    /**
+     * And it is not claimed when nothing was imported.
+     *
+     * <p>A result that always says "imported" costs a full rebuild of the map every time
+     * somebody opens this row and backs out, which is a visible flash and a refetch of every
+     * tag. The stub in {@link #answerTheFetchScreenAtTheDoor} cancels, which is what backing out
+     * of that screen does.
+     */
+    @Test
+    public void backingOutOfItDoesNotClaimAnImport() {
+        this.openSettingsExpectingAResult();
+
+        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.settings_fetch_from_account)).perform(click());
+        Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
+
+        androidx.test.espresso.Espresso.pressBackUnconditionally();
+
+        final android.content.Intent data = this.scenario.getResult().getResultData();
+        if (data != null) {
+            assertFalse("a cancelled account screen was reported as an import",
+                    data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false));
+        }
     }
 }

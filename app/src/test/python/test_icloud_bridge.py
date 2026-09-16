@@ -1063,6 +1063,51 @@ class TestASignInThatNoLongerWorks:
 
         assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
 
+    def test_a_dead_cloudkit_token_is_the_same_situation(self):
+        """
+        **Issue #225, and it was a dead end rather than a wrong sentence.**
+
+        A CloudKit 401 arrived as UNKNOWN, which is the retry screen, and retrying re-runs the
+        identical call. The Settings button that reconnects the account therefore led to the
+        same failure every time, with nothing on screen offering a way back - in the one flow
+        whose entire job is recovering from this.
+        """
+        try:
+            raise UnauthorizedError(
+                "CloudKit rejected the iCloud token. It has most likely expired;"
+                " logging in again will obtain a fresh one.")
+        except UnauthorizedError:
+            answer = json.loads(icloud_bridge._unexpected("checking the account"))
+
+        assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_the_other_cloudkit_refusal_is_too(self):
+        # The second of the two 401 sites, worded differently and meaning the same thing. The
+        # match is on the prefix they share rather than on either sentence.
+        try:
+            raise UnauthorizedError("CloudKit rejected the token for this operation; log in again")
+        except UnauthorizedError:
+            answer = json.loads(icloud_bridge._unexpected("fetching the beacons"))
+
+        assert answer["reason"] == icloud_bridge.REASON_CREDENTIALS_REJECTED
+
+    def test_a_second_factor_being_demanded_is_emphatically_not(self):
+        """
+        **The reason this type went unclassified for so long, and the thing not to break.**
+
+        `request_pet` raises the same class when Apple wants a code. Answering that with a
+        forced sign-out costs somebody a working session and a re-login they never needed - so
+        the match is the CloudKit wording, not the type.
+        """
+        try:
+            raise UnauthorizedError(
+                "Re-authentication ended in state LoginState.REQUIRE_2FA rather than"
+                " AUTHENTICATED, so no PET was issued.")
+        except UnauthorizedError:
+            answer = json.loads(icloud_bridge._unexpected("opening a keychain session"))
+
+        assert answer["reason"] != icloud_bridge.REASON_CREDENTIALS_REJECTED
+
     def test_it_is_found_underneath_a_wrapper(self):
         # These come back through run_until_complete and FindMy.py's own layers, so the
         # interesting error is rarely the outermost one.

@@ -29,6 +29,7 @@ import android.widget.TextView;
 import com.google.android.material.slider.Slider;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
@@ -137,6 +138,43 @@ public class SettingsActivity extends AppCompatActivity {
     private boolean shownDevicesChanged = false;
 
     /**
+     * Whether connecting an iCloud account from here actually brought tags in.
+     *
+     * <p><b>Reported onward for the same reason as the two above, and it was not.</b> The map
+     * holds its tags in memory and reads them once, when it is created. Reaching the account
+     * flow from here goes Map to Settings to iCloud, so returning resumes the map rather than
+     * recreating it, and tags that were just imported are absent until the app is closed and
+     * reopened. They sat in the device list reading "No last location known", which looks like
+     * a fetch that failed rather than a screen that never learned they exist.
+     *
+     * <p>{@code FetchFromICloudActivity} has always said so - it sets
+     * {@link FetchFromICloudActivity#RESULT_IMPORTED} on the way out, and both the map and the
+     * device list act on it when they launch that screen themselves. This screen started it with
+     * {@code startActivity}, which discards the result, so the one path through Settings was the
+     * one path that dropped the signal.
+     */
+    private boolean importedFromAccount = false;
+
+    /**
+     * Connecting an iCloud account, started from the row on this screen.
+     *
+     * <p>For a result, not fire-and-forget: see {@link #importedFromAccount}.
+     */
+    private final ActivityResultLauncher<Intent> fetchFromICloudLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            (ActivityResult result) -> {
+                final Intent data = result.getData();
+                if (data != null
+                        && data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false)) {
+                    this.importedFromAccount = true;
+                }
+                // The linked/unlinked subtitle is read when this screen is built, so without
+                // this it still says "not connected" underneath an account just connected.
+                this.sayWhetherTheAccountIsLinked();
+            }
+    );
+
+    /**
      * Where "help build full support" goes.
      *
      * <p>Deliberately an issue rather than a wiki page. Someone reading this setting has just
@@ -243,10 +281,13 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void handleEndActivity() {
-        if (this.mapProviderChanged || this.shownDevicesChanged) {
+        if (this.mapProviderChanged || this.shownDevicesChanged || this.importedFromAccount) {
             Intent data = new Intent();
             data.putExtra("mapProviderChanged", this.mapProviderChanged);
             data.putExtra("shownDevicesChanged", this.shownDevicesChanged);
+            // Carried under the name the iCloud screen uses, so the map reads one key whether
+            // that screen was reached from the map, the device list, or through here.
+            data.putExtra(FetchFromICloudActivity.RESULT_IMPORTED, this.importedFromAccount);
             setResult(RESULT_OK, data);
         }
         this.finish();
@@ -539,7 +580,9 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void onClickFetchFromAccount() {
-        this.startActivity(new Intent(this, FetchFromICloudActivity.class));
+        // Launched for a result rather than with startActivity: what comes back decides whether
+        // the map has to rebuild. See importedFromAccount.
+        this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class));
     }
 
     private void onClickEditTheme() {

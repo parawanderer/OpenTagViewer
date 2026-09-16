@@ -97,8 +97,19 @@ import lombok.NoArgsConstructor;
  * it observes is {@code 0x90}: bit 5 clear where the specification requires it set, and reserved
  * bit 4 set. Adam Catley's teardown records a real AirTag advertising {@code 0x10}, which breaks
  * the same two rules. The specification governs third-party MFi accessories; AirTag is Apple's own
- * hardware and predates it. Decoding {@code 0x90} against Table 5-5 anyway yields "battery Low"
- * for a tag whose own record reads Full - a confident, wrong answer, which is worse than none.
+ * hardware and predates it.
+ *
+ * <p><b>This paragraph used to end by saying that decoding {@code 0x90} yields "battery Low" for
+ * a tag whose record reads Full, and offering that as the proof that the byte lies. It was the
+ * wrong way round.</b> @parawanderer's two tags read {@code 0x90} for months on cells that had
+ * not been changed in as long, over both Bluetooth and the Find My network; replacing the
+ * batteries moved them to {@code 0x10} and {@code 0x50}. "Low" was correct. What was stale was
+ * the accessory record saying Full - written by Apple's own devices, of which this user has
+ * none, so it had never been updated at all.
+ *
+ * <p>Worth keeping the correction visible rather than quietly deleting the claim: it was written
+ * confidently, it was load-bearing for the decision below, and the thing that disproved it was
+ * somebody changing two batteries and looking.
  *
  * <p><b>And the byte is not trustworthy even when it is well-formed.</b> Caesar Creek Software's
  * write-up of this network puts it plainly: "it's supposed to indicate the battery level and
@@ -113,6 +124,40 @@ import lombok.NoArgsConstructor;
  * rather than one decoder. Nobody has built that, and doing it honestly would mean sitting down
  * with several kinds of tag at several battery levels and writing down what each one emits. The
  * gate below exists so that the app stays useful and silent in the meantime, instead of guessing.
+ *
+ * <p><b>The live Bluetooth path does read two of these bits, and that is not a contradiction of
+ * the paragraph above.</b> {@code FindMyAdvertisement.batteryLevelOf} takes bits 6-7 off an
+ * advertisement this phone heard itself, and never consults the rest of the table - so the
+ * reserved bits an AirTag sets wrongly are the ones it does not look at. It also has no
+ * alternative: the battery on the account record is written by Apple's devices, so for a user
+ * without one it is years old or never written. What is refused here is decoding a
+ * non-conforming byte <i>as though the whole table applied</i>, which is a different claim.
+ *
+ * <p>Two AirTags on one account, watched across a battery change on 2026-09-16, give three of
+ * the four states - and the same remainder every time:
+ *
+ * <pre>
+ *   0x90 = 0b10010000   both tags, on cells months old        bits 6-7 = 0b10  Low
+ *   0x50 = 0b01010000   one tag, cell just replaced           bits 6-7 = 0b01  Medium
+ *   0x10 = 0b00010000   the other, cell just replaced         bits 6-7 = 0b00  Full
+ * </pre>
+ *
+ * <p>Bit 4 is set and bit 5 clear in all three - the two that break this table - while only bits
+ * 6-7 move, and they move in the order Table 5-5 gives, downward as the cell ages and upward
+ * when it is replaced. A remainder constant across three battery states is a signature rather
+ * than a field. Catley's teardown independently records {@code 0x10}.
+ *
+ * <p><b>The gate below stays anyway, and not because of the claim just corrected.</b> Asked
+ * directly, on 2026-09-16, @parawanderer's answer was that this is debug metadata and does not
+ * need decoding. That is the reason to keep in mind, because it does not depend on any of the
+ * protocol argument above: this row exists so somebody can quote what arrived, the raw byte is
+ * certainly right, and a label beside it would be the app's opinion competing with the tag's
+ * own on a screen meant for evidence. The battery reading people act on is on the map, from the
+ * live advertisement, where it is one word and not a bit pattern.
+ *
+ * <p>Written down because the paragraph above removed a justification without removing the
+ * decision. Anybody reading "the 0x90 objection was wrong" and concluding that this should now
+ * decode is following an argument nobody made.
  *
  * <p>So {@link #status(long)} decodes only a byte that actually conforms to Table 5-5 - bit 5 set
  * and every reserved bit clear - and otherwise shows the number alone. A conforming byte is

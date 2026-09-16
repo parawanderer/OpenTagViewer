@@ -186,6 +186,46 @@ android {
             keyAlias = System.getenv("KEY_ALIAS")
             keyPassword = System.getenv("KEY_PASSWORD")
         }
+
+        // **A debug key that is the same key every time, when one is supplied.**
+        //
+        // Without this, AGP signs debug builds with `~/.android/debug.keystore`, which a fresh
+        // CI runner *generates on the spot*. Two consequences, both of which bit:
+        //
+        // 1. Every CI debug APK is signed by a different key, so installing a newer one over an
+        //    older one fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE. The only way forward is to
+        //    uninstall, and `allowBackup` is false, so that permanently destroys the imported
+        //    beacons and location history on that device. Testing successive builds meant
+        //    wiping the app every time.
+        // 2. A Google Maps key is restricted by package name *and* signing SHA-1, so a key whose
+        //    SHA-1 changes per build cannot be whitelisted at all. Maps rendered blank in every
+        //    CI debug build, which reads as the API key being missing from the build.
+        //
+        // Supplied through the environment rather than committed: it is a low-value key, but a
+        // signing key in a public repository is a bad habit to start, and `.gitignore` covers
+        // the filename. CI writes it from the DEBUG_KEYSTORE_BASE64 secret; see
+        // CONTRIBUTING.md for using the same one locally, which is what makes a locally built
+        // APK and a CI one interchangeable on the same device.
+        //
+        // **Falls back to AGP's default when absent**, so a clone with no keystore still builds.
+        // The passwords are Android's well-known debug constants on purpose: this key proves
+        // nothing and guards nothing, and inventing secrets for it would only mean another thing
+        // that has to be supplied before the project compiles.
+        getByName("debug") {
+            val supplied = file(System.getenv("DEBUG_KEYSTORE_FILE") ?: "debug-keystore.jks")
+            if (supplied.exists()) {
+                storeFile = supplied
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            } else {
+                logger.lifecycle(
+                    "No debug keystore at ${supplied.path}; using the default one. Debug APKs " +
+                        "from this build will not match CI's, so installing one over the other " +
+                        "needs an uninstall. See CONTRIBUTING.md."
+                )
+            }
+        }
     }
 
     buildTypes {

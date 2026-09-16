@@ -163,8 +163,20 @@ message about the zip rather than about a code. Publish an exporter that locks b
 that app is out, and every bundle written that day is unopenable by whoever receives it, and the
 recipient is the one person in that transaction who chose none of it and can fix none of it.
 
-**The wizard's lock is defaulted on**, in `wizard.py`'s `lock_bundle`, and
-`test_wizard_bundle_locking.py` asserts that.
+**The wizard has no lock switch at all**, and that is stronger than a default. `_write_it` calls
+`generate_passcode()` unconditionally, so no path from that window produces an unlocked bundle;
+`test_wizard_bundle_locking.py` asserts the control's *absence*, by attribute and by walking the
+widgets, rather than asserting a value somebody can flip back.
+
+It was a ticked checkbox, and a ticked checkbox is one idle click from an unlocked zip holding
+key material that cannot be revoked. That click gets made: a user sent @parawanderer their tags
+in an unlocked bundle. **Do not restore it** — the person the lock protects is precisely the
+person who would untick it to make a message go away.
+
+The escape hatch is `exporter.cli`'s `--no-password`, and its being CLI-only is the design rather
+than an omission. Somebody who found a flag and typed it has chosen an unlocked bundle; somebody
+clicking through a window has not, and offering both the same control treats those as one
+decision.
 
 **It was flipped on before app 1.1.0 was published, which is not what the paragraph above
 describes, and the exception is worth understanding rather than copying.** The ordering exists to

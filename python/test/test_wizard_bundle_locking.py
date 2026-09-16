@@ -1,13 +1,15 @@
 """
-The wizard can lock the bundles it writes, and shows the code once.
+The wizard locks every bundle it writes, and shows the code once.
 
-**The default is on, now that app 1.1.0 is released.** A locked bundle can only be opened by that
-version or newer; anything older fails with a message about the zip rather than about a code, and
-the person who meets that failure is the recipient - who chose neither the exporter nor its
-version. That is why this waited for the app rather than shipping alongside it.
+**There is no way to ask it not to, and that is the behaviour under test.** It was a ticked
+checkbox, which is one idle click from an unlocked bundle holding key material that cannot be
+revoked - and that click has been made in the field, by somebody who sent their tags to a
+stranger in an unlocked zip. The escape hatch lives on the CLI's `--no-password`, where finding
+a flag and typing it is evidence of a decision.
 
-**These tests assert the default in both directions on purpose.** The value moved twice with no
-test noticing either time, which is how it came to be wrong in the first place.
+**Asserted as the absence of a control, not only as a default.** A default is a value somebody
+can flip back; this suite fails if the window grows a way to turn locking off at all. The value
+moved twice before without a test noticing either time.
 
 The code is the part with a permanent cost. It is not stored anywhere and cannot be recovered, so
 a bundle written without the user being shown its code is a bundle nobody can ever open.
@@ -47,10 +49,8 @@ def bundle():
     return ExportBundle(entries={"OPENTAGVIEWER.yml": b"version: 0.0.2\n"}, exported_at_ms=0)
 
 
-def write(window, bundle, path, *, locked: bool):
-    """Run the write step with the checkbox in a known state, and report what happened."""
-    window.lock_bundle.set(locked)
-
+def write(window, bundle, path):
+    """Run the write step and report what happened. There is no state to set: it always locks."""
     with mock.patch.object(wizard, "write_zip") as write_zip, \
          mock.patch.object(wizard, "_show_the_code") as shown, \
          mock.patch.object(wizard.messagebox, "showinfo") as info, \
@@ -60,32 +60,49 @@ def write(window, bundle, path, *, locked: bool):
     return write_zip, shown, info, error, closed
 
 
-class TestTheDefault:
+class TestThereIsNoWayToTurnItOff:
     """
-    Off until an app that can open one is released - see the module docstring.
-
-    A bundle holds key material that cannot be revoked and travels through other people's
-    infrastructure, so on is where this belongs eventually. It is not there yet.
+    The control is gone, not merely defaulted on - see the module docstring for what that cost.
     """
 
-    def test_the_checkbox_starts_ticked(self, window):
-        assert window.lock_bundle.get() is True, (
-            "the default is on now that app 1.1.0 is released and can open a locked bundle"
+    def test_the_window_has_no_locking_switch(self, window):
+        assert not hasattr(window, "lock_bundle"), (
+            "the window grew a way to turn locking off again; the CLI's --no-password is where"
+            " that belongs, because typing a flag is a decision and clicking a box is not"
+        )
+
+    def test_no_checkbox_offers_it_either(self, window):
+        # The attribute could be renamed and the checkbox kept, which would pass the test above
+        # while putting the click back on screen. So the widgets are searched as well.
+        labels = []
+
+        def walk(widget):
+            for child in widget.winfo_children():
+                try:
+                    labels.append(str(child.cget("text")).lower())
+                except tk.TclError:
+                    pass
+                walk(child)
+
+        walk(window)
+
+        assert not any("lock" in label for label in labels), (
+            f"something on the window still offers locking as a choice: {labels}"
         )
 
     def test_a_bundle_is_written_with_a_code(self, window, bundle, tmp_path):
         write_zip, _shown, _info, _error, _closed = write(
-            window, bundle, tmp_path / "x.zip", locked=True)
+            window, bundle, tmp_path / "x.zip")
 
         passcode = write_zip.call_args.kwargs["password"]
-        assert passcode, "the bundle was written unlocked while the box was ticked"
+        assert passcode, "the bundle was written unlocked"
         assert len(passcode) == 12
 
     def test_the_code_uses_the_alphabet_the_importer_expects(self, window, bundle, tmp_path):
         # Crockford's base32, minus I, L, O and U. The app folds the confusable letters back on
         # input; a code containing one would still work, but it would defeat the point of the
         # alphabet - which is that this gets read off a screen and typed somewhere else.
-        write_zip, *_ = write(window, bundle, tmp_path / "x.zip", locked=True)
+        write_zip, *_ = write(window, bundle, tmp_path / "x.zip")
 
         assert set(write_zip.call_args.kwargs["password"]) <= set(
             "0123456789ABCDEFGHJKMNPQRSTVWXYZ")
@@ -99,18 +116,21 @@ class TestShowingTheCode:
 
     def test_the_code_is_shown_and_it_is_the_one_that_was_used(self, window, bundle, tmp_path):
         write_zip, shown, _info, _error, _closed = write(
-            window, bundle, tmp_path / "x.zip", locked=True)
+            window, bundle, tmp_path / "x.zip")
 
         shown.assert_called_once()
         assert shown.call_args.args[3] == write_zip.call_args.kwargs["password"]
 
-    def test_an_unlocked_bundle_says_so_instead(self, window, bundle, tmp_path):
-        write_zip, shown, info, _error, _closed = write(
-            window, bundle, tmp_path / "x.zip", locked=False)
+    def test_the_code_is_always_shown_because_there_is_always_one(self, window, bundle, tmp_path):
+        # There used to be an "Exported, and this bundle is not locked" path here. It is gone
+        # with the checkbox: every write from this window has a code, so every write shows one.
+        # If a no-code path ever comes back, this fails rather than silently writing a bundle
+        # whose only warning nobody wrote.
+        write_zip, shown, info, _error, _closed = write(window, bundle, tmp_path / "x.zip")
 
-        assert write_zip.call_args.kwargs["password"] is None
-        shown.assert_not_called()
-        assert "not locked" in info.call_args.args[1]
+        assert write_zip.call_args.kwargs["password"] is not None
+        shown.assert_called_once()
+        info.assert_not_called()
 
 
 class TestWhenItCannotBeWritten:
@@ -119,7 +139,6 @@ class TestWhenItCannotBeWritten:
     """
 
     def test_a_missing_pyzipper_is_said_plainly(self, window, bundle, tmp_path):
-        window.lock_bundle.set(True)
 
         with mock.patch.object(wizard, "write_zip",
                                side_effect=RuntimeError("pyzipper is not installed")), \
@@ -130,7 +149,6 @@ class TestWhenItCannotBeWritten:
         assert "pyzipper" in error.call_args.args[1]
 
     def test_a_disk_that_will_not_take_it_keeps_the_window(self, window, bundle, tmp_path):
-        window.lock_bundle.set(True)
 
         with mock.patch.object(wizard, "write_zip", side_effect=OSError("No space left")), \
              mock.patch.object(wizard.messagebox, "showerror") as error:
@@ -140,7 +158,7 @@ class TestWhenItCannotBeWritten:
         assert "No space left" in error.call_args.args[1]
 
     def test_a_successful_write_does_close_it(self, window, bundle, tmp_path):
-        *_rest, closed = write(window, bundle, tmp_path / "x.zip", locked=True)
+        *_rest, closed = write(window, bundle, tmp_path / "x.zip")
 
         assert closed is True
 

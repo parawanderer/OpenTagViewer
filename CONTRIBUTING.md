@@ -115,6 +115,46 @@ than replacing it. **Never uninstall a production install to force an install** 
 `allowBackup` is false, so the beacons and location history are gone for good, and getting
 them back means redoing the macOS export.
 
+### The shared debug keystore
+
+**Android signs debug builds with `~/.android/debug.keystore`, and a CI runner has no such file,
+so it generates one per run.** Two things follow, and both were met before this was fixed:
+
+- **A debug APK cannot be installed over one from a different machine or a different CI run.**
+  Same `applicationId`, different signing key, so the install fails with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. The only way forward is an uninstall, and an uninstall
+  destroys that device's imported beacons and location history.
+- **Google Maps renders blank.** A Maps key is restricted by package name *and* signing SHA-1,
+  and a SHA-1 that changes every build cannot be whitelisted at all. It looks exactly like a
+  build with no API key in it.
+
+So CI writes one fixed keystore from the `DEBUG_KEYSTORE_BASE64` repository secret, and
+`app/build.gradle.kts` uses `app/debug-keystore.jks` when that file is present. Its SHA-1 is
+whitelisted against the Maps key, so **CI debug builds render maps and upgrade in place**.
+
+To make your local builds interchangeable with CI's, put the same keystore at
+`app/debug-keystore.jks`:
+
+```bash
+gh secret list -R parawanderer/OpenTagViewer     # confirms it exists; secrets cannot be read back
+# Ask a maintainer for the file, then:
+ls -l app/debug-keystore.jks
+keytool -list -v -keystore app/debug-keystore.jks -storepass android -alias androiddebugkey \
+  | grep SHA1
+```
+
+`*.jks` is gitignored, and the passwords are Android's well-known debug constants
+(`android` / `androiddebugkey`) deliberately: the key proves nothing and guards nothing, and
+giving it real secrets would only add something else to supply before the project builds.
+
+**Without the file, everything still builds** — Gradle logs a line saying so and falls back to
+the generated key. That is the right behaviour for a fork, and it is also why a missing keystore
+does not announce itself as an error when maps later come up blank.
+
+**Changing the debug key means one more uninstall, once.** Anything already installed was signed
+with the old per-run key, so the first build after this lands still refuses to install over it.
+After that they upgrade in place.
+
 ---
 
 ## Testing
