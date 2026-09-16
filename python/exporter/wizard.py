@@ -59,6 +59,7 @@ from findmy.errors import AppleServiceUnavailableError
 from findmy.keychain.recovery import RecoveryError
 
 from exporter.icloud import Candidate, ExportSourceError, not_a_terms_problem
+from exporter.identity import written_by_opentagviewer
 from exporter.version import (
     APP_TITLE,
     EXPORT_VIA_WIZARD,
@@ -524,7 +525,18 @@ class WizardApp(tk.Tk):
 
             async with await icloud.open_client(account) as client:
                 options = await client.recovery_options()
-                if not options.recoverable:
+
+                # This project's own escrow records are dropped rather than offered: joining the
+                # trust circle writes one beside the user's real hardware, and its passcode was
+                # generated and never shown, so "which device's passcode do you have?" has no
+                # answer for it. Filtered before the count, so an account holding nothing but our
+                # own records says there is nothing to recover from - which is the truth.
+                recoverable = [
+                    record for record in options.recoverable
+                    if not written_by_opentagviewer(record.serial)
+                ]
+
+                if not recoverable:
                     raise ExportSourceError(
                         "No device on this account can currently be recovered from, so its keychain"
                         " cannot be unlocked.",
@@ -535,9 +547,9 @@ class WizardApp(tk.Tk):
                     "Unlock",
                     "Which device's screen-lock passcode do you have?\n"
                     "That is its PIN or login password, not your Apple ID password.",
-                    [record.describe() for record in options.recoverable],
+                    [record.describe() for record in recoverable],
                 ))
-                chosen = options.recoverable[index]
+                chosen = recoverable[index]
 
                 async def ask_passcode(attempt: int, chosen=chosen) -> str:
                     again = "\n\nThat last one was not accepted." if attempt > 1 else ""

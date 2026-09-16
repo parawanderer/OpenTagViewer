@@ -140,3 +140,49 @@ serial is the only one sign-in controls that a person actually reads - which is 
 
 CLOUDKIT_DEVICE_NAME = DEVICE_NAME
 """Older spelling, kept for anything still importing it."""
+
+
+APP_SERIAL_PREFIX = "0PENTAGV"
+"""
+What the Android app's serials begin with, mirroring :data:`SERIAL_PREFIX` for this program.
+
+**Here rather than only in Java**, because the two programs have to recognise *each other's*
+records and not merely their own. This module is one of the handful shipped into the APK
+(`app/build.gradle.kts` lists it by name), so it is the one place both can read the pair from.
+Duplicating the literal is not free, which is why
+`PythonPackagingTest.thepythonSideFiltersOnThePrefixJavaActuallyPresents` asserts it against
+`AdiDeviceIdentity.SERIAL_PREFIX` on a device rather than trusting this comment.
+"""
+
+OUR_SERIAL_PREFIXES = (SERIAL_PREFIX, APP_SERIAL_PREFIX)
+"""Both prefixes this project presents to Apple, for :func:`written_by_opentagviewer`."""
+
+
+def written_by_opentagviewer(serial: str | None) -> bool:
+    """
+    Whether a serial belongs to this project rather than to a device the user owns.
+
+    **For filtering escrow records out of a recovery picker, and that is the whole use.** Joining
+    the trust circle registers this project as a device and writes an escrow record beside the
+    user's real hardware. The picker then asks for "the screen-lock passcode of one of your Apple
+    devices" for something with no screen and no lock, and there is no answer: that passcode was
+    generated, never shown, and was never the user's to know.
+
+    **Matching the prefix rather than one serial is the point.** The app used to compare against
+    the serial the current session presents, which worked only while every install presented the
+    same constant. Serials are drawn per install now (:data:`EXPORTER_SERIAL` explains why), so an
+    exact match filters this install's record and leaves every other one of ours on the list - a
+    reinstall's, the other program's, and one per trust-circle join. The prefixes are the stable
+    part by design: see :data:`SERIAL_PREFIX`, which exists so an entry is identifiable as ours.
+
+    Both legacy constants are caught without being named, since `0PENTAGVIEWR` and `0PENTAGXPORT`
+    begin with their own prefixes.
+
+    :param serial: The serial off an escrow record, which may be absent or a non-string - the
+        record schema is unstable enough that every field can be missing.
+    :return: True when this project wrote it, and the user cannot be asked about it.
+    """
+    if not isinstance(serial, str):
+        return False
+
+    return serial.startswith(OUR_SERIAL_PREFIXES)
