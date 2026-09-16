@@ -464,6 +464,34 @@ generally has neither, and without `pendingTerms`/`acceptTerms` they are stuck o
 screen that keeps refusing them for a reason nothing tells them.
 """
 
+REASON_ICLOUD_REFUSED = "icloud_refused"
+"""
+Apple accepted the sign-in and then refused to open iCloud for this account.
+
+**Authentication worked.** The password was right, the second factor was right, and the
+`com.apple.mobileme` delegate exchange that follows them is what failed - so nothing on the
+sign-in screen is wrong and re-entering it changes nothing.
+
+**Split out of :data:`REASON_TERMS`, which used to swallow it.** Every `MobileMeDelegateError`
+was reported as terms pending, because terms were the only cause anybody had a remedy for. The
+response has two independent error channels and terms arrive on only one of them: when
+`localizedError` is absent, the delegate refused the account on its own `status` and the terms
+flow has nothing to show. Reported as issue #221, where somebody whose terms were fine was shown
+an empty document list and told to accept some.
+
+**What it does mean is not established, so the screen does not assert one.** It is met across
+every client sharing this sign-in path, on Apple IDs that have never been used with an Apple
+device - macless-haystack#84, #86 and #87, where the same delegate status arrives both with
+"A server problem is blocking Apple ID sign in" and with "Account limit reached". The advice
+that circulates there is to fill the account out at appleid.apple.com, and that is offered as
+the thing to try rather than as the answer.
+
+**Deliberately not :data:`REASON_APPLE_DECLINED`.** That one says wait and try again, which is
+also what Apple's own wording here says - and across those clients it does not clear on its own.
+Sending somebody back to retry an unchanged sign-in indefinitely is worse than saying plainly
+that the account looks like the problem.
+"""
+
 REASON_APPLE_DECLINED = "apple_declined"
 """
 Apple answered, and refused to serve the request. Not the password, and not the network.
@@ -506,8 +534,21 @@ def classifyLoginFailure(error: BaseException) -> str:
     # "terms pending" is not established**, so this reports the possibility rather than asserting
     # it - the screen offers to fetch them and says plainly that if the cause is something else,
     # accepting terms will not fix it. The desktop CLI makes the same judgement the same way.
+    #
+    # **But only when the response used that channel at all.** `localizedError` is where a
+    # response explains itself in words, and where terms arrive; the delegate's own `status`
+    # fails independently of it. Treating both as terms sent somebody with perfectly good terms
+    # to an empty document list and told them to accept something - issue #221. `status`-only
+    # failures are a refusal of the account, and get their own sentence.
+    #
+    # **Reads `localized_error` rather than `names_a_localized_error`, on purpose.** The property
+    # is the nicer spelling and says exactly this, but it landed in the fork after the commit
+    # pinned in `app/build.gradle.kts`, and the attribute behind it has been there all along. So
+    # this works on the pinned version rather than requiring the pin to move first - which would
+    # drag rule 14's four files into a fix that does not otherwise need them. Switching to the
+    # property is safe whenever the pin next moves; both spellings coexist.
     if isinstance(error, MobileMeDelegateError):
-        return REASON_TERMS
+        return REASON_TERMS if error.localized_error is not None else REASON_ICLOUD_REFUSED
 
     # Before the network checks, and not because of ordering hazards - it is a RuntimeError and
     # collides with none of them. It is here because it reads as the same thing to a user and is

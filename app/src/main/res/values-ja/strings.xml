@@ -389,4 +389,5 @@
 Appleが要求を拒否しただけなら、少し待ってからもう一度お試しください。それでも失敗する場合は、このログを添えて報告すると修正できます。</string>
     <string name="login_failed_apple_asked_to_wait">Apple がサインインを拒否し、再試行まで %1$s 待つよう求めています。Apple ID やパスワードの問題ではなく、Apple 側の拒否です。</string>
     <string name="login_try_remote_anisette">リモートサーバーを試す</string>
+    <string name="login_failed_icloud_refused">パスワードと確認コードは受け付けられましたが、その後 Apple がこのアカウントの iCloud を開きませんでした。これは利用規約の問題ではありません。同じ方法でサインインする他のアプリでも、Apple 製デバイスで一度も使われたことのない Apple ID でこれが起きると報告されています。appleid.apple.com にサインインし、支払い方法の追加などアカウント情報を入力すると解消することがほとんどです。待つだけでは通常は解消しません。</string>
 </resources>

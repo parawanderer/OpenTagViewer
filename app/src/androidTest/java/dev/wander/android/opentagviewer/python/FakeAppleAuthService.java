@@ -164,6 +164,29 @@ public final class FakeAppleAuthService implements AppleAuthService {
     }
 
     /**
+     * Apple signs the user in and then will not open iCloud for the account.
+     *
+     * <p><b>Issue #221.</b> The message is the real one, word for word off the reporter's screen:
+     * the delegate's own {@code status}, with nothing on the {@code localizedError} channel that
+     * terms arrive on. Every delegate failure used to be reported as terms pending, so this
+     * account - whose terms were fine - was shown an empty document list and told to accept
+     * something.
+     *
+     * <p>Carries no account, which is what keeps it out of the terms flow: {@code
+     * hasTermsToAccept()} needs both the reason and the session.
+     */
+    public static FakeAppleAuthService icloudIsRefusedForTheAccount() {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "The com.apple.mobileme delegate request failed, reporting status=1,"
+                        + " status-message='A server problem is blocking Apple ID sign in."
+                        + " Try signing in later.'",
+                PythonAccountLoginException.REASON_ICLOUD_REFUSED);
+        return fake;
+    }
+
+    /**
      * Apple declining, and saying how long to leave it - a {@code Retry-After} on the refusal.
      *
      * <p><b>Not yet seen from Grand Slam</b>, which is why {@link #appleIsDeclining()} carries no

@@ -824,6 +824,13 @@ public class AppleLoginActivity extends AppCompatActivity {
             return this.getString(R.string.login_failed_apple_declined);
         }
 
+        // Apple took the password and the code, then would not open iCloud for the account. Kept
+        // apart from the terms sentence because the remedy is elsewhere entirely, and apart from
+        // "Apple declined" because that one says to wait - see REASON_ICLOUD_REFUSED.
+        if (PythonAccountLoginException.REASON_ICLOUD_REFUSED.equals(reason)) {
+            return this.getString(R.string.login_failed_icloud_refused);
+        }
+
         // Reached when the terms path was tried and produced nothing to accept, so the sentence
         // says what Apple said and then that accepting terms will not fix something else -
         // rather than asserting a cause that has not been established.

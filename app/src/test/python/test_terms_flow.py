@@ -363,3 +363,58 @@ class TestRecognisingThatTermsAreWhyTheSignInFailed:
         detail = main.describeLoginFailure(MobileMeDelegateError(localized_error="TERMS"))
 
         assert detail.strip()
+
+
+class TestADelegateFailureThatIsNotAboutTerms:
+    """
+    Issue #221, and the reason this class exists separately from the one above.
+
+    The delegate response has two error channels. `localizedError` is where terms arrive;
+    the delegate's own `status` fails independently of it. Every `MobileMeDelegateError` was
+    reported as terms pending, so an account whose terms were fine was shown an empty document
+    list and told to accept something.
+    """
+
+    # The shape that actually arrived, quoted from the screenshot on #221.
+    REFUSED = MobileMeDelegateError(
+        status=1,
+        status_message="A server problem is blocking Apple ID sign in. Try signing in later.",
+    )
+
+    def test_a_status_only_failure_is_not_reported_as_terms(self):
+        assert main.classifyLoginFailure(self.REFUSED) == main.REASON_ICLOUD_REFUSED
+        assert main.classifyLoginFailure(self.REFUSED) != main.REASON_TERMS
+
+    def test_a_localized_error_is_still_reported_as_terms(self):
+        # The other half of the branch. Without this, "fix" the split by always returning the
+        # new reason and the terms flow becomes unreachable with nothing going red.
+        assert main.classifyLoginFailure(
+            MobileMeDelegateError(localized_error="TERMS", status=1)) == main.REASON_TERMS
+
+    def test_it_is_not_reported_as_apple_declining(self):
+        """
+        `apple_declined` tells somebody to wait and try again, and offers the Anisette server
+        route. Apple's own wording here says to try later too - and across the clients sharing
+        this sign-in path it does not clear on its own, so that advice is a loop.
+        """
+        assert main.classifyLoginFailure(self.REFUSED) != main.REASON_APPLE_DECLINED
+
+    def test_it_is_not_left_unclassified(self):
+        # UNKNOWN renders the raw exception text, which here is a paragraph about a delegate.
+        assert main.classifyLoginFailure(self.REFUSED) != main.REASON_UNKNOWN
+
+    def test_the_account_is_not_handed_back(self, signingIn):
+        """
+        Unlike terms, there is nothing further to do with the session, so holding it is only
+        an invitation to store it - the bad write behind #43 and #119.
+        """
+        _, answer = signingIn(self.REFUSED)
+
+        assert answer["reason"] == main.REASON_ICLOUD_REFUSED
+        assert "account" not in answer
+
+    def test_what_apple_said_survives_into_the_detail(self):
+        # The status message is the only evidence a bug report can carry about this.
+        detail = main.describeLoginFailure(self.REFUSED)
+
+        assert "A server problem is blocking Apple ID sign in." in detail

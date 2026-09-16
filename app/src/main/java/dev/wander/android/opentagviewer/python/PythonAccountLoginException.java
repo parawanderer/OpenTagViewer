@@ -33,7 +33,25 @@ public class PythonAccountLoginException extends RuntimeException {
      */
     public static final String REASON_TERMS = "terms";
 
-    /** Anything not recognised. The detail is shown as-is rather than guessed at. */
+    /**
+     * Apple signed the user in and then refused to open iCloud. Matches
+     * {@code REASON_ICLOUD_REFUSED}.
+     *
+     * <p><b>Split out of {@link #REASON_TERMS}, which used to swallow it.</b> Every delegate
+     * failure was reported as terms pending, because terms were the only cause with a remedy.
+     * The response has two error channels and terms arrive on only one; when that channel is
+     * empty, the delegate refused the account itself and the terms flow has nothing to show.
+     * Issue #221 is somebody whose terms were fine being shown an empty document list.
+     *
+     * <p>Carries no account, deliberately: unlike terms, there is nothing further to do with
+     * the session from here.
+     *
+     * <p><b>Not {@link #REASON_APPLE_DECLINED}</b>, which advises waiting. Apple's own wording
+     * here says to try later, and across the clients sharing this sign-in path it does not
+     * clear on its own - so repeating that advice sends somebody to retry forever.
+     */
+    public static final String REASON_ICLOUD_REFUSED = "icloud_refused";
+
     /**
      * Apple answered and refused to serve. Matches {@code REASON_APPLE_DECLINED}.
      *
@@ -42,6 +60,7 @@ public class PythonAccountLoginException extends RuntimeException {
      */
     public static final String REASON_APPLE_DECLINED = "apple_declined";
 
+    /** Anything not recognised. The detail is shown as-is rather than guessed at. */
     public static final String REASON_UNKNOWN = "unknown";
 
     private final String reason;
