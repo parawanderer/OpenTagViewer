@@ -180,7 +180,6 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
                 .blockingFirst();
 
         ActivityHistoryViewBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_history_view);
-        WindowPaddingUtil.insetForSystemBars(binding.getRoot());
 
         binding.setHandleClickBack(this::finish);
         binding.setPageTitle(this.getCurrentBeaconName());
@@ -202,6 +201,14 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
                 this::handleOnClickHistoryListItem
         );
         RecyclerView recyclerView = findViewById(R.id.recycler_view_history_items);
+
+        // **The bottom inset goes on the list, not on the root.** Padding the root shortens the
+        // coordinator inside it, so the sheet stopped above the navigation bar and the white
+        // activity background showed through beneath a grey sheet - with the last history row
+        // clipped by the same gap. Paired call, so the bottom cannot be left out: see
+        // WindowPaddingUtil.
+        WindowPaddingUtil.insetForSystemBars(binding.getRoot(), recyclerView);
+
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(this.historyItemsAdapter);
         recyclerView.setItemAnimator(null);

@@ -158,10 +158,16 @@
 
         </LinearLayout>
 
+        <!--
+            clipToPadding=false so the navigation-bar inset added in HistoryViewActivity is
+            somewhere the last row can scroll into, rather than a dead band below the list that
+            clips it. The sheet's own background still runs to the bottom of the screen.
+        -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view_history_items"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:clipToPadding="false" />
 
     </LinearLayout>
 
