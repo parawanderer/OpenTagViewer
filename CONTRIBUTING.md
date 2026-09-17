@@ -174,6 +174,7 @@ wizard).
 | Desktop exporter tests | `python/test/` | pytest | no |
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
+| Native stub tests | `app/src/test/cpp/` | CMake / CTest, **Linux only** | no |
 | Test doubles for the bridge | `app/src/debug/python/` | installed from an instrumented test | provisioned for you |
 | Fakes for the screens | `app/src/androidTest/java/.../ui/maps/` | used directly by a test | provisioned for you |
 
@@ -600,6 +601,36 @@ credited nobody. `--expect-contributor` turns that into a visible failure, and t
 what keep it honest - including the case where the expected login is one of `EXCLUDED_LOGINS`
 and its absence is correct rather than a fault.
 
+### Native stub tests
+
+```bash
+cmake -S app/src/test/cpp -B build/native-stubs && cmake --build build/native-stubs
+ctest --test-dir build/native-stubs --output-on-failure
+```
+
+The app ships its own stand-ins for two of Apple's libraries (`app/src/main/cpp/stubs/`), so that
+Apple's `libstoreservicescore.so` loads without 20 MB of dependencies it never uses. These build
+the same stubs, through the same `stubs/AppleStubs.cmake`, for the machine running the tests, and
+check three things: every symbol in the `.symbols` lists is exported, every generated stub returns
+0, and `makeWorkQueue` returns an empty `shared_ptr` through the buffer its caller passes.
+
+That last one is issue #232. The generated stub never wrote the buffer, and Apple's code read the
+leftover stack as a pointer and wrote through it, which was harmless on most phones and crashed
+the app at launch on some. The test fills the buffer with garbage first, so it fails on every
+machine instead of on unlucky ones.
+
+**Linux only**, x86_64 or arm64. Mach-O prefixes C symbols with an underscore, so the exported
+names cannot be looked up as Apple's library looks them up. On a Mac, use a container:
+
+```bash
+docker run --rm -v "$PWD":/src -w /tmp ubuntu:24.04 bash -c \
+  'apt-get -qq update && apt-get -qq install -y clang cmake make >/dev/null &&
+   CC=clang CXX=clang++ cmake -S /src/app/src/test/cpp -B b && cmake --build b &&
+   ctest --test-dir b --output-on-failure'
+```
+
+Add `--platform linux/amd64` to run the x86_64 side under emulation.
+
 ### Which Python each tree targets
 
 There are three, and they are not the same:
@@ -822,6 +853,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
 | `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
+| `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same

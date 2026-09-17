@@ -15,12 +15,10 @@
 #include <dlfcn.h>
 #include <android/log.h>
 
-#include <cstdio>
-#include <cstring>
-#include <memory>
-#include <new>
 #include <string>
 #include <vector>
+
+#include "stubs/stub_checks.h"
 
 #define LOG_TAG "adi"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -45,42 +43,15 @@ std::string to_utf8(JNIEnv *env, jstring value) {
     return out;
 }
 
-/// See NativeAdi_checkMakeWorkQueueStub. Here, outside `extern "C"`, because it names a C++
-/// function type. Returns an empty string when the stub behaved.
+/// See NativeAdi_checkMakeWorkQueueStub. Returns an empty string when the stub behaved.
 std::string check_make_work_queue_stub() {
     void *library = dlopen("libmediaplatform.so", RTLD_NOW | RTLD_NOLOAD);
     if (library == nullptr) {
         return "libmediaplatform.so is not loaded";
     }
-    void *symbol = dlsym(library, "_ZN13mediaplatform9WorkQueue13makeWorkQueueERKNSt6__ndk112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEENS0_13WorkQueueTypeE");
+    void *symbol = dlsym(library, opentagviewer::stubs::MAKE_WORK_QUEUE);
     dlclose(library);
-    if (symbol == nullptr) {
-        return "libmediaplatform.so does not export makeWorkQueue";
-    }
-
-    using MakeWorkQueue = std::shared_ptr<int> (*)(const std::string &, int);
-    const auto make_work_queue = reinterpret_cast<MakeWorkQueue>(symbol);
-
-    // What was on the stack on the phones #232 crashed on. The object is constructed in place
-    // (guaranteed elision in C++17), so this buffer is the one the stub is handed to write into.
-    unsigned char storage[sizeof(std::shared_ptr<int>)];
-    std::memset(storage, 0xA5, sizeof storage);
-
-    const std::string name = "URLBagRequest";
-    ::new (static_cast<void *>(storage)) std::shared_ptr<int>(make_work_queue(name, 0));
-
-    void *words[2] = {};
-    std::memcpy(words, storage, sizeof words);
-    // Not destroyed: a stub that failed left garbage there, and releasing it is what crashed.
-
-    if (words[0] == nullptr && words[1] == nullptr) {
-        return {};
-    }
-    char message[160];
-    std::snprintf(message, sizeof message,
-                  "makeWorkQueue left {object=%p, control=%p} in the caller's buffer", words[0],
-                  words[1]);
-    return message;
+    return opentagviewer::stubs::check_make_work_queue(symbol);
 }
 
 }  // namespace
@@ -333,18 +304,8 @@ Java_dev_wander_android_opentagviewer_anisette_NativeAdi_otpRequest(
 }
 
 /**
- * Calls our libmediaplatform.so stub for makeWorkQueue exactly as libstoreservicescore.so does, and
- * says whether it left the caller's buffer holding a real answer.
- *
- * Issue #232: the generated stub returned 0 in a register, but the real function returns a
- * std::shared_ptr by value - through a buffer the caller provides - and a static constructor in
- * Apple's library read that buffer back as a control block. Leftover stack there crashed dlopen on
- * some phones. No test could see it, because the tests that load Apple's library are opt-in and the
- * emulator happened to leave zeros. This one needs no Apple library and no luck: the buffer is
- * filled with garbage first, so a stub that does not write it fails on every device and ABI.
- *
- * Declared with the real return type, std::shared_ptr, so the call is made the way Apple's code
- * makes it rather than the way our stub's source happens to describe itself.
+ * Calls our libmediaplatform.so stub for makeWorkQueue exactly as libstoreservicescore.so does.
+ * See stubs/stub_checks.h, which the host tests in app/src/test/cpp/ run too.
  *
  * @return null if the stub returned an empty shared_ptr, otherwise what went wrong
  */
