@@ -402,7 +402,8 @@ What to look at afterwards, since passing is not the whole story — filter logc
 (`app/src/main/cpp/stubs/`), and each one reports itself when called:
 
 - **INFO** means a symbol we already know is called harmlessly, listed with its evidence in
-  `libmediaplatform.expected`
+  `libmediaplatform.expected`, or one written by hand in `libmediaplatform_handwritten.cpp`
+  because it returns a C++ object by value, which the generated stubs cannot
 - **ERROR** means Apple's code now depends on something we only pretend to implement. The
   result may be silently wrong rather than obviously broken, so it needs investigating
   before trusting anything the run produced.

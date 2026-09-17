@@ -44,9 +44,18 @@ function(add_apple_stub library)
     # the alarm. A library without one treats every call as unexpected.
     set(expected "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}.expected")
 
+    # Optional: functions that cannot be generated, because they return a C++ object by value.
+    # The generator skips whatever this file defines. See issue #232.
+    set(handwritten "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}_handwritten.cpp")
+
     set(inputs "${symbols}" "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake")
+    set(sources "${generated}")
     if (EXISTS "${expected}")
         list(APPEND inputs "${expected}")
+    endif ()
+    if (EXISTS "${handwritten}")
+        list(APPEND inputs "${handwritten}")
+        list(APPEND sources "${handwritten}")
     endif ()
 
     add_custom_command(
@@ -54,6 +63,7 @@ function(add_apple_stub library)
             COMMAND ${CMAKE_COMMAND}
             -DSYMBOLS=${symbols}
             -DEXPECTED=${expected}
+            -DHANDWRITTEN=${handwritten}
             -DOUTPUT=${generated}
             -DLIBRARY=lib${library}.so
             -DSAFE=${library}
@@ -65,7 +75,7 @@ function(add_apple_stub library)
     # The target name cannot collide with the output name, hence the _stub suffix here and
     # OUTPUT_NAME below. What ends up in the APK is lib<library>.so, which is what the linker
     # looks for.
-    add_library(${library}_stub SHARED "${generated}")
+    add_library(${library}_stub SHARED ${sources})
     set_target_properties(${library}_stub PROPERTIES
             OUTPUT_NAME "${library}"
             PREFIX "lib")

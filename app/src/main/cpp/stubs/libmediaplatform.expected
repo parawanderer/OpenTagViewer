@@ -8,12 +8,12 @@
 # Add to this list only with evidence - a passing end-to-end provisioning run with the call
 # observed - never because a log line was annoying.
 
-# Called from a static constructor while dlopen'ing libstoreservicescore.so, before any ADI
-# function runs. Our stub returns NULL.
+# Nothing is listed here now.
 #
-# Harmless, established two ways. Provisioning completes successfully with the NULL: verified
-# by AdiProvisioningTest against Apple's real servers on 2026-08-10 (session completed,
-# ADIGetLoginCode then returned 0). And the reference implementation is in the same position
-# by construction - Dadoum/Provision's loader never runs .init_array at all, so this
-# constructor does not execute there either, and every public Anisette server runs that way.
-F _ZN13mediaplatform9WorkQueue13makeWorkQueueERKNSt6__ndk112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEENS0_13WorkQueueTypeE
+# makeWorkQueue used to be: called from a static constructor while dlopen'ing
+# libstoreservicescore.so, and believed harmless because "our stub returns NULL". It did not. It
+# returns a std::shared_ptr by value, through a buffer the caller provides, and the generated stub
+# never wrote that buffer - so the constructor read a leftover stack value as a control block and
+# incremented through it. That was issue #232. It is written by hand in
+# libmediaplatform_handwritten.cpp now, and the lesson for this file is that "provisioning still
+# worked" established nothing about what a stub leaves behind for its caller.

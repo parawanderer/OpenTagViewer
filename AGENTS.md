@@ -106,11 +106,22 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   that warning to make a log quieter.
 - **A native crash is not an exception, and the fallback above cannot see one.** `ensureReady`
   catches everything and falls back to a remote server, which is the right design and was not
-  enough: on some phones Apple's `libstoreservicescore.so` dies inside `dlopen`, in its own
+  enough: on some phones Apple's `libstoreservicescore.so` died inside `dlopen`, in its own
   static initialisers, with a `SIGBUS` (`BUS_ADRALN`) — issue #232, a Pixel 5 and a Redmi
-  Note 12 Pro. It is the pinned arm64 binary, byte for byte the one that works elsewhere. The
-  process dies inside the call, the `catch` never runs, and because the sign-in screen checks
-  Anisette the moment it opens, 1.1.0 could not be opened at all on those devices.
+  Note 11 Pro+ 5G. The process dies inside the call, the `catch` never runs, and because the
+  sign-in screen checks Anisette the moment it opens, 1.1.0 could not be opened at all on those
+  devices.
+
+  **The cause was ours: a stub that returned a C++ object by value.** `makeWorkQueue`, in our
+  generated `libmediaplatform.so` stand-in, returns a `std::shared_ptr` through a buffer the caller
+  passes (`x8` on arm64, a hidden first argument on x86_64). The generated `long f(void) { return
+  0; }` never wrote it, and a constructor in Apple's library read the leftover stack as a control
+  block and incremented through it. Zero on most phones, so nothing happened; a live misaligned
+  pointer on those two. It had been recorded as "harmless, our stub returns NULL" on the strength
+  of provisioning succeeding — which says nothing about what a stub leaves in its caller's memory.
+  It is hand-written in `stubs/libmediaplatform_handwritten.cpp` now, and `MakeWorkQueueStubTest`
+  calls it into a garbage-filled buffer so it fails on any ABI. **Before marking a stubbed call
+  harmless, check its return type in the caller's disassembly**, not whether the run completed.
   So the library is loaded **in a throwaway process first** — `AppleLibraryProbeService`, declared
   with `android:process=":adiprobe"` — and the app loads it only if that process survived
   (`TryItElsewhereFirst`, answer kept per app version, ABI and library build). A death over there

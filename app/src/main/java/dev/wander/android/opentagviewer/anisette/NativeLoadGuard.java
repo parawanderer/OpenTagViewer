@@ -8,8 +8,10 @@ import java.util.concurrent.Callable;
  *
  * <p><b>Why this exists.</b> On some devices Apple's own {@code libstoreservicescore.so} crashes
  * inside {@code dlopen}, while running its static initialisers - a {@code SIGBUS} with
- * {@code BUS_ADRALN}, reported from a Pixel 5 and a Redmi Note 12 Pro in issue #232. It is the
- * correct arm64 binary, byte for byte the pinned one that works elsewhere. {@link LocalAnisette}
+ * {@code BUS_ADRALN}, reported from a Pixel 5 and a Redmi Note 11 Pro+ 5G in issue #232. That one
+ * turned out to be our own stub for {@code makeWorkQueue} (see
+ * {@code app/src/main/cpp/stubs/libmediaplatform_handwritten.cpp}) and is fixed; this stays for the
+ * next native crash nobody has found yet. {@link LocalAnisette}
  * catches every exception and falls back to a remote Anisette server, which is the right design,
  * but a signal is not an exception: the process dies inside the call, the fallback never runs,
  * and the login screen - which checks Anisette as soon as it opens - does it again on the next
