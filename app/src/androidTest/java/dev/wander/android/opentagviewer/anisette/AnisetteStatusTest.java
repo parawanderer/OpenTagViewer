@@ -72,6 +72,20 @@ public class AnisetteStatusTest {
         assertFalse(status.needsOwnApk());
     }
 
+    /**
+     * Apple's library crashing on this phone (#232) is its own state, because it is the only one
+     * that asks for a report - and it must not offer an APK, which would be the same library.
+     */
+    @Test
+    public void aLibraryThatCrashesThisPhoneIsItsOwnState() {
+        final AnisetteStatus status = AnisetteStatus.of(
+                FakeAnisetteSource.unavailable(LocalAnisette.CRASHES_HERE_REASON));
+
+        assertEquals(AnisetteStatus.State.CRASHES_HERE, status.state());
+        assertTrue(status.failed());
+        assertFalse("a copy of the same library crashes the same way", status.needsOwnApk());
+    }
+
     /** No source at all is "nothing has happened yet", not "something went wrong". */
     @Test
     public void noSourceIsPendingRatherThanBroken() {

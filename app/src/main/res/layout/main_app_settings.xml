@@ -83,6 +83,19 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
+        <!--
+            Only when Apple's library crashes on this phone (issue #232). Nothing in Settings fixes
+            that and the cause is not known, so which phone it is is the useful thing to send.
+        -->
+        <Button
+            android:id="@+id/anisetteReportCrashButton"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/anisette_report_crash"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

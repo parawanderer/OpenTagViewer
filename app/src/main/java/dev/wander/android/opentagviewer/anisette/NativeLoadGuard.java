@@ -18,9 +18,12 @@ import java.util.concurrent.Callable;
  *
  * <p><b>So the record is written before the call and removed after it.</b> A record still present
  * at the next launch means the call never returned, which on a load that takes milliseconds means
- * it killed the process. That launch uses a remote server instead. The user meets the crash once
- * rather than on every launch, which is not good, but it is recoverable, and nothing short of
- * running Apple's code in another process does better.
+ * it killed the process. That launch uses a remote server instead.
+ *
+ * <p><b>It is the backstop now, not the first line.</b> On its own it lets the user meet the crash
+ * once before it knows, so {@link TryItElsewhereFirst} has a throwaway process load the library
+ * before this process does, and die in its place. This still guards the load that follows, for a
+ * phone where the library survives over there and not here.
  *
  * <p><b>The record names the attempt, not just the fact of one.</b> It holds the app version and
  * the pinned library build, and only a record for the <i>same</i> attempt counts. An update to

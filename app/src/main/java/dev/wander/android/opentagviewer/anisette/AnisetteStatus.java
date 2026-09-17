@@ -32,7 +32,14 @@ public final class AnisetteStatus {
          * <p>The only state that offers supplying an APK by hand, because it is the only one
          * where doing so would help. Everything else is either fine or fixed by other means.
          */
-        APPLE_CHANGED
+        APPLE_CHANGED,
+        /**
+         * Apple's library kills the process that loads it, on this device (issue #232).
+         *
+         * <p>The only state that asks for a report. Nothing the user can change fixes it, and the
+         * reason is not known yet - so which phone it happens on is the useful thing they have.
+         */
+        CRASHES_HERE
     }
 
     private final State state;
@@ -67,6 +74,9 @@ public final class AnisetteStatus {
         }
 
         final String reason = source.unavailableReason();
+        if (reason != null && reason.contains(LocalAnisette.CRASHES_HERE_REASON)) {
+            return new AnisetteStatus(State.CRASHES_HERE, reason);
+        }
         return new AnisetteStatus(
                 looksLikeAppleChangedTheLibraries(reason)
                         ? State.APPLE_CHANGED : State.UNAVAILABLE,
@@ -93,6 +103,13 @@ public final class AnisetteStatus {
     /** The failure, when there is one. Null otherwise. */
     public String detail() {
         return this.detail;
+    }
+
+    /** Whether local Anisette failed, whatever the reason. */
+    public boolean failed() {
+        return this.state == State.UNAVAILABLE
+                || this.state == State.APPLE_CHANGED
+                || this.state == State.CRASHES_HERE;
     }
 
     /** Whether supplying an Apple Music APK by hand would help. */

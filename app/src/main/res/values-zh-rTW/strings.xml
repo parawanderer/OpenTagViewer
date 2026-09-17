@@ -390,4 +390,7 @@
     <string name="login_failed_apple_asked_to_wait">Apple 拒絕了此次登入，並要求等待 %1$s 後再試。這是 Apple 的拒絕，不是你的 Apple ID 或密碼有問題。</string>
     <string name="login_try_remote_anisette">嘗試遠端伺服器</string>
     <string name="login_failed_icloud_refused">密碼和驗證碼都通過了，但接著 Apple 沒有為此帳戶開放 iCloud。這與服務條款無關。以同樣方式登入的其他應用程式也回報，從未在 Apple 裝置上使用過的 Apple ID 會出現這種情況；登入 appleid.apple.com 並補齊帳戶資訊——例如新增付款方式——通常就能解決。只是等待通常沒有用。</string>
+    <string name="anisette_login_crashes_here">Apple 的登入函式庫在這支手機上會當機，因此這一步改由伺服器完成。其他功能一切正常。我們還不知道為什麼會在部分手機上發生，附上你的機型回報會有幫助。</string>
+    <string name="anisette_report_crash">回報這支手機</string>
+    <string name="anisette_crash_report_body">Apple 的登入函式庫在這支手機上一載入就會當機。它在大多數手機上都能正常運作，我們還不知道受影響的手機有什麼共通點。\n\nOpenTagViewer 現在改用伺服器完成這一步，因此你可以正常登入和使用 App。附上下方資訊的回報能幫助我們找到原因。</string>
 </resources>

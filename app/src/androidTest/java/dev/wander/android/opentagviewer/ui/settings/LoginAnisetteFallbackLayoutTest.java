@@ -3,10 +3,13 @@ package dev.wander.android.opentagviewer.ui.settings;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.os.Build;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -17,6 +20,8 @@ import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.AppleLibraryCrashReport;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 
 /**
@@ -151,6 +156,47 @@ public class LoginAnisetteFallbackLayoutTest {
                 View.VISIBLE, view(R.id.anisetteRemoteSection).getVisibility());
         assertEquals("the device did not fail, so there is nothing to explain",
                 View.GONE, view(R.id.anisetteLoginFallbackReason).getVisibility());
+    }
+
+    /**
+     * <b>A phone Apple's library crashes on (#232) says so, and asks for a report.</b> The general
+     * sentence says the device "could not set up sign-in", which reads as worth retrying; nothing
+     * the user does changes this, and which phone it is is what would help.
+     */
+    @Test
+    public void aPhoneAppleCrashesOnIsToldSoAndOfferedAReport() {
+        apply(AnisetteStatus.of(FakeAnisetteSource.unavailable(LocalAnisette.CRASHES_HERE_REASON)));
+
+        assertEquals("they still need the server to sign in",
+                View.VISIBLE, view(R.id.anisetteRemoteSection).getVisibility());
+        assertEquals(this.screen.getContext().getString(R.string.anisette_login_crashes_here),
+                ((TextView) view(R.id.anisetteLoginFallbackReason)).getText().toString());
+        assertEquals(View.VISIBLE, view(R.id.anisetteReportCrashButton).getVisibility());
+    }
+
+    /** Any other failure keeps the general sentence and asks for nothing. */
+    @Test
+    public void anOrdinaryFailureAfterACrashGoesBackToTheGeneralSentence() {
+        apply(AnisetteStatus.of(FakeAnisetteSource.unavailable(LocalAnisette.CRASHES_HERE_REASON)));
+        apply(AnisetteStatus.of(FakeAnisetteSource.unavailable("Unable to resolve host")));
+
+        assertEquals(this.screen.getContext().getString(R.string.anisette_login_needs_server),
+                ((TextView) view(R.id.anisetteLoginFallbackReason)).getText().toString());
+        assertEquals("a network failure is not worth a bug report",
+                View.GONE, view(R.id.anisetteReportCrashButton).getVisibility());
+    }
+
+    /** The report is only worth sending if it names the phone. */
+    @Test
+    public void theReportNamesThePhone() {
+        final String report = AppleLibraryCrashReport.describe(
+                getInstrumentation().getTargetContext(),
+                AnisetteStatus.of(FakeAnisetteSource.unavailable(LocalAnisette.CRASHES_HERE_REASON)));
+
+        assertTrue(report, report.contains(Build.MODEL));
+        assertTrue(report, report.contains("API " + Build.VERSION.SDK_INT));
+        assertTrue(report, report.contains(Build.SUPPORTED_ABIS[0]));
+        assertTrue(report, report.contains("#232"));
     }
 
     private void apply(final AnisetteStatus status) {

@@ -390,4 +390,7 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="login_failed_apple_asked_to_wait">Apple이 로그인을 거부했으며, 다시 시도하기 전에 %1$s 기다려 달라고 요청했습니다. Apple ID나 비밀번호의 문제가 아니라 Apple 쪽의 거부입니다.</string>
     <string name="login_try_remote_anisette">원격 서버 시도</string>
     <string name="login_failed_icloud_refused">비밀번호와 인증 코드는 통과했지만, 그 뒤에 Apple이 이 계정의 iCloud를 열어 주지 않았습니다. 약관과는 관계가 없습니다. 같은 방식으로 로그인하는 다른 앱에서도 Apple 기기에서 한 번도 사용한 적이 없는 Apple ID에서 이런 일이 보고되며, appleid.apple.com에 로그인해 결제 수단 추가처럼 계정 정보를 채우면 대개 해결됩니다. 기다리는 것만으로는 보통 해결되지 않습니다.</string>
+    <string name="anisette_login_crashes_here">Apple의 로그인 라이브러리가 이 휴대폰에서 충돌하므로 이 단계는 서버가 대신 처리합니다. 나머지는 모두 정상적으로 작동합니다. 일부 휴대폰에서 왜 이런 일이 생기는지 아직 모릅니다. 기기 모델을 알려 주시면 도움이 됩니다.</string>
+    <string name="anisette_report_crash">이 휴대폰 신고하기</string>
+    <string name="anisette_crash_report_body">이 휴대폰에서는 Apple의 로그인 라이브러리가 불러오자마자 충돌합니다. 대부분의 휴대폰에서는 정상 작동하며, 영향을 받는 기기들의 공통점은 아직 모릅니다.\n\n이제 OpenTagViewer가 이 단계에 서버를 사용하므로 로그인하고 앱을 정상적으로 쓸 수 있습니다. 아래 정보와 함께 신고해 주시면 원인을 찾는 데 도움이 됩니다.</string>
 </resources>

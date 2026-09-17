@@ -5,6 +5,9 @@ import static android.view.View.VISIBLE;
 
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -36,6 +39,8 @@ import java.util.stream.Collectors;
 import androidx.appcompat.app.AppCompatDelegate;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.AppleLibraryCrashReport;
+import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
@@ -339,10 +344,37 @@ public class SharedMainSettingsManager {
                 && !forceShow
                 && state != AnisetteStatus.State.PENDING;
 
+        // **A phone Apple's library crashes on is told so, and asked for a report** (issue #232).
+        // The generic sentence says the device "could not set up sign-in", which invites trying
+        // again - and there is nothing to try. What helps is knowing which phone it is.
+        final boolean crashes = explain && state == AnisetteStatus.State.CRASHES_HERE;
+
         final View reason = root.findViewById(R.id.anisetteLoginFallbackReason);
         if (reason != null) {
             reason.setVisibility(explain ? VISIBLE : GONE);
+            if (reason instanceof TextView) {
+                ((TextView) reason).setText(crashes
+                        ? R.string.anisette_login_crashes_here
+                        : R.string.anisette_login_needs_server);
+            }
         }
+
+        final View report = root.findViewById(R.id.anisetteReportCrashButton);
+        if (report != null) {
+            report.setVisibility(crashes ? VISIBLE : GONE);
+            report.setOnClickListener(crashes ? v -> openTheCrashReport(v.getContext(), status)
+                    : null);
+        }
+    }
+
+    private static void openTheCrashReport(final Context context, final AnisetteStatus status) {
+        final Intent intent = ErrorReportActivity.intentFor(context,
+                AppleLibraryCrashReport.describe(context, status),
+                R.string.anisette_crash_report_body);
+        if (!(context instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        context.startActivity(intent);
     }
 
     /**
@@ -424,8 +456,7 @@ public class SharedMainSettingsManager {
         }
 
         final AnisetteStatus.State state = status.state();
-        final boolean failed = state == AnisetteStatus.State.UNAVAILABLE
-                || state == AnisetteStatus.State.APPLE_CHANGED;
+        final boolean failed = status.failed();
 
         final boolean checking = state == AnisetteStatus.State.CHECKING;
 

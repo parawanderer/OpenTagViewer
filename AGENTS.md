@@ -111,12 +111,20 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   Note 12 Pro. It is the pinned arm64 binary, byte for byte the one that works elsewhere. The
   process dies inside the call, the `catch` never runs, and because the sign-in screen checks
   Anisette the moment it opens, 1.1.0 could not be opened at all on those devices.
-  `NativeLoadGuard` writes a record before the native calls and removes it after; a record still
-  there at the next launch means the load never returned, so that launch uses a server. Keep
-  anything new that calls into Apple's code **inside** that window, keep anything slow (network,
-  provisioning) **outside** it — a user closing the app mid-wait leaves the same record a crash
-  does — and keep its store on `commit()`: `apply()` writes asynchronously and dies with the
-  process, which would pass every test and never once record a crash.
+  So the library is loaded **in a throwaway process first** — `AppleLibraryProbeService`, declared
+  with `android:process=":adiprobe"` — and the app loads it only if that process survived
+  (`TryItElsewhereFirst`, answer kept per app version, ABI and library build). A death over there
+  is reported to the app by the binder and nobody sees a crash, including people upgrading from
+  1.1.0 who have no record of one. Both processes run `LocalAnisette.openAndInitialise`, so **add
+  any new pre-provisioning call into Apple's code there**, or a pass in one says nothing about the
+  other. `OpenAirTagApplication` returns early in that process: starting Python there would unpack
+  Chaquopy's assets from two processes at once.
+
+  `NativeLoadGuard` is the backstop behind it: a record written before the native calls and removed
+  after, so a record still there at the next launch means the load never returned. Keep anything
+  slow (network, provisioning) **outside** that window — a user closing the app mid-wait leaves the
+  same record a crash does — and keep its store on `commit()`: `apply()` writes asynchronously and
+  dies with the process, which would pass every test and never once record a crash.
 
   **CI cannot catch this class as it stands**, for two reasons that are easy to mistake for one.
   The managed device is x86_64, so it downloads Apple's *x86_64* build and never the arm64 one a
