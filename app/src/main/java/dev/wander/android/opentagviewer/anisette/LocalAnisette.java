@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
+import dev.wander.android.opentagviewer.BuildConfig;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.util.LoadedOnce;
 
@@ -74,6 +75,12 @@ public final class LocalAnisette implements AnisetteSource {
      * point of the alphabet excluding {@code I} is that it cannot have drawn it.
      */
     public static final String KEY_SERIAL = "serial";
+
+    /**
+     * Present only while Apple's library is being loaded - or after a load that killed the
+     * process. See {@link NativeLoadGuard}.
+     */
+    static final String KEY_LOADING_APPLES_LIBRARY = "loadingApplesLibrary";
 
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
@@ -178,11 +185,24 @@ public final class LocalAnisette implements AnisetteSource {
             // at the file writes.
             final ApplesLibrary loaded = APPLES_LIBRARY.get(() -> {
                 final AdiLibraryManifest manifest = AdiLibraryManifest.load(this.context);
+
+                // **Before anything else, and inside the lock.** On some devices Apple's library
+                // kills the process while it is being loaded (issue #232), which no catch below
+                // can see - so the only evidence is a record that the last load never returned.
+                // Inside the lock because two threads loading at once is ordinary (#135): checked
+                // outside, the second would read the first one's in-progress record as a crash.
+                final NativeLoadGuard guard = this.nativeLoadGuard(manifest);
+                if (guard.previousAttemptCrashed()) {
+                    throw new AdiLibrary.AdiUnavailableException(
+                            "Apple's library crashed this app the last time it was loaded on this"
+                                    + " device, so a remote Anisette server is used instead");
+                }
+
                 final File libraryDir = libraryDirectory(this.context, this.abi);
 
                 download(manifest, libraryDir);
                 verify(manifest, libraryDir);
-                return load(libraryDir);
+                return load(libraryDir, guard);
             });
 
             this.adi = loaded.adi;
@@ -248,16 +268,25 @@ public final class LocalAnisette implements AnisetteSource {
      * calls it today, which is the only reason there is no invalidation here; resetting Anisette
      * against a cached, already-initialised library would appear to work and change nothing.
      */
-    private ApplesLibrary load(File libraryDir) throws Exception {
+    private ApplesLibrary load(File libraryDir, NativeLoadGuard guard) throws Exception {
         for (final String stub : STUBS) {
             System.loadLibrary(stub);
         }
 
-        final AdiLibrary library = AdiLibrary.open(libraryDir, FROM_APPLE);
+        // Read before the library is opened rather than after: it touches only preferences, and
+        // moving it lets the guarded window below hold exactly the calls into Apple's code.
         final AdiDeviceIdentity deviceIdentity = loadOrCreateIdentity();
         final File provisioningDir = new File(this.context.getFilesDir(), "anisette/provisioning");
 
-        library.initialise(libraryDir, provisioningDir, deviceIdentity.adiIdentifier());
+        // **The window is the load and the initialise, and nothing longer.** Both are native,
+        // both take milliseconds, and #232's crash is in the first. Provisioning is left out on
+        // purpose: it waits on the network for seconds, and a user closing the app during it
+        // would leave the same record a crash does, switching local Anisette off for nothing.
+        final AdiLibrary library = guard.around(() -> {
+            final AdiLibrary opened = AdiLibrary.open(libraryDir, FROM_APPLE);
+            opened.initialise(libraryDir, provisioningDir, deviceIdentity.adiIdentifier());
+            return opened;
+        });
         new AdiProvisioning(deviceIdentity, library)
                 .provisionIfNeeded(AdiProvisioning.ANONYMOUS_DS_ID);
 
@@ -279,6 +308,41 @@ public final class LocalAnisette implements AnisetteSource {
      * background thread inside a blocking sequence, and does not want an Rx round trip in the
      * middle of it.
      */
+    /**
+     * The guard for loading Apple's library, keyed to this app build, ABI and library build.
+     *
+     * <p>{@code commit()}, never {@code apply()}: the write before the load is only worth anything
+     * if it is on disk when the process dies, and {@code apply()} leaves it in a queue that dies
+     * with it. See {@link NativeLoadGuard.Store}.
+     */
+    private NativeLoadGuard nativeLoadGuard(final AdiLibraryManifest manifest) {
+        final SharedPreferences preferences =
+                this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+
+        final NativeLoadGuard.Store store = new NativeLoadGuard.Store() {
+            @Override
+            public String get() {
+                return preferences.getString(KEY_LOADING_APPLES_LIBRARY, null);
+            }
+
+            @Override
+            public void set(final String attempt) {
+                if (!preferences.edit().putString(KEY_LOADING_APPLES_LIBRARY, attempt).commit()) {
+                    Log.w(TAG, "Could not record that Apple's library is loading; a crash during"
+                            + " the load would not be noticed on the next launch");
+                }
+            }
+
+            @Override
+            public void clear() {
+                preferences.edit().remove(KEY_LOADING_APPLES_LIBRARY).commit();
+            }
+        };
+
+        return new NativeLoadGuard(store, NativeLoadGuard.attemptFor(
+                BuildConfig.VERSION_CODE, this.abi, manifest.apkVersion()));
+    }
+
     private AdiDeviceIdentity loadOrCreateIdentity() {
         final SharedPreferences preferences =
                 this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);

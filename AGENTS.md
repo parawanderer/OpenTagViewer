@@ -104,6 +104,24 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   `LocalAnisette.recordSessionProvenance` records which kind established the session so that
   this is reported rather than presenting as auth that silently stops working. Never remove
   that warning to make a log quieter.
+- **A native crash is not an exception, and the fallback above cannot see one.** `ensureReady`
+  catches everything and falls back to a remote server, which is the right design and was not
+  enough: on some phones Apple's `libstoreservicescore.so` dies inside `dlopen`, in its own
+  static initialisers, with a `SIGBUS` (`BUS_ADRALN`) — issue #232, a Pixel 5 and a Redmi
+  Note 12 Pro. It is the pinned arm64 binary, byte for byte the one that works elsewhere. The
+  process dies inside the call, the `catch` never runs, and because the sign-in screen checks
+  Anisette the moment it opens, 1.1.0 could not be opened at all on those devices.
+  `NativeLoadGuard` writes a record before the native calls and removes it after; a record still
+  there at the next launch means the load never returned, so that launch uses a server. Keep
+  anything new that calls into Apple's code **inside** that window, keep anything slow (network,
+  provisioning) **outside** it — a user closing the app mid-wait leaves the same record a crash
+  does — and keep its store on `commit()`: `apply()` writes asynchronously and dies with the
+  process, which would pass every test and never once record a crash.
+
+  **CI cannot catch this class as it stands**, for two reasons that are easy to mistake for one.
+  The managed device is x86_64, so it downloads Apple's *x86_64* build and never the arm64 one a
+  phone runs; and the tests that load Apple's real library are opt-in (`anisetteLiveTests`), so
+  the default suite loads it on no architecture at all. An arm64 image alone would fix neither.
 
 ### 5. Never bundle an AMap API key
 
