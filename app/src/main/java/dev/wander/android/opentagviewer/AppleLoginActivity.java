@@ -247,8 +247,9 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_apple_login);
         // This screen had neither inset applied - so its buttons sat under the navigation bar
-        // and its heading under the status bar, on the very first screen anybody sees.
-        WindowPaddingUtil.insetForSystemBars(this.binding.getRoot());
+        // and its heading under the status bar, on the very first screen anybody sees. And the
+        // keyboard: it covered the Anisette server field while somebody was typing into it.
+        WindowPaddingUtil.insetForSystemBarsAndKeyboard(this.binding.getRoot());
 
         if (this.getSupportActionBar() != null) {
             this.getSupportActionBar().hide();

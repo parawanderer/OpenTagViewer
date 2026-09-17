@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.ui.compat;
 
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -52,6 +53,55 @@ public final class WindowPaddingUtil {
                     ownRight + bars.right,
                     ownBottom + bars.bottom
             );
+            return insets;
+        });
+    }
+
+    /**
+     * {@link #insetForSystemBars(View)}, for a scrolling screen somebody types into: it also gets
+     * out of the keyboard's way.
+     *
+     * <p><b>Android 15 stopped doing this for the app.</b> Targeting SDK 35 makes every window edge
+     * to edge, and an edge-to-edge window is not resized when the keyboard opens - so
+     * {@code adjustResize}, which is what used to push a text field up above the keyboard, quietly
+     * does nothing. The keyboard is reported as an inset like the navigation bar, and a screen that
+     * ignores it has its field drawn underneath. The sign-in screen's Anisette server field was
+     * covered that way: the text being typed was hidden behind the keys typing it.
+     *
+     * <p><b>A margin, not padding, and that is the fix rather than a detail.</b> A
+     * {@code ScrollView} brings the focused field into view when it gets <i>shorter</i> - the same
+     * thing a resized window used to cause. Padding its bottom leaves its height alone, so the
+     * field would stay under the keyboard with the content merely allowed to scroll past it.
+     *
+     * <p>Only the keyboard's own inset is used, so this is a no-op wherever the system still
+     * resizes the window: there, nothing of the window is under the keyboard and the inset is zero.
+     *
+     * @param scrollingScreen the scrolling root, whose parent gives it margins
+     */
+    public static void insetForSystemBarsAndKeyboard(final View scrollingScreen) {
+        final int ownLeft = scrollingScreen.getPaddingLeft();
+        final int ownTop = scrollingScreen.getPaddingTop();
+        final int ownRight = scrollingScreen.getPaddingRight();
+        final int ownBottom = scrollingScreen.getPaddingBottom();
+
+        ViewCompat.setOnApplyWindowInsetsListener(scrollingScreen, (v, insets) -> {
+            final Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            final int keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
+
+            // The keyboard covers the navigation bar, so while it is up the bar needs no room.
+            v.setPadding(
+                    ownLeft + bars.left,
+                    ownTop + bars.top,
+                    ownRight + bars.right,
+                    ownBottom + (keyboard > 0 ? 0 : bars.bottom)
+            );
+
+            final ViewGroup.LayoutParams params = v.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams
+                    && ((ViewGroup.MarginLayoutParams) params).bottomMargin != keyboard) {
+                ((ViewGroup.MarginLayoutParams) params).bottomMargin = keyboard;
+                v.setLayoutParams(params);
+            }
             return insets;
         });
     }
