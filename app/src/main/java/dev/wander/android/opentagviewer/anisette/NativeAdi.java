@@ -80,4 +80,14 @@ public final class NativeAdi {
      * @return {@code {machineIdentifier, oneTimePassword}} - in that order - or null on error
      */
     public static native byte[][] otpRequest(long function, long dispose, long dsId, int[] out);
+
+    /**
+     * Calls our stand-in for {@code mediaplatform::WorkQueue::makeWorkQueue} the way Apple's library
+     * does, into a buffer filled with garbage. Issue #232 was that stand-in never writing it.
+     *
+     * <p>For tests. Needs {@code System.loadLibrary("mediaplatform")} first, and no Apple library.
+     *
+     * @return null if it came back as an empty {@code shared_ptr}, otherwise what it left behind
+     */
+    static native String checkMakeWorkQueueStub();
 }

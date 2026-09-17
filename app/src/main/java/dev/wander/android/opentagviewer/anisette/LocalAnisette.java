@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
+import dev.wander.android.opentagviewer.BuildConfig;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.util.LoadedOnce;
 
@@ -74,6 +75,32 @@ public final class LocalAnisette implements AnisetteSource {
      * point of the alphabet excluding {@code I} is that it cannot have drawn it.
      */
     public static final String KEY_SERIAL = "serial";
+
+    /**
+     * Present only while Apple's library is being loaded - or after a load that killed the
+     * process. See {@link NativeLoadGuard}.
+     */
+    static final String KEY_LOADING_APPLES_LIBRARY = "loadingApplesLibrary";
+
+    /**
+     * Whether Apple's library survived being loaded in a separate process, for this app version,
+     * ABI and library build. See {@link TryItElsewhereFirst}.
+     */
+    static final String KEY_APPLES_LIBRARY_ELSEWHERE = "applesLibraryInASeparateProcess";
+
+    /**
+     * What {@link #unavailableReason()} says when Apple's library kills whatever loads it, on this
+     * device. {@link AnisetteStatus} matches on it, which is why it is one constant.
+     */
+    public static final String CRASHES_HERE_REASON =
+            "Apple's library crashes this app on this device, so a remote Anisette server is used"
+                    + " instead";
+
+    /**
+     * The attempt whose separate process did not answer, in this process. Not persisted: no answer
+     * is not evidence of anything, so the next launch asks again.
+     */
+    private static volatile String noAnswerThisProcess;
 
     /** Apple's, in dependency order. CoreFoundation and mediaplatform are our stubs. */
     private static final List<String> FROM_APPLE = Arrays.asList(
@@ -178,11 +205,48 @@ public final class LocalAnisette implements AnisetteSource {
             // at the file writes.
             final ApplesLibrary loaded = APPLES_LIBRARY.get(() -> {
                 final AdiLibraryManifest manifest = AdiLibraryManifest.load(this.context);
+
+                // **Before anything else, and inside the lock.** On some devices Apple's library
+                // kills the process while it is being loaded (issue #232), which no catch below
+                // can see - so the only evidence is a record that the last load never returned.
+                // Inside the lock because two threads loading at once is ordinary (#135): checked
+                // outside, the second would read the first one's in-progress record as a crash.
+                final String attempt = NativeLoadGuard.attemptFor(
+                        BuildConfig.VERSION_CODE, this.abi, manifest.apkVersion());
+                final NativeLoadGuard.Store store = this.storeFor(KEY_LOADING_APPLES_LIBRARY);
+                final NativeLoadGuard guard = new NativeLoadGuard(store, attempt);
+                if (guard.previousAttemptCrashed()) {
+                    throw new AdiLibrary.AdiUnavailableException(CRASHES_HERE_REASON);
+                }
+
                 final File libraryDir = libraryDirectory(this.context, this.abi);
 
                 download(manifest, libraryDir);
                 verify(manifest, libraryDir);
-                return load(libraryDir);
+
+                // **Somewhere else first, so the crash has nobody to take down.** The guard above
+                // only learns from a crash that already happened; this finds out without one. See
+                // TryItElsewhereFirst. After the download, because the other process needs the
+                // files, and still inside the lock, so two callers never start two processes.
+                if (!attempt.equals(noAnswerThisProcess)) {
+                    switch (new TryItElsewhereFirst(this.storeFor(KEY_APPLES_LIBRARY_ELSEWHERE),
+                            attempt).decide(new AppleLibraryProbe(this.context, libraryDir))) {
+                        case CRASHES_HERE:
+                            throw new AdiLibrary.AdiUnavailableException(CRASHES_HERE_REASON);
+                        case NOT_THIS_TIME:
+                            // Remembered for this process only: every caller waiting the full
+                            // timeout again would stall the sign-in screen repeatedly.
+                            noAnswerThisProcess = attempt;
+                            break;
+                        case LOAD:
+                        default:
+                            return load(libraryDir, guard);
+                    }
+                }
+                throw new AdiLibrary.AdiUnavailableException(
+                        "Apple's library was being tried in a separate process first, and that"
+                                + " process did not answer in time; a remote Anisette server is"
+                                + " used until the app is next started");
             });
 
             this.adi = loaded.adi;
@@ -248,16 +312,18 @@ public final class LocalAnisette implements AnisetteSource {
      * calls it today, which is the only reason there is no invalidation here; resetting Anisette
      * against a cached, already-initialised library would appear to work and change nothing.
      */
-    private ApplesLibrary load(File libraryDir) throws Exception {
-        for (final String stub : STUBS) {
-            System.loadLibrary(stub);
-        }
-
-        final AdiLibrary library = AdiLibrary.open(libraryDir, FROM_APPLE);
+    private ApplesLibrary load(File libraryDir, NativeLoadGuard guard) throws Exception {
+        // Read before the library is opened rather than after: it touches only preferences, and
+        // moving it lets the guarded window below hold exactly the calls into Apple's code.
         final AdiDeviceIdentity deviceIdentity = loadOrCreateIdentity();
         final File provisioningDir = new File(this.context.getFilesDir(), "anisette/provisioning");
 
-        library.initialise(libraryDir, provisioningDir, deviceIdentity.adiIdentifier());
+        // **The window is the load and the initialise, and nothing longer.** Both are native,
+        // both take milliseconds, and #232's crash is in the first. Provisioning is left out on
+        // purpose: it waits on the network for seconds, and a user closing the app during it
+        // would leave the same record a crash does, switching local Anisette off for nothing.
+        final AdiLibrary library = guard.around(() -> openAndInitialise(
+                libraryDir, provisioningDir, deviceIdentity.adiIdentifier()));
         new AdiProvisioning(deviceIdentity, library)
                 .provisionIfNeeded(AdiProvisioning.ANONYMOUS_DS_ID);
 
@@ -266,6 +332,58 @@ public final class LocalAnisette implements AnisetteSource {
         // the cache would be handed to everyone after it, and would read as Apple rejecting the
         // app rather than as a bad load.
         return new ApplesLibrary(library, deviceIdentity);
+    }
+
+    /**
+     * Load Apple's library and point it at its directories: every call into Apple's code that
+     * happens before provisioning, and nothing else.
+     *
+     * <p><b>One method, because two processes run it.</b> {@link #load} runs it here, inside
+     * {@link NativeLoadGuard}; {@link AppleLibraryProbeService} runs it in a throwaway process to
+     * find out whether it is safe to. If they made different calls, a pass in one would say
+     * nothing about the other.
+     */
+    static AdiLibrary openAndInitialise(final File libraryDir, final File provisioningDir,
+                                        final String adiIdentifier) throws Exception {
+        for (final String stub : STUBS) {
+            System.loadLibrary(stub);
+        }
+
+        final AdiLibrary opened = AdiLibrary.open(libraryDir, FROM_APPLE);
+        opened.initialise(libraryDir, provisioningDir, adiIdentifier);
+        return opened;
+    }
+
+    /**
+     * One preference as a {@link NativeLoadGuard.Store}.
+     *
+     * <p>{@code commit()}, never {@code apply()}: the write before the load is only worth anything
+     * if it is on disk when the process dies, and {@code apply()} leaves it in a queue that dies
+     * with it. See {@link NativeLoadGuard.Store}.
+     */
+    private NativeLoadGuard.Store storeFor(final String key) {
+        final SharedPreferences preferences =
+                this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+
+        return new NativeLoadGuard.Store() {
+            @Override
+            public String get() {
+                return preferences.getString(key, null);
+            }
+
+            @Override
+            public void set(final String value) {
+                if (!preferences.edit().putString(key, value).commit()) {
+                    Log.w(TAG, "Could not write " + key + "; a crash loading Apple's library might"
+                            + " not be noticed on the next launch");
+                }
+            }
+
+            @Override
+            public void clear() {
+                preferences.edit().remove(key).commit();
+            }
+        };
     }
 
     /**

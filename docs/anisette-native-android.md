@@ -248,6 +248,13 @@ anything on the network path. Instead the one missing root is added for that one
 (SHA-256 `b0b1730e...f024`, published at https://www.apple.com/appleca/). That is *stricter*
 than the default, not looser.
 
+> [!WARNING]
+> **The conclusion below was wrong, and it was issue #232.** `makeWorkQueue` returns a
+> `std::shared_ptr` by value, through a buffer the caller provides; the generated stub never wrote
+> it, and the constructor that calls it increments a reference count through whatever was left
+> there. That was zero on every device this was tested on and a live pointer on some phones, where
+> `dlopen` crashed. See `app/src/main/cpp/stubs/libmediaplatform_handwritten.cpp`.
+
 **3. The stub question is answered on the path that mattered.** `makeWorkQueue` was called,
 returned NULL, and provisioning completed anyway. So stubbing holds through provisioning, and
 that symbol is now recorded in `libmediaplatform.expected` - logged at INFO rather than raising
@@ -319,7 +326,9 @@ else becomes a trampoline that *throws* `UndefinedSymbolException`. And their lo
 runs `.init_array`** - `androidlibrary.d` has no constructor handling at all.
 
 So in the reference implementation that constructor never runs, and whatever global holds the
-work queue stays zero: functionally identical to our stub returning NULL. Every public Anisette
+work queue stays zero: functionally identical to our stub returning NULL. (It was not identical:
+the stub never wrote the returned `shared_ptr`, and the constructor did run - see the warning in
+section 5 and issue #232.) Every public Anisette
 server is a live demonstration that ADI's provisioning paths work with no work queue. Worth
 watching during provisioning, but not an open question.
 

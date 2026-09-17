@@ -423,4 +423,7 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="login_failed_apple_asked_to_wait">Apple refused the sign-in and asked for %1$s before trying again. This is Apple declining, not a problem with your Apple ID or password.</string>
     <string name="login_try_remote_anisette">Try a remote server</string>
     <string name="login_failed_icloud_refused">Your password and code were accepted, and then Apple would not open iCloud for this account. This is not about terms of service. Other apps that sign in this way see it on Apple IDs that have never been used with an Apple device, and signing in at appleid.apple.com and completing the account details — adding a payment method, for instance — is what usually clears it. Waiting on its own generally does not.</string>
+    <string name="anisette_login_crashes_here">Apple\'s sign-in library crashes on this phone, so a server does this step instead. Everything else works normally. We don\'t know why it happens on some phones yet, and a report naming yours helps.</string>
+    <string name="anisette_report_crash">Report this phone</string>
+    <string name="anisette_crash_report_body">Apple\'s sign-in library crashes as soon as it loads on this phone. It works on most phones, and we do not know yet what the affected ones have in common.\n\nOpenTagViewer now uses a server for that step, so you can sign in and use the app normally. A report with the details below is what helps us find the cause.</string>
 </resources>

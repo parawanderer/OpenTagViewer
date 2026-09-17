@@ -1,13 +1,17 @@
 package dev.wander.android.opentagviewer;
 
+import android.app.Application;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
-import com.chaquo.python.android.PyApplication;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 import com.google.android.material.color.DynamicColors;
 
+import dev.wander.android.opentagviewer.anisette.AppleLibraryProbeService;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -15,12 +19,27 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.service.NearbyScanService;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
-public class OpenAirTagApplication extends PyApplication {
+import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
+
+public class OpenAirTagApplication extends Application {
     private static final String TAG = OpenAirTagApplication.class.getSimpleName();
 
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // **The process that tries Apple's library first gets none of this.** It runs this class
+        // like any other process of the app, and it exists to load one library and possibly die.
+        // Starting Python there would unpack Chaquopy's assets from two processes at once, and
+        // resuming the background scan would start a second scanner. See AppleLibraryProbeService.
+        if (isTheAppleLibraryProbe()) {
+            return;
+        }
+
+        // What PyApplication did, which this used to extend. Done by hand so the line above can
+        // come first.
+        Python.start(new AndroidPlatform(this));
 
         // 高德地图SDK隐私合规初始化
         // 必须在调用任何SDK接口之前调用
@@ -29,6 +48,28 @@ public class OpenAirTagApplication extends PyApplication {
         this.setupTheme();
         this.setupSystemColors();
         this.resumeBackgroundScanIfEnabled();
+    }
+
+    private boolean isTheAppleLibraryProbe() {
+        return this.processName().endsWith(AppleLibraryProbeService.PROCESS_SUFFIX);
+    }
+
+    private String processName() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return Application.getProcessName();
+        }
+        try (FileInputStream cmdline = new FileInputStream("/proc/self/cmdline")) {
+            final byte[] buffer = new byte[256];
+            final int read = cmdline.read(buffer);
+            int end = 0;
+            while (end < Math.max(read, 0) && buffer[end] != 0) {
+                end++;
+            }
+            return new String(buffer, 0, end, StandardCharsets.UTF_8);
+        } catch (final Exception e) {
+            Log.w(TAG, "Could not read this process's name; assuming the main process", e);
+            return this.getPackageName();
+        }
     }
 
     /**

@@ -131,6 +131,18 @@
             android:exported="false"
             android:foregroundServiceType="location|connectedDevice" />
 
+        <!--
+            Loads Apple's ADI library in a process of its own, before the app loads it in its
+            own. On some phones that library kills whatever process loads it (issue #232), and
+            this way the process it kills is this one. See TryItElsewhereFirst.
+
+            Not exported: only the app binds it.
+        -->
+        <service
+            android:name=".anisette.AppleLibraryProbeService"
+            android:exported="false"
+            android:process=":adiprobe" />
+
         <!-- Reached only when the app cannot name what went wrong - see the class doc. -->
         <activity
             android:name=".ui.error.ErrorReportActivity"

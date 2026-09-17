@@ -104,6 +104,43 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   `LocalAnisette.recordSessionProvenance` records which kind established the session so that
   this is reported rather than presenting as auth that silently stops working. Never remove
   that warning to make a log quieter.
+- **A native crash is not an exception, and the fallback above cannot see one.** `ensureReady`
+  catches everything and falls back to a remote server, which is the right design and was not
+  enough: on some phones Apple's `libstoreservicescore.so` died inside `dlopen`, in its own
+  static initialisers, with a `SIGBUS` (`BUS_ADRALN`) — issue #232, a Pixel 5 and a Redmi
+  Note 11 Pro+ 5G. The process dies inside the call, the `catch` never runs, and because the
+  sign-in screen checks Anisette the moment it opens, 1.1.0 could not be opened at all on those
+  devices.
+
+  **The cause was ours: a stub that returned a C++ object by value.** `makeWorkQueue`, in our
+  generated `libmediaplatform.so` stand-in, returns a `std::shared_ptr` through a buffer the caller
+  passes (`x8` on arm64, a hidden first argument on x86_64). The generated `long f(void) { return
+  0; }` never wrote it, and a constructor in Apple's library read the leftover stack as a control
+  block and incremented through it. Zero on most phones, so nothing happened; a live misaligned
+  pointer on those two. It had been recorded as "harmless, our stub returns NULL" on the strength
+  of provisioning succeeding — which says nothing about what a stub leaves in its caller's memory.
+  It is hand-written in `stubs/libmediaplatform_handwritten.cpp` now, and `MakeWorkQueueStubTest`
+  calls it into a garbage-filled buffer so it fails on any ABI. **Before marking a stubbed call
+  harmless, check its return type in the caller's disassembly**, not whether the run completed.
+  So the library is loaded **in a throwaway process first** — `AppleLibraryProbeService`, declared
+  with `android:process=":adiprobe"` — and the app loads it only if that process survived
+  (`TryItElsewhereFirst`, answer kept per app version, ABI and library build). A death over there
+  is reported to the app by the binder and nobody sees a crash, including people upgrading from
+  1.1.0 who have no record of one. Both processes run `LocalAnisette.openAndInitialise`, so **add
+  any new pre-provisioning call into Apple's code there**, or a pass in one says nothing about the
+  other. `OpenAirTagApplication` returns early in that process: starting Python there would unpack
+  Chaquopy's assets from two processes at once.
+
+  `NativeLoadGuard` is the backstop behind it: a record written before the native calls and removed
+  after, so a record still there at the next launch means the load never returned. Keep anything
+  slow (network, provisioning) **outside** that window — a user closing the app mid-wait leaves the
+  same record a crash does — and keep its store on `commit()`: `apply()` writes asynchronously and
+  dies with the process, which would pass every test and never once record a crash.
+
+  **CI cannot catch this class as it stands**, for two reasons that are easy to mistake for one.
+  The managed device is x86_64, so it downloads Apple's *x86_64* build and never the arm64 one a
+  phone runs; and the tests that load Apple's real library are opt-in (`anisetteLiveTests`), so
+  the default suite loads it on no architecture at all. An arm64 image alone would fix neither.
 
 ### 5. Never bundle an AMap API key
 

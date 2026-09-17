@@ -390,4 +390,7 @@
     <string name="login_failed_apple_asked_to_wait">Apple 拒绝了此次登录，并要求等待 %1$s 后再试。这是 Apple 的拒绝，不是你的 Apple ID 或密码有问题。</string>
     <string name="login_try_remote_anisette">尝试远程服务器</string>
     <string name="login_failed_icloud_refused">密码和验证码都通过了，但随后 Apple 没有为此账户开放 iCloud。这与服务条款无关。以同样方式登录的其他应用也报告，从未在 Apple 设备上使用过的 Apple ID 会出现这种情况；登录 appleid.apple.com 并补全账户信息——例如添加付款方式——通常就能解决。仅仅等待通常没有用。</string>
+    <string name="anisette_login_crashes_here">Apple 的登录库在这部手机上会崩溃，因此这一步改由服务器完成。其他功能一切正常。我们还不知道为什么会在部分手机上发生，附上你的机型报告会有帮助。</string>
+    <string name="anisette_report_crash">报告这部手机</string>
+    <string name="anisette_crash_report_body">Apple 的登录库在这部手机上一加载就会崩溃。它在大多数手机上都能正常运行，我们还不知道受影响的手机有什么共同点。\n\nOpenTagViewer 现在改用服务器完成这一步，因此你可以正常登录和使用应用。附上下方信息的报告能帮助我们找到原因。</string>
 </resources>

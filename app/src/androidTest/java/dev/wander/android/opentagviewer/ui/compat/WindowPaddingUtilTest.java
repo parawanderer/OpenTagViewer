@@ -2,10 +2,15 @@ package dev.wander.android.opentagviewer.ui.compat;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -154,5 +159,114 @@ public class WindowPaddingUtilTest {
         deliverInsetsTo(root);
 
         assertEquals(NAV_BAR + 9, list.getPaddingBottom());
+    }
+
+    private static final int KEYBOARD = 600;
+
+    private static WindowInsetsCompat withTheKeyboard(final int height) {
+        return new WindowInsetsCompat.Builder()
+                .setInsets(
+                        WindowInsetsCompat.Type.systemBars(),
+                        Insets.of(0, STATUS_BAR, 0, NAV_BAR))
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, height))
+                .build();
+    }
+
+    /** A screen inside something that gives it margins, as an activity's content view is. */
+    private FrameLayout windowAround(final View screen) {
+        final FrameLayout window = new FrameLayout(this.context);
+        window.addView(screen, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return window;
+    }
+
+    /**
+     * <b>The keyboard takes room from the bottom of the screen, as a margin.</b>
+     *
+     * <p>Targeting Android 15 means the window is no longer resized for the keyboard, so nothing
+     * else will. A margin rather than padding: a {@code ScrollView} only brings the focused field
+     * into view when it gets shorter.
+     */
+    @Test
+    public void gtheKeyboardShortensTheScreenRatherThanCoveringIt() {
+        final View screen = new FrameLayout(this.context);
+        this.windowAround(screen);
+
+        WindowPaddingUtil.insetForSystemBarsAndKeyboard(screen);
+        ViewCompat.dispatchApplyWindowInsets(screen, withTheKeyboard(KEYBOARD));
+
+        final ViewGroup.MarginLayoutParams params =
+                (ViewGroup.MarginLayoutParams) screen.getLayoutParams();
+        assertEquals("the field being typed into would be drawn under the keyboard",
+                KEYBOARD, params.bottomMargin);
+        assertEquals("the keyboard covers the navigation bar, so there is nothing to clear",
+                0, screen.getPaddingBottom());
+        assertEquals(STATUS_BAR, screen.getPaddingTop());
+    }
+
+    /** Closing it gives the room back, and the navigation bar its padding. */
+    @Test
+    public void hclosingTheKeyboardGivesTheRoomBack() {
+        final View screen = new FrameLayout(this.context);
+        this.windowAround(screen);
+
+        WindowPaddingUtil.insetForSystemBarsAndKeyboard(screen);
+        ViewCompat.dispatchApplyWindowInsets(screen, withTheKeyboard(KEYBOARD));
+        ViewCompat.dispatchApplyWindowInsets(screen, withTheKeyboard(0));
+
+        assertEquals(0, ((ViewGroup.MarginLayoutParams) screen.getLayoutParams()).bottomMargin);
+        assertEquals(NAV_BAR, screen.getPaddingBottom());
+    }
+
+    /**
+     * <b>What the user actually sees: the field they are typing into ends up above the keyboard.</b>
+     *
+     * <p>The two tests above pin the numbers; this one pins that the numbers do the job, because
+     * padding the same amount would pass an arithmetic test and leave the field covered.
+     */
+    @Test
+    public void itheFocusedFieldIsScrolledAboveTheKeyboard() {
+        getInstrumentation().runOnMainSync(() -> {
+            final ScrollView screen = new ScrollView(this.context);
+            // Smooth scrolling animates, and this asserts where it lands.
+            screen.setSmoothScrollingEnabled(false);
+
+            final LinearLayout content = new LinearLayout(this.context);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.addView(new View(this.context), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 900));
+            final EditText field = new EditText(this.context);
+            content.addView(field, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 100));
+            content.addView(new View(this.context), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1000));
+            screen.addView(content);
+
+            final FrameLayout window = this.windowAround(screen);
+            WindowPaddingUtil.insetForSystemBarsAndKeyboard(screen);
+            ViewCompat.dispatchApplyWindowInsets(screen, withTheKeyboard(0));
+            layOut(window);
+
+            assertTrue("the test needs a focused field", field.requestFocus());
+            assertTrue("the field starts on screen, as one somebody just tapped is",
+                    content.getTop() + field.getBottom() - screen.getScrollY()
+                            <= screen.getHeight());
+
+            ViewCompat.dispatchApplyWindowInsets(screen, withTheKeyboard(KEYBOARD));
+            layOut(window);
+
+            final int fieldBottomOnScreen =
+                    content.getTop() + field.getBottom() - screen.getScrollY();
+            assertTrue("the field is " + fieldBottomOnScreen + "px down a screen the keyboard"
+                            + " leaves " + screen.getHeight() + "px of",
+                    fieldBottomOnScreen <= screen.getHeight());
+        });
+    }
+
+    private static void layOut(final View window) {
+        window.measure(
+                View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(1200, View.MeasureSpec.EXACTLY));
+        window.layout(0, 0, 1080, 1200);
     }
 }

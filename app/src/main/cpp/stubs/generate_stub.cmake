@@ -10,8 +10,9 @@
 # Returning long rather than void is deliberate. The real signatures vary and we do not know
 # them, but on both ABIs an integer return lands in the same register a pointer would, so
 # callers expecting a pointer see NULL and callers expecting an int see 0 - the two harmless
-# answers. Functions that return structs by value would not be handled correctly; if any turn
-# out to be called, they need writing by hand.
+# answers. Functions that return structs by value are not handled correctly, and one of them was
+# the cause of issue #232: those are written by hand in lib<name>_handwritten.cpp, passed here as
+# -DHANDWRITTEN, and skipped below.
 
 # Run with cmake -P, which does not inherit the project's policies. Without this, IN_LIST is
 # treated as a plain argument rather than an operator (CMP0057) and the expected-symbol lookup
@@ -51,7 +52,7 @@ set(body
         "// Known to be called, and known to be harmless - see ${LIBRARY_BASE}.expected for the\n"
         "// evidence behind each one. Logged, but not counted against the session, because an\n"
         "// alarm that fires on every successful run is one nobody reads.\n"
-        "static void stub_called_expected(const char *name) {\n"
+        "__attribute__((unused)) static void stub_called_expected(const char *name) {\n"
         "    __android_log_print(ANDROID_LOG_INFO, \"adi-stub\",\n"
         "        \"%s was called and returned 0, which is expected here \"\n"
         "        \"(see app/src/main/cpp/stubs/${LIBRARY_BASE}.expected)\", name)\;\n"
@@ -90,8 +91,20 @@ if (EXISTS "${EXPECTED}")
     endforeach ()
 endif ()
 
+# Symbols defined by hand, found by their asm labels so the file itself is the only list. Keep
+# each label on one line with its declaration.
+set(handwritten_symbols "")
+if (DEFINED HANDWRITTEN AND EXISTS "${HANDWRITTEN}")
+    file(STRINGS "${HANDWRITTEN}" handwritten_lines REGEX "__asm__\\(\"[^\"]+\"\\)")
+    foreach (handwritten_line IN LISTS handwritten_lines)
+        string(REGEX MATCH "__asm__\\(\"([^\"]+)\"\\)" ignored "${handwritten_line}")
+        list(APPEND handwritten_symbols "${CMAKE_MATCH_1}")
+    endforeach ()
+endif ()
+
 set(index 0)
 set(functions 0)
+set(handwritten 0)
 set(objects 0)
 set(expected_count 0)
 
@@ -103,6 +116,11 @@ foreach (line IN LISTS lines)
 
     string(SUBSTRING "${line}" 0 1 kind)
     string(SUBSTRING "${line}" 2 -1 name)
+
+    if ("${name}" IN_LIST handwritten_symbols)
+        math(EXPR handwritten "${handwritten} + 1")
+        continue()
+    endif ()
 
     if (kind STREQUAL "F")
         set(reporter "stub_called")
@@ -132,4 +150,4 @@ string(JOIN "" contents ${body})
 file(WRITE "${OUTPUT}" "${contents}")
 
 message(STATUS "${LIBRARY}: generated ${functions} function stubs and ${objects} data stubs "
-        "(${expected_count} known to be called harmlessly)")
+        "(${expected_count} known to be called harmlessly, ${handwritten} written by hand)")
