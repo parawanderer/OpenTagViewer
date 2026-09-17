@@ -139,8 +139,11 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
 
   **CI now loads Apple's library for real, on both architectures, without an emulator** -
   `adi-on-bionic.yml`, which runs it under Android's own linker and libc on plain x86_64 and arm64
-  Linux runners (`app/src/test/adi-on-bionic/`). The emulator suite could not: the managed device is
-  x86_64, and its tests that load Apple's library are opt-in because they provision against Apple.
+  Linux runners (`app/src/test/adi-on-bionic/`). The emulator suite cannot do that part: the managed
+  device is x86_64. What it does instead is `ApplesRealLibraryOnThisDeviceTest`, which runs by default
+  and takes the app's own path - download, manifest check, the separate process, `openAndInitialise`,
+  JNI - up to "not provisioned", with nothing sent to Apple but the library download. Provisioning
+  stays opt-in (`anisetteLiveTests`), because that is the part that talks to Apple's servers.
   **Whether the old stub crashed depended on the architecture and the bionic build** - arm64 on both
   Android 9 and 14 bionic, x86_64 on 9 only, and x86_64 on 14 not at all - so a green run on one
   combination says nothing about the others, and the probe's "no generated stub was called" check

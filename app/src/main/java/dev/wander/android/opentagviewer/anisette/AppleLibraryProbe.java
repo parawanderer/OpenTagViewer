@@ -42,6 +42,9 @@ final class AppleLibraryProbe implements TryItElsewhereFirst.Probe {
     private final File libraryDir;
     private final boolean dieInstead;
 
+    /** Why the load threw in the other process, if it replied and it did. */
+    private volatile String loadError;
+
     AppleLibraryProbe(final Context context, final File libraryDir) {
         this(context, libraryDir, false);
     }
@@ -64,6 +67,7 @@ final class AppleLibraryProbe implements TryItElsewhereFirst.Probe {
         final Messenger replyTo = new Messenger(new Handler(replies.getLooper(), message -> {
             if (message.what == AppleLibraryProbeService.SURVIVED) {
                 final String error = message.getData().getString(AppleLibraryProbeService.EXTRA_ERROR);
+                this.loadError = error;
                 if (error != null) {
                     Log.i(TAG, "The separate process survived loading Apple's library, which threw: "
                             + error);
@@ -153,6 +157,17 @@ final class AppleLibraryProbe implements TryItElsewhereFirst.Probe {
             }
             replies.quitSafely();
         }
+    }
+
+    /**
+     * Why the load threw in the other process, after {@link #run} came back {@code SURVIVED}; null
+     * if it loaded and initialised.
+     *
+     * <p>Not part of the decision - a load that throws falls back on its own in this process too - but
+     * it is what lets a test tell "the process survived" apart from "Apple's library actually loaded".
+     */
+    String loadError() {
+        return this.loadError;
     }
 
     private static void settle(final AtomicReference<TryItElsewhereFirst.Outcome> outcome,

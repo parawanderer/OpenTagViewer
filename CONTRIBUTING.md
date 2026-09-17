@@ -167,7 +167,7 @@ wizard).
 | --- | --- | --- | --- |
 | Android unit tests | `app/src/test/java/` | Gradle / JUnit | no |
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
-| Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
+| Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** except `ApplesRealLibraryOnThisDeviceTest` | yes, and network |
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Wiki screenshots | `app/src/androidTest/java/.../ui/WikiScreenshots*Test` | as above, **opt-in** | a windowed emulator |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
@@ -390,7 +390,12 @@ They are skipped unless you ask for them:
 From Android Studio, add `-e anisetteLiveTests true` to **Instrumentation extra params** in
 the run configuration.
 
-They are gated because they talk to third parties, not because they are unfinished:
+**One of them is not skipped:** `ApplesRealLibraryOnThisDeviceTest` runs in the default suite. It
+downloads the libraries from Apple's CDN, loads them through the app's own code - in the separate
+process and in the test's - and stops at ADI reporting "not provisioned", so nothing is sent to Apple
+beyond the download. It needs network, like the rest.
+
+The others are gated because they talk to third parties, not because they are unfinished:
 
 - they download about 2.9 MB of Apple's libraries from Apple's CDN, so they need network
 - `AdiProvisioningTest` **provisions a new machine identity with Apple on every run**, which

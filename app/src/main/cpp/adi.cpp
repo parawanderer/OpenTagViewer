@@ -309,6 +309,35 @@ Java_dev_wander_android_opentagviewer_anisette_NativeAdi_otpRequest(
  *
  * @return null if the stub returned an empty shared_ptr, otherwise what went wrong
  */
+/**
+ * How many times ADI has called a generated stub in either stand-in library - the count each one
+ * keeps for exactly this (see stubs/generate_stub.cmake). Zero is the only answer that means Apple's
+ * code did not depend on something we only pretend to provide.
+ *
+ * @return the total, or -1 if a stub library is not loaded or does not expose its count
+ */
+JNIEXPORT jint JNICALL
+Java_dev_wander_android_opentagviewer_anisette_NativeAdi_generatedStubCalls(JNIEnv *, jclass) {
+    const struct { const char *library; const char *accessor; } counters[] = {
+            {"libCoreFoundation.so", "CoreFoundation_adi_stub_calls"},
+            {"libmediaplatform.so", "mediaplatform_adi_stub_calls"},
+    };
+    int total = 0;
+    for (const auto &counter : counters) {
+        void *library = dlopen(counter.library, RTLD_NOW | RTLD_NOLOAD);
+        if (library == nullptr) {
+            return -1;
+        }
+        const auto count = reinterpret_cast<int (*)()>(dlsym(library, counter.accessor));
+        dlclose(library);
+        if (count == nullptr) {
+            return -1;
+        }
+        total += count();
+    }
+    return total;
+}
+
 JNIEXPORT jstring JNICALL
 Java_dev_wander_android_opentagviewer_anisette_NativeAdi_checkMakeWorkQueueStub(JNIEnv *env, jclass) {
     const std::string problem = check_make_work_queue_stub();
