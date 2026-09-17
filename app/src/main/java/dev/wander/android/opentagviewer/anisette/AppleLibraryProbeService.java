@@ -110,11 +110,45 @@ public final class AppleLibraryProbeService extends Service {
         }
     }
 
+    /**
+     * Sends this process the signal #232's phones died by, and <b>never returns</b>.
+     *
+     * <p><b>Never returning is the part that matters.</b> {@code kill} delivers the signal to the
+     * process, which hands it to whichever thread it likes - on the emulator, the main one - and the
+     * system then spends a moment writing a crash report before the process is gone. The first
+     * version returned from here, so this thread went on to load, and replied "survived" 11ms after
+     * the fatal signal and before the death. A real crash is in the loading thread itself and can
+     * send nothing, so this thread does not either.
+     *
+     * <p>If the process is somehow still here after ten seconds, it is killed outright: still a
+     * death the app has to notice, rather than a test that waits out its timeout.
+     */
     private static void dieLikeTheCrash() {
         try {
             Os.kill(Os.getpid(), OsConstants.SIGBUS);
         } catch (final ErrnoException e) {
+            Log.w(TAG, "Could not send SIGBUS; killing the process instead", e);
             Process.killProcess(Process.myPid());
+        }
+
+        sleepThrough(10_000);
+        Log.w(TAG, "Still alive ten seconds after SIGBUS; killing the process outright");
+        Process.killProcess(Process.myPid());
+        while (true) {
+            sleepThrough(10_000);
+        }
+    }
+
+    /** Sleeps the whole duration: this thread must not get as far as replying. */
+    private static void sleepThrough(final long millis) {
+        final long deadline = System.currentTimeMillis() + millis;
+        long left;
+        while ((left = deadline - System.currentTimeMillis()) > 0) {
+            try {
+                Thread.sleep(left);
+            } catch (final InterruptedException ignored) {
+                // Keep sleeping.
+            }
         }
     }
 
