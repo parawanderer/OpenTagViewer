@@ -1,0 +1,59 @@
+name: Native stub tests
+
+# Builds our stand-ins for Apple's libCoreFoundation.so and libmediaplatform.so for the runner and
+# checks them, on both architectures the app ships: every listed symbol exported, every generated
+# stub returning 0, and makeWorkQueue returning an empty shared_ptr through the caller's buffer.
+#
+# No Android and no emulator - the stubs are our own C and C++, so they build for plain Linux, and a
+# run takes seconds. Both architectures because the bug this exists for (issue #232) was a calling
+# convention mistake, and arm64 and x86_64 return by-value objects through different registers.
+# See app/src/test/cpp/.
+#
+# Its own path is in the filters, because .github/** matches nothing else (AGENTS.md rule 16).
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/**"
+      - "app/src/test/cpp/**"
+      - ".github/workflows/native-stubs.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/**"
+      - "app/src/test/cpp/**"
+      - ".github/workflows/native-stubs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stubs:
+    name: Native stubs (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # clang, because the NDK is clang: the stubs should be compiled by the compiler family that
+      # builds them for the APK. Both are preinstalled on GitHub's Ubuntu images.
+      - name: Build
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S app/src/test/cpp -B build/native-stubs -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-stubs -j "$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build/native-stubs --output-on-failure

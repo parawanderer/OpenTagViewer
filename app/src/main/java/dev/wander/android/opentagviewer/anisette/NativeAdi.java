@@ -90,4 +90,12 @@ public final class NativeAdi {
      * @return null if it came back as an empty {@code shared_ptr}, otherwise what it left behind
      */
     static native String checkMakeWorkQueueStub();
+
+    /**
+     * How many times ADI has called a generated stub in either stand-in library. Anything but zero
+     * means Apple's code now depends on something we only pretend to implement.
+     *
+     * @return the total, or -1 if a stub library is not loaded
+     */
+    static native int generatedStubCalls();
 }

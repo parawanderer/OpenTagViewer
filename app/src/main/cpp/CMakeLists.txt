@@ -36,51 +36,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 # Apple's ever enters the repository.
 # --------------------------------------------------------------------------------------------
 
-function(add_apple_stub library)
-    set(symbols "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}.symbols")
-    set(generated "${CMAKE_CURRENT_BINARY_DIR}/lib${library}_stub.c")
-
-    # Optional: symbols ADI is known to call harmlessly, which log at INFO rather than raising
-    # the alarm. A library without one treats every call as unexpected.
-    set(expected "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}.expected")
-
-    # Optional: functions that cannot be generated, because they return a C++ object by value.
-    # The generator skips whatever this file defines. See issue #232.
-    set(handwritten "${CMAKE_CURRENT_SOURCE_DIR}/stubs/lib${library}_handwritten.cpp")
-
-    set(inputs "${symbols}" "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake")
-    set(sources "${generated}")
-    if (EXISTS "${expected}")
-        list(APPEND inputs "${expected}")
-    endif ()
-    if (EXISTS "${handwritten}")
-        list(APPEND inputs "${handwritten}")
-        list(APPEND sources "${handwritten}")
-    endif ()
-
-    add_custom_command(
-            OUTPUT "${generated}"
-            COMMAND ${CMAKE_COMMAND}
-            -DSYMBOLS=${symbols}
-            -DEXPECTED=${expected}
-            -DHANDWRITTEN=${handwritten}
-            -DOUTPUT=${generated}
-            -DLIBRARY=lib${library}.so
-            -DSAFE=${library}
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/stubs/generate_stub.cmake"
-            DEPENDS ${inputs}
-            COMMENT "Generating lib${library}.so stub from lib${library}.symbols"
-            VERBATIM)
-
-    # The target name cannot collide with the output name, hence the _stub suffix here and
-    # OUTPUT_NAME below. What ends up in the APK is lib<library>.so, which is what the linker
-    # looks for.
-    add_library(${library}_stub SHARED ${sources})
-    set_target_properties(${library}_stub PROPERTIES
-            OUTPUT_NAME "${library}"
-            PREFIX "lib")
-    target_link_libraries(${library}_stub log)
-endfunction()
+# Defined in stubs/AppleStubs.cmake, which app/src/test/cpp/ includes too - so the host tests
+# build exactly the stubs that ship, rather than a copy of how they are built.
+include("${CMAKE_CURRENT_SOURCE_DIR}/stubs/AppleStubs.cmake")
 
 add_apple_stub(CoreFoundation)
 add_apple_stub(mediaplatform)

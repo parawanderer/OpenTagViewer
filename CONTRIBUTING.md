@@ -167,13 +167,15 @@ wizard).
 | --- | --- | --- | --- |
 | Android unit tests | `app/src/test/java/` | Gradle / JUnit | no |
 | Android instrumented tests | `app/src/androidTest/java/` | Gradle / JUnit + emulator | provisioned for you |
-| Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** | yes, and network |
+| Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** except `ApplesRealLibraryOnThisDeviceTest` | yes, and network |
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Wiki screenshots | `app/src/androidTest/java/.../ui/WikiScreenshots*Test` | as above, **opt-in** | a windowed emulator |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop exporter tests | `python/test/` | pytest | no |
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
+| Native stub tests | `app/src/test/cpp/` | CMake / CTest, **Linux only** | no |
+| Apple's ADI on bionic | `app/src/test/adi-on-bionic/` | NDK + Android's linker on plain Linux, in CI | no, but Linux on each architecture |
 | Test doubles for the bridge | `app/src/debug/python/` | installed from an instrumented test | provisioned for you |
 | Fakes for the screens | `app/src/androidTest/java/.../ui/maps/` | used directly by a test | provisioned for you |
 
@@ -388,7 +390,12 @@ They are skipped unless you ask for them:
 From Android Studio, add `-e anisetteLiveTests true` to **Instrumentation extra params** in
 the run configuration.
 
-They are gated because they talk to third parties, not because they are unfinished:
+**One of them is not skipped:** `ApplesRealLibraryOnThisDeviceTest` runs in the default suite. It
+downloads the libraries from Apple's CDN, loads them through the app's own code - in the separate
+process and in the test's - and stops at ADI reporting "not provisioned", so nothing is sent to Apple
+beyond the download. It needs network, like the rest.
+
+The others are gated because they talk to third parties, not because they are unfinished:
 
 - they download about 2.9 MB of Apple's libraries from Apple's CDN, so they need network
 - `AdiProvisioningTest` **provisions a new machine identity with Apple on every run**, which
@@ -599,6 +606,44 @@ answered from the stale cache writes no diff, opens no pull request and goes gre
 credited nobody. `--expect-contributor` turns that into a visible failure, and these tests are
 what keep it honest - including the case where the expected login is one of `EXCLUDED_LOGINS`
 and its absence is correct rather than a fault.
+
+### Native stub tests
+
+```bash
+cmake -S app/src/test/cpp -B build/native-stubs && cmake --build build/native-stubs
+ctest --test-dir build/native-stubs --output-on-failure
+```
+
+The app ships its own stand-ins for two of Apple's libraries (`app/src/main/cpp/stubs/`), so that
+Apple's `libstoreservicescore.so` loads without 20 MB of dependencies it never uses. These build
+the same stubs, through the same `stubs/AppleStubs.cmake`, for the machine running the tests, and
+check three things: every symbol in the `.symbols` lists is exported, every generated stub returns
+0, and `makeWorkQueue` returns an empty `shared_ptr` through the buffer its caller passes.
+
+That last one is issue #232. The generated stub never wrote the buffer, and Apple's code read the
+leftover stack as a pointer and wrote through it, which was harmless on most phones and crashed
+the app at launch on some. The test fills the buffer with garbage first, so it fails on every
+machine instead of on unlucky ones.
+
+**Linux only**, x86_64 or arm64. Mach-O prefixes C symbols with an underscore, so the exported
+names cannot be looked up as Apple's library looks them up. On a Mac, use a container:
+
+```bash
+docker run --rm -v "$PWD":/src -w /tmp ubuntu:24.04 bash -c \
+  'apt-get -qq update && apt-get -qq install -y clang cmake make >/dev/null &&
+   CC=clang CXX=clang++ cmake -S /src/app/src/test/cpp -B b && cmake --build b &&
+   ctest --test-dir b --output-on-failure'
+```
+
+Add `--platform linux/amd64` to run the x86_64 side under emulation.
+
+### Apple's ADI on bionic
+
+CI only. Apple's real `libstoreservicescore.so` is loaded and initialised on plain Linux under
+Android's own linker and libc, taken from AOSP emulator system images, with our stubs and every
+static constructor running. No provisioning and nothing sent to Apple beyond downloading the
+libraries. See [`app/src/test/adi-on-bionic/README.md`](app/src/test/adi-on-bionic/README.md) for how
+it works and what it measured.
 
 ### Which Python each tree targets
 
@@ -822,6 +867,8 @@ run regardless: each AES entry carries a fresh random salt.
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
 | `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
+| `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
+| `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
