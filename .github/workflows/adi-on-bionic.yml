@@ -1,0 +1,154 @@
+name: Apple's ADI on bionic
+
+# Loads and initialises Apple's real ADI libraries on plain x86_64 and arm64 Linux runners, with no
+# emulator, under Android's own linker and libc taken from AOSP emulator system images. Our stubs,
+# Apple's static constructors and the initialisation calls all run for real. No provisioning, no
+# Apple account, and nothing sent to Apple beyond range requests for the APK's libraries.
+#
+# Why: issue #232 was a crash inside libstoreservicescore.so's static constructors during dlopen,
+# caused by our makeWorkQueue stub, and nothing in CI loaded Apple's library at all - the emulator
+# suite is x86_64 and never opens it by default. Whether the bug crashes depends on the architecture
+# and on the bionic build, so this runs both architectures on an old bionic (Android 9) and a modern
+# one (Android 14), and proves each time that the pre-fix stub still fails. See
+# app/src/test/adi-on-bionic/README.md.
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/**"
+      - "app/src/main/assets/adi-libraries.json"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/AdiFunction.java"
+      - "app/src/test/adi-on-bionic/**"
+      - "scripts/update_adi_stub_symbols.py"
+      - ".github/workflows/adi-on-bionic.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/**"
+      - "app/src/main/assets/adi-libraries.json"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/AdiFunction.java"
+      - "app/src/test/adi-on-bionic/**"
+      - "scripts/update_adi_stub_symbols.py"
+      - ".github/workflows/adi-on-bionic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the probe and stubs with the NDK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # Both ABIs are cross-compiled here: the arm64 runner image has no Android SDK, and the NDK
+      # ships no linux-aarch64 host toolchain.
+      - name: Build
+        run: |
+          # The NDK app/build.gradle.kts pins, when the image has it; otherwise the image's own.
+          pinned="$(sed -n 's/.*ndkVersion = "\(.*\)".*/\1/p' app/build.gradle.kts)"
+          ndk="$ANDROID_HOME/ndk/$pinned"
+          [ -d "$ndk" ] || ndk="$ANDROID_NDK_HOME"
+          echo "NDK: $ndk (app pins $pinned)"
+
+          # The negative control: makeWorkQueue as it was before #232 was fixed.
+          cp -r app/src/main/cpp/stubs build-old-stubs
+          rm build-old-stubs/libmediaplatform_handwritten.cpp
+
+          for abi in arm64-v8a x86_64; do
+            for variant in fixed old; do
+              extra=()
+              [ "$variant" = old ] && extra=(-DSTUBS_DIR="$PWD/build-old-stubs")
+              cmake -S app/src/test/adi-on-bionic -B "build/$abi-$variant" -G Ninja \
+                -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
+                -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-24 -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 "${extra[@]}" >/dev/null
+              cmake --build "build/$abi-$variant" >/dev/null
+              mkdir -p "dist/$abi/$variant"
+              cp build/$abi-$variant/{adi_probe,libCoreFoundation.so,libmediaplatform.so} "dist/$abi/$variant/"
+            done
+          done
+          file dist/*/*/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: probe
+          path: dist/
+
+  run:
+    name: Run on ${{ matrix.name }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Android 9: bionic is plain files in system.img. Extracted with debugfs, no sudo.
+          - name: arm64, Android 9 bionic
+            runner: ubuntu-24.04-arm
+            abi: arm64-v8a
+            image: https://dl.google.com/android/repository/sys-img/android/arm64-v8a-28_r02.zip
+            sha1: e209114dd0dfc2f4e0d328f5fd7367fec39ee1bd
+            extract: extract_bionic.sh
+          - name: x86_64, Android 9 bionic
+            runner: ubuntu-24.04
+            abi: x86_64
+            image: https://dl.google.com/android/repository/sys-img/android/x86_64-28_r04.zip
+            sha1: d47a85c8f4e9fd57df97814ad8884eeb0f3a0ef0
+            extract: extract_bionic.sh
+          # Android 14: bionic lives in the com.android.runtime APEX, inside a dynamic partition.
+          # The arm64 one is the architecture and bionic generation of the phones #232 crashed on.
+          - name: arm64, Android 14 bionic
+            runner: ubuntu-24.04-arm
+            abi: arm64-v8a
+            image: https://dl.google.com/android/repository/sys-img/android/arm64-v8a-34_r04.zip
+            sha1: d9f2011131919abe952814e041f16f317242c3fa
+            extract: extract_bionic_apex.sh
+          - name: x86_64, Android 14 bionic
+            runner: ubuntu-24.04
+            abi: x86_64
+            image: https://dl.google.com/android/repository/sys-img/android/x86_64-34_r04.zip
+            sha1: 5f6a249f9bc3b1b4c459b13ce2eb646c9680bed1
+            extract: extract_bionic_apex.sh
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: probe
+          path: dist
+
+      - name: Fetch Apple's libraries and verify them against adi-libraries.json
+        run: |
+          python3 app/src/test/adi-on-bionic/fetch_apple_libs.py ${{ matrix.abi }} apple
+          chmod +x dist/*/*/adi_probe
+
+      # The runtime is 46-65 MB once trimmed to what is needed, against a 430-720 MB image, so it is
+      # cached. Keyed on the image and the script that extracts it. Saved only by a passing job.
+      - uses: actions/cache@v6
+        id: runtime-cache
+        with:
+          path: runtime
+          key: bionic-${{ matrix.sha1 }}-${{ hashFiles(format('app/src/test/adi-on-bionic/{0}', matrix.extract), 'app/src/test/adi-on-bionic/lp_extract.py') }}
+
+      - name: Extract bionic from the system image
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        run: |
+          # Every platform library Apple's libraries and the probe ask for, and their dependencies.
+          roots=$(for f in apple/*.so dist/${{ matrix.abi }}/fixed/*; do
+                    readelf -d "$f" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p'
+                  done | sort -u | grep -vxE 'libCoreFoundation.so|libmediaplatform.so|libc\+\+_shared.so')
+          echo "roots:" $roots
+          bash "app/src/test/adi-on-bionic/${{ matrix.extract }}" "${{ matrix.image }}" "${{ matrix.sha1 }}" runtime $roots
+
+      # Where the executables' PT_INTERP and bionic's default search path expect them.
+      - name: Install bionic at /system
+        run: |
+          sudo mkdir -p /system
+          sudo cp -a runtime/system/bin runtime/system/lib64 /system/
+          du -sh /system
+
+      - name: Load and initialise Apple's library, with the shipping stubs and the pre-#232 ones
+        run: bash app/src/test/adi-on-bionic/run_probe.sh "dist/${{ matrix.abi }}" apple

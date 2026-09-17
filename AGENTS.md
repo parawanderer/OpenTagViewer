@@ -137,10 +137,16 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   same record a crash does — and keep its store on `commit()`: `apply()` writes asynchronously and
   dies with the process, which would pass every test and never once record a crash.
 
-  **CI cannot catch this class as it stands**, for two reasons that are easy to mistake for one.
-  The managed device is x86_64, so it downloads Apple's *x86_64* build and never the arm64 one a
-  phone runs; and the tests that load Apple's real library are opt-in (`anisetteLiveTests`), so
-  the default suite loads it on no architecture at all. An arm64 image alone would fix neither.
+  **CI now loads Apple's library for real, on both architectures, without an emulator** -
+  `adi-on-bionic.yml`, which runs it under Android's own linker and libc on plain x86_64 and arm64
+  Linux runners (`app/src/test/adi-on-bionic/`). The emulator suite could not: the managed device is
+  x86_64, and its tests that load Apple's library are opt-in because they provision against Apple.
+  **Whether the old stub crashed depended on the architecture and the bionic build** - arm64 on both
+  Android 9 and 14 bionic, x86_64 on 9 only, and x86_64 on 14 not at all - so a green run on one
+  combination says nothing about the others, and the probe's "no generated stub was called" check
+  is the only thing that fails on the last. Keep all four, and keep the negative control that puts
+  the pre-fix stub back and requires the job to fail. `native-stubs.yml` checks the stubs' exports
+  and return conventions on their own, in seconds.
 
 ### 5. Never bundle an AMap API key
 

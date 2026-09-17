@@ -175,6 +175,7 @@ wizard).
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
 | Tooling tests | `scripts/test/` | pytest | no |
 | Native stub tests | `app/src/test/cpp/` | CMake / CTest, **Linux only** | no |
+| Apple's ADI on bionic | `app/src/test/adi-on-bionic/` | NDK + Android's linker on plain Linux, in CI | no, but Linux on each architecture |
 | Test doubles for the bridge | `app/src/debug/python/` | installed from an instrumented test | provisioned for you |
 | Fakes for the screens | `app/src/androidTest/java/.../ui/maps/` | used directly by a test | provisioned for you |
 
@@ -631,6 +632,14 @@ docker run --rm -v "$PWD":/src -w /tmp ubuntu:24.04 bash -c \
 
 Add `--platform linux/amd64` to run the x86_64 side under emulation.
 
+### Apple's ADI on bionic
+
+CI only. Apple's real `libstoreservicescore.so` is loaded and initialised on plain Linux under
+Android's own linker and libc, taken from AOSP emulator system images, with our stubs and every
+static constructor running. No provisioning and nothing sent to Apple beyond downloading the
+libraries. See [`app/src/test/adi-on-bionic/README.md`](app/src/test/adi-on-bionic/README.md) for how
+it works and what it measured.
+
 ### Which Python each tree targets
 
 There are three, and they are not the same:
@@ -854,6 +863,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
 | `check-adi-libraries.yml` | weekly | Checks Apple's ADI libraries still match what is checked in, opens an issue if they drifted |
 | `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
+| `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
