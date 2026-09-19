@@ -26,7 +26,11 @@ import inspect
 
 import pytest
 from findmy import InvalidCredentialsError, LoginState
-from findmy.errors import UnhandledProtocolError
+from findmy.errors import (
+    AppleServiceUnavailableError,
+    MobileMeDelegateError,
+    UnhandledProtocolError,
+)
 from findmy.keychain.recovery import RecoveryError
 
 from exporter import icloud
@@ -267,9 +271,30 @@ class FakeFactorThatTakesTheCodeThenFails:
         self.submitted.append(code)
 
         if len(self.submitted) <= self.fail_first:
-            raise UnhandledProtocolError("Error response for GSA request: 503")
+            raise AppleServiceUnavailableError(503, "The Grand Slam request")
 
         return LoginState.LOGGED_IN
+
+
+class FakeFactorThatTakesTheCodeThenFailsWith:
+    """
+    A second factor whose submit fails the same way every time, with an error that is not weather.
+
+    Issue #236 is the model: the code is taken, and the re-authentication behind it comes back
+    asking for 2FA again. Counts what it was asked for, because the bug was what it cost.
+    """
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.submitted: list[str] = []
+        self.requests = 0
+
+    async def request(self) -> None:
+        self.requests += 1
+
+    async def submit(self, code: str):
+        self.submitted.append(code)
+        raise self.error
 
 
 @pytest.fixture
@@ -299,7 +324,7 @@ class TestACodeAppleTookAndThenFailedOn:
 
     def test_it_is_recognised_as_a_spent_code(self):
         assert icloud.code_was_already_spent(
-            UnhandledProtocolError("Error response for GSA request: 503"))
+            AppleServiceUnavailableError(503, "The Grand Slam request"))
 
     def test_a_rejected_code_is_not_a_spent_one(self):
         """The opposite case, and the one where re-typing is right."""
@@ -555,6 +580,55 @@ async def _next(codes):
 
 async def _unused(*_args, **_kwargs):
     raise AssertionError("should not have been asked")
+
+
+STILL_ASKING_FOR_2FA = UnhandledProtocolError(
+    "Unexpected state after submitting 2FA: LoginState.REQUIRE_2FA")
+
+
+class TestAFailureThatIsNotWeather:
+    """
+    Issue #236: Apple took the code and asked for verification again, identically every time.
+
+    The spent-code recovery waits and sends a new code, which is right for a refusal and useless
+    for this - it ran three codes per sign-in, the reporter tried six times, and nothing about the
+    answer changed. Anything that is not a refusal has to leave after one submit, unchanged, so the
+    front end's own handlers see it.
+    """
+
+    @pytest.mark.parametrize("error", [
+        STILL_ASKING_FOR_2FA,
+        UnhandledProtocolError("SMS 2FA request failed: 400"),
+    ], ids=["still-asking-for-2fa", "a-status-that-is-not-a-refusal"])
+    def test_it_is_not_a_spent_code(self, error):
+        assert not icloud.code_was_already_spent(error)
+
+    def test_it_spends_one_code_and_stops(self, no_waiting):
+        factor = FakeFactorThatTakesTheCodeThenFailsWith(STILL_ASKING_FOR_2FA)
+        codes = iter(["111111", "222222", "333333"])
+
+        with pytest.raises(UnhandledProtocolError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
+
+        assert raised.value is STILL_ASKING_FOR_2FA, "it has to arrive unchanged"
+        assert factor.submitted == ["111111"]
+        assert factor.requests == 0, "a new code was sent for a failure a new code cannot fix"
+
+    def test_the_delegate_error_reaches_the_terms_handler(self, no_waiting):
+        """
+        Both front ends catch `MobileMeDelegateError` around `log_in` to offer the terms. It is an
+        `UnhandledProtocolError` by inheritance, so the wide net took it first, and after 2FA that
+        handler could never run.
+        """
+        error = MobileMeDelegateError(localized_error="TERMS", status=1)
+        factor = FakeFactorThatTakesTheCodeThenFailsWith(error)
+        codes = iter(["111111"])
+
+        with pytest.raises(MobileMeDelegateError) as raised:
+            asyncio.run(icloud._submit_code_with_retries(factor, lambda: _next(codes), _unused))
+
+        assert raised.value is error
+        assert factor.requests == 0
 
 
 class TestTheDiagnosticsSurvive:
