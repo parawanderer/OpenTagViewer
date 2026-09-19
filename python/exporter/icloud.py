@@ -548,11 +548,18 @@ def code_was_already_spent(error: BaseException) -> bool:
     should be re-typed; this one has been consumed by the half that worked, so re-typing it is a
     guaranteed second failure.
 
-    The net is wide - `UnhandledProtocolError` is FindMy.py's "Apple said something this library
-    does not model" - but every failure it catches here happened *after* the submit returned, so
-    the code is gone in all of them.
+    **Only a refusal counts - an `AppleServiceUnavailableError`, which is what #168's 503 is now.**
+    This used to accept any `UnhandledProtocolError`, on the reasoning that everything raised after
+    the submit had consumed the code. True, and not enough: waiting and sending a new code is only
+    a recovery when the failure is weather. Issue #236 is Apple taking the code and then asking for
+    verification *again*, the same way every time - and the wide net turned that into a loop that
+    waited, sent a fresh code and failed identically, a dozen codes deep before the reporter read
+    the log. A `MobileMeDelegateError` is the same shape, and the wide net also kept it from the
+    terms handler both front ends put around :func:`log_in`.
+
+    So anything else propagates unchanged, to the handlers that know what it means.
     """
-    return isinstance(error, UnhandledProtocolError)
+    return isinstance(error, AppleServiceUnavailableError)
 
 
 async def _submit_code_with_retries(chosen, get_code, retry_code, announce=None):
@@ -564,9 +571,9 @@ async def _submit_code_with_retries(chosen, get_code, retry_code, announce=None)
     (findmy-export 01-authentication §5). So somebody who mistyped a code they are still holding
     would lose it by being "helpfully" sent another, and a resend has to be a thing they choose.
 
-    **A code Apple took and then failed on is not re-typed and is not asked about**: it waits and
-    sends a new one by itself. Nothing the user could type would help - the code is spent - and the
-    only recovery anyone has observed is the passage of time. Asking "shall I try again?" of
+    **A code Apple took and then was refused on is not re-typed and is not asked about**: it waits
+    and sends a new one by itself. Nothing the user could type would help - the code is spent - and
+    the only recovery anyone has observed is the passage of time. Asking "shall I try again?" of
     somebody with no way to judge the answer is a worse interface than doing it.
 
     Bounded by the same attempt budget as a mistyped code, so the worst case is two waits and then
@@ -576,6 +583,10 @@ async def _submit_code_with_retries(chosen, get_code, retry_code, announce=None)
         try:
             return await chosen.submit(await get_code())
         except UnhandledProtocolError as e:
+            if not code_was_already_spent(e):
+                # Not weather, so a new code would meet the same answer. See #236.
+                raise
+
             logger.info("Apple took the code and then failed to finish signing in: %s", e)
 
             # The last attempt has nothing left to wait for, and waiting before saying so would
