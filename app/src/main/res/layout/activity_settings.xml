@@ -8,6 +8,7 @@
         <variable name="handleClickBack" type="Runnable" />
         <variable name="onClickFetchFromAccount" type="Runnable" />
         <variable name="onClickUnlinkAccount" type="Runnable" />
+        <variable name="onClickExtraSources" type="Runnable" />
         <variable name="fetchFromAccountSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
@@ -121,6 +122,15 @@
                 app:onClick="@{onClickUnlinkAccount}"
                 app:sectionSubtitle="@{@string/icloud_unlink_subtitle}"
                 app:title="@{@string/icloud_unlink_title}" />
+
+            <!-- Google Find Hub trackers, beside the Apple account -->
+            <include
+                android:id="@+id/settings_extra_sources"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/host_24px}"
+                app:onClick="@{onClickExtraSources}"
+                app:sectionSubtitle="@{@string/extra_sources_subtitle}"
+                app:title="@{@string/extra_sources}" />
 
         </LinearLayout>
 

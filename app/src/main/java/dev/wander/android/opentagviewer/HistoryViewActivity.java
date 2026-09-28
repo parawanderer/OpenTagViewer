@@ -82,6 +82,7 @@ import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.DailyHistoryFetchRecord;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
+import dev.wander.android.opentagviewer.source.ReportSources;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
@@ -386,8 +387,14 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
         var reqData = BeaconRepository.plistFallback(
                 this.beaconId, this.beaconInformation.getOwnedBeaconPlistRaw());
         // asyncReq emits Observable<FetchResult> (reports + updated accessory state per beacon)
+        // Each device through its own sources: the Apple account and Google Find Hub - see
+        // ReportSources.
         var asyncReq = this.beaconRepo.toAccessoryRequests(reqData)
-                .flatMap(requests -> this.appleService.getReportsBetween(requests, beginningOfDay, endOfDay));
+                .flatMap(requests -> Observable.fromIterable(requests)
+                        .concatMap(request -> ReportSources.create(this).fetch(
+                                request, beginningOfDay, endOfDay, false,
+                                this.appleService == null ? null
+                                        : this.appleService.getReportsBetween(List.of(request), beginningOfDay, endOfDay))));
 
         // **What Apple returns is merged with what we already hold, for every day.**
         //

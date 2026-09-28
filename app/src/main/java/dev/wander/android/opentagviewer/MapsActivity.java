@@ -48,6 +48,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 
+import dev.wander.android.opentagviewer.ui.importing.ExternalDeviceImporter;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
 import dev.wander.android.opentagviewer.ui.importing.ImportOutcome;
@@ -73,6 +74,7 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
@@ -102,7 +104,11 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
+import dev.wander.android.opentagviewer.source.ExternalAccessory;
+import dev.wander.android.opentagviewer.source.ExtraSourcesSettings;
+import dev.wander.android.opentagviewer.source.ReportSources;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import dev.wander.android.opentagviewer.python.FetchResult;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.PythonDiagnostics;
@@ -143,6 +149,7 @@ import dev.wander.android.opentagviewer.ble.NearbyTagSighting;
 import dev.wander.android.opentagviewer.ble.NearbyTagSightings;
 import dev.wander.android.opentagviewer.ble.NearbyTagIndex;
 import dev.wander.android.opentagviewer.ble.NearbyTagWatcher;
+import dev.wander.android.opentagviewer.ble.FmdnNearbyWatcher;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
@@ -216,7 +223,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private UserDataRepository userDataRepository;
 
+    /** OpenHaystack keys and Google trackers - see ExternalDeviceImporter. */
+    private final ExternalDeviceImporter externalImporter =
+            new ExternalDeviceImporter(this, this::handleDeviceListChanged);
+    private final ActivityResultLauncher<String[]> openKeysFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(), this.externalImporter::importKeysFile);
+
     private PythonAppleService appleService = null;
+    /** Google Find Hub, beside the Apple account. */
+    private ReportSources reportSources;
 
     private UserSettings userSettings;
 
@@ -258,6 +273,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     /** The in-flight nearby scan, disposed in {@link #onPause()} so the radio stops with the screen. */
     private Disposable nearbyWatchDisposable;
+    /** Last ring failure shown as a toast, so a retrying loop reports it once. */
+    private String lastRingFailureShown;
+    /** Google Find Hub trackers, recognised by EID - see FmdnNearbyWatcher. */
+    private Disposable fmdnNearbyWatchDisposable;
 
     /**
      * Redraws the cards once a second while the nearby scan is running, so a nearby card's
@@ -526,6 +545,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 UserAuthDataStore.getInstance(getApplicationContext()),
                 new AppCryptographyUtil());
 
+        this.reportSources = ReportSources.create(this);
+
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(getApplicationContext()));
         // The fetch this screen is about to run is what produces the drift measurement, so
@@ -747,27 +768,43 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
 
         final Map<String, String> accessoryJsonByBeaconId = new HashMap<>();
+        final Map<String, String> googleIdByBeaconId = new HashMap<>();
         for (final var entry : this.beacons.entrySet()) {
             final String accessoryJson = entry.getValue().getInfo().getOwnedBeaconAccessoryJson();
-            if (accessoryJson != null && !accessoryJson.isEmpty()) {
+            if (accessoryJson == null || accessoryJson.isEmpty()) continue;
+            if (ExternalAccessory.isGoogle(accessoryJson)) {
+                googleIdByBeaconId.put(entry.getKey(), ExternalAccessory.googleId(accessoryJson));
+            } else {
                 accessoryJsonByBeaconId.put(entry.getKey(), accessoryJson);
             }
         }
-        if (accessoryJsonByBeaconId.isEmpty()) {
+        if (accessoryJsonByBeaconId.isEmpty() && googleIdByBeaconId.isEmpty()) {
             // Ordinary on a cold start: the beacons load asynchronously and are not here yet.
             // addBeaconToCurrent starts the watch once they arrive - see there.
             return;
         }
 
-        this.nearbyWatchDisposable = new NearbyTagWatcher(
-                AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
-                ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        this::onTagHeardNearby,
-                        error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error),
-                        this::onNearbyWatchEnded);
+        if (!googleIdByBeaconId.isEmpty() && new ExtraSourcesSettings(this).isGoogleConfigured()) {
+            this.fmdnNearbyWatchDisposable = new FmdnNearbyWatcher()
+                    .watch(this.getApplicationContext(), googleIdByBeaconId)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(this::onTagHeardNearby,
+                            error -> Log.w(TAG, "Google tracker nearby watch ended", error));
+        }
+
+        // Only with Apple-keyed tags to watch: an empty watch completes at once, which reads as
+        // a dead scan and would clear the Google sightings every 30 s
+        if (!accessoryJsonByBeaconId.isEmpty()) {
+            this.nearbyWatchDisposable = new NearbyTagWatcher(
+                    AppDependencies.accessoryMacResolver(), this.sightingPersister::onSighting,
+                    ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .watch(this.getApplicationContext(), accessoryJsonByBeaconId)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(
+                            this::onTagHeardNearby,
+                            error -> Log.w(TAG, "Nearby tag watch ended unexpectedly", error),
+                            this::onNearbyWatchEnded);
+        }
 
         this.nearbyStatusTickerDisposable = Observable
                 .interval(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
@@ -802,6 +839,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             this.nearbyWatchDisposable.dispose();
         }
         this.nearbyWatchDisposable = null;
+        if (this.fmdnNearbyWatchDisposable != null && !this.fmdnNearbyWatchDisposable.isDisposed()) {
+            this.fmdnNearbyWatchDisposable.dispose();
+        }
+        this.fmdnNearbyWatchDisposable = null;
         if (this.nearbyStatusTickerDisposable != null
                 && !this.nearbyStatusTickerDisposable.isDisposed()) {
             this.nearbyStatusTickerDisposable.dispose();
@@ -859,9 +900,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void showNearbyStatusOn(
             final FrameLayout card, final NearbyTagSighting sighting, final long nowMs) {
         final TextView line = card.findViewById(R.id.device_last_update);
-        line.setText(this.getString(R.string.nearby_now_with_battery_and_signal,
-                this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+        // Google trackers encrypt their battery flags, so their sightings carry none
+        line.setText(sighting.getBatteryLevel() == null
+                ? this.getString(R.string.nearby_now_with_signal,
+                        NearbyTagLabel.signalStrengthBars(sighting.getRssi()))
+                : this.getString(R.string.nearby_now_with_battery_and_signal,
+                        this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
+                        NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
 
         // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
         // callback, before the clock the caller reads has ticked past it.
@@ -1016,7 +1061,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // same thing they were told before, having done the one thing the screen offered them.
         var async = this.fetchLastReportsFor(
                         beaconId, beacon.getInfo().getOwnedBeaconPlistRaw(),
-                        HOURS_TO_GO_BACK_FIRST_TIME)
+                        HOURS_TO_GO_BACK_FIRST_TIME, true)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         reports -> this.handleDeviceListChanged(),
@@ -1044,6 +1089,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
             if (itemId == R.id.do_import) {
                 this.handleImport();
+            } else if (itemId == R.id.add_openhaystack) {
+                this.openKeysFileLauncher.launch(new String[]{"*/*"});
+            } else if (itemId == R.id.add_google) {
+                this.externalImporter.importFromGoogle();
             } else if (itemId == R.id.settings) {
                 this.showSettingsPage();
             } else if (itemId == R.id.information) {
@@ -1575,7 +1624,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         var async = this.fetchLastReportsFor(
                 beaconId,
                 Objects.requireNonNull(this.beacons.get(beaconId)).getInfo().getOwnedBeaconPlistRaw(),
-                1)
+                1,
+                true)
                 .doOnNext(this::addBeaconLocationsToCurrent)
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -1644,6 +1694,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             TagCardHelper.toggleRingActive(container, true);
         }
 
+        this.lastRingFailureShown = null;
         this.continuousPingDisposable = AppDependencies.accessorySoundTrigger()
                 .playSoundContinuously(this.getApplicationContext(), accessoryJson)
                 .observeOn(AndroidSchedulers.mainThread())
@@ -1703,6 +1754,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                                 : R.string.play_sound_no_candidate_macs,
                         LENGTH_LONG).show();
                 return;
+            }
+            // The loop retries quietly, which used to hide why a ring never happens (a tracker
+            // refusing the request, a missing sound service). Say so - once per distinct reason.
+            final String reason = update.getResult().getMessage();
+            if ((status == BleSoundTriggerStatus.FAILED || status == BleSoundTriggerStatus.NO_SOUND_SERVICE)
+                    && reason != null && !reason.equals(this.lastRingFailureShown)) {
+                this.lastRingFailureShown = reason;
+                Toast.makeText(this, this.getString(R.string.ring_failed_reason, reason), LENGTH_LONG).show();
             }
         }
 
@@ -1827,7 +1886,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // so we no longer need to read userSettings.getAnisetteServerUrl() here.
         // Produce Anisette on this device where possible, rather than relaying every refresh
         // through a public Anisette server. Falls back to the configured server by itself.
-        var asyncAppleService = PythonAuthService.restoreAccount(
+        final Observable<Object> asyncAppleService = PythonAuthService.restoreAccount(
                     userAuth.get(),
                     // Somebody is signed in here, so an unchosen mode keeps them on whatever
                     // already works: switching would present Apple with a different machine.
@@ -1844,6 +1903,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 return this.appleService;
             });
 
+        this.showDevicesAndFetch(asyncAppleService);
+    }
+
+    /**
+     * Shows the stored devices and their cached locations, then fetches fresh reports once
+     * {@code asyncAppleService} (the restored account) is ready.
+     */
+    private void showDevicesAndFetch(final Observable<Object> asyncAppleService) {
         // get list of Beacons
         var asyncAllBeacons = this.beaconRepo.getAllBeacons()
                 .flatMap(BeaconDataParser::parseAsync)
@@ -2282,11 +2349,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // Guarded on the disposable so the periodic account refresh, which also lands here,
         // does not bounce a running scan - Android silently blocks an app that starts scans
         // too often.
-        if (!newBeaconInformation.isEmpty() && this.nearbyWatchDisposable == null) {
+        if (!newBeaconInformation.isEmpty() && this.nearbyWatchDisposable == null
+                && this.fmdnNearbyWatchDisposable == null) {
             // Re-checked on the main thread: this load finishes on a background thread, and by
             // the time the post runs, onResume may have started the watch already.
             this.runOnUiThread(() -> {
-                if (this.nearbyWatchDisposable == null && !this.isFinishing()) {
+                if (this.nearbyWatchDisposable == null && this.fmdnNearbyWatchDisposable == null
+                        && !this.isFinishing()) {
                     this.startWatchingForNearbyTags();
                 }
             });
@@ -2625,7 +2694,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         now,
                         DateUtils.MINUTE_IN_MILLIS
                 ).toString();
-                deviceLastUpdate.setText(this.getString(R.string.last_updated_x, timeAgo));
+                // Which network it came from, once there is more than one to come from
+                final String source = LocationReport.PROVENANCE_GOOGLE.equals(lastLocation.getProvenance())
+                        ? this.getString(R.string.source_google)
+                        : LocationReport.PROVENANCE_LOCAL.equals(lastLocation.getProvenance())
+                        ? null
+                        : this.getString(R.string.source_apple);
+                final String updated = this.getString(R.string.last_updated_x, timeAgo);
+                deviceLastUpdate.setText(source == null ? updated : updated + " · " + source);
                 // Nothing live to pulse for once the sighting has aged out.
                 ((ImageView) v.findViewById(R.id.device_nearby_pulse)).setVisibility(GONE);
             }
@@ -2767,7 +2843,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         return this.beaconRepo.toScheduledAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .doOnNext(this::armLongFetchBannerIfSlow)
-                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack, false))
                 .doOnNext(reports -> this.refreshPolicy.markFetched(now)) // on success, update this time.
                 .doFinally(this::markFetchFinished);
     }
@@ -2777,7 +2853,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         return this.beaconRepo.toAccessoryRequests(beaconIdToPlist)
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .doOnNext(this::armLongFetchBannerIfSlow)
-                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack))
+                .flatMap(requests -> this.fetchOneAccessoryAtATime(requests, hoursToGoBack, false))
                 .doFinally(this::markFetchFinished);
     }
 
@@ -2801,18 +2877,18 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * an Activity - see {@code RxFlowsTest}.
      */
     private Observable<Map<String, List<BeaconLocationReport>>> fetchOneAccessoryAtATime(
-            final List<AccessoryRequest> requests, final int hoursToGoBack) {
+            final List<AccessoryRequest> requests, final int hoursToGoBack, final boolean askGoogleNow) {
 
         // **A tag nobody has searched for yet gets the whole week.** Read once for the batch,
         // then applied per accessory - see HOURS_TO_GO_BACK_FIRST_TIME. Everything else keeps
         // the window it asked for.
         return this.beaconRepo.neverScanned().flatMap(neverScanned -> RxFlows.oneAtATime(
                 requests,
-                request -> this.appleService.getLastReports(
-                                List.of(request),
+                request -> this.fetchFromSources(request,
                                 neverScanned.contains(request.getBeaconId())
                                         ? HOURS_TO_GO_BACK_FIRST_TIME
-                                        : hoursToGoBack)
+                                        : hoursToGoBack,
+                                askGoogleNow)
                         .flatMap(this.beaconRepo::storeFetchResult),
                 this::setLongFetchProgress,
                 (request, error) -> {
@@ -2829,15 +2905,35 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 }));
     }
 
-    private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(final String beaconId, final String pList, final int hoursToGoBack) {
+    private Observable<Map<String, List<BeaconLocationReport>>> fetchLastReportsFor(
+            final String beaconId, final String pList, final int hoursToGoBack, final boolean askGoogleNow) {
         Log.i(TAG, "Preparing to fetch location reports for the last " + hoursToGoBack + " hours!");
         // Not Map.of - see BeaconRepository.plistFallback. A self-generated tag has no plist.
         return this.beaconRepo.toAccessoryRequests(BeaconRepository.plistFallback(beaconId, pList))
                 .doOnSubscribe(__ -> this.markFetchStarted())
                 .doOnNext(this::armLongFetchBannerIfSlow)
-                .flatMap(requests -> this.appleService.getLastReports(requests, hoursToGoBack))
+                .flatMap(requests -> Observable.fromIterable(requests)
+                        .concatMap(request -> this.fetchFromSources(request, hoursToGoBack, askGoogleNow)))
                 .flatMap(this.beaconRepo::storeFetchResult)
                 .doFinally(this::markFetchFinished);
+    }
+
+    /**
+     * One device's reports from wherever they come from: the Apple account and Google Find Hub -
+     * see {@link ReportSources}.
+     *
+     * @param askGoogleNow a person asked (refresh button), so Google is asked for fresh
+     *                     locations rather than only reading what the service already holds
+     */
+    private Observable<FetchResult> fetchFromSources(
+            final AccessoryRequest request, final int hoursToGoBack, final boolean askGoogleNow) {
+        final long now = System.currentTimeMillis();
+        return this.reportSources.fetch(
+                request,
+                now - hoursToGoBack * 3_600_000L,
+                now,
+                askGoogleNow,
+                ReportSources.appleFetchOrNull(this.appleService, request, hoursToGoBack));
     }
 
     /**
