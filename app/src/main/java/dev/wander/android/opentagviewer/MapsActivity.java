@@ -1967,9 +1967,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // reason when a session goes stale, and each failure calls this - so without the latch a
         // six-tag account would ask Apple for six codes, or sign out six times over. The check
         // and the set are both on the main thread, which is why a plain boolean is enough.
-        if (this.appleService == null
-                || this.alreadyAskingAboutTheSession
+        if (this.appleService == null) {
+            Log.d(TAG, "Not checking the session: there is no Apple service");
+            return;
+        }
+        if (this.alreadyAskingAboutTheSession
                 || (this.twoFactorAgain != null && this.twoFactorAgain.isShowing())) {
+            // **Logged, because a silent return here used to be indistinguishable from
+            // "checked, the session is fine".** Both left a failed fetch with no follow-up
+            // line in the log, and only one of them says anything about the session.
+            Log.d(TAG, "Not re-checking the session: a check is already in flight or on screen");
             return;
         }
         this.alreadyAskingAboutTheSession = true;
@@ -1979,7 +1986,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(needed -> {
                     if (needed.isEmpty()) {
-                        return; // nothing wrong with this session
+                        // **Logged, because this answer is half the diagnosis.** A fetch that
+                        // was refused while the session answers as healthy is not a dead
+                        // session - the reports endpoint itself is refusing (rate limiting,
+                        // flagging), and no re-login fixes that. Without the line, this
+                        // outcome and a check suppressed by the latch above produce the same
+                        // empty log.
+                        Log.i(TAG, "The session answers as healthy after a failed fetch, so the"
+                                + " refusal is specific to fetching rather than a dead session");
+                        return;
                     }
 
                     final List<PythonAuthService.AuthMethod> methods = needed.get();

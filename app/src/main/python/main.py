@@ -1945,6 +1945,18 @@ def getLastReports(
 
             print(f"Got {len(reports)} raw reports for {beaconId}")
 
+            # Log the age of the newest one, not only the count. A fetch that succeeds while
+            # Apple's newest report is hours old means the network genuinely holds nothing
+            # newer - the "stale map with no error anywhere" case - and a count alone cannot
+            # tell that from a fetch that returned something fresh.
+            if reports:
+                newest_ms = max(int(r.timestamp.timestamp() * 1000) for r in reports)
+                age_min = max(0, (now_ms - newest_ms) // 60000)
+                age = f"{age_min} min" if age_min < 180 else f"{age_min / 60:.1f} h"
+                newest_iso = datetime.fromtimestamp(
+                    newest_ms / 1000, tz=timezone.utc).isoformat(timespec="seconds")
+                print(f"  -> newest report is {age} old ({newest_iso})")
+
             # Measured here because this is the one place both halves are in scope: what the
             # alignment said before anything was fetched, and what the fetch made of it.
             aligned_after = _alignmentOf(airtag)
