@@ -45,12 +45,6 @@ uv run python -m exporter.cli       # the same thing in a terminal
 uv run python -m exporter.cli --help
 ```
 
-> [!IMPORTANT]
-> **Pass `--no-password` to the CLI for now**, or use the window, which does not lock bundles.
-> The CLI encrypts by default and no released version of the Android app can open an encrypted
-> zip — its reader cannot decrypt anything. See
-> [the handover doc](../docs/android-import-handover.md).
-
 **tkinter** is what draws the window, and it is not part of a stock Python on macOS or Linux:
 
 ```shell

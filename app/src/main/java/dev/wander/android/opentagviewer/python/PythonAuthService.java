@@ -290,6 +290,11 @@ public final class PythonAuthService {
     public static Observable<PythonAppleAccount> restoreAccount(
             final AppleUserData appleUserData, final AnisetteSource localAnisette) {
         return Observable.fromCallable(() -> {
+            // **The two lines bracket the Python call so a stall is visible.** A capture that
+            // shows the first and never the second means the restore is sitting inside Python
+            // (anisette provisioning, the network) rather than failed - and a failure is the
+            // only one of those the exception below distinguishes today.
+            Log.i(TAG, "Restoring the stored account");
             var data = AppCryptographyUtil.AppEncryptedData.fromFlattened(appleUserData.getData());
             var account = new AppCryptographyUtil().decrypt(data, KEYSTORE_ALIAS_ACCOUNT);
 
@@ -308,6 +313,7 @@ public final class PythonAuthService {
                 throw new PythonAccountLoginException("Error occurred while restoring account! Check python logs for more details");
             }
 
+            Log.i(TAG, "Account restore returned from Python");
             return new PythonAppleAccount(returned);
         }).subscribeOn(Schedulers.io());
     }
