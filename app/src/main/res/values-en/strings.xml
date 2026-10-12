@@ -393,4 +393,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="anisette_login_crashes_here">Apple\'s sign-in library crashes on this phone, so a server does this step instead. Everything else works normally. We don\'t know why it happens on some phones yet, and a report naming yours helps.</string>
     <string name="anisette_report_crash">Report this phone</string>
     <string name="anisette_crash_report_body">Apple\'s sign-in library crashes as soon as it loads on this phone. It works on most phones, and we do not know yet what the affected ones have in common.\n\nOpenTagViewer now uses a server for that step, so you can sign in and use the app normally. A report with the details below is what helps us find the cause.</string>
+    <string name="login_failed_refused_before_password">Apple refused to start signing in to this Apple ID before your password was checked, so retyping it will not help. Check that you can sign in at account.apple.com and whether Apple asks anything of you there. Trying a remote server presents Apple with a different device, which is worth a try. Apple said: %1$s</string>
 </resources>

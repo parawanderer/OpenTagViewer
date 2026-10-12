@@ -121,6 +121,21 @@ public final class FakeAppleAuthService implements AppleAuthService {
         return fake;
     }
 
+    /**
+     * Apple refuses the first step of the sign-in, before the password is used, then serves the
+     * next - issue #248's shape, followed by the retry through a server getting past it.
+     *
+     * <p>Fails as {@code REFUSED_BEFORE_PASSWORD}, which the remote-server button is also gated on.
+     */
+    public static FakeAppleAuthService refusesBeforeThePasswordOnceThenSignsIn() {
+        final FakeAppleAuthService fake = new FakeAppleAuthService(LOGIN_STATE.LOGGED_IN, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "Email verification failed (ec=-1): This action cannot be completed at this time.",
+                PythonAccountLoginException.REASON_REFUSED_BEFORE_PASSWORD);
+        fake.loginFailuresRemaining = 1;
+        return fake;
+    }
+
     /** The password is wrong, or Apple is unreachable. */
     public static FakeAppleAuthService rejectsTheSignIn(final String message) {
         final FakeAppleAuthService fake =
