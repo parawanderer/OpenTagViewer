@@ -1230,6 +1230,29 @@ class TestClassifyingAFailedLogin:
             UnhandledProtocolError("Error response for GSA request: 418"),
         ) == main.REASON_UNKNOWN
 
+    def test_a_refusal_before_the_password_is_its_own_reason(self):
+        """
+        Issue #248. Grand Slam refused the `init` step, which sends no password, and the screen
+        showed "Email verification failed" verbatim - which reads as a typo and is not one.
+        """
+        from findmy.errors import GrandSlamRefusedError
+
+        refused = GrandSlamRefusedError("init", -1, "This action cannot be completed at this time.")
+
+        assert main.classifyLoginFailure(refused) == main.REASON_REFUSED_BEFORE_PASSWORD
+        assert "ec=-1" in main.describeLoginFailure(refused)
+
+    def test_a_wrong_password_is_not_a_refusal_before_it(self):
+        """
+        Same type, second step. A different Anisette server cannot fix a bad credential, so
+        this must not become the reason that offers one.
+        """
+        from findmy.errors import GrandSlamRefusedError
+
+        wrong = GrandSlamRefusedError("complete", -20101, "Your Apple ID or password was incorrect.")
+
+        assert main.classifyLoginFailure(wrong) == main.REASON_UNKNOWN
+
     def test_a_library_error_is_recognised_by_its_module(self):
         class ClientConnectorError(Exception):
             pass

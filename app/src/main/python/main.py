@@ -10,7 +10,7 @@ import base64
 import NSKeyedUnArchiver
 
 from findmy import FindMyAccessory, MobileMeDelegateError
-from findmy.errors import AppleServiceUnavailableError
+from findmy.errors import AppleServiceUnavailableError, GrandSlamRefusedError
 from findmy.accessory import FixedRollingKeyPairAccessory
 from findmy.keys import KeyPairType
 from findmy.reports import (
@@ -511,6 +511,25 @@ usually the phone's - check the connection. This one is Apple's, and checking an
 end is wasted effort.
 """
 
+REASON_REFUSED_BEFORE_PASSWORD = "refused_before_password"
+"""
+Grand Slam refused the first step of the sign-in, which carries the username and the Anisette
+headers and no password.
+
+**So the password is not the problem, and the screen must not suggest it is.** This arrived as
+an `InvalidCredentialsError` reading "Email verification failed", shown verbatim, on a device
+whose local Anisette was working - OpenTagViewer#248. What is left is the account itself, or the
+machine identity the Anisette data presents, and the second is the one thing this app can change:
+the screen offers the remote-server route for it, as it does for :data:`REASON_APPLE_DECLINED`.
+
+**Which `ec` means what is not established.** Apple's text here is generic, and the code was not
+kept until the fork started carrying it, so nothing branches on a value. The detail keeps the
+code, so a report carries it.
+
+**A wrong password is not this.** That is refused at the second step, `complete`, and stays
+:data:`REASON_UNKNOWN` - a different Anisette identity cannot fix a bad credential.
+"""
+
 REASON_UNKNOWN = "unknown"
 """Anything else. The detail is shown as-is, because a wrong guess is worse than raw text."""
 
@@ -556,6 +575,11 @@ def classifyLoginFailure(error: BaseException) -> str:
     # fine sends them to reset a router over a 503.
     if isinstance(error, AppleServiceUnavailableError):
         return REASON_APPLE_DECLINED
+
+    # Only the first step. The same type reports a wrong password at the second, and that one
+    # must not offer a different Anisette server as though it could help.
+    if isinstance(error, GrandSlamRefusedError) and error.before_password:
+        return REASON_REFUSED_BEFORE_PASSWORD
 
     if isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
         return REASON_NETWORK

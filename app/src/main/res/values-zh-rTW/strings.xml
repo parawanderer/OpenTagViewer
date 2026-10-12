@@ -393,4 +393,5 @@
     <string name="anisette_login_crashes_here">Apple 的登入函式庫在這支手機上會當機，因此這一步改由伺服器完成。其他功能一切正常。我們還不知道為什麼會在部分手機上發生，附上你的機型回報會有幫助。</string>
     <string name="anisette_report_crash">回報這支手機</string>
     <string name="anisette_crash_report_body">Apple 的登入函式庫在這支手機上一載入就會當機。它在大多數手機上都能正常運作，我們還不知道受影響的手機有什麼共通點。\n\nOpenTagViewer 現在改用伺服器完成這一步，因此你可以正常登入和使用 App。附上下方資訊的回報能幫助我們找到原因。</string>
+    <string name="login_failed_refused_before_password">Apple 在檢查你的密碼之前就拒絕開始登入此 Apple ID，所以重新輸入密碼沒有用。請確認你能否在 account.apple.com 登入，以及 Apple 是否在那裡要求你做什麼。遠端伺服器會以另一台裝置的身分出現在 Apple 面前，值得一試。Apple 的回覆：%1$s</string>
 </resources>

@@ -393,4 +393,5 @@
     <string name="anisette_login_crashes_here">Apple 的登录库在这部手机上会崩溃，因此这一步改由服务器完成。其他功能一切正常。我们还不知道为什么会在部分手机上发生，附上你的机型报告会有帮助。</string>
     <string name="anisette_report_crash">报告这部手机</string>
     <string name="anisette_crash_report_body">Apple 的登录库在这部手机上一加载就会崩溃。它在大多数手机上都能正常运行，我们还不知道受影响的手机有什么共同点。\n\nOpenTagViewer 现在改用服务器完成这一步，因此你可以正常登录和使用应用。附上下方信息的报告能帮助我们找到原因。</string>
+    <string name="login_failed_refused_before_password">Apple 在检查你的密码之前就拒绝开始登录此 Apple ID，所以重新输入密码没有用。请确认你能否在 account.apple.com 登录，以及 Apple 是否在那里要求你做什么。远程服务器会以另一台设备的身份出现在 Apple 面前，值得一试。Apple 的回复：%1$s</string>
 </resources>

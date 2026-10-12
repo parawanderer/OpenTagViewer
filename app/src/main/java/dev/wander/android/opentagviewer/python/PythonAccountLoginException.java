@@ -60,6 +60,17 @@ public class PythonAccountLoginException extends RuntimeException {
      */
     public static final String REASON_APPLE_DECLINED = "apple_declined";
 
+    /**
+     * Apple refused the first step of the sign-in, before the password was used. Matches
+     * {@code REASON_REFUSED_BEFORE_PASSWORD}.
+     *
+     * <p>Issue #248: shown verbatim as "Email verification failed", which reads as a typo in the
+     * Apple ID or password and is neither. Like {@link #REASON_APPLE_DECLINED} it offers the
+     * remote-server route, because local Anisette worked and Apple still said no - so the machine
+     * identity is the thing left to change. Unlike it, nothing here says to wait.
+     */
+    public static final String REASON_REFUSED_BEFORE_PASSWORD = "refused_before_password";
+
     /** Anything not recognised. The detail is shown as-is rather than guessed at. */
     public static final String REASON_UNKNOWN = "unknown";
 

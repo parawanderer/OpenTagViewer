@@ -11,6 +11,7 @@ import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
@@ -167,6 +168,29 @@ public class ForceRemoteAnisetteAfterDeclineTest {
                 server.calls() > 0);
         assertEquals("a sign-in through a server is stored as remote",
                 UserSettings.ANISETTE_REMOTE, storedSettings().getAnisetteMode());
+    }
+
+    /**
+     * Issue #248: refused before the password was used, on a device whose local Anisette works.
+     *
+     * <p>The button appears, and the sentence says the password is not the problem while keeping
+     * Apple's text, which carries the {@code ec} a report needs.
+     */
+    @Test
+    public void aRefusalBeforeThePasswordOffersTheRemoteServer() {
+        AppDependencies.replaceAuthService(
+                this.apple = FakeAppleAuthService.refusesBeforeThePasswordOnceThenSignsIn());
+
+        launch();
+        signInExpectingAnotherLoginCall();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_try_remote_anisette))
+                .perform(scrollTo()).check(matches(isDisplayed())));
+
+        final String expected = getInstrumentation().getTargetContext().getString(
+                R.string.login_failed_refused_before_password,
+                "Email verification failed (ec=-1): This action cannot be completed at this time.");
+        onView(withId(R.id.login_error_message_text)).check(matches(withText(expected)));
     }
 
     /**

@@ -747,15 +747,18 @@ public class AppleLoginActivity extends AppCompatActivity {
         ((TextView) this.findViewById(R.id.login_error_message_text))
                 .setText(this.describeLoginFailure(error));
 
-        // Offer the server route only when Apple itself refused the sign-in - a 429 or 503 -
-        // and not for a wrong password or a dead network, where a different Anisette identity
-        // changes nothing. That is the one failure where local Anisette worked and Apple still
-        // said no, so switching the machine identity a server presents is the thing left to try.
+        // Offer the server route only when Apple itself refused the sign-in - a 429 or 503, or
+        // a refusal before the password was used (#248) - and not for a wrong password or a dead
+        // network, where a different Anisette identity changes nothing. Those are the failures
+        // where local Anisette worked and Apple still said no, so switching the machine identity
+        // a server presents is the thing left to try.
         final String reason = error instanceof PythonAccountLoginException
                 ? ((PythonAccountLoginException) error).getReason()
                 : PythonAccountLoginException.REASON_UNKNOWN;
+        final boolean appleRefused = PythonAccountLoginException.REASON_APPLE_DECLINED.equals(reason)
+                || PythonAccountLoginException.REASON_REFUSED_BEFORE_PASSWORD.equals(reason);
         this.findViewById(R.id.login_error_try_remote_anisette).setVisibility(
-                PythonAccountLoginException.REASON_APPLE_DECLINED.equals(reason) ? VISIBLE : GONE);
+                appleRefused ? VISIBLE : GONE);
     }
 
     /**
@@ -823,6 +826,13 @@ public class AppleLoginActivity extends AppCompatActivity {
                                 this.getResources().getConfiguration().getLocales().get(0)));
             }
             return this.getString(R.string.login_failed_apple_declined);
+        }
+
+        // Refused before the password was used (#248), so the sentence says that retyping it
+        // will not help. Apple's own text follows, because it carries the ec a report needs.
+        if (PythonAccountLoginException.REASON_REFUSED_BEFORE_PASSWORD.equals(reason)) {
+            return this.getString(R.string.login_failed_refused_before_password,
+                    error.getLocalizedMessage());
         }
 
         // Apple took the password and the code, then would not open iCloud for the account. Kept
