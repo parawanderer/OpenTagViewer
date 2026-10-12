@@ -1,0 +1,90 @@
+name: Waiting on reporter
+
+# Keeps the `waiting on reporter` label true, so it can be trusted as a list of issues where the
+# next move is the reporter's rather than ours.
+#
+# - **It comes off when the reporter replies.** A label nobody removes is wrong the moment they
+#   answer, and then the list has to be checked by hand, which is what it was meant to replace.
+# - **After 14 days without a reply, one reminder is posted**, and only one until somebody else
+#   comments.
+#
+# **It never closes anything, on purpose.** Reporters here are often people who sideloaded an APK
+# once and will not be back, so auto-closing would keep the open list tidy. But some of those
+# issues are real bugs whose reporter went quiet, and other people still have them. Closing stays
+# a person's decision.
+#
+# `issue_comment` and `schedule` both run the copy of this file on the default branch, so neither
+# half can be exercised from a pull request. `workflow_dispatch` with `dry_run` prints what the
+# reminder would do without posting.
+
+on:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print what would be posted, post nothing
+        type: boolean
+        default: true
+
+permissions:
+  issues: write
+
+env:
+  LABEL: waiting on reporter
+  DAYS: 14
+
+jobs:
+  reporter-replied:
+    # Issues only (`issue_comment` fires for pull requests too), and only the issue's own author:
+    # anyone else's comment, ours included, is not the answer being waited for.
+    if: |
+      github.event_name == 'issue_comment'
+      && !github.event.issue.pull_request
+      && github.event.comment.user.login == github.event.issue.user.login
+      && contains(github.event.issue.labels.*.name, 'waiting on reporter')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove the label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: gh issue edit "$ISSUE" --remove-label "$LABEL"
+
+  remind:
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      # The marker is how a reminder recognises the last one. If the newest comment is a reminder,
+      # nothing new has been said since, and posting another would only repeat it.
+      - name: Remind where the reporter has been quiet
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          marker='<!-- waiting-on-reporter-reminder -->'
+          gh issue list --state open --label "$LABEL" --limit 200 --json number \
+            --jq '.[].number' |
+          while read -r n; do
+            verdict=$(gh issue view "$n" --json author,createdAt,comments | jq -r \
+              --arg marker "$marker" --argjson days "$DAYS" '
+                (.comments | last) as $c
+                | (if $c then $c.createdAt else .createdAt end) as $at
+                | if $c and ($c.body | contains($marker)) then "skip: already reminded"
+                  elif $c and $c.author.login == .author.login then "skip: the reporter commented last, so the label is stale"
+                  elif (now - ($at | fromdateiso8601)) < ($days * 86400) then "skip: quiet for less than \($days) days"
+                  else "remind" end')
+            echo "#$n: $verdict"
+            [ "$verdict" = remind ] || continue
+            [ "$DRY_RUN" = true ] && continue
+            gh issue comment "$n" --body-file - <<BODY
+          This is still waiting on the information asked for above. A reply with it is all that is needed. If the problem has stopped happening, say so and the issue can be closed.
+
+          *Posted automatically: this issue is labelled \`$LABEL\` and has had no reply for $DAYS days.*
+          $marker
+          BODY
+          done
