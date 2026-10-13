@@ -958,10 +958,12 @@ public class BeaconRepository {
                                     .horizontalAccuracy(locationReport.getHorizontalAccuracy())
                                     .status(locationReport.getStatus())
                                     .lastUpdate(now)
-                                    // Everything arriving here was decrypted from Apple's
-                                    // network. The local path writes its own rows and sets this
-                                    // itself - see recordLocalSighting.
-                                    .provenance(LocationReport.PROVENANCE_APPLE)
+                                    // Apple's network unless the fetch said otherwise: the
+                                    // extra sources mark Google's reports (see ReportSources).
+                                    // The local path writes its own rows - see recordLocalSighting.
+                                    .provenance(locationReport.getProvenance() != null
+                                            ? locationReport.getProvenance()
+                                            : LocationReport.PROVENANCE_APPLE)
                                     .build()
                             ))
                             .toArray(LocationReport[]::new);

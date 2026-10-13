@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
+import dev.wander.android.opentagviewer.source.ExternalAccessory;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,13 +23,17 @@ import java.util.Map;
  * <p><b>Blocking, and starts an interpreter.</b> Never call this on the main thread; the {@code
  * ble} package that uses it does so on an Rx scheduler.
  */
+/*
+ * Google Find Hub trackers (ExternalAccessory.TYPE_GOOGLE) have no Apple keys and are never
+ * handed to Python here: there is no MAC to derive, and FindMy.py raises on the type.
+ */
 public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
     private static final String TAG = ChaquopyAccessoryMacResolver.class.getSimpleName();
     private static final String MODULE_MAIN = "main";
 
     @Override
     public Map<String, Integer> currentMacAddresses(final String accessoryJson) {
-        if (accessoryJson == null || accessoryJson.isEmpty()) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || ExternalAccessory.isGoogle(accessoryJson)) {
             // Not yet backfilled from the legacy plist - see OwnedBeacon.accessoryJson. A real
             // state, not a failure, so this reports it the same way Python does: nothing found.
             return Collections.emptyMap();
@@ -61,7 +66,7 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
     @Override
     @Nullable
     public IndexRange candidateWindow(final String accessoryJson) {
-        if (accessoryJson == null || accessoryJson.isEmpty()) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || ExternalAccessory.isGoogle(accessoryJson)) {
             return null;
         }
 
@@ -86,7 +91,8 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
     @Override
     public Map<String, Integer> addressesBetween(
             final String accessoryJson, final int lo, final int hi) {
-        if (accessoryJson == null || accessoryJson.isEmpty() || hi < lo) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || hi < lo
+                || ExternalAccessory.isGoogle(accessoryJson)) {
             return Collections.emptyMap();
         }
 
@@ -120,7 +126,8 @@ public class ChaquopyAccessoryMacResolver implements AccessoryMacResolver {
     public String recordSeen(
             final String accessoryJson, final String mac, final long seenAtUnixMs,
             final Integer hintIndex) {
-        if (accessoryJson == null || accessoryJson.isEmpty() || mac == null) {
+        if (accessoryJson == null || accessoryJson.isEmpty() || mac == null
+                || ExternalAccessory.isGoogle(accessoryJson)) {
             return null;
         }
 

@@ -15,4 +15,7 @@ public final class AppKeyStoreConstants {
      * a peer is left on the account that this app can no longer use or clean up.
      */
     public static final String KEYSTORE_ALIAS_KEYCHAIN = "keychain_membership";
+
+    /** The Google Find Hub service's API token and HTTP password - see ExtraSourcesSettings. */
+    public static final String KEYSTORE_ALIAS_EXTRA_SOURCES = "extra_sources";
 }

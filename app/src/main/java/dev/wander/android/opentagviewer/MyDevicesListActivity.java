@@ -47,6 +47,7 @@ import dev.wander.android.opentagviewer.databinding.ActivityMyDevicesListBinding
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.ui.importing.ExternalDeviceImporter;
 import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
@@ -200,6 +201,15 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 }
             }
     );
+
+    /** OpenHaystack keys and Google trackers; the list is rebuilt once one is added. */
+    private final ExternalDeviceImporter externalImporter = new ExternalDeviceImporter(this, () -> {
+        this.devicesListChanged = true;
+        this.recreate();
+    });
+
+    private final ActivityResultLauncher<String[]> openKeysFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(), this.externalImporter::importKeysFile);
 
     private final ActivityResultLauncher<Intent> deviceInfoActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -648,6 +658,14 @@ public class MyDevicesListActivity extends AppCompatActivity {
             }
             if (id == R.id.action_import_from_file) {
                 this.handleStartImport();
+                return true;
+            }
+            if (id == R.id.action_add_openhaystack) {
+                this.openKeysFileLauncher.launch(new String[]{"*/*"});
+                return true;
+            }
+            if (id == R.id.action_add_google) {
+                this.externalImporter.importFromGoogle();
                 return true;
             }
             if (id == R.id.action_import_history) {

@@ -9,6 +9,10 @@
         android:id="@+id/device_play_sound_nearby"
         android:title="@string/play_sound_nearby" />
 
+    <!-- Hidden for Google trackers, see DeviceInfoActivity -->
+    <item
+        android:id="@+id/device_link_google"
+        android:title="@string/link_google_tracker" />
     <item
         android:id="@+id/device_delete"
         android:title="@string/remove_device" />

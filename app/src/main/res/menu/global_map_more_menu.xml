@@ -10,6 +10,12 @@
         android:title="@string/do_import" />
 
     <item
+        android:id="@+id/add_openhaystack"
+        android:title="@string/add_openhaystack_key" />
+    <item
+        android:id="@+id/add_google"
+        android:title="@string/add_from_google" />
+    <item
         android:id="@+id/settings"
         android:title="@string/settings" />
 

@@ -490,11 +490,13 @@ public class BleAccessorySoundTriggerTest {
         assertEquals(List.of(A_DEVICE), fakes.stopped);
     }
 
-    /** Only a sound started over DULT is worth a connection to stop. */
+    /** Only a sound started over DULT or FMDN is worth a connection to stop. */
     @Test
-    public void onlyASuccessfulDultSoundHasAStopCommand() {
+    public void onlyASuccessfulDultOrFmdnSoundHasAStopCommand() {
         assertTrue(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
                 BleGattSoundTrigger.PROTOCOL_DULT, "test").hasStopCommand());
+        assertTrue(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
+                FmdnRingTrigger.PROTOCOL, "test").hasStopCommand());
         assertFalse(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
                 "AirTag", "test").hasStopCommand());
         assertFalse(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,

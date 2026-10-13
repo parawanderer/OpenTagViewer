@@ -109,4 +109,10 @@ public class LocationReport {
 
     /** Heard by this phone's own radio, positioned from this phone's own location. */
     public static final String PROVENANCE_LOCAL = "local";
+
+    /**
+     * Reported by the Google Find Hub network, through the googlefind service
+     * (see {@code source/ExtraSourcesApi}).
+     */
+    public static final String PROVENANCE_GOOGLE = "google";
 }

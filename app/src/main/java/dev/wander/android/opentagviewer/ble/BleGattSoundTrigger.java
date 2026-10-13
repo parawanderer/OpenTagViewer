@@ -223,7 +223,7 @@ public final class BleGattSoundTrigger {
     }
 
     @SuppressLint("MissingPermission")
-    private static void writeCharacteristicCompat(
+    static void writeCharacteristicCompat(
             final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic, final byte[] value) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeCharacteristic(characteristic, value, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
@@ -235,7 +235,7 @@ public final class BleGattSoundTrigger {
     }
 
     @SuppressLint("MissingPermission")
-    private static void writeDescriptorCompat(
+    static void writeDescriptorCompat(
             final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor, final byte[] value) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeDescriptor(descriptor, value);

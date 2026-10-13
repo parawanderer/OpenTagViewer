@@ -228,6 +228,9 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setHandleClickBack(this::handleEndActivity);
         this.binding.setOnClickFetchFromAccount(this::onClickFetchFromAccount);
         this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);
+        this.binding.setOnClickExtraSources(() ->
+                startActivity(new Intent(this, ExtraSourcesSettingsActivity.class)));
+
         this.sayWhetherTheAccountIsLinked();
 
         this.binding.setOnClickTheme(this::onClickEditTheme);

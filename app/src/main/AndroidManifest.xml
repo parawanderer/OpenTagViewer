@@ -181,6 +181,10 @@
             android:label="@string/information"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
+            android:name=".ExtraSourcesSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings"
