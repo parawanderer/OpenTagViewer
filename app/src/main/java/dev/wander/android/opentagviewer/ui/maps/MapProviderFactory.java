@@ -1,9 +1,13 @@
 package dev.wander.android.opentagviewer.ui.maps;
 
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
 
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -48,22 +52,37 @@ public class MapProviderFactory {
     }
 
     /**
-     * The provider to actually use: Google Maps needs the key from secrets.properties, and a
-     * build without one gets OpenStreetMap (which needs none) instead of a map that cannot load.
+     * Values the Maps key takes in a build that has no real one, so Google would draw an empty
+     * grey map. {@code DEFAULT_API_KEY} comes from {@code local.defaults.properties} when there is
+     * no {@code secrets.properties}; {@code maps_key_default_value} is what
+     * {@code build-debug.yml} writes when the repository secret is unavailable, as on fork PRs.
      */
-    public static String effectiveProvider(final android.content.Context context, final String providerType) {
-        if (providerType != null && !PROVIDER_GOOGLE.equals(providerType)) {
+    private static final Set<String> PLACEHOLDER_KEYS = Set.of("DEFAULT_API_KEY", "maps_key_default_value");
+
+    /**
+     * The provider to actually use. A build without a usable Google Maps key gets OpenStreetMap,
+     * which needs none, instead of a map that cannot load.
+     */
+    public static String effectiveProvider(final Context context, final String providerType) {
+        String key = null;
+        try {
+            final Bundle meta = context.getPackageManager().getApplicationInfo(
+                    context.getPackageName(), PackageManager.GET_META_DATA).metaData;
+            key = meta == null ? null : meta.getString("com.google.android.geo.API_KEY");
+        } catch (final Exception e) {
+            Log.w(TAG, "Could not read the Maps API key; treating it as absent", e);
+        }
+        return effectiveProvider(providerType, key);
+    }
+
+    /** {@link #effectiveProvider(Context, String)} once the key has been read. */
+    static String effectiveProvider(final String providerType, final String googleMapsKey) {
+        if (PROVIDER_AMAP.equals(providerType) || PROVIDER_OSM.equals(providerType)) {
             return providerType;
         }
-        try {
-            final android.os.Bundle meta = context.getPackageManager().getApplicationInfo(
-                    context.getPackageName(), android.content.pm.PackageManager.GET_META_DATA).metaData;
-            final String key = meta == null ? null : meta.getString("com.google.android.geo.API_KEY");
-            if (key == null || key.isBlank() || key.equals("DEFAULT_API_KEY")) {
-                return PROVIDER_OSM;
-            }
-        } catch (final Exception e) {
-            Log.w(TAG, "Could not read the Maps API key; using OpenStreetMap", e);
+        // Google, unset or unknown - all of which create() turns into Google Maps.
+        if (googleMapsKey == null || googleMapsKey.isBlank() || PLACEHOLDER_KEYS.contains(googleMapsKey)) {
+            Log.w(TAG, "No usable Google Maps key in this build; using OpenStreetMap");
             return PROVIDER_OSM;
         }
         return providerType;

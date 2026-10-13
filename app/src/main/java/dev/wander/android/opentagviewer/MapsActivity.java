@@ -21,9 +21,7 @@ import androidx.core.view.WindowCompat;
 
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.app.Dialog;
-import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.location.Address;
 import android.location.Geocoder;
@@ -502,7 +500,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         app.setupTheme();
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        this.checkApiKey();
 
         this.binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(this.binding.getRoot());
@@ -1752,28 +1749,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Intent deviceInfoIntent = new Intent(this, DeviceInfoActivity.class);
         deviceInfoIntent.putExtra("beaconId", beaconId);
         deviceInfoActivityLauncher.launch(deviceInfoIntent);
-    }
-
-    /** Whether this build carries a Google Maps key; without one the map falls back to OSM. */
-    private boolean checkApiKey() {
-        try {
-            ApplicationInfo appInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
-            Bundle bundle = Objects.requireNonNull(appInfo.metaData);
-
-            String apiKey = bundle.getString("com.google.android.geo.API_KEY");
-
-            if (apiKey == null || apiKey.isBlank() || apiKey.equals("DEFAULT_API_KEY")) {
-                Log.w(TAG, "No Google Maps API key in secrets.properties; using OpenStreetMap");
-                return false;
-            }
-            return true;
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.e(TAG, "Package name not found.", e);
-            throw new RuntimeException("Error getting package info", e);
-        } catch (NullPointerException e) {
-            Log.e(TAG, "Error accessing meta-data.", e); // Handle the case where meta-data is completely missing
-            throw new RuntimeException("Error accessing meta-data in manifest", e);
-        }
     }
 
     private void handleAuthAndShowDevices() {
