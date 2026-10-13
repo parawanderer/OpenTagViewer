@@ -394,9 +394,9 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="anisette_report_crash">Signaler ce téléphone</string>
     <string name="anisette_crash_report_body">La bibliothèque de connexion d\'Apple plante dès son chargement sur ce téléphone. Elle fonctionne sur la plupart des téléphones, et nous ne savons pas encore ce que les appareils concernés ont en commun.\n\nOpenTagViewer utilise désormais un serveur pour cette étape : vous pouvez vous connecter et utiliser l\'app normalement. Un rapport avec les informations ci-dessous nous aide à trouver la cause.</string>
     <string name="login_failed_refused_before_password">Apple a refusé de commencer la connexion à cet identifiant Apple avant même de vérifier votre mot de passe : le saisir à nouveau ne changera rien. Vérifiez que vous pouvez vous connecter sur account.apple.com et si Apple vous y demande quelque chose. Un serveur distant présente un autre appareil à Apple, cela vaut la peine d\'essayer. Apple a répondu : %1$s</string>
-    <string name="extra_sources">Sources de localisation supplémentaires</string>
+    <string name="extra_sources">Sources de localisation supplémentaires (expérimental)</string>
     <string name="extra_sources_subtitle">Traceurs Google Find Hub</string>
-    <string name="extra_sources_explainer">Localisez les traceurs de votre compte Google via votre propre service googlefind. Ajoutez-les comme appareils, ou associez-les à un appareil pour afficher les rapports des deux réseaux sur un seul repère.</string>
+    <string name="extra_sources_explainer">Expérimental. Localisez les traceurs de votre compte Google via votre propre service googlefind. Ajoutez-les comme appareils, ou associez-les à un appareil pour afficher les rapports des deux réseaux sur un seul repère.</string>
     <string name="google_find_hub_explainer">Rapports des traceurs de votre compte Google, via un service googlefind. Les nouvelles positions ne sont demandées que lorsque vous actualisez une balise.</string>
     <string name="server_url">Adresse du serveur</string>
     <string name="http_username">Nom d\'utilisateur HTTP (facultatif)</string>
@@ -409,8 +409,8 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="keys_file_invalid">Ce n\'est pas un fichier .keys contenant une clé privée</string>
     <string name="openhaystack_default_name">Balise OpenHaystack</string>
     <string name="add_openhaystack_key">Ajouter une clé OpenHaystack (.keys)</string>
-    <string name="add_from_google">Ajouter depuis Google Find Hub</string>
-    <string name="link_google_tracker">Associer un traceur Google</string>
+    <string name="add_from_google">Ajouter depuis Google Find Hub (expérimental)</string>
+    <string name="link_google_tracker">Associer un traceur Google (expérimental)</string>
     <string name="google_link_saved">Association au traceur Google enregistrée</string>
     <string name="google_not_configured">Configurez d\'abord Google Find Hub dans Paramètres → Sources de localisation supplémentaires</string>
     <string name="google_tracker_none">Aucun</string>
@@ -421,4 +421,5 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="google_find_hub_tracker">Traceur Google Find Hub</string>
     <string name="nearby_now_with_signal">À proximité (%1$s)</string>
     <string name="ring_failed_reason">Échec de la sonnerie : %1$s</string>
+    <string name="server_url_not_https">Pas en https : le jeton d\'API sera envoyé sans chiffrement.</string>
 </resources>

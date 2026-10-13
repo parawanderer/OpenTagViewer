@@ -394,9 +394,9 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_report_crash">Deze telefoon melden</string>
     <string name="anisette_crash_report_body">Apples aanmeldbibliotheek crasht op deze telefoon zodra ze geladen wordt. Op de meeste telefoons werkt ze, en we weten nog niet wat de getroffen toestellen gemeen hebben.\n\nOpenTagViewer gebruikt voor die stap nu een server, dus je kunt gewoon aanmelden en de app normaal gebruiken. Een melding met de gegevens hieronder helpt ons de oorzaak te vinden.</string>
     <string name="login_failed_refused_before_password">Apple weigerde het inloggen met deze Apple ID te starten voordat je wachtwoord werd gecontroleerd, dus opnieuw intypen helpt niet. Controleer of je kunt inloggen op account.apple.com en of Apple daar iets van je vraagt. Een externe server stelt zich bij Apple voor als een ander apparaat, dat is het proberen waard. Apple meldde: %1$s</string>
-    <string name="extra_sources">Extra locatiebronnen</string>
+    <string name="extra_sources">Extra locatiebronnen (experimenteel)</string>
     <string name="extra_sources_subtitle">Google Find Hub-trackers</string>
-    <string name="extra_sources_explainer">Vind de trackers in je Google-account via je eigen googlefind-service. Voeg ze toe als apparaat, of koppel ze aan een apparaat zodat de meldingen van beide netwerken op één markering staan.</string>
+    <string name="extra_sources_explainer">Experimenteel. Vind de trackers in je Google-account via je eigen googlefind-service. Voeg ze toe als apparaat, of koppel ze aan een apparaat zodat de meldingen van beide netwerken op één markering staan.</string>
     <string name="google_find_hub_explainer">Meldingen van de trackers in je Google-account, via een googlefind-service. Nieuwe locaties worden alleen opgevraagd als je een tag vernieuwt.</string>
     <string name="server_url">Serveradres</string>
     <string name="http_username">HTTP-gebruikersnaam (optioneel)</string>
@@ -409,8 +409,8 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="keys_file_invalid">Dit is geen .keys-bestand met een privésleutel</string>
     <string name="openhaystack_default_name">OpenHaystack-tag</string>
     <string name="add_openhaystack_key">OpenHaystack-sleutel toevoegen (.keys)</string>
-    <string name="add_from_google">Toevoegen uit Google Find Hub</string>
-    <string name="link_google_tracker">Google-tracker koppelen</string>
+    <string name="add_from_google">Toevoegen uit Google Find Hub (experimenteel)</string>
+    <string name="link_google_tracker">Google-tracker koppelen (experimenteel)</string>
     <string name="google_link_saved">Koppeling met Google-tracker opgeslagen</string>
     <string name="google_not_configured">Stel eerst Google Find Hub in via Instellingen → Extra locatiebronnen</string>
     <string name="google_tracker_none">Geen</string>
@@ -421,4 +421,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="google_find_hub_tracker">Google Find Hub-tracker</string>
     <string name="nearby_now_with_signal">Dichtbij (%1$s)</string>
     <string name="ring_failed_reason">Laten afgaan mislukt: %1$s</string>
+    <string name="server_url_not_https">Geen https: het API-token wordt onversleuteld verstuurd.</string>
 </resources>

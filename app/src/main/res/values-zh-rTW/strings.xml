@@ -394,9 +394,9 @@
     <string name="anisette_report_crash">回報這支手機</string>
     <string name="anisette_crash_report_body">Apple 的登入函式庫在這支手機上一載入就會當機。它在大多數手機上都能正常運作，我們還不知道受影響的手機有什麼共通點。\n\nOpenTagViewer 現在改用伺服器完成這一步，因此你可以正常登入和使用 App。附上下方資訊的回報能幫助我們找到原因。</string>
     <string name="login_failed_refused_before_password">Apple 在檢查你的密碼之前就拒絕開始登入此 Apple ID，所以重新輸入密碼沒有用。請確認你能否在 account.apple.com 登入，以及 Apple 是否在那裡要求你做什麼。遠端伺服器會以另一台裝置的身分出現在 Apple 面前，值得一試。Apple 的回覆：%1$s</string>
-    <string name="extra_sources">其他位置來源</string>
+    <string name="extra_sources">其他位置來源（實驗性）</string>
     <string name="extra_sources_subtitle">Google Find Hub 追蹤器</string>
-    <string name="extra_sources_explainer">透過你自己的 googlefind 服務定位 Google 帳戶中的追蹤器。可將其新增為裝置，或連結到某個裝置，讓兩個網路的報告顯示在同一個標記上。</string>
+    <string name="extra_sources_explainer">實驗性功能。透過你自己的 googlefind 服務定位 Google 帳戶中的追蹤器。可將其新增為裝置，或連結到某個裝置，讓兩個網路的報告顯示在同一個標記上。</string>
     <string name="google_find_hub_explainer">透過 googlefind 服務取得你 Google 帳戶中追蹤器的報告。只在重新整理標籤時要求新位置。</string>
     <string name="server_url">伺服器位址</string>
     <string name="http_username">HTTP 使用者名稱（選填）</string>
@@ -409,8 +409,8 @@
     <string name="keys_file_invalid">這不是包含私密金鑰的 .keys 檔案</string>
     <string name="openhaystack_default_name">OpenHaystack 標籤</string>
     <string name="add_openhaystack_key">新增 OpenHaystack 金鑰（.keys）</string>
-    <string name="add_from_google">從 Google Find Hub 新增</string>
-    <string name="link_google_tracker">連結 Google 追蹤器</string>
+    <string name="add_from_google">從 Google Find Hub 新增（實驗性）</string>
+    <string name="link_google_tracker">連結 Google 追蹤器（實驗性）</string>
     <string name="google_link_saved">已儲存 Google 追蹤器連結</string>
     <string name="google_not_configured">請先在「設定 → 其他位置來源」中設定 Google Find Hub</string>
     <string name="google_tracker_none">無</string>
@@ -421,4 +421,5 @@
     <string name="google_find_hub_tracker">Google Find Hub 追蹤器</string>
     <string name="nearby_now_with_signal">在附近 (%1$s)</string>
     <string name="ring_failed_reason">響鈴失敗：%1$s</string>
+    <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
 </resources>

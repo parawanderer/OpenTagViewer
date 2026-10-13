@@ -53,7 +53,8 @@ This project is a relatively polished looking Android/Java UI-wrapper around the
 | **Self-made tags** ([OpenHaystack](https://github.com/seemoo-lab/openhaystack), [Macless Haystack](https://github.com/dchristl/macless-haystack)) | ✅ | Works; requires creating an export by [CLI](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags-With-The-CLI) or [Wizard](https://github.com/parawanderer/OpenTagViewer/wiki/How-To:-Export-AirTags) |
 | **Your own iPhone, iPad or Mac** | ⚠️ | Partial coverage (see issue [#131](https://github.com/parawanderer/OpenTagViewer/issues/131)) |
 | **A tag someone shared with you** through Apple's own sharing | ❌ | Only the account that *owns* a tag can export it. Ask the owner to export it and send you the zip |
-| **Tile, Samsung SmartTag, Google Find My Device trackers** | ❌ | Different networks entirely, with nothing in common with Apple's. This is an open feature request that can be contributed to the app if wanted. |
+| **Google Find Hub trackers** | 🧪 | Experimental. Needs your own self-hosted [googlefind-service](https://github.com/alex-so-3/googlefind-service), then *Settings → Extra location sources (experimental)*. An on-device version is [#257](https://github.com/parawanderer/OpenTagViewer/issues/257) |
+| **Tile, Samsung SmartTag** | ❌ | Different networks entirely, with nothing in common with Apple's. |
 
 > [!NOTE]
 > This app (currently) reads Apple's Find My network. Anything not on that network cannot be tracked with it, no matter how similar the device looks.

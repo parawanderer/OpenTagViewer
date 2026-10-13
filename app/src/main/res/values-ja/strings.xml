@@ -394,9 +394,9 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="anisette_report_crash">この端末を報告</string>
     <string name="anisette_crash_report_body">この端末では、Apple のサインイン用ライブラリが読み込み直後にクラッシュします。ほとんどの端末では問題なく動作しており、影響を受ける端末の共通点はまだ分かっていません。\n\nOpenTagViewer はこの手順にサーバーを使うようになったため、サインインもアプリの利用も通常どおりできます。下の情報を添えて報告していただくと、原因の特定に役立ちます。</string>
     <string name="login_failed_refused_before_password">Apple はパスワードを確認する前に、この Apple ID へのサインインの開始を拒否しました。パスワードを入力し直しても解決しません。account.apple.com にサインインできるか、そこで Apple から何か求められていないかを確認してください。リモートサーバーを使うと Apple には別のデバイスとして見えるので、試す価値があります。Apple の応答: %1$s</string>
-    <string name="extra_sources">追加の位置情報ソース</string>
+    <string name="extra_sources">追加の位置情報ソース（試験運用）</string>
     <string name="extra_sources_subtitle">Google Find Hub トラッカー</string>
-    <string name="extra_sources_explainer">自分の googlefind サービス経由で Google アカウントのトラッカーを探します。デバイスとして追加するか、デバイスにリンクして両方のネットワークのレポートを 1 つのマーカーに表示できます。</string>
+    <string name="extra_sources_explainer">試験運用中の機能です。自分の googlefind サービス経由で Google アカウントのトラッカーを探します。デバイスとして追加するか、デバイスにリンクして両方のネットワークのレポートを 1 つのマーカーに表示できます。</string>
     <string name="google_find_hub_explainer">googlefind サービス経由の、Google アカウントのトラッカーのレポート。新しい位置はタグを更新したときだけ要求します。</string>
     <string name="server_url">サーバーのアドレス</string>
     <string name="http_username">HTTP ユーザー名（任意）</string>
@@ -409,8 +409,8 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="keys_file_invalid">秘密鍵を含む .keys ファイルではありません</string>
     <string name="openhaystack_default_name">OpenHaystack タグ</string>
     <string name="add_openhaystack_key">OpenHaystack キーを追加（.keys）</string>
-    <string name="add_from_google">Google Find Hub から追加</string>
-    <string name="link_google_tracker">Google トラッカーをリンク</string>
+    <string name="add_from_google">Google Find Hub から追加（試験運用）</string>
+    <string name="link_google_tracker">Google トラッカーをリンク（試験運用）</string>
     <string name="google_link_saved">Google トラッカーのリンクを保存しました</string>
     <string name="google_not_configured">先に「設定 → 追加の位置情報ソース」で Google Find Hub を設定してください</string>
     <string name="google_tracker_none">なし</string>
@@ -421,4 +421,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="google_find_hub_tracker">Google Find Hub トラッカー</string>
     <string name="nearby_now_with_signal">近くにあります (%1$s)</string>
     <string name="ring_failed_reason">鳴らせませんでした: %1$s</string>
+    <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
 </resources>
