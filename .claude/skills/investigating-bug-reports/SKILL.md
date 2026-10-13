@@ -99,6 +99,11 @@ useful answer. "It is X" is not, when it is not.
 Say what the screenshot showed. If something genuinely is absent, ask for that one thing, and do
 not ask for anything the thread already contains.
 
+Once the reply asking for it is posted, label the issue `waiting on reporter`
+(`gh issue edit <n> --add-label "waiting on reporter"`). `waiting-on-reporter.yml` removes it when
+the reporter answers and reminds them once after 14 days, so the label is the list of issues whose
+next move is not ours.
+
 **Quote the error text, never the surrounding screen, and never re-upload the image.** Reporters
 redact unevenly: one here blacked out a phone number by hand and left the pixels either side of it
 untouched. A screenshot is personal data that happens to contain a stack trace.

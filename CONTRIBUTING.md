@@ -870,6 +870,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
 | `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
+| `waiting-on-reporter.yml` | a comment on an issue, daily | Removes the `waiting on reporter` label when the issue's author replies. Daily, comments once on any labelled issue quiet for 14 days, and again only after somebody else has commented. Never closes anything. Both triggers run the copy on `main`, so a PR cannot exercise it; `workflow_dispatch` defaults to a dry run that prints what it would post |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
 `:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
