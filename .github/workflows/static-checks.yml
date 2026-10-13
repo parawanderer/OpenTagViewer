@@ -58,6 +58,14 @@ jobs:
           python -m pip install pytest
           python -m pytest scripts/test -v
 
+      # Reported but not yet blocking: the existing code has about 270 findings, and the cleanup
+      # (`--fix`) waits until the open pull requests are merged so it does not conflict with them.
+      # Remove continue-on-error once it is done. See "Fully qualified names in Java" in
+      # CONTRIBUTING.md.
+      - name: Check Java uses imports, not fully qualified names
+        continue-on-error: true
+        run: python scripts/check_java_imports.py
+
       # pyright rather than mypy: the editors used on this project run Pylance, which is
       # pyright, and mypy's defaults are lenient enough to pass code Pylance flags.
       #
