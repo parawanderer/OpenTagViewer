@@ -177,7 +177,11 @@
                         android:layout_marginStart="12dp"
                         android:indeterminate="true"
                         android:visibility="gone"
-                        app:indicatorSize="20dp" />
+                        app:hideAnimationBehavior="inward"
+                        app:indicatorSize="20dp"
+                        app:showAnimationBehavior="inward"
+                        app:trackColor="?attr/colorSurfaceVariant"
+                        app:trackCornerRadius="2dp" />
                 </LinearLayout>
 
                 <TextView
