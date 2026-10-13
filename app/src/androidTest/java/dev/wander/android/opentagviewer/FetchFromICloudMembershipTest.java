@@ -29,6 +29,7 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.EscrowPasscode;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import android.view.View;
 
 /**
  * Asking for the device passcode once, and never again.
@@ -82,7 +83,7 @@ public class FetchFromICloudMembershipTest {
     private boolean isShown(final int id) {
         final boolean[] shown = {false};
         this.scenario.onActivity(activity ->
-                shown[0] = activity.findViewById(id).getVisibility() == android.view.View.VISIBLE);
+                shown[0] = activity.findViewById(id).getVisibility() == View.VISIBLE);
         return shown[0];
     }
 

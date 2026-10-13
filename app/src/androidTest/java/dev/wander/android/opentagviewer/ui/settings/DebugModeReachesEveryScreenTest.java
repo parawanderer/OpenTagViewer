@@ -40,6 +40,7 @@ import dev.wander.android.opentagviewer.python.PythonAppleService;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.ui.maps.AMapWithTagsOnIt;
+import androidx.recyclerview.widget.RecyclerView;
 
 /**
  * One switch in Settings, and the three unrelated screens that have to obey it.
@@ -343,7 +344,7 @@ public class DebugModeReachesEveryScreenTest {
     private boolean aHistoryRowExists() {
         final boolean[] any = {false};
         this.screen.onActivity(activity -> {
-            final androidx.recyclerview.widget.RecyclerView list =
+            final RecyclerView list =
                     activity.findViewById(R.id.recycler_view_history_items);
             any[0] = list != null && list.getAdapter() != null
                     && list.getAdapter().getItemCount() > 0;

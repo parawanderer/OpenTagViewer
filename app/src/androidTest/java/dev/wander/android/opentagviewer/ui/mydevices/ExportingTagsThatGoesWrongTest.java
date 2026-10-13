@@ -38,6 +38,8 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.BundleBuilder;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.util.export.TagExporter;
+import dev.wander.android.opentagviewer.MapsActivity;
+import dev.wander.android.opentagviewer.util.parse.BundlePasscode;
 
 /**
  * What an export does when it cannot be done.
@@ -66,7 +68,7 @@ public class ExportingTagsThatGoesWrongTest {
         Intents.init();
         intending(anyOf(
                 hasComponent(ErrorReportActivity.class.getName()),
-                hasComponent(dev.wander.android.opentagviewer.MapsActivity.class.getName())))
+                hasComponent(MapsActivity.class.getName())))
                 .respondWith(new ActivityResult(Activity.RESULT_CANCELED, null));
     }
 
@@ -203,8 +205,8 @@ public class ExportingTagsThatGoesWrongTest {
         assertEquals(1, written.getCount());
         assertEquals(12, written.getPasscode().length());
         assertEquals(written.getPasscode(),
-                dev.wander.android.opentagviewer.util.parse.BundlePasscode.normalise(
-                        dev.wander.android.opentagviewer.util.parse.BundlePasscode.format(
+                BundlePasscode.normalise(
+                        BundlePasscode.format(
                                 written.getPasscode())));
     }
 

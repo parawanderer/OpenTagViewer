@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Iterator;
 
 /**
  * {@link BundleBuilder} over {@code main.buildExportBundle}, which calls the same
@@ -90,7 +91,7 @@ public class ChaquopyBundleBuilder implements BundleBuilder {
             // whatever order a hash gives. Nothing depends on it; a reproducible file is simply
             // easier to reason about when two of them differ.
             final Map<String, byte[]> files = new LinkedHashMap<>();
-            for (final java.util.Iterator<String> names = entries.keys(); names.hasNext(); ) {
+            for (final Iterator<String> names = entries.keys(); names.hasNext(); ) {
                 final String name = names.next();
                 files.put(name, Base64.decode(entries.getString(name), Base64.DEFAULT));
             }

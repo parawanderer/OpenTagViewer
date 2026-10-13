@@ -41,6 +41,8 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.db.AccountBeaconsForTests;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
+import android.view.View;
+import androidx.test.espresso.intent.matcher.IntentMatchers;
 
 /**
  * The 503 that arrives <i>after</i> Apple has accepted the code.
@@ -84,7 +86,7 @@ public class ACodeAppleTookAndThenFailedOnTest {
         AppDependencies.replaceAnisette(settings -> FakeAnisetteSource.ready());
 
         Intents.init();
-        Intents.intending(androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent(
+        Intents.intending(IntentMatchers.hasComponent(
                         MapsActivity.class.getName()))
                 .respondWith(new ActivityResult(Activity.RESULT_OK, null));
 
@@ -199,7 +201,7 @@ public class ACodeAppleTookAndThenFailedOnTest {
         // stays in the hierarchy behind the method list, so matching on the number alone finds
         // two views the second time round and Espresso refuses. It works the first time only
         // because that label has not been rendered yet.
-        final org.hamcrest.Matcher<android.view.View> theSmsOption =
+        final org.hamcrest.Matcher<View> theSmsOption =
                 allOf(withText(containsString(FakeAppleAuthService.PHONE_ONE)), isDisplayed());
 
         onView(withId(R.id.twofactorauthchoice_back_button)).perform(click());

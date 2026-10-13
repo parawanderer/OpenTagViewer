@@ -45,6 +45,9 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.NonNull;
+import dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao;
+import java.util.Collections;
+import java.util.Random;
 
 public class BeaconRepository {
     private final static String TAG = BeaconRepository.class.getSimpleName();
@@ -58,7 +61,7 @@ public class BeaconRepository {
      * across refreshes instead of restarting - a fresh Random each time is a fresh chance to
      * draw the same order.
      */
-    private final java.util.Random shuffle = new java.util.Random();
+    private final Random shuffle = new Random();
 
     public BeaconRepository(OpenTagViewerDatabase db) {
         this(db, new ChaquopyPlistToAccessoryJsonConverter());
@@ -526,7 +529,7 @@ public class BeaconRepository {
     public Observable<List<AccessoryRequest>> toAccessoryRequests(Map<String, String> beaconIdToPlistFallback) {
         return Observable.fromCallable(() -> {
             if (beaconIdToPlistFallback.isEmpty()) {
-                return java.util.Collections.<AccessoryRequest>emptyList();
+                return Collections.<AccessoryRequest>emptyList();
             }
 
             final var dao = db.ownedBeaconDao();
@@ -881,7 +884,7 @@ public class BeaconRepository {
      * Python knows how wide the key window was - see {@code FetchResult#getExhaustedWideSearch}.
      */
     private void recordWhatEachScanFound(
-            final dev.wander.android.opentagviewer.db.room.dao.OwnedBeaconDao dao,
+            final OwnedBeaconDao dao,
             final FetchResult fetchResult) {
 
         final long now = System.currentTimeMillis();

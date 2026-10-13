@@ -20,6 +20,7 @@ import org.junit.runner.RunWith;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import android.database.sqlite.SQLiteDatabase;
 
 /**
  * Regression tests for the v1 → v2 database upgrade.
@@ -763,7 +764,7 @@ public class OpenTagViewerDatabaseMigrationTest {
         values.put("is_removed", isRemoved ? 1 : 0);
         values.put("from_account", 0);
         values.put("fruitless_scans", 0);
-        db.insert("OwnedBeacons", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+        db.insert("OwnedBeacons", SQLiteDatabase.CONFLICT_ABORT, values);
     }
 
     /**
@@ -777,7 +778,7 @@ public class OpenTagViewerDatabaseMigrationTest {
         values.put("last_update", 1700000000000L);
         values.put("ui_name", uiName);
         values.put("ui_emoji", uiEmoji);
-        db.insert("UserBeaconOptions", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+        db.insert("UserBeaconOptions", SQLiteDatabase.CONFLICT_ABORT, values);
     }
 
     private static void insertImport(SupportSQLiteDatabase db, long id) {
@@ -788,7 +789,7 @@ public class OpenTagViewerDatabaseMigrationTest {
         values.put("exported_at", 1699999999000L);
         values.put("source_user", "someone@example.com");
         values.put("via", "test");
-        db.insert("Import", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+        db.insert("Import", SQLiteDatabase.CONFLICT_ABORT, values);
     }
 
     private static void insertOwnedBeaconV1(
@@ -799,7 +800,7 @@ public class OpenTagViewerDatabaseMigrationTest {
         values.put("content", content);
         values.put("version", "1.0");
         values.put("is_removed", isRemoved ? 1 : 0);
-        db.insert("OwnedBeacons", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+        db.insert("OwnedBeacons", SQLiteDatabase.CONFLICT_ABORT, values);
     }
 
     private static void insertLocationReport(
@@ -816,6 +817,6 @@ public class OpenTagViewerDatabaseMigrationTest {
         values.put("horizontal_accuracy", 10);
         values.put("status", 0);
         values.put("last_update", timestamp);
-        db.insert("LocationReport", android.database.sqlite.SQLiteDatabase.CONFLICT_ABORT, values);
+        db.insert("LocationReport", SQLiteDatabase.CONFLICT_ABORT, values);
     }
 }

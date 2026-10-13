@@ -52,6 +52,11 @@ import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
+import androidx.datastore.preferences.core.MutablePreferences;
+import dev.wander.android.opentagviewer.AppKeyStoreConstants;
+import io.reactivex.rxjava3.core.Single;
+import java.security.KeyStore;
+import java.util.function.Consumer;
 
 /**
  * The one-time offer to read tags out of the Apple account.
@@ -342,11 +347,11 @@ public class TheICloudOfferAppearsOnceTest {
      */
     private void andThenItsKeystoreKeyDisappears() {
         try {
-            final java.security.KeyStore keyStore =
-                    java.security.KeyStore.getInstance("AndroidKeyStore");
+            final KeyStore keyStore =
+                    KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
             keyStore.deleteEntry(
-                    dev.wander.android.opentagviewer.AppKeyStoreConstants.KEYSTORE_ALIAS_KEYCHAIN);
+                    AppKeyStoreConstants.KEYSTORE_ALIAS_KEYCHAIN);
         } catch (final Exception e) {
             throw new IllegalStateException("could not take the keystore key away", e);
         }
@@ -355,12 +360,12 @@ public class TheICloudOfferAppearsOnceTest {
     /** Keep the key, ruin the ciphertext: the combination that should not be possible. */
     private void butItsStoredBytesAreDamaged() {
         UserAuthDataStore.getInstance(this.context).updateDataAsync(preferences -> {
-            final androidx.datastore.preferences.core.MutablePreferences mutable =
+            final MutablePreferences mutable =
                     preferences.toMutablePreferences();
             mutable.set(UserAuthDataStore.KEYCHAIN_MEMBERSHIP,
                     new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
                             17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32});
-            return io.reactivex.rxjava3.core.Single.just(mutable);
+            return Single.just(mutable);
         }).blockingGet();
     }
 
@@ -437,7 +442,7 @@ public class TheICloudOfferAppearsOnceTest {
      * the Anisette offer already answered. It failed for a reason that had nothing to do with
      * the behaviour, and would have passed or failed depending on the order tests ran in.
      */
-    private void settingsWhere(final java.util.function.Consumer<UserSettings> arrange) {
+    private void settingsWhere(final Consumer<UserSettings> arrange) {
         final UserSettings settings = this.settingsRepo.getUserSettings();
 
         settings.setIcloudOfferMade(false);

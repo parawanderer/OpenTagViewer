@@ -46,6 +46,10 @@ import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.LogRedactor;
+import android.net.Uri;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
 
 /**
  * The page somebody lands on when the app cannot say what went wrong.
@@ -377,15 +381,15 @@ public class TheErrorPageIsReportableTest {
         intended(hasAction(Intent.ACTION_VIEW));
     }
 
-    private static org.hamcrest.Matcher<android.net.Uri> hasToString(final String expected) {
-        return new org.hamcrest.TypeSafeMatcher<>() {
+    private static Matcher<Uri> hasToString(final String expected) {
+        return new TypeSafeMatcher<>() {
             @Override
-            protected boolean matchesSafely(final android.net.Uri uri) {
+            protected boolean matchesSafely(final Uri uri) {
                 return expected.equals(uri.toString());
             }
 
             @Override
-            public void describeTo(final org.hamcrest.Description description) {
+            public void describeTo(final Description description) {
                 description.appendText("a Uri of " + expected);
             }
         };

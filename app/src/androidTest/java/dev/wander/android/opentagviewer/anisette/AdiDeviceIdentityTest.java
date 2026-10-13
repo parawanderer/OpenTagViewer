@@ -17,6 +17,11 @@ import org.junit.runner.RunWith;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * The exact strings this app tells Apple it is.
@@ -128,13 +133,13 @@ public class AdiDeviceIdentityTest {
      */
     @Test
     public void everyProfileSuppliesTheSixFieldsFindMyExpects() throws Exception {
-        final Set<String> expected = new HashSet<>(java.util.Arrays.asList(
+        final Set<String> expected = new HashSet<>(Arrays.asList(
                 "model", "os_name", "os_version", "os_build", "cfnetwork", "darwin"));
 
         for (final Hardware hardware : Hardware.values()) {
             final JSONObject json = new JSONObject(hardware.toJson());
             final Set<String> actual = new HashSet<>();
-            for (final java.util.Iterator<String> keys = json.keys(); keys.hasNext(); ) {
+            for (final Iterator<String> keys = json.keys(); keys.hasNext(); ) {
                 actual.add(keys.next());
             }
 
@@ -170,10 +175,10 @@ public class AdiDeviceIdentityTest {
         final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
 
         assertEquals(16, fresh.adiIdentifier().length());
-        assertEquals(fresh.adiIdentifier().toLowerCase(java.util.Locale.ROOT),
+        assertEquals(fresh.adiIdentifier().toLowerCase(Locale.ROOT),
                 fresh.adiIdentifier());
         assertEquals(36, fresh.uniqueDeviceIdentifier().length());
-        assertEquals(fresh.uniqueDeviceIdentifier().toUpperCase(java.util.Locale.ROOT),
+        assertEquals(fresh.uniqueDeviceIdentifier().toUpperCase(Locale.ROOT),
                 fresh.uniqueDeviceIdentifier());
     }
 
@@ -186,11 +191,11 @@ public class AdiDeviceIdentityTest {
      */
     @Test
     public void theiphoneProfilesLocalUserIdIsAUuid() {
-        final String id = Hardware.IPHONE.newLocalUserId(new java.security.SecureRandom());
+        final String id = Hardware.IPHONE.newLocalUserId(new SecureRandom());
 
         assertEquals(36, id.length());
-        assertEquals(id.toUpperCase(java.util.Locale.ROOT), id);
-        java.util.UUID.fromString(id);
+        assertEquals(id.toUpperCase(Locale.ROOT), id);
+        UUID.fromString(id);
     }
 
     /**
@@ -203,7 +208,7 @@ public class AdiDeviceIdentityTest {
      */
     @Test
     public void theiphoneProfileProvisionsUnderWhatFindMyWouldSend() {
-        final String id = Hardware.IPHONE.newLocalUserId(new java.security.SecureRandom());
+        final String id = Hardware.IPHONE.newLocalUserId(new SecureRandom());
         final String whatJavaSends = Hardware.IPHONE.localUserHeader(id);
         final String whatFindMyWillSend = Base64.encodeToString(
                 id.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);

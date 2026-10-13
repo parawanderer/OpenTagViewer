@@ -19,6 +19,7 @@ import java.util.List;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
+import java.util.ArrayList;
 
 /**
  * Which fetches put the "still locating your tags" banner up.
@@ -80,7 +81,7 @@ public class WhichFetchesAreWorthABannerTest {
     }
 
     private boolean wouldBeSlow(final String... beaconIds) {
-        final List<AccessoryRequest> requests = new java.util.ArrayList<>();
+        final List<AccessoryRequest> requests = new ArrayList<>();
         for (final String id : beaconIds) {
             requests.add(new AccessoryRequest(id, "{\"type\":\"accessory\"}"));
         }

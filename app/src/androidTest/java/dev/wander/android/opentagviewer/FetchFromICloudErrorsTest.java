@@ -25,6 +25,12 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.python.icloud.ICloudException;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailure;
+import android.view.View;
+import androidx.test.platform.app.InstrumentationRegistry;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import org.junit.Before;
 
 /**
  * What the user is told when reading the account does not work.
@@ -54,7 +60,7 @@ public class FetchFromICloudErrorsTest {
         AccountBeaconsForTests.forgetThemAll();
     }
 
-    @org.junit.Before
+    @Before
     public void forgetAnyStoredMembership() {
         // Finishing this flow writes real rows into the real database. Cleared here too,
         // because a test that crashed left its tags behind for whatever runs next.
@@ -64,11 +70,11 @@ public class FetchFromICloudErrorsTest {
         // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
         // member and never sees the device list. Cleared before rather than only after, because
         // a test that crashed leaves it behind.
-        new dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository(
-                dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore.getInstance(
-                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(
+                        InstrumentationRegistry.getInstrumentation()
                                 .getTargetContext()),
-                new dev.wander.android.opentagviewer.util.android.AppCryptographyUtil())
+                new AppCryptographyUtil())
                 .forget().blockingAwait();
     }
 
@@ -81,7 +87,7 @@ public class FetchFromICloudErrorsTest {
     private boolean isShown(final int id) {
         final boolean[] shown = {false};
         this.scenario.onActivity(activity ->
-                shown[0] = activity.findViewById(id).getVisibility() == android.view.View.VISIBLE);
+                shown[0] = activity.findViewById(id).getVisibility() == View.VISIBLE);
         return shown[0];
     }
 

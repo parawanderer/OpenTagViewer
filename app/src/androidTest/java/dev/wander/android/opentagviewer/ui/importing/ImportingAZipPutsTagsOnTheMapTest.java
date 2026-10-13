@@ -46,6 +46,10 @@ import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.ui.maps.AMapWithTagsOnIt;
+import androidx.test.espresso.matcher.ViewMatchers;
+import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
+import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
+import dev.wander.android.opentagviewer.ui.maps.FakeMapProvider;
 
 /**
  * A zip, chosen from the file picker, ends up as tags on the map.
@@ -172,7 +176,7 @@ public class ImportingAZipPutsTagsOnTheMapTest {
                 2, this.theMap.map().markerCount()));
 
         for (final String beaconId : List.of(BEACON_A, BEACON_B)) {
-            final List<dev.wander.android.opentagviewer.ui.maps.FakeMapProvider.PlacedMarker> pins =
+            final List<FakeMapProvider.PlacedMarker> pins =
                     this.theMap.map().markers().stream()
                             .filter(placed -> beaconId.equals(placed.marker.getId()))
                             .collect(Collectors.toList());
@@ -216,7 +220,7 @@ public class ImportingAZipPutsTagsOnTheMapTest {
         // Not wrapped in Eventually: a PopupMenu is up by the time the click returns, and asking
         // for a platform-popup root that is not there yet is the slow question, not the quick
         // one.
-        onView(androidx.test.espresso.matcher.ViewMatchers.withText(R.string.do_import))
+        onView(ViewMatchers.withText(R.string.do_import))
                 .inRoot(isPlatformPopup()).perform(click());
     }
 
@@ -273,7 +277,7 @@ public class ImportingAZipPutsTagsOnTheMapTest {
      * secret in no sense whatsoever.
      */
     private static String ownedBeaconPlist(final String beaconId) {
-        return dev.wander.android.opentagviewer.python.icloud.FakeICloudService
+        return FakeICloudService
                 .AN_OWNED_BEACON_PLIST
                 // The fixture names one identifier; a bundle with two tags needs two. The
                 // importer takes the beacon id from the file name, so this only keeps the
@@ -302,7 +306,7 @@ public class ImportingAZipPutsTagsOnTheMapTest {
         for (final String beaconId : List.of(BEACON_A, BEACON_B)) {
             this.db.ownedBeaconDao().delete(OwnedBeacon.builder().id(beaconId).build());
             this.db.beaconNamingRecordDao().delete(
-                    dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord.builder()
+                    BeaconNamingRecord.builder()
                             .id(beaconId).build());
         }
 

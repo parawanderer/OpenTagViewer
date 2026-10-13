@@ -51,6 +51,7 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.BundleBuilder;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
+import android.content.ClipData;
 
 /**
  * Giving somebody a tag, at a pace a person can follow.
@@ -227,7 +228,7 @@ public class WalkingThroughSharingATagTest {
         getInstrumentation().runOnMainSync(() -> {
             final ClipboardManager clipboard = getInstrumentation().getTargetContext()
                     .getSystemService(ClipboardManager.class);
-            final android.content.ClipData clip =
+            final ClipData clip =
                     clipboard == null ? null : clipboard.getPrimaryClip();
             held[0] = clip == null || clip.getItemCount() == 0
                     ? null : clip.getItemAt(0).getText();

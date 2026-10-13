@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import java.util.concurrent.TimeUnit;
 
 /** A JVM test: {@link NearbyTagIndex} has no Android and no Bluetooth in it, deliberately. */
 public class NearbyTagIndexTest {
@@ -99,7 +100,7 @@ public class NearbyTagIndexTest {
     @Test
     public void expiryIsShorterThanTheRolloverInterval() {
         assertTrue("an index older than a rollover predicts addresses nothing is sending any more",
-                NearbyTagIndex.MAX_AGE_MS < java.util.concurrent.TimeUnit.MINUTES.toMillis(15));
+                NearbyTagIndex.MAX_AGE_MS < TimeUnit.MINUTES.toMillis(15));
     }
 
     // --- rebuilding ---------------------------------------------------------------------------

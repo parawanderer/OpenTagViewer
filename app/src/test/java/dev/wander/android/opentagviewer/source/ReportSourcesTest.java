@@ -20,6 +20,7 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.FetchResult;
 import io.reactivex.rxjava3.core.Observable;
+import java.io.IOException;
 
 public class ReportSourcesTest {
     private static final long NOW = 1_800_000_000_000L;
@@ -50,7 +51,7 @@ public class ReportSourcesTest {
         @Override
         public List<BeaconLocationReport> reports(final String googleId, final long sinceMs) throws Exception {
             if (this.failing) {
-                throw new java.io.IOException("service down");
+                throw new IOException("service down");
             }
             return new ArrayList<>(this.reports);
         }

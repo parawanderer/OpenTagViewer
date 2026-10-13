@@ -38,6 +38,10 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.FakeAppleAuthService;
 import dev.wander.android.opentagviewer.python.TermsDocument;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import android.view.View;
+import android.widget.ScrollView;
+import androidx.test.espresso.Espresso;
+import androidx.test.espresso.action.ViewActions;
 
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
@@ -261,7 +265,7 @@ public class AcceptingTermsFlowTest {
         Eventually.check(() -> onView(withId(R.id.login_terms_container))
                 .check(matches(isDisplayed())));
 
-        androidx.test.espresso.Espresso.pressBack();
+        Espresso.pressBack();
 
         // Still here, still on the first document, and nothing sent.
         Eventually.check(() -> onView(withId(R.id.login_terms_container))
@@ -308,7 +312,7 @@ public class AcceptingTermsFlowTest {
         for (int attempt = 0; attempt < 30 && scrollY() != previous; attempt++) {
             previous = scrollY();
             onView(withId(R.id.login_terms_scroll))
-                    .perform(androidx.test.espresso.action.ViewActions.swipeUp());
+                    .perform(ViewActions.swipeUp());
             // Paced so this is watchable when somebody is being shown the flow. Off by default,
             // so a normal run and CI are unaffected.
             TestPace.afterAStep();
@@ -342,7 +346,7 @@ public class AcceptingTermsFlowTest {
     private int scrollY() {
         final int[] value = {-1};
         this.scenario.onActivity(activity ->
-                value[0] = ((android.widget.ScrollView)
+                value[0] = ((ScrollView)
                         activity.findViewById(R.id.login_terms_scroll)).getScrollY());
         return value[0];
     }
@@ -364,7 +368,7 @@ public class AcceptingTermsFlowTest {
     private boolean isShown(final int id) {
         final boolean[] shown = {false};
         this.scenario.onActivity(activity ->
-                shown[0] = activity.findViewById(id).getVisibility() == android.view.View.VISIBLE);
+                shown[0] = activity.findViewById(id).getVisibility() == View.VISIBLE);
         return shown[0];
     }
 

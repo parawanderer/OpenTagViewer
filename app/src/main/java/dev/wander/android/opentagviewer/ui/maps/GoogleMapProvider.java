@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.R;
+import androidx.fragment.app.FragmentActivity;
+import com.google.android.gms.maps.model.CameraPosition;
 
 /**
  * Google Maps地图提供商实现
@@ -53,11 +55,11 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
         this.activity = activity;
         this.callback = callback;
         
-        if (!(activity instanceof androidx.fragment.app.FragmentActivity)) {
+        if (!(activity instanceof FragmentActivity)) {
             throw new IllegalArgumentException("Activity must be a FragmentActivity to use Google Maps");
         }
         
-        FragmentManager fragmentManager = ((androidx.fragment.app.FragmentActivity) activity).getSupportFragmentManager();
+        FragmentManager fragmentManager = ((FragmentActivity) activity).getSupportFragmentManager();
         
         // 查找或创建SupportMapFragment
         mapFragment = (SupportMapFragment) fragmentManager.findFragmentById(containerViewId);
@@ -317,7 +319,7 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
     @Override
     public CameraPosition getCameraPosition() {
         if (googleMap == null) return null;
-        com.google.android.gms.maps.model.CameraPosition position = googleMap.getCameraPosition();
+        CameraPosition position = googleMap.getCameraPosition();
         return new CameraPosition(
                 position.target.latitude,
                 position.target.longitude,

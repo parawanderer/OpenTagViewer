@@ -33,6 +33,8 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.util.parse.AppleZipImporterUtil;
 import dev.wander.android.opentagviewer.util.parse.BundlePasscode;
 import dev.wander.android.opentagviewer.util.parse.ZipImporterException;
+import java.io.FileInputStream;
+import java.io.InputStream;
 
 /**
  * A bundle this app writes, imported back by this app.
@@ -291,7 +293,7 @@ public class WhatWeExportWeCanImportTest {
         // And the listing is readable without the code, which is a property of the zip format
         // rather than a choice - worth pinning so nobody assumes the file is opaque.
         final byte[] head = new byte[2];
-        try (java.io.InputStream in = new java.io.FileInputStream(this.bundle)) {
+        try (InputStream in = new FileInputStream(this.bundle)) {
             if (in.read(head) != 2) {
                 fail("the bundle is too short to be a zip");
             }

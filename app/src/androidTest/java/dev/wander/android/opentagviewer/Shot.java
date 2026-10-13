@@ -13,6 +13,7 @@ import com.google.android.material.color.MaterialColors;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
 /**
  * A picture of what is on screen, for looking at afterwards.
@@ -156,7 +157,7 @@ public final class Shot {
     }
 
     private static void write(final Bitmap bitmap, final String dir, final String name)
-            throws java.io.IOException {
+            throws IOException {
         try (FileOutputStream out = new FileOutputStream(new File(new File(dir), name + ".png"))) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
         }

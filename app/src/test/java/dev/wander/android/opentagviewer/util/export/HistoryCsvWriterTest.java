@@ -14,6 +14,7 @@ import java.util.Locale;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
+import java.time.Instant;
 
 /**
  * The CSV a user opens in a spreadsheet.
@@ -36,7 +37,7 @@ public class HistoryCsvWriterTest {
      * then asserts against a date nobody intended.
      */
     private static final String RECORDED_AT_UTC = "2026-08-15T12:34:56Z";
-    private static final long RECORDED_AT = java.time.Instant.parse(RECORDED_AT_UTC).toEpochMilli();
+    private static final long RECORDED_AT = Instant.parse(RECORDED_AT_UTC).toEpochMilli();
 
     private static BeaconLocationReport.BeaconLocationReportBuilder report() {
         return BeaconLocationReport.builder()

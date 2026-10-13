@@ -27,6 +27,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import dev.wander.android.opentagviewer.R;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.util.TypedValue;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 /**
  * The terms step, inflated and drawn without an activity, an account or a network.
@@ -149,8 +154,8 @@ public class TermsStepLayoutTest {
 
             // Loaded with the theme, which is how the app loads it - passing null here is the
             // mistake that makes a theme-attribute vector draw as nothing.
-            final android.graphics.drawable.Drawable arrow =
-                    androidx.core.content.res.ResourcesCompat.getDrawable(
+            final Drawable arrow =
+                    ResourcesCompat.getDrawable(
                             themed.getResources(), R.drawable.arrow_back_24px, themed.getTheme());
 
             assertNotNull("the back arrow drawable is missing", arrow);
@@ -257,8 +262,8 @@ public class TermsStepLayoutTest {
     private static int resolvedBackground(final View from, final View root) {
         View current = from;
         while (current != null) {
-            if (current.getBackground() instanceof android.graphics.drawable.ColorDrawable) {
-                return ((android.graphics.drawable.ColorDrawable)
+            if (current.getBackground() instanceof ColorDrawable) {
+                return ((ColorDrawable)
                         current.getBackground()).getColor();
             }
             if (current == root || !(current.getParent() instanceof View)) {
@@ -269,7 +274,7 @@ public class TermsStepLayoutTest {
 
         // Nothing painted between here and the root, so what shows through is the window
         // background - which is what the activity would paint.
-        final android.util.TypedValue value = new android.util.TypedValue();
+        final TypedValue value = new TypedValue();
         from.getContext().getTheme()
                 .resolveAttribute(android.R.attr.colorBackground, value, true);
         return value.data;
@@ -298,7 +303,7 @@ public class TermsStepLayoutTest {
     }
 
     private static void write(final Bitmap bitmap, final String name) throws IOException {
-        final String directory = androidx.test.platform.app.InstrumentationRegistry
+        final String directory = InstrumentationRegistry
                 .getArguments().getString("additionalTestOutputDir");
         if (directory == null) {
             return;

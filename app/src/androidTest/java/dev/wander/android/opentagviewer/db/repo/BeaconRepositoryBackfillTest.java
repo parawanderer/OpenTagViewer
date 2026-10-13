@@ -27,6 +27,8 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.PlistToAccessoryJsonConverter;
+import dev.wander.android.opentagviewer.python.FetchResult;
+import java.util.Set;
 
 /**
  * Covers the lazy {@code accessory_json} backfill.
@@ -333,12 +335,12 @@ public class BeaconRepositoryBackfillTest {
         var repo = new BeaconRepository(this.db, new RecordingConverter(null));
 
         final String updated = "{\"type\":\"accessory\",\"alignment_index\":4242}";
-        var fetchResult = new dev.wander.android.opentagviewer.python.FetchResult(
+        var fetchResult = new FetchResult(
                 Collections.emptyMap(),
                 Map.of("beacon-a", updated),
                 // Nothing was searched wide and found empty here; this test is about the
                 // accessory JSON being written back, not about tags that have gone quiet.
-                java.util.Set.of(), java.util.Set.of()
+                Set.of(), Set.of()
         );
 
         repo.storeFetchResult(fetchResult).blockingFirst();
@@ -353,10 +355,10 @@ public class BeaconRepositoryBackfillTest {
         insertBeacon("beacon-a", PLIST, CONVERTED_JSON);
         var repo = new BeaconRepository(this.db, new RecordingConverter(null));
 
-        var updates = new java.util.HashMap<String, String>();
+        var updates = new HashMap<String, String>();
         updates.put("beacon-a", null);
-        var fetchResult = new dev.wander.android.opentagviewer.python.FetchResult(
-                Collections.emptyMap(), updates, java.util.Set.of(), java.util.Set.of());
+        var fetchResult = new FetchResult(
+                Collections.emptyMap(), updates, Set.of(), Set.of());
 
         repo.storeFetchResult(fetchResult).blockingFirst();
 

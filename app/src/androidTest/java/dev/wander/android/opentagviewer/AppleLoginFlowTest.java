@@ -50,6 +50,8 @@ import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.python.PythonAuthService.AuthMethodPhone;
 import dev.wander.android.opentagviewer.util.HowLongToWait;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import android.content.Context;
+import java.util.Locale;
 
 /**
  * Signing in, driven end to end with Apple replaced.
@@ -335,7 +337,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        final android.content.Context context = getInstrumentation().getTargetContext();
+        final Context context = getInstrumentation().getTargetContext();
 
         Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
                 withText(context.getString(R.string.login_failed_apple_declined)))));
@@ -370,7 +372,7 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        final android.content.Context context = getInstrumentation().getTargetContext();
+        final Context context = getInstrumentation().getTargetContext();
 
         Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
                 withText(context.getString(R.string.login_failed_icloud_refused)))));
@@ -402,11 +404,11 @@ public class AppleLoginFlowTest {
         launch();
         signIn();
 
-        final android.content.Context context = getInstrumentation().getTargetContext();
-        final java.util.Locale locale = context.getResources().getConfiguration().getLocales().get(0);
+        final Context context = getInstrumentation().getTargetContext();
+        final Locale locale = context.getResources().getConfiguration().getLocales().get(0);
 
         // The device's ICU, not a string this test composed: 90 seconds is two minutes, not one.
-        assertEquals("2 minutes", HowLongToWait.of(90).describe(java.util.Locale.ENGLISH));
+        assertEquals("2 minutes", HowLongToWait.of(90).describe(Locale.ENGLISH));
 
         Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
                 withText(context.getString(R.string.login_failed_apple_asked_to_wait,

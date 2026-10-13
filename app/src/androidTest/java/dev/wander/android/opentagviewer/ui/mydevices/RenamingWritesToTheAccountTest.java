@@ -44,6 +44,7 @@ import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailure;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import android.widget.TextView;
 
 /**
  * Renaming a tag, which does two completely different things depending on the tag.
@@ -283,7 +284,7 @@ public class RenamingWritesToTheAccountTest {
         final String[] shown = {null};
         Eventually.check(() -> {
             this.scenario.onActivity(activity -> shown[0] =
-                    ((android.widget.TextView) activity
+                    ((TextView) activity
                             .findViewById(R.id.settings_debug_naming_record_battery_level)
                             .findViewById(R.id.settings_clickable_item_content)).getText().toString());
             assertNotNull(shown[0]);

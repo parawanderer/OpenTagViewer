@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Arrays;
 
 public class FmdnRingCommandTest {
     private static final byte[] RING_KEY = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -29,8 +30,8 @@ public class FmdnRingCommandTest {
         assertEquals(14, write.length);
         assertEquals(0x05, write[0]);
         assertEquals(12, write[1]);
-        assertEquals("43e3b0b455361e86", FmdnRingCommand.hex(java.util.Arrays.copyOfRange(write, 2, 10)));
-        assertArrayEquals(new byte[]{(byte) 0xff, 0x01, 0x2c, 0x00}, java.util.Arrays.copyOfRange(write, 10, 14));
+        assertEquals("43e3b0b455361e86", FmdnRingCommand.hex(Arrays.copyOfRange(write, 2, 10)));
+        assertArrayEquals(new byte[]{(byte) 0xff, 0x01, 0x2c, 0x00}, Arrays.copyOfRange(write, 10, 14));
     }
 
     @Test

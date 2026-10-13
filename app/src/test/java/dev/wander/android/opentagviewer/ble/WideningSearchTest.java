@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import java.util.Set;
 
 /**
  * The rule for looking further back, without a radio, a phone or a key derivation.
@@ -248,8 +249,8 @@ public class WideningSearchTest {
         heard.put(NEAR, 1_000_000L);
         heard.put(MISSING, 1_000_000L - WideningSearch.HEARD_RECENTLY_MS);
 
-        assertEquals(java.util.Set.of(MISSING),
+        assertEquals(Set.of(MISSING),
                 WideningSearch.notHeardRecently(
-                        java.util.Set.of(NEAR, MISSING), heard, 1_000_000L));
+                        Set.of(NEAR, MISSING), heard, 1_000_000L));
     }
 }

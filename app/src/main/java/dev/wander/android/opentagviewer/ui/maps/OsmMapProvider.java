@@ -28,6 +28,8 @@ import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider;
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay;
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
+import org.osmdroid.config.Configuration;
+import org.osmdroid.views.CustomZoomButtonsController;
 
 /**
  * OpenStreetMap provider, via osmdroid.
@@ -77,10 +79,10 @@ public class OsmMapProvider implements IMapProvider {
         // Required by OSM's tile usage policy (https://operations.osmfoundation.org/policies/tiles/):
         // a User-Agent that identifies the app, and a place on disk for the tile cache rather
         // than re-fetching what was already drawn a moment ago.
-        org.osmdroid.config.Configuration.getInstance().setUserAgentValue(activity.getPackageName());
+        Configuration.getInstance().setUserAgentValue(activity.getPackageName());
         File cacheDir = new File(activity.getCacheDir(), "osmdroid");
-        org.osmdroid.config.Configuration.getInstance().setOsmdroidBasePath(cacheDir);
-        org.osmdroid.config.Configuration.getInstance().setOsmdroidTileCache(new File(cacheDir, "tiles"));
+        Configuration.getInstance().setOsmdroidBasePath(cacheDir);
+        Configuration.getInstance().setOsmdroidTileCache(new File(cacheDir, "tiles"));
 
         this.mapView = new MapView(activity);
         this.mapView.setTileSource(TileSourceFactory.MAPNIK);
@@ -91,7 +93,7 @@ public class OsmMapProvider implements IMapProvider {
         // cards - visible, overlapping, and not reachable to tap. Google and AMap are configured
         // without their equivalents too, so turning these off is what makes the providers agree.
         this.mapView.getZoomController().setVisibility(
-                org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER);
+                CustomZoomButtonsController.Visibility.NEVER);
         this.controller = this.mapView.getController();
 
         this.copyrightOverlay = new CopyrightOverlay(activity);

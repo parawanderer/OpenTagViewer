@@ -41,6 +41,13 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ui.compat.TheNavigationBar;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
+import android.content.Context;
+import dev.wander.android.opentagviewer.anisette.LocalAnisette;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import org.hamcrest.Matchers;
+import org.junit.Before;
 
 /**
  * Reading the account, driven end to end with iCloud replaced.
@@ -69,7 +76,7 @@ public class FetchFromICloudFlowTest {
         AccountBeaconsForTests.forgetThemAll();
     }
 
-    @org.junit.Before
+    @Before
     public void forgetAnyStoredMembership() {
         // Finishing this flow writes real rows into the real database. Cleared here too,
         // because a test that crashed left its tags behind for whatever runs next.
@@ -79,11 +86,11 @@ public class FetchFromICloudFlowTest {
         // FetchFromICloudMembershipTest stores one; without this, every test here resumes as a
         // member and never sees the device list. Cleared before rather than only after, because
         // a test that crashed leaves it behind.
-        new dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository(
-                dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore.getInstance(
-                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(
+                        InstrumentationRegistry.getInstrumentation()
                                 .getTargetContext()),
-                new dev.wander.android.opentagviewer.util.android.AppCryptographyUtil())
+                new AppCryptographyUtil())
                 .forget().blockingAwait();
     }
 
@@ -98,17 +105,17 @@ public class FetchFromICloudFlowTest {
      */
     private static final String THE_STORED_SERIAL = "0PENTAGVK7QX";
 
-    @org.junit.Before
+    @Before
     public void giveThisInstallASerialToShow() {
-        final android.content.Context context =
+        final Context context =
                 InstrumentationRegistry.getInstrumentation().getTargetContext();
 
         context.getSharedPreferences(
-                        dev.wander.android.opentagviewer.anisette.LocalAnisette.PREFERENCES,
-                        android.content.Context.MODE_PRIVATE)
+                        LocalAnisette.PREFERENCES,
+                        Context.MODE_PRIVATE)
                 .edit()
                 .putString(
-                        dev.wander.android.opentagviewer.anisette.LocalAnisette.KEY_SERIAL,
+                        LocalAnisette.KEY_SERIAL,
                         THE_STORED_SERIAL)
                 .commit();
     }
@@ -118,10 +125,10 @@ public class FetchFromICloudFlowTest {
     public void takeTheSerialBackOut() {
         InstrumentationRegistry.getInstrumentation().getTargetContext()
                 .getSharedPreferences(
-                        dev.wander.android.opentagviewer.anisette.LocalAnisette.PREFERENCES,
-                        android.content.Context.MODE_PRIVATE)
+                        LocalAnisette.PREFERENCES,
+                        Context.MODE_PRIVATE)
                 .edit()
-                .remove(dev.wander.android.opentagviewer.anisette.LocalAnisette.KEY_SERIAL)
+                .remove(LocalAnisette.KEY_SERIAL)
                 .commit();
     }
 
@@ -158,7 +165,7 @@ public class FetchFromICloudFlowTest {
     private boolean isShown(final int id) {
         final boolean[] shown = {false};
         this.scenario.onActivity(activity ->
-                shown[0] = activity.findViewById(id).getVisibility() == android.view.View.VISIBLE);
+                shown[0] = activity.findViewById(id).getVisibility() == View.VISIBLE);
         return shown[0];
     }
 
@@ -407,8 +414,8 @@ public class FetchFromICloudFlowTest {
     public void appleDecliningSaysSoRatherThanShowingTheStatusCode() {
         this.open(FakeICloudService.whereAppleIsDeclining());
 
-        final android.content.Context context =
-                androidx.test.platform.app.InstrumentationRegistry
+        final Context context =
+                InstrumentationRegistry
                         .getInstrumentation().getTargetContext();
 
         Eventually.check(() -> onView(withId(R.id.icloud_retry_container))
@@ -417,7 +424,7 @@ public class FetchFromICloudFlowTest {
                 withText(context.getString(R.string.icloud_apple_declined_body)))));
 
         onView(withId(R.id.icloud_retry_body)).check(matches(
-                not(withText(org.hamcrest.Matchers.containsString("503")))));
+                not(withText(Matchers.containsString("503")))));
         onView(withId(R.id.icloud_no_tags_container)).check(matches(not(isDisplayed())));
         TestPace.afterAStep();
     }

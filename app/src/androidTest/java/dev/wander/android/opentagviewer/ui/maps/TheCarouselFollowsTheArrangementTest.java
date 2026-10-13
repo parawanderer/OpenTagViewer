@@ -21,6 +21,7 @@ import java.util.List;
 
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.R;
+import androidx.test.espresso.Espresso;
 
 /**
  * The map's tag carousel shows the order the user arranged.
@@ -141,7 +142,7 @@ public class TheCarouselFollowsTheArrangementTest {
     }
 
     private void goBackToTheMap() {
-        androidx.test.espresso.Espresso.pressBack();
+        Espresso.pressBack();
 
         // The map recreates on the way back, so the carousel is rebuilt from scratch - wait for
         // it to exist again before asking what is in it, or an empty list reads as a pass.

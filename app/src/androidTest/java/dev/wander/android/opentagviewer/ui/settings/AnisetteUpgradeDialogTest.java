@@ -30,6 +30,7 @@ import java.util.List;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.ui.TestHostActivity;
+import androidx.test.espresso.ViewInteraction;
 
 /**
  * The one-time offer to move an existing login off a public Anisette server.
@@ -215,7 +216,7 @@ public class AnisetteUpgradeDialogTest {
      * Left to choose, it picks the activity underneath - where none of these views are - and
      * reports the buttons as missing from a hierarchy they were never in.
      */
-    private static androidx.test.espresso.ViewInteraction inTheDialog(final int stringRes) {
+    private static ViewInteraction inTheDialog(final int stringRes) {
         return onView(withText(stringRes)).inRoot(isDialog());
     }
 

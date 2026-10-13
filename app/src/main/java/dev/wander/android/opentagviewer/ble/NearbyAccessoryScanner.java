@@ -17,6 +17,7 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Scans for a BLE advertisement whose address matches one of an accessory's currently-expected
@@ -87,7 +88,7 @@ public final class NearbyAccessoryScanner {
         })
                 .firstOrError()
                 .timeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .onErrorResumeNext(error -> error instanceof java.util.concurrent.TimeoutException
+                .onErrorResumeNext(error -> error instanceof TimeoutException
                         ? Single.error(new NotNearbyException())
                         : Single.error(error));
     }

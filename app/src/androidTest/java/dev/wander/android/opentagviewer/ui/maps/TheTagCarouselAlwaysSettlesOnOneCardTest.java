@@ -19,6 +19,7 @@ import java.util.List;
 
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.R;
+import android.view.View;
 
 /**
  * However the tag row is dragged, it ends up centred on exactly one card.
@@ -142,7 +143,7 @@ public class TheTagCarouselAlwaysSettlesOnOneCardTest {
 
     /** Where the first card sits, as a cheap way to tell whether the row moved at all. */
     private int leftEdgeOfTheFirstCard() {
-        final List<android.view.View> cards = this.theMap.cards();
+        final List<View> cards = this.theMap.cards();
         if (cards.isEmpty()) {
             return Integer.MIN_VALUE;
         }

@@ -11,6 +11,7 @@ import java.util.List;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
+import java.util.Locale;
 
 /**
  * Writes a tag's location history as CSV.
@@ -124,8 +125,8 @@ public final class HistoryCsvWriter {
                 Long.toString(report.getTimestamp()),
                 // Plain decimal rather than the default locale's formatting: a comma decimal
                 // separator would silently split the row into extra columns.
-                String.format(java.util.Locale.ROOT, "%.7f", report.getLatitude()),
-                String.format(java.util.Locale.ROOT, "%.7f", report.getLongitude()),
+                String.format(Locale.ROOT, "%.7f", report.getLatitude()),
+                String.format(Locale.ROOT, "%.7f", report.getLongitude()),
                 Long.toString(report.getHorizontalAccuracy()),
                 Long.toString(report.getConfidence()),
                 Long.toString(report.getStatus()),

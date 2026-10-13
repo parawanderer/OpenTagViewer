@@ -99,6 +99,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import java.util.Objects;
 
 
 public class SettingsActivity extends AppCompatActivity {
@@ -702,7 +703,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void updateMapProvider(String provider) {
         final String currentProvider = this.currentSettings.getMapProvider();
-        this.mapProviderChanged = this.mapProviderChanged || !java.util.Objects.equals(currentProvider, provider);
+        this.mapProviderChanged = this.mapProviderChanged || !Objects.equals(currentProvider, provider);
         this.currentSettings.setMapProvider(provider);
         this.binding.setCurrentMapProvider(this.getCurrentMapProviderUiString());
         this.saveSettings();

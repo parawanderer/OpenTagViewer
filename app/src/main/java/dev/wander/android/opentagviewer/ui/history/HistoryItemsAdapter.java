@@ -39,6 +39,7 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import androidx.annotation.VisibleForTesting;
 
 public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapter.ViewHolder> {
     private static final String TAG = HistoryItemsAdapter.class.getSimpleName();
@@ -52,7 +53,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
      * found to have no address - without a geocoder, which on a test device answers nothing
      * for every coordinate on earth and so cannot produce the interesting case on purpose.
      */
-    @androidx.annotation.VisibleForTesting
+    @VisibleForTesting
     static void cacheGeocodeForTest(final double latitude, final double longitude,
                                     final List<Address> result) {
         GEOCODING_CACHE.put(cacheKey(latitude, longitude), result);
@@ -208,7 +209,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
         return String.format(Locale.ROOT, "%.4f,%.4f", latitude, longitude);
     }
 
-    @androidx.annotation.VisibleForTesting
+    @VisibleForTesting
     static List<Address> getCachedGeocode(double latitude, double longitude) {
         final String key = cacheKey(latitude, longitude);
         var cached = GEOCODING_CACHE.get(key);
@@ -227,7 +228,7 @@ public class HistoryItemsAdapter extends RecyclerView.Adapter<HistoryItemsAdapte
      * Belt and braces here is cheap, and the failure it prevents is a crash on a screen the user
      * is only scrolling.
      */
-    @androidx.annotation.VisibleForTesting
+    @VisibleForTesting
     static String convertLocationToUIName(@lombok.NonNull List<Address> geocodeData) {
         if (geocodeData.isEmpty()) {
             return null;

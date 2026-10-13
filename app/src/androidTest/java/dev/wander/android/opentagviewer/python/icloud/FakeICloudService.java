@@ -5,6 +5,7 @@ import java.util.List;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
+import java.util.concurrent.TimeUnit;
 
 /**
  * An iCloud that behaves however a test needs it to.
@@ -228,7 +229,7 @@ public final class FakeICloudService implements ICloudService {
         // A real account takes a moment. Everything else here is instant, which is right for a
         // test and useless for looking at the screen somebody sees while they wait.
         return this.answerDelayMs > 0
-                ? answer.delay(this.answerDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                ? answer.delay(this.answerDelayMs, TimeUnit.MILLISECONDS)
                 : answer;
     }
 
@@ -268,7 +269,7 @@ public final class FakeICloudService implements ICloudService {
 
         return this.unlockDelayMs > 0
                 ? Completable.complete()
-                        .delay(this.unlockDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        .delay(this.unlockDelayMs, TimeUnit.MILLISECONDS)
                 : Completable.complete();
     }
 

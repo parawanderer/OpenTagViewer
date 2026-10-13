@@ -76,6 +76,7 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import android.os.Build;
 
 public class MyDevicesListActivity extends AppCompatActivity {
     private static final String TAG = MyDevicesListActivity.class.getSimpleName();
@@ -494,9 +495,9 @@ public class MyDevicesListActivity extends AppCompatActivity {
      * phone a bundle came from, which is the useful half, without naming anybody.
      */
     private static String exportedByLabel() {
-        return android.os.Build.MODEL == null || android.os.Build.MODEL.isBlank()
+        return Build.MODEL == null || Build.MODEL.isBlank()
                 ? "OpenTagViewer for Android"
-                : "OpenTagViewer on " + android.os.Build.MODEL;
+                : "OpenTagViewer on " + Build.MODEL;
     }
 
     /** Dated, so exporting twice does not ask about overwriting. */

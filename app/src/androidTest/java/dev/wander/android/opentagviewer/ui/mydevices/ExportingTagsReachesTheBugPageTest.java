@@ -46,6 +46,7 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.BundleBuilder;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
+import dev.wander.android.opentagviewer.Eventually;
 
 /**
  * Exporting tags, driven from the list, when the app cannot do it.
@@ -160,15 +161,15 @@ public class ExportingTagsReachesTheBugPageTest {
     private void exportIt() {
         this.scenario = ActivityScenario.launch(MyDevicesListActivity.class);
 
-        dev.wander.android.opentagviewer.Eventually.check(() ->
+        Eventually.check(() ->
                 onView(withText(A_NAME)).check(matches(isDisplayed())));
         onView(withText(A_NAME)).perform(longClick());
 
-        dev.wander.android.opentagviewer.Eventually.check(() ->
+        Eventually.check(() ->
                 onView(withId(R.id.selection_menu_button)).check(matches(isDisplayed())));
         onView(withId(R.id.selection_menu_button)).perform(click());
 
-        dev.wander.android.opentagviewer.Eventually.check(() ->
+        Eventually.check(() ->
                 onView(withText(R.string.export_tags)).check(matches(isDisplayed())));
         onView(withText(R.string.export_tags)).perform(click());
     }
@@ -193,7 +194,7 @@ public class ExportingTagsReachesTheBugPageTest {
 
         this.exportIt();
 
-        dev.wander.android.opentagviewer.Eventually.check(() -> intended(allOf(
+        Eventually.check(() -> intended(allOf(
                 hasAction(Intent.ACTION_CREATE_DOCUMENT),
                 hasType("application/zip"))));
     }
@@ -214,7 +215,7 @@ public class ExportingTagsReachesTheBugPageTest {
 
         this.exportIt();
 
-        dev.wander.android.opentagviewer.Eventually.check(() -> intended(allOf(
+        Eventually.check(() -> intended(allOf(
                 hasComponent(ErrorReportActivity.class.getName()),
                 hasExtra(ErrorReportActivity.EXTRA_BODY, R.string.error_report_body_export))));
     }
@@ -228,7 +229,7 @@ public class ExportingTagsReachesTheBugPageTest {
 
         this.exportIt();
 
-        dev.wander.android.opentagviewer.Eventually.check(() -> intended(hasExtra(
+        Eventually.check(() -> intended(hasExtra(
                 ErrorReportActivity.EXTRA_CAUSE,
                 "BundleBuildException: Python did not start.")));
     }
@@ -250,7 +251,7 @@ public class ExportingTagsReachesTheBugPageTest {
 
         this.exportIt();
 
-        dev.wander.android.opentagviewer.Eventually.check(() ->
+        Eventually.check(() ->
                 onView(withId(R.id.exported_bundle_code)).check(matches(isDisplayed())));
 
         // The two things that make the code usable: it says it cannot be shown again, and it

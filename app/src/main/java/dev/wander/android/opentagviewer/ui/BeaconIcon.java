@@ -11,6 +11,7 @@ import com.google.android.material.button.MaterialButton;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
+import android.content.Context;
 
 /**
  * Which icon stands in for a tag that has no emoji.
@@ -142,7 +143,7 @@ public final class BeaconIcon {
      * including a context forced to night, which is how this gets rendered both ways in a test
      * without touching the device.
      */
-    private static ColorStateList tintFor(final android.content.Context context,
+    private static ColorStateList tintFor(final Context context,
                                           @DrawableRes final int icon) {
         if (icon == R.drawable.findmy_accessory) {
             return null;
