@@ -598,6 +598,7 @@ something else and a bug in a guard reports green while protecting nothing:
 | `exporter_version.py` | whether a release tag may disagree with the version in the source |
 | `release_notes.py` | the notes of a *published* release, so a parsing mistake is visible to everyone |
 | `fetch_contributors.py` | whether a merge actually credited the contributor, or quietly did not |
+| `check_java_imports.py` | the Java import style check, and through `--fix`, edits to Java source |
 
 The last is the odd one, and worth a sentence. It fails nothing and gates nobody's build - it
 regenerates a credits page. What its tests protect is the *reporting*: GitHub computes
@@ -674,6 +675,23 @@ The installs matter: pyright reports an unresolved import as an error, so withou
 `NSKeyedUnArchiver` and `pillow` present it fails while telling you nothing about your code.
 
 `python/` is not clean yet and is excluded from CI's pyright step.
+
+### Fully qualified names in Java
+
+Write `Context context` with `import android.content.Context;`, not `android.content.Context
+context`. A long name is only for where the short one would clash: another type of that name is
+imported, declared in the file or in the same package, or an import would shadow a `java.lang`
+type. `android.R` next to the app's own `R` is the usual case.
+
+```bash
+python scripts/check_java_imports.py          # report, exit 1 on findings
+python scripts/check_java_imports.py --fix    # shorten them and add the imports
+```
+
+It reads the source alone, so it needs no Gradle and runs in under a second. It runs in
+`static-checks.yml` but **does not fail the build yet**: the existing code has about 270 of these,
+and fixing them is being held back until the open pull requests are in, so the cleanup does not
+conflict with them. Once it is fixed, the step becomes blocking.
 
 ---
 
@@ -859,7 +877,7 @@ run regardless: each AES entry carries a fresh random salt.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, string tooling tests. Seconds, no Android |
+| `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, tooling tests, Java import check (reported, not yet blocking). Seconds, no Android |
 | `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK. Also publishes the generated Room schemas as `room-schemas`, so a version bump made without an Android toolchain can still commit the JSON rule 1 requires |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
