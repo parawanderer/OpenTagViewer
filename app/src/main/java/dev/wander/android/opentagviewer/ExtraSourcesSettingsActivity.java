@@ -16,6 +16,8 @@ import dev.wander.android.opentagviewer.databinding.ActivityExtraSourcesBinding;
 import dev.wander.android.opentagviewer.source.ExtraSourcesApi;
 import dev.wander.android.opentagviewer.source.ExtraSourcesSettings;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
+import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
+import dev.wander.android.opentagviewer.util.android.WebLink;
 
 /**
  * Settings for the extra location source: googlefind (Google Find Hub trackers). Values are
@@ -54,6 +56,12 @@ public class ExtraSourcesSettingsActivity extends AppCompatActivity {
         for (int i = 0; i < KEYS.length; i++) fields[i].setText(this.settings.get(KEYS[i]));
 
         this.binding.extraSourcesTest.setOnClickListener(v -> this.test());
+        this.binding.extraSourcesGoogleGuide.setOnClickListener(v -> {
+            final var properties = PropertiesUtil.getProperties(this.getAssets(), "app.properties");
+            if (properties != null) {
+                WebLink.open(this, properties.getProperty("googleFindHubWikiPage"));
+            }
+        });
 
         this.warnIfUnencrypted();
         this.binding.extraSourcesGoogleUrl.addTextChangedListener(new TextWatcher() {

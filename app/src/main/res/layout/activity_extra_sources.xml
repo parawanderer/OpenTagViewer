@@ -89,6 +89,16 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="13sp" />
 
+                    <!-- The service has to be set up first, and only the wiki says how -->
+                    <Button
+                        android:id="@+id/extra_sources_google_guide"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-12dp"
+                        android:fontFamily="@font/nunito_medium"
+                        android:text="@string/google_find_hub_setup_guide" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/extra_sources_google_url_layout"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"

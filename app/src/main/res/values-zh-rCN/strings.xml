@@ -422,4 +422,5 @@
     <string name="nearby_now_with_signal">在附近 (%1$s)</string>
     <string name="ring_failed_reason">响铃失败：%1$s</string>
     <string name="server_url_not_https">不是 https：API 令牌将以未加密方式发送。</string>
+    <string name="google_find_hub_setup_guide">如何设置</string>
 </resources>

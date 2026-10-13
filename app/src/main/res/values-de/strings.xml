@@ -422,4 +422,5 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="nearby_now_with_signal">In der Nähe (%1$s)</string>
     <string name="ring_failed_reason">Klingeln fehlgeschlagen: %1$s</string>
     <string name="server_url_not_https">Kein https: Das API-Token wird unverschlüsselt gesendet.</string>
+    <string name="google_find_hub_setup_guide">So richtest du das ein</string>
 </resources>

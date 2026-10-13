@@ -32,6 +32,7 @@ public class ExtraSourcesLayoutTest {
             R.id.extra_sources_google_token, R.id.extra_sources_google_user,
             R.id.extra_sources_google_password, R.id.extra_sources_test,
             R.id.extra_sources_test_progress, R.id.extra_sources_test_result,
+            R.id.extra_sources_google_guide,
     };
 
     @Test

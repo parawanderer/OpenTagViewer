@@ -422,4 +422,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="nearby_now_with_signal">Dichtbij (%1$s)</string>
     <string name="ring_failed_reason">Laten afgaan mislukt: %1$s</string>
     <string name="server_url_not_https">Geen https: het API-token wordt onversleuteld verstuurd.</string>
+    <string name="google_find_hub_setup_guide">Zo stel je dit in</string>
 </resources>

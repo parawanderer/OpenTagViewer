@@ -422,4 +422,5 @@
     <string name="nearby_now_with_signal">Рядом (%1$s)</string>
     <string name="ring_failed_reason">Не удалось подать сигнал: %1$s</string>
     <string name="server_url_not_https">Не https: токен API будет передан без шифрования.</string>
+    <string name="google_find_hub_setup_guide">Как это настроить</string>
 </resources>

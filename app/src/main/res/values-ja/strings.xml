@@ -422,4 +422,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="nearby_now_with_signal">近くにあります (%1$s)</string>
     <string name="ring_failed_reason">鳴らせませんでした: %1$s</string>
     <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
+    <string name="google_find_hub_setup_guide">設定方法</string>
 </resources>
