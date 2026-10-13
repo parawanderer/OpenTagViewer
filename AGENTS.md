@@ -992,8 +992,9 @@ locales the first time it was run. It also runs in CI, on every PR and every rel
 
 ### Pre-commit hook
 
-`.githooks/pre-commit` runs the translation check, plus flake8 and pyright over whichever
-Python files are staged, and refuses a commit that stages `secrets.properties`. Hooks are not
+`.githooks/pre-commit` runs the translation check, flake8 and pyright over whichever Python
+files are staged, the Java import check when Java is staged, and refuses a commit that stages
+`secrets.properties`. Hooks are not
 versioned, so each clone has to opt in once:
 
 ```bash

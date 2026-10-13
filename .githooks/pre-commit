@@ -79,6 +79,16 @@ if [[ -n "$changed_python" ]]; then
 fi
 
 # ---------------------------------------------------------------------------------------
+# Java: fully qualified names where an import would do. The whole tree rather than the staged
+# files, because whether a long name is needed depends on the other classes in its package.
+# Under a second, and it reads source only.
+# ---------------------------------------------------------------------------------------
+if staged | grep -qE '^app/src/.*\.java$'; then
+    say "Java changed - checking for fully qualified names an import would do"
+    "$PYTHON" scripts/check_java_imports.py || failed=1
+fi
+
+# ---------------------------------------------------------------------------------------
 # Secrets. secrets.properties holds a real Google Maps key and is gitignored; committing it
 # would publish the key, and a published key cannot be unpublished, only rotated.
 # ---------------------------------------------------------------------------------------
