@@ -162,6 +162,8 @@ public class CustomAccessoryImportTest {
                 info.isEmojiFilled());
         assertEquals("so it must fall to the self-generated icon, not Apple's logo",
                 R.drawable.tag_self_generated, BeaconIcon.forBeacon(info));
+        assertEquals("the map card's Ring and the nearby watch derive addresses from this",
+                row.accessoryJson, info.getOwnedBeaconAccessoryJson());
     }
 
     /**

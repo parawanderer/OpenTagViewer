@@ -107,7 +107,11 @@ final class CustomAccessoryParser {
                 .productId(0)
                 .vendorId(0)
                 .batteryLevel(0)
-                .stableIdentifier(List.of());
+                .stableIdentifier(List.of())
+                // The map card's Ring reads this: without it a self-generated tag had no
+                // accessory to derive addresses from ("Could not compute this accessory's
+                // current address"), while the device screen - which reads the row - worked.
+                .ownedBeaconAccessoryJson(beaconData.getOwnedBeaconInfo().accessoryJson);
 
         if (userOverrides != null) {
             built.userOverrideName(userOverrides.uiName)
