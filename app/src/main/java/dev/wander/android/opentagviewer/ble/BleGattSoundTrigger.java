@@ -14,8 +14,10 @@ import android.util.Log;
 
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -37,6 +39,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BleGattSoundTrigger {
     private static final String TAG = BleGattSoundTrigger.class.getSimpleName();
+
+    /** {@link BleSoundTriggerResult#getProtocol()} for a sound started over DULT. */
+    static final String PROTOCOL_DULT = "DULT";
 
     private static final UUID DULT_SERVICE =
             UUID.fromString("15190001-12F4-C226-88ED-2AC5579F2A85");
@@ -128,7 +133,7 @@ public final class BleGattSoundTrigger {
                     }
 
                     if (dult != null) {
-                        enableNotifyThenWrite(gatt, dult, DULT_START_OPCODE, "DULT");
+                        enableNotifyThenWrite(gatt, dult, DULT_START_OPCODE, PROTOCOL_DULT);
                     } else if (findMy != null) {
                         enableNotifyThenWrite(gatt, findMy, FINDMY_START_OPCODE, "FindMy (fd44)");
                     } else if (airtag != null) {
@@ -238,5 +243,69 @@ public final class BleGattSoundTrigger {
             descriptor.setValue(value);
             gatt.writeDescriptor(descriptor);
         }
+    }
+
+    /** DULT Sound_Stop, little-endian like the start opcode. */
+    private static final byte[] DULT_STOP_OPCODE = {0x01, 0x03};
+
+    /**
+     * Connects and writes DULT's Sound_Stop, if the device has the DULT service; completes
+     * either way (and on any failure) within about ten seconds.
+     */
+    @SuppressLint("MissingPermission")
+    public static Completable stopDult(
+            final Context context, final BluetoothDevice device) {
+        return Completable.create(emitter -> {
+            final BluetoothGatt[] gattRef = new BluetoothGatt[1];
+            final BluetoothGattCallback callback = new BluetoothGattCallback() {
+                private BluetoothGattCharacteristic dult;
+
+                @Override
+                public void onConnectionStateChange(final BluetoothGatt gatt, final int status, final int newState) {
+                    if (newState == BluetoothProfile.STATE_CONNECTED) {
+                        gatt.discoverServices();
+                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                        gatt.close();
+                        emitter.onComplete();
+                    }
+                }
+
+                @Override
+                public void onServicesDiscovered(final BluetoothGatt gatt, final int status) {
+                    this.dult = characteristicOf(gatt, DULT_SERVICE, DULT_CHARACTERISTIC);
+                    if (this.dult == null) {
+                        gatt.disconnect();
+                        return;
+                    }
+                    gatt.setCharacteristicNotification(this.dult, true);
+                    final BluetoothGattDescriptor descriptor = this.dult.getDescriptor(CCCD);
+                    if (descriptor == null) {
+                        writeCharacteristicCompat(gatt, this.dult, DULT_STOP_OPCODE);
+                    } else {
+                        writeDescriptorCompat(gatt, descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                    }
+                }
+
+                @Override
+                public void onDescriptorWrite(final BluetoothGatt gatt, final BluetoothGattDescriptor d, final int status) {
+                    if (this.dult != null) {
+                        writeCharacteristicCompat(gatt, this.dult, DULT_STOP_OPCODE);
+                    }
+                }
+
+                @Override
+                public void onCharacteristicWrite(final BluetoothGatt gatt, final BluetoothGattCharacteristic c, final int status) {
+                    Log.i(TAG, "DULT stop written to " + device.getAddress() + " (status=" + status + ")");
+                    gatt.disconnect();
+                }
+            };
+            gattRef[0] = device.connectGatt(context, false, callback);
+            emitter.setCancellable(() -> {
+                if (gattRef[0] != null) {
+                    gattRef[0].disconnect();
+                    gattRef[0].close();
+                }
+            });
+        }).timeout(10, TimeUnit.SECONDS).onErrorComplete();
     }
 }

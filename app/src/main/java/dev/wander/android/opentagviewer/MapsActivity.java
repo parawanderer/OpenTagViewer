@@ -236,6 +236,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * than leaving it running in the background with nothing left to show its state. */
     private Disposable continuousPingDisposable;
 
+    /** Whether the running ping started a sound that has a stop command (DULT). */
+    private boolean continuousPingLeftStoppableSound;
+
+    /**
+     * Stops still in flight, by beaconId. A new ping for the same tag cancels its pending stop,
+     * which would otherwise land after the new start and silence it.
+     */
+    private final Map<String, Disposable> pendingSoundStops = new HashMap<>();
+
     /** Which tag's ring button asked for BLE permission, so the result callback - which carries
      * no context of its own - knows what to start once it is granted. */
     private String ringPermissionRequestBeaconId;
@@ -1623,7 +1632,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         }
         final String accessoryJson = beaconData.getInfo().getOwnedBeaconAccessoryJson();
 
+        final Disposable pendingStop = this.pendingSoundStops.remove(beaconId);
+        if (pendingStop != null) {
+            pendingStop.dispose();
+        }
+
         this.continuousPingBeaconId = beaconId;
+        this.continuousPingLeftStoppableSound = false;
         final FrameLayout container = this.dynamicCardsForTag.get(beaconId);
         if (container != null) {
             TagCardHelper.toggleRingActive(container, true);
@@ -1670,6 +1685,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // since this update was emitted - either way, there is nothing left to show it on.
         if (!beaconId.equals(this.continuousPingBeaconId)) {
             return;
+        }
+
+        if (update.getPhase() == BleSoundTriggerPhase.DONE && update.getResult().hasStopCommand()) {
+            this.continuousPingLeftStoppableSound = true;
         }
 
         if (update.getPhase() == BleSoundTriggerPhase.DONE) {
@@ -1719,10 +1738,28 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private void stopContinuousPing() {
-        if (this.continuousPingDisposable != null && !this.continuousPingDisposable.isDisposed()) {
+        final boolean wasRinging = this.continuousPingDisposable != null
+                && !this.continuousPingDisposable.isDisposed();
+        if (wasRinging) {
             this.continuousPingDisposable.dispose();
         }
+        // The last trigger may still be sounding (a DULT device plays until told otherwise or
+        // its own timeout), so tell it to stop rather than only not asking again. Only when it
+        // was rung over DULT: an AirTag has no stop and would cost a connection for nothing.
+        final BeaconData ringing = this.continuousPingBeaconId == null ? null
+                : this.beacons.get(this.continuousPingBeaconId);
+        if (wasRinging && this.continuousPingLeftStoppableSound && ringing != null) {
+            final Disposable previous = this.pendingSoundStops.put(this.continuousPingBeaconId,
+                    AppDependencies.accessorySoundTrigger()
+                            .stopSound(this.getApplicationContext(),
+                                    ringing.getInfo().getOwnedBeaconAccessoryJson())
+                            .subscribe(() -> Log.d(TAG, "Stop sent (or nothing to stop)")));
+            if (previous != null) {
+                previous.dispose();
+            }
+        }
         this.continuousPingDisposable = null;
+        this.continuousPingLeftStoppableSound = false;
 
         if (this.continuousPingBeaconId != null) {
             final FrameLayout container = this.dynamicCardsForTag.get(this.continuousPingBeaconId);
