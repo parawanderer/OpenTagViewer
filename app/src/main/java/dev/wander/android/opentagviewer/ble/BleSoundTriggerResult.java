@@ -52,11 +52,12 @@ public class BleSoundTriggerResult {
     }
 
     /**
-     * Whether this attempt left something sounding that can be told to stop. Only DULT has a
+     * Whether this attempt left something sounding that can be told to stop. DULT and FMDN have a
      * stop command; an AirTag stops by itself, so asking it costs a connection for nothing.
      */
     public boolean hasStopCommand() {
         return this.status == BleSoundTriggerStatus.SUCCESS
-                && BleGattSoundTrigger.PROTOCOL_DULT.equals(this.protocol);
+                && (BleGattSoundTrigger.PROTOCOL_DULT.equals(this.protocol)
+                || FmdnRingTrigger.PROTOCOL.equals(this.protocol));
     }
 }

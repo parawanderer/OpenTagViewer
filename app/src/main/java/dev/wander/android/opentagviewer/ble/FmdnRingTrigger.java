@@ -46,7 +46,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 @SuppressLint("MissingPermission")   // checked through BlePermissions first
 public final class FmdnRingTrigger implements AccessorySoundTrigger {
     private static final String TAG = FmdnRingTrigger.class.getSimpleName();
-    private static final String PROTOCOL = "FMDN";
+    /** {@link BleSoundTriggerResult#getProtocol()} for a ring sent over FMDN. */
+    static final String PROTOCOL = "FMDN";
 
     private static final ParcelUuid FMDN_SERVICE_DATA = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
     private static final UUID FAST_PAIR_SERVICE = UUID.fromString("0000fe2c-0000-1000-8000-00805f9b34fb");
@@ -218,7 +219,8 @@ public final class FmdnRingTrigger implements AccessorySoundTrigger {
                     final BluetoothGattDescriptor cccd = this.actions.getDescriptor(CCCD);
                     if (cccd != null) {
                         gatt.setCharacteristicNotification(this.actions, true);
-                        gatt.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                        BleGattSoundTrigger.writeDescriptorCompat(
+                                gatt, cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                     } else {
                         gatt.readCharacteristic(this.actions);
                     }
@@ -227,6 +229,22 @@ public final class FmdnRingTrigger implements AccessorySoundTrigger {
                 @Override
                 public void onCharacteristicChanged(final BluetoothGatt gatt, final BluetoothGattCharacteristic c, final byte[] value) {
                     Log.i(TAG, "Beacon Actions notification: " + FmdnRingCommand.hex(value));
+                }
+
+                // Below API 33 the platform calls these older overloads instead, with the value
+                // on the characteristic; without them a ring on Android 12 and below waits out
+                // the timeout
+                @Override
+                @SuppressWarnings("deprecation")
+                public void onCharacteristicChanged(final BluetoothGatt gatt, final BluetoothGattCharacteristic c) {
+                    this.onCharacteristicChanged(gatt, c, c.getValue());
+                }
+
+                @Override
+                @SuppressWarnings("deprecation")
+                public void onCharacteristicRead(final BluetoothGatt gatt, final BluetoothGattCharacteristic c,
+                                                 final int status) {
+                    this.onCharacteristicRead(gatt, c, c.getValue(), status);
                 }
 
                 @Override
@@ -248,7 +266,7 @@ public final class FmdnRingTrigger implements AccessorySoundTrigger {
                                 RING_DECISECONDS, FmdnRingCommand.VOLUME_DEFAULT,
                                 FmdnRingCommand.VARIANTS[this.variant]);
                         Log.i(TAG, "Writing: " + FmdnRingCommand.hex(request));
-                        gatt.writeCharacteristic(this.actions, request, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                        BleGattSoundTrigger.writeCharacteristicCompat(gatt, this.actions, request);
                     } catch (final IllegalArgumentException e) {
                         this.finish(done(BleSoundTriggerStatus.FAILED, e.getMessage()), gatt);
                     }

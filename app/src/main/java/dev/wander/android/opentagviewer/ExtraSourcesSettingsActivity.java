@@ -1,6 +1,8 @@
 package dev.wander.android.opentagviewer;
 
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.EditText;
 
@@ -52,6 +54,32 @@ public class ExtraSourcesSettingsActivity extends AppCompatActivity {
         for (int i = 0; i < KEYS.length; i++) fields[i].setText(this.settings.get(KEYS[i]));
 
         this.binding.extraSourcesTest.setOnClickListener(v -> this.test());
+
+        this.warnIfUnencrypted();
+        this.binding.extraSourcesGoogleUrl.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(final CharSequence s, final int start, final int count, final int after) {
+            }
+
+            @Override
+            public void onTextChanged(final CharSequence s, final int start, final int before, final int count) {
+            }
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+                ExtraSourcesSettingsActivity.this.warnIfUnencrypted();
+            }
+        });
+    }
+
+    /**
+     * The app permits cleartext HTTP (network_security_config.xml), so an http:// address sends
+     * the API token, which reads every location the service holds, unencrypted.
+     */
+    private void warnIfUnencrypted() {
+        final String url = String.valueOf(this.binding.extraSourcesGoogleUrl.getText()).trim();
+        this.binding.extraSourcesGoogleUrlLayout.setHelperText(
+                url.regionMatches(true, 0, "http://", 0, 7) ? this.getString(R.string.server_url_not_https) : null);
     }
 
     private void save() {

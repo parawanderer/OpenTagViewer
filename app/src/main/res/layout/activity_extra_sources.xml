@@ -90,6 +90,7 @@
                         android:textSize="13sp" />
 
                     <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/extra_sources_google_url_layout"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

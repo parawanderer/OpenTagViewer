@@ -1757,8 +1757,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             }
             // The loop retries quietly, which used to hide why a ring never happens (a tracker
             // refusing the request, a missing sound service). Say so - once per distinct reason.
+            // Google trackers only, while that path is experimental: the message is diagnostic
+            // English, and the Find My path already reports through the card's label
             final String reason = update.getResult().getMessage();
-            if ((status == BleSoundTriggerStatus.FAILED || status == BleSoundTriggerStatus.NO_SOUND_SERVICE)
+            final BeaconData ringing = this.beacons.get(beaconId);
+            final boolean google = ringing != null
+                    && ExternalAccessory.isGoogle(ringing.getInfo().getOwnedBeaconAccessoryJson());
+            if (google && (status == BleSoundTriggerStatus.FAILED || status == BleSoundTriggerStatus.NO_SOUND_SERVICE)
                     && reason != null && !reason.equals(this.lastRingFailureShown)) {
                 this.lastRingFailureShown = reason;
                 Toast.makeText(this, this.getString(R.string.ring_failed_reason, reason), LENGTH_LONG).show();
@@ -2694,12 +2699,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         now,
                         DateUtils.MINUTE_IN_MILLIS
                 ).toString();
-                // Which network it came from, once there is more than one to come from
+                // Only Google is named: Apple is every other card's source, and labelling all of
+                // them would change the row for everyone who never set Google up
                 final String source = LocationReport.PROVENANCE_GOOGLE.equals(lastLocation.getProvenance())
                         ? this.getString(R.string.source_google)
-                        : LocationReport.PROVENANCE_LOCAL.equals(lastLocation.getProvenance())
-                        ? null
-                        : this.getString(R.string.source_apple);
+                        : null;
                 final String updated = this.getString(R.string.last_updated_x, timeAgo);
                 deviceLastUpdate.setText(source == null ? updated : updated + " · " + source);
                 // Nothing live to pulse for once the sighting has aged out.
