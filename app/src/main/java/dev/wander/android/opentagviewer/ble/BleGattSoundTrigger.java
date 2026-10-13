@@ -14,8 +14,10 @@ import android.util.Log;
 
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -37,6 +39,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BleGattSoundTrigger {
     private static final String TAG = BleGattSoundTrigger.class.getSimpleName();
+
+    /** {@link BleSoundTriggerResult#getProtocol()} for a sound started over DULT. */
+    static final String PROTOCOL_DULT = "DULT";
 
     private static final UUID DULT_SERVICE =
             UUID.fromString("15190001-12F4-C226-88ED-2AC5579F2A85");
@@ -128,7 +133,7 @@ public final class BleGattSoundTrigger {
                     }
 
                     if (dult != null) {
-                        enableNotifyThenWrite(gatt, dult, DULT_START_OPCODE, "DULT");
+                        enableNotifyThenWrite(gatt, dult, DULT_START_OPCODE, PROTOCOL_DULT);
                     } else if (findMy != null) {
                         enableNotifyThenWrite(gatt, findMy, FINDMY_START_OPCODE, "FindMy (fd44)");
                     } else if (airtag != null) {
@@ -248,9 +253,9 @@ public final class BleGattSoundTrigger {
      * either way (and on any failure) within about ten seconds.
      */
     @SuppressLint("MissingPermission")
-    public static io.reactivex.rxjava3.core.Completable stopDult(
+    public static Completable stopDult(
             final Context context, final BluetoothDevice device) {
-        return io.reactivex.rxjava3.core.Completable.create(emitter -> {
+        return Completable.create(emitter -> {
             final BluetoothGatt[] gattRef = new BluetoothGatt[1];
             final BluetoothGattCallback callback = new BluetoothGattCallback() {
                 private BluetoothGattCharacteristic dult;
@@ -283,7 +288,9 @@ public final class BleGattSoundTrigger {
 
                 @Override
                 public void onDescriptorWrite(final BluetoothGatt gatt, final BluetoothGattDescriptor d, final int status) {
-                    if (this.dult != null) writeCharacteristicCompat(gatt, this.dult, DULT_STOP_OPCODE);
+                    if (this.dult != null) {
+                        writeCharacteristicCompat(gatt, this.dult, DULT_STOP_OPCODE);
+                    }
                 }
 
                 @Override
@@ -299,6 +306,6 @@ public final class BleGattSoundTrigger {
                     gattRef[0].close();
                 }
             });
-        }).timeout(10, java.util.concurrent.TimeUnit.SECONDS).onErrorComplete();
+        }).timeout(10, TimeUnit.SECONDS).onErrorComplete();
     }
 }

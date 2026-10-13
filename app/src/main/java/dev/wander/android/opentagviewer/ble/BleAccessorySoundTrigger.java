@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -57,6 +58,11 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
         Observable<BleSoundTriggerUpdate> trigger(Context context, D device);
     }
 
+    /** Sends a stop to a found device. Real: {@link BleGattSoundTrigger#stopDult}. */
+    interface GattStopper<D> {
+        Completable stop(Context context, D device);
+    }
+
     /**
      * Reads the BLE address off a found device. Real: {@code BluetoothDevice::getAddress}.
      *
@@ -104,6 +110,7 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
     private final PermissionCheck permissionCheck;
     private final Scanner<D> scanner;
     private final GattTrigger<D> gattTrigger;
+    private final GattStopper<D> gattStopper;
     private final int gattAttempts;
     private final long gattRetryDelayMs;
     private final long continuousPingPauseMs;
@@ -119,11 +126,11 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             final AccessoryMacResolver macResolver) {
         return new BleAccessorySoundTrigger<>(macResolver, BlePermissions::granted,
                 NearbyAccessoryScanner::findNearby, BleGattSoundTrigger::trigger,
-                BluetoothDevice::getAddress,
+                BleGattSoundTrigger::stopDult, BluetoothDevice::getAddress,
                 GATT_ATTEMPTS, GATT_RETRY_DELAY_MS, CONTINUOUS_PING_PAUSE_MS);
     }
 
-    /** Package-private: only {@code BleAccessorySoundTriggerTest} constructs one of these with fakes. */
+    /** For tests that never stop a sound: the stopper is a no-op. */
     BleAccessorySoundTrigger(
             final AccessoryMacResolver macResolver,
             final PermissionCheck permissionCheck,
@@ -133,10 +140,27 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
             final int gattAttempts,
             final long gattRetryDelayMs,
             final long continuousPingPauseMs) {
+        this(macResolver, permissionCheck, scanner, gattTrigger,
+                (context, device) -> Completable.complete(), addressOf,
+                gattAttempts, gattRetryDelayMs, continuousPingPauseMs);
+    }
+
+    /** Package-private: only {@code BleAccessorySoundTriggerTest} constructs one of these with fakes. */
+    BleAccessorySoundTrigger(
+            final AccessoryMacResolver macResolver,
+            final PermissionCheck permissionCheck,
+            final Scanner<D> scanner,
+            final GattTrigger<D> gattTrigger,
+            final GattStopper<D> gattStopper,
+            final AddressOf<D> addressOf,
+            final int gattAttempts,
+            final long gattRetryDelayMs,
+            final long continuousPingPauseMs) {
         this.macResolver = macResolver;
         this.permissionCheck = permissionCheck;
         this.scanner = scanner;
         this.gattTrigger = gattTrigger;
+        this.gattStopper = gattStopper;
         this.addressOf = addressOf;
         this.gattAttempts = gattAttempts;
         this.gattRetryDelayMs = gattRetryDelayMs;
@@ -196,15 +220,17 @@ public class BleAccessorySoundTrigger<D> implements AccessorySoundTrigger {
     }
 
     @Override
-    public io.reactivex.rxjava3.core.Completable stopSound(final Context context, final String accessoryJson) {
-        return io.reactivex.rxjava3.core.Completable.defer(() -> {
-            if (!this.permissionCheck.granted(context)) return io.reactivex.rxjava3.core.Completable.complete();
+    public Completable stopSound(final Context context, final String accessoryJson) {
+        return Completable.defer(() -> {
+            if (!this.permissionCheck.granted(context)) {
+                return Completable.complete();
+            }
             final Map<String, Integer> candidates = this.macResolver.currentMacAddresses(accessoryJson);
-            if (candidates == null || candidates.isEmpty()) return io.reactivex.rxjava3.core.Completable.complete();
+            if (candidates == null || candidates.isEmpty()) {
+                return Completable.complete();
+            }
             return this.scanner.findNearby(context, candidates.keySet(), SCAN_TIMEOUT_MS)
-                    .flatMapCompletable(device -> device instanceof android.bluetooth.BluetoothDevice
-                            ? BleGattSoundTrigger.stopDult(context, (android.bluetooth.BluetoothDevice) device)
-                            : io.reactivex.rxjava3.core.Completable.complete());
+                    .flatMapCompletable(device -> this.gattStopper.stop(context, device));
         }).onErrorComplete().subscribeOn(Schedulers.io());
     }
 

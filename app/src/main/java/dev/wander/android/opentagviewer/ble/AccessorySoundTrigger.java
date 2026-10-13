@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ble;
 
 import android.content.Context;
 
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 
 /**
@@ -43,7 +44,7 @@ public interface AccessorySoundTrigger {
      * Sound_Stop). AirTags stop by themselves and have none, so the default does nothing.
      * Never errors; best effort.
      */
-    default io.reactivex.rxjava3.core.Completable stopSound(Context context, String accessoryJson) {
-        return io.reactivex.rxjava3.core.Completable.complete();
+    default Completable stopSound(Context context, String accessoryJson) {
+        return Completable.complete();
     }
 }

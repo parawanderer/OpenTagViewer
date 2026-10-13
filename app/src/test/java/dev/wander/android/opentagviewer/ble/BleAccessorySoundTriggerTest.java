@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.ble;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -8,6 +9,7 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -431,6 +434,75 @@ public class BleAccessorySoundTriggerTest {
                 callsAtDispose, scannerCalls.get());
     }
 
+    // --- stopping a sound ---------------------------------------------------------------------
+    //
+    // stopSound swallows every error, an AssertionError thrown from a fake included, so these
+    // count calls rather than relying on an "unreachable" fake to fail the test.
+
+    @Test
+    public void stoppingWithoutPermissionNeitherResolvesNorScans() throws InterruptedException {
+        final FakeResolver resolver = resolverReturning(List.of(A_MAC));
+        final StopFakes fakes = new StopFakes(Single.just(A_DEVICE));
+
+        stopSoundBlocking(fakes.trigger(resolver, false));
+
+        assertEquals(0, resolver.resolveCalls.get());
+        assertEquals(0, fakes.scans.get());
+    }
+
+    @Test
+    public void stoppingWithNoCandidateMacsDoesNotScan() throws InterruptedException {
+        final StopFakes fakes = new StopFakes(Single.just(A_DEVICE));
+
+        stopSoundBlocking(fakes.trigger(resolverReturning(List.of()), true));
+        stopSoundBlocking(fakes.trigger(new FakeResolver(null), true));
+
+        assertEquals(0, fakes.scans.get());
+    }
+
+    @Test
+    public void stoppingATagThatIsNotNearbySendsNothing() throws InterruptedException {
+        final StopFakes fakes = new StopFakes(
+                Single.error(new NearbyAccessoryScanner.NotNearbyException()));
+
+        stopSoundBlocking(fakes.trigger(resolverReturning(List.of(A_MAC)), true));
+
+        assertEquals(1, fakes.scans.get());
+        assertEquals(List.of(), fakes.stopped);
+    }
+
+    @Test
+    public void stoppingAFoundTagSendsTheStopToThatDevice() throws InterruptedException {
+        final StopFakes fakes = new StopFakes(Single.just(A_DEVICE));
+
+        stopSoundBlocking(fakes.trigger(resolverReturning(List.of(A_MAC)), true));
+
+        assertEquals(List.of(A_DEVICE), fakes.stopped);
+    }
+
+    @Test
+    public void aFailedStopStillCompletes() throws InterruptedException {
+        final StopFakes fakes = new StopFakes(Single.just(A_DEVICE));
+        fakes.stopResult = Completable.error(new IllegalStateException("GATT 133"));
+
+        stopSoundBlocking(fakes.trigger(resolverReturning(List.of(A_MAC)), true));
+
+        assertEquals(List.of(A_DEVICE), fakes.stopped);
+    }
+
+    /** Only a sound started over DULT is worth a connection to stop. */
+    @Test
+    public void onlyASuccessfulDultSoundHasAStopCommand() {
+        assertTrue(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
+                BleGattSoundTrigger.PROTOCOL_DULT, "test").hasStopCommand());
+        assertFalse(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
+                "AirTag", "test").hasStopCommand());
+        assertFalse(new BleSoundTriggerResult(BleSoundTriggerStatus.SUCCESS,
+                "FindMy (fd44)", "test").hasStopCommand());
+        assertFalse(new BleSoundTriggerResult(BleSoundTriggerStatus.FAILED,
+                BleGattSoundTrigger.PROTOCOL_DULT, "test").hasStopCommand());
+    }
+
     // --- helpers ------------------------------------------------------------------------------
 
     private static List<BleSoundTriggerUpdate> playSoundBlocking(
@@ -441,6 +513,43 @@ public class BleAccessorySoundTriggerTest {
         observer.assertComplete();
         observer.assertNoErrors();
         return observer.values();
+    }
+
+    /** A scanner and a stopper that record what they were asked to do. */
+    private static final class StopFakes {
+        private final Single<String> scanResult;
+        private final AtomicInteger scans = new AtomicInteger();
+        private final List<String> stopped = Collections.synchronizedList(new ArrayList<>());
+        private Completable stopResult = Completable.complete();
+
+        private StopFakes(final Single<String> scanResult) {
+            this.scanResult = scanResult;
+        }
+
+        private BleAccessorySoundTrigger<String> trigger(
+                final FakeResolver resolver, final boolean permitted) {
+            return new BleAccessorySoundTrigger<>(resolver, context -> permitted,
+                    (context, macs, timeout) -> {
+                        this.scans.incrementAndGet();
+                        return this.scanResult;
+                    },
+                    unreachableGattTrigger(),
+                    (context, device) -> {
+                        this.stopped.add(device);
+                        return this.stopResult;
+                    },
+                    s -> s, 3, 0L, 0L);
+        }
+    }
+
+    /** Completes and never errors - the contract the caller relies on to fire and forget it. */
+    private static void stopSoundBlocking(final BleAccessorySoundTrigger<String> trigger)
+            throws InterruptedException {
+        final TestObserver<Void> observer = trigger.stopSound(null, "{}").test();
+        assertTrue("stopSound did not complete within " + AWAIT_SECONDS + "s",
+                observer.await(AWAIT_SECONDS, TimeUnit.SECONDS));
+        observer.assertComplete();
+        observer.assertNoErrors();
     }
 
     private static BleAccessorySoundTrigger.Scanner<String> unreachableScanner() {

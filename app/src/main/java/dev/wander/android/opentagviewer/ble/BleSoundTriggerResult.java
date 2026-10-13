@@ -50,4 +50,13 @@ public class BleSoundTriggerResult {
             final BleSoundTriggerStatus status, final String protocol, final String message) {
         this(status, protocol, message, null);
     }
+
+    /**
+     * Whether this attempt left something sounding that can be told to stop. Only DULT has a
+     * stop command; an AirTag stops by itself, so asking it costs a connection for nothing.
+     */
+    public boolean hasStopCommand() {
+        return this.status == BleSoundTriggerStatus.SUCCESS
+                && BleGattSoundTrigger.PROTOCOL_DULT.equals(this.protocol);
+    }
 }
