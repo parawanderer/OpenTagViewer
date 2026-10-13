@@ -3,7 +3,8 @@
 `android.content.Context context` where `import android.content.Context;` would do is the
 pattern this catches. A fully qualified name is allowed only where the short name would clash
 with something else in the file: an import of a different type, a type the file declares, a
-class in the same package, or a `java.lang` type an import would shadow. That is the one case
+class in the same package, a type nested in a supertype the project declares, or a
+`java.lang` type an import would shadow. That is the one case
 where Java needs the long form, and it is decided here from the source alone, so this runs in
 well under a second with no Gradle and no classpath.
 
@@ -56,6 +57,9 @@ JAVA_LANG = frozenset({
 PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 IMPORT_RE = re.compile(r"^\s*import\s+(static\s+)?([\w.]+?)(\.\*)?\s*;", re.MULTILINE)
 DECLARED_RE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Z]\w*)")
+# A type declaration up to its opening brace, which is where `extends` and `implements` live.
+HEADER_RE = re.compile(r"\b(?:class|interface|enum|record)\s+[A-Z]\w*([^{;]*)\{")
+GENERICS_RE = re.compile(r"<[^<>]*>")
 # A run of lowercase segments followed by the first capitalised one: the type. Anything after it
 # (`Map.Entry`, `View.VISIBLE`) stays as written and resolves through the import.
 QUALIFIED_RE = re.compile(r"(?<![\w.])((?:[a-z_][a-z0-9_]*\.)+)([A-Z]\w*)")
@@ -154,6 +158,20 @@ class JavaFile:
             has_wildcard=any(wildcard and not static for static, _, wildcard in found),
         )
 
+    @property
+    def qualified(self) -> str:
+        return f"{self.package}.{self.path.stem}" if self.package else self.path.stem
+
+    def supertypes(self) -> set[str]:
+        """Every type named after `extends` or `implements`, generics stripped, as written."""
+        named: set[str] = set()
+        for header in HEADER_RE.findall(self.code):
+            while GENERICS_RE.search(header):
+                header = GENERICS_RE.sub("", header)
+            for clause in re.split(r"\b(?:extends|implements|permits)\b", header)[1:]:
+                named.update(part.strip() for part in clause.split(",") if part.strip())
+        return {name for name in named if re.fullmatch(r"[\w.]+", name)}
+
 
 def collect(paths: list[Path]) -> list[Path]:
     files: list[Path] = []
@@ -170,6 +188,39 @@ def classes_by_package(files: list[JavaFile]) -> dict[str, set[str]]:
     return found
 
 
+def inherited_types(java: JavaFile, by_name: dict[str, JavaFile]) -> set[str]:
+    """Types nested in this file's supertypes, transitively, as far as the scanned sources go.
+
+    Inside a class body a member type inherited from a supertype shadows a single-type import of
+    the same name - JLS 6.4.1 - so `import com.google...CameraPosition;` in a class implementing
+    an interface that nests its own `CameraPosition` compiles to the wrong one. Supertypes outside
+    the scanned sources (`View.OnClickListener` in a `View` subclass) cannot be seen from here;
+    the compiler catches those.
+    """
+    found: set[str] = set()
+    seen: set[str] = set()
+    pending = [java]
+    while pending:
+        current = pending.pop()
+        for name in current.supertypes():
+            target = _resolve(name, current, by_name)
+            if target is None or target.qualified in seen:
+                continue
+            seen.add(target.qualified)
+            found.update(target.declared)
+            pending.append(target)
+    return found
+
+
+def _resolve(name: str, java: JavaFile, by_name: dict[str, JavaFile]) -> JavaFile | None:
+    top = name.split(".", 1)[0]
+    if "." in name and top[:1].islower():
+        return by_name.get(name)
+    if top in java.imports:
+        return by_name.get(java.imports[top])
+    return by_name.get(f"{java.package}.{top}" if java.package else top)
+
+
 def package_roots(files: list[JavaFile]) -> frozenset[str]:
     roots = set(BASE_ROOTS)
     for java in files:
@@ -177,7 +228,8 @@ def package_roots(files: list[JavaFile]) -> frozenset[str]:
     return frozenset(roots)
 
 
-def findings_in(java: JavaFile, same_package: set[str], roots: frozenset[str]) -> list[Finding]:
+def findings_in(java: JavaFile, same_package: set[str], roots: frozenset[str],
+                inherited: set[str] | None = None) -> list[Finding]:
     candidates = list(_qualified_names(java, roots))
     targets_by_simple: dict[str, set[str]] = {}
     for finding in candidates:
@@ -185,7 +237,7 @@ def findings_in(java: JavaFile, same_package: set[str], roots: frozenset[str]) -
 
     return [
         finding for finding in candidates
-        if not _must_stay_qualified(finding, java, same_package, targets_by_simple)
+        if not _must_stay_qualified(finding, java, same_package | (inherited or set()), targets_by_simple)
     ]
 
 
@@ -255,9 +307,11 @@ def scan(paths: list[Path]) -> list[tuple[JavaFile, list[Finding]]]:
     files = [JavaFile.read(path) for path in collect(paths)]
     by_package = classes_by_package(files)
     roots = package_roots(files)
+    by_name = {java.qualified: java for java in files}
     result = []
     for java in files:
-        found = findings_in(java, by_package.get(java.package, set()), roots)
+        found = findings_in(java, by_package.get(java.package, set()), roots,
+                            inherited_types(java, by_name))
         if found:
             result.append((java, found))
     return result

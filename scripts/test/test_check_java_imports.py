@@ -51,6 +51,33 @@ def test_reports_the_line_and_column(tmp_path: Path):
     assert (finding.line, finding.column) == (4, 5)
 
 
+def test_keeps_a_name_a_supertype_nests(tmp_path: Path):
+    # GoogleMapProvider implements IMapProvider, which nests its own CameraPosition. A member type
+    # inherited from a supertype beats a single-type import inside the class body, so importing
+    # Google's CameraPosition compiles to the wrong type.
+    java(tmp_path, "interface Provider {\n    final class Position {}\n}\n", name="Provider")
+    java(tmp_path, (
+        "class Thing implements Runnable, Provider {\n"
+        "    com.google.maps.Position position;\n"
+        "}\n"
+    ))
+    assert flagged(tmp_path) == []
+
+
+def test_keeps_a_name_nested_further_up_or_in_another_package(tmp_path: Path):
+    java(tmp_path, "public class Base<T> {\n    public enum Mode {}\n}\n",
+         name="Base", package="dev.base")
+    java(tmp_path, "import dev.base.Base;\n\nclass Middle extends Base<String> {}\n", name="Middle")
+    java(tmp_path, "class Thing extends Middle {\n    com.vendor.Mode mode;\n}\n")
+    assert flagged(tmp_path) == []
+
+
+def test_a_supertype_nesting_something_else_changes_nothing(tmp_path: Path):
+    java(tmp_path, "interface Provider {\n    final class Position {}\n}\n", name="Provider")
+    java(tmp_path, "class Thing implements Provider {\n    android.content.Context context;\n}\n")
+    assert flagged(tmp_path) == ["android.content.Context"]
+
+
 # --- what it ignores -------------------------------------------------------------------------
 
 def test_ignores_comments_strings_and_text_blocks(tmp_path: Path):

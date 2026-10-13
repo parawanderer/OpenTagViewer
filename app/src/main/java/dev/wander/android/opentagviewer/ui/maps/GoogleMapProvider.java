@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 
 import dev.wander.android.opentagviewer.R;
 import androidx.fragment.app.FragmentActivity;
-import com.google.android.gms.maps.model.CameraPosition;
 
 /**
  * Google Maps地图提供商实现
@@ -319,7 +318,7 @@ public class GoogleMapProvider implements IMapProvider, OnMapReadyCallback {
     @Override
     public CameraPosition getCameraPosition() {
         if (googleMap == null) return null;
-        CameraPosition position = googleMap.getCameraPosition();
+        com.google.android.gms.maps.model.CameraPosition position = googleMap.getCameraPosition();
         return new CameraPosition(
                 position.target.latitude,
                 position.target.longitude,
