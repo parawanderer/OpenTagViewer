@@ -72,11 +72,11 @@ public class MapProviderFactory {
         } catch (final Exception e) {
             Log.w(TAG, "Could not read the Maps API key; treating it as absent", e);
         }
-        return effectiveProvider(providerType, key);
+        return providerFor(providerType, key);
     }
 
     /** {@link #effectiveProvider(Context, String)} once the key has been read. */
-    static String effectiveProvider(final String providerType, final String googleMapsKey) {
+    static String providerFor(final String providerType, final String googleMapsKey) {
         if (PROVIDER_AMAP.equals(providerType) || PROVIDER_OSM.equals(providerType)) {
             return providerType;
         }
