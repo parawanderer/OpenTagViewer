@@ -11,6 +11,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
@@ -38,21 +42,51 @@ public final class ReportSources {
      * for by itself instead, but not more often than this.
      */
     private static final long GOOGLE_FIRST_LOCATE_EVERY_MS = 30 * 60_000L;
-    private static final Map<String, Long> lastFirstLocate = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Shared by every instance: a screen creates its own, and the throttle must outlive it. */
+    private static final Map<String, Long> LAST_FIRST_LOCATE = new ConcurrentHashMap<>();
 
-    private final ExtraSourcesSettings settings;
-    private final SourceLinks links;
-    private final ExtraSourcesApi api;
+    /** The googlefind calls this class makes. Real: {@link ExtraSourcesApi}. */
+    interface Google {
+        void locate(String googleId, int waitS) throws Exception;
 
-    public ReportSources(final ExtraSourcesSettings settings, final SourceLinks links, final ExtraSourcesApi api) {
-        this.settings = settings;
-        this.links = links;
-        this.api = api;
+        List<BeaconLocationReport> reports(String googleId, long sinceMs) throws Exception;
+    }
+
+    private final BooleanSupplier googleConfigured;
+    private final Function<String, String> linkedGoogleId;
+    private final Google google;
+    private final LongSupplier clock;
+    private final Map<String, Long> lastFirstLocate;
+
+    /**
+     * Seams rather than the settings, links and HTTP client themselves, which all need a
+     * {@code Context}: this class decides which network a device's reports come from, and that
+     * decision is tested on the JVM - see {@code ReportSourcesTest}.
+     */
+    ReportSources(final BooleanSupplier googleConfigured, final Function<String, String> linkedGoogleId,
+                  final Google google, final LongSupplier clock, final Map<String, Long> lastFirstLocate) {
+        this.googleConfigured = googleConfigured;
+        this.linkedGoogleId = linkedGoogleId;
+        this.google = google;
+        this.clock = clock;
+        this.lastFirstLocate = lastFirstLocate;
     }
 
     public static ReportSources create(final Context context) {
         final ExtraSourcesSettings settings = new ExtraSourcesSettings(context);
-        return new ReportSources(settings, new SourceLinks(context), new ExtraSourcesApi(settings));
+        final SourceLinks links = new SourceLinks(context);
+        final ExtraSourcesApi api = new ExtraSourcesApi(settings);
+        return new ReportSources(settings::isGoogleConfigured, links::googleId, new Google() {
+            @Override
+            public void locate(final String googleId, final int waitS) throws Exception {
+                api.googleLocate(googleId, waitS);
+            }
+
+            @Override
+            public List<BeaconLocationReport> reports(final String googleId, final long sinceMs) throws Exception {
+                return api.googleReports(googleId, sinceMs);
+            }
+        }, System::currentTimeMillis, LAST_FIRST_LOCATE);
     }
 
     /**
@@ -81,15 +115,15 @@ public final class ReportSources {
         }
 
         final String googleId = ExternalAccessory.isGoogle(json)
-                ? ExternalAccessory.googleId(json) : this.links.googleId(beaconId);
-        if (googleId == null || !this.settings.isGoogleConfigured()) {
+                ? ExternalAccessory.googleId(json) : this.linkedGoogleId.apply(beaconId);
+        if (googleId == null || !this.googleConfigured.getAsBoolean()) {
             return apple;
         }
 
         final Observable<List<BeaconLocationReport>> google = Observable.fromCallable(() -> {
             if (askGoogleNow) {
                 try {
-                    this.api.googleLocate(googleId, GOOGLE_LOCATE_WAIT_S);
+                    this.google.locate(googleId, GOOGLE_LOCATE_WAIT_S);
                 } catch (final Exception e) {
                     // The stored reports are still worth showing
                     Log.w(TAG, "Google locate request failed for " + beaconId, e);
@@ -97,18 +131,18 @@ public final class ReportSources {
             }
             // Google's answer is the last known position, often hours or days old, so a scheduled
             // one-hour window would hide it; the database drops what it already holds
-            final long googleSince = Math.min(sinceMs, System.currentTimeMillis() - 7 * 86_400_000L);
-            List<BeaconLocationReport> fetched = this.api.googleReports(googleId, googleSince);
-            if (!askGoogleNow && fetched.isEmpty() && this.api.googleReports(googleId, 0).isEmpty()) {
+            final long googleSince = Math.min(sinceMs, this.clock.getAsLong() - 7 * 86_400_000L);
+            List<BeaconLocationReport> fetched = this.google.reports(googleId, googleSince);
+            if (!askGoogleNow && fetched.isEmpty() && this.google.reports(googleId, 0).isEmpty()) {
                 // Never located: ask Google once, rather than waiting for a refresh button that
                 // a device without a location does not have
-                final long now = System.currentTimeMillis();
-                final Long last = lastFirstLocate.get(googleId);
+                final long now = this.clock.getAsLong();
+                final Long last = this.lastFirstLocate.get(googleId);
                 if (last == null || now - last > GOOGLE_FIRST_LOCATE_EVERY_MS) {
-                    lastFirstLocate.put(googleId, now);
+                    this.lastFirstLocate.put(googleId, now);
                     try {
-                        this.api.googleLocate(googleId, GOOGLE_LOCATE_WAIT_S);
-                        fetched = this.api.googleReports(googleId, googleSince);
+                        this.google.locate(googleId, GOOGLE_LOCATE_WAIT_S);
+                        fetched = this.google.reports(googleId, googleSince);
                     } catch (final Exception e) {
                         Log.w(TAG, "First Google locate failed for " + beaconId, e);
                     }

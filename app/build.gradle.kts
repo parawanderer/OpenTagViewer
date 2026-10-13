@@ -567,6 +567,9 @@ dependencies {
     implementation(libs.commons.csv)
 
     testImplementation(libs.junit)
+    // The real org.json for JVM tests that parse the googlefind service's answers -
+    // android.jar's is a stub there. The app itself uses the platform's.
+    testImplementation(libs.org.json)
     testImplementation(libs.android.room.testing)
     testCompileOnly(libs.projectlombok)
 

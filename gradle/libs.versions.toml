@@ -1,6 +1,8 @@
 [versions]
 agp = "8.8.2"
 junit = "4.13.2"
+# JVM tests only: android.jar's org.json is a stub there, so parsing returns nothing.
+orgJson = "20240303"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 appcompat = "1.7.0"
@@ -46,6 +48,7 @@ commonsCsv = "1.14.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 espresso-intents = { group = "androidx.test.espresso", name = "espresso-intents", version.ref = "espressoCore" }

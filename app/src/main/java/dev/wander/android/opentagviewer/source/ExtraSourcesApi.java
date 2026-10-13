@@ -14,6 +14,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.Function;
 
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
@@ -28,10 +30,19 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
  * travels in {@code X-Api-Token} rather than only in {@code Authorization}.
  */
 public final class ExtraSourcesApi {
-    private final ExtraSourcesSettings settings;
+    /** A stored setting by key. Real: {@link ExtraSourcesSettings#get}. */
+    private final Function<String, String> setting;
+    /** Base64 without line breaks. Real: {@code android.util.Base64}, a stub on the JVM. */
+    private final Function<byte[], String> base64;
 
     public ExtraSourcesApi(final ExtraSourcesSettings settings) {
-        this.settings = settings;
+        this(settings::get, bytes -> Base64.encodeToString(bytes, Base64.NO_WRAP));
+    }
+
+    /** For {@code ExtraSourcesApiTest}, which runs on the JVM against a local socket. */
+    ExtraSourcesApi(final Function<String, String> setting, final Function<byte[], String> base64) {
+        this.setting = setting;
+        this.base64 = base64;
     }
 
     public static final class ApiException extends IOException {
@@ -53,10 +64,12 @@ public final class ExtraSourcesApi {
         }
     }
 
-    private static String basic(final String user, final String password) {
-        if (user.isEmpty()) return null;
+    private String basic(final String user, final String password) {
+        if (user.isEmpty()) {
+            return null;
+        }
         final String raw = user + ":" + password;
-        return "Basic " + Base64.encodeToString(raw.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+        return "Basic " + this.base64.apply(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String join(String base, final String path) {
@@ -105,11 +118,11 @@ public final class ExtraSourcesApi {
     // ---- Google Find Hub, through googlefind ----
 
     private String google(final String method, final String path, final int timeoutMs) throws IOException {
-        return request(method, join(this.settings.get(ExtraSourcesSettings.GOOGLE_URL), path),
+        return request(method, join(this.setting.apply(ExtraSourcesSettings.GOOGLE_URL), path),
                 "POST".equals(method) ? "{}" : null,
-                basic(this.settings.get(ExtraSourcesSettings.GOOGLE_USER),
-                        this.settings.get(ExtraSourcesSettings.GOOGLE_PASSWORD)),
-                this.settings.get(ExtraSourcesSettings.GOOGLE_TOKEN), timeoutMs);
+                this.basic(this.setting.apply(ExtraSourcesSettings.GOOGLE_USER),
+                        this.setting.apply(ExtraSourcesSettings.GOOGLE_PASSWORD)),
+                this.setting.apply(ExtraSourcesSettings.GOOGLE_TOKEN), timeoutMs);
     }
 
     public List<GoogleDevice> googleDevices() throws Exception {
@@ -142,7 +155,7 @@ public final class ExtraSourcesApi {
         for (int i = 0; i < key.length; i++) key[i] = (byte) Integer.parseInt(keyHex.substring(2 * i, 2 * i + 2), 16);
         final JSONArray arr = o.getJSONArray("eids");
         final List<String> eids = new ArrayList<>();
-        for (int i = 0; i < arr.length(); i++) eids.add(arr.getString(i).toLowerCase(java.util.Locale.ROOT));
+        for (int i = 0; i < arr.length(); i++) eids.add(arr.getString(i).toLowerCase(Locale.ROOT));
         return new RingMaterial(key, eids);
     }
 
