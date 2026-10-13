@@ -21,9 +21,7 @@ import androidx.core.view.WindowCompat;
 
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.app.Dialog;
-import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.location.Address;
 import android.location.Geocoder;
@@ -511,7 +509,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         app.setupTheme();
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        this.checkApiKey();
 
         this.binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(this.binding.getRoot());
@@ -569,6 +566,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // 根据用户设置创建地图提供商
         String mapProviderType = this.userSettings.getMapProvider();
+        // A build without a Google Maps key (secrets.properties) still has a map: OpenStreetMap
+        // needs no key, so it stands in for Google rather than the app refusing to start.
+        mapProviderType = MapProviderFactory.effectiveProvider(this, mapProviderType);
 
         // **Before the new provider touches it.** Changing provider calls recreate(), and the
         // FragmentManager restores Google's map fragment into this container while a plain view
@@ -1786,26 +1786,6 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Intent deviceInfoIntent = new Intent(this, DeviceInfoActivity.class);
         deviceInfoIntent.putExtra("beaconId", beaconId);
         deviceInfoActivityLauncher.launch(deviceInfoIntent);
-    }
-
-    private void checkApiKey() {
-        try {
-            ApplicationInfo appInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
-            Bundle bundle = Objects.requireNonNull(appInfo.metaData);
-
-            String apiKey = bundle.getString("com.google.android.geo.API_KEY");
-
-            if (apiKey == null || apiKey.isBlank() || apiKey.equals("DEFAULT_API_KEY")) {
-                Toast.makeText(this, "API Key was not set in secrets.properties", LENGTH_SHORT).show();
-                throw new RuntimeException("API Key was not set in secrets.properties");
-            }
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.e(TAG, "Package name not found.", e);
-            throw new RuntimeException("Error getting package info", e);
-        } catch (NullPointerException e) {
-            Log.e(TAG, "Error accessing meta-data.", e); // Handle the case where meta-data is completely missing
-            throw new RuntimeException("Error accessing meta-data in manifest", e);
-        }
     }
 
     private void handleAuthAndShowDevices() {

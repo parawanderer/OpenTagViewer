@@ -216,7 +216,7 @@ public class HistoryViewActivity extends AppCompatActivity implements IMapProvid
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         // 根据用户设置创建地图提供商
         String mapProviderType = this.userSettings.getMapProvider();
-        this.mapProvider = MapProviderFactory.create(mapProviderType);
+        this.mapProvider = MapProviderFactory.create(MapProviderFactory.effectiveProvider(this, mapProviderType));
         
         // 初始化地图
         this.mapProvider.initialize(this, R.id.history_map, this);
