@@ -2,7 +2,6 @@ package dev.wander.android.opentagviewer.anisette;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -25,14 +24,16 @@ import org.junit.runner.RunWith;
  * What an upgrade does to an identity that already exists.
  *
  * <p><b>This is the half nobody can test by hand.</b> Reaching the interesting case for real
- * means having installed a build from before hardware profiles existed, signed in to a real
- * Apple account on it, and then upgrading - and the way it fails is that Apple stops
- * recognising the machine hours later, on somebody else's phone, with nothing in a log to say
- * why. So the older shapes are written into {@link LocalAnisette#PREFERENCES} directly and read
- * back through the same door the app uses.
+ * means having installed an older build, signed in to a real Apple account on it, and then
+ * upgrading - and the way it fails is that Apple stops recognising the machine hours later, on
+ * somebody else's phone, with nothing in a log to say why. So the older shapes are written into
+ * {@link LocalAnisette#PREFERENCES} directly and read back through the same door the app uses.
  *
- * <p>The rule being tested is one sentence: <b>an install that already has an identity keeps
- * the machine it has always claimed.</b> Everything below is a way of getting that wrong.
+ * <p>The rule being tested is two sentences. <b>An install whose profile can still sign in
+ * keeps the machine it has always claimed</b> - its ids, its serial, its profile. <b>An install
+ * whose profile Apple refuses is replaced</b>, once, by one that can: since 2026-10-12 that is
+ * every install claiming the Mac or the iPhone, see {@link AdiDeviceIdentity#generate()}.
+ * Everything below is a way of getting one of those wrong.
  */
 @RunWith(AndroidJUnit4.class)
 public class LocalAnisetteIdentityTest {
@@ -73,6 +74,7 @@ public class LocalAnisetteIdentityTest {
                 true);
     }
 
+    /** Three keys and no profile: an install from before there was a choice. */
     private void writeTheOldShape() {
         assertTrue(this.preferences.edit()
                 .putString(LocalAnisette.KEY_DEVICE_ID, OLD_DEVICE_ID)
@@ -81,73 +83,110 @@ public class LocalAnisetteIdentityTest {
                 .commit());
     }
 
+    /** The old ids under an explicit profile, as an install that chose one would have them. */
+    private void writeTheOldShapeAs(final AdiDeviceIdentity.Hardware hardware) {
+        writeTheOldShape();
+        assertTrue(this.preferences.edit()
+                .putString(LocalAnisette.KEY_HARDWARE, hardware.name())
+                .commit());
+    }
+
     private static String modelOf(String json) throws Exception {
         return new JSONObject(json).getString("model");
+    }
+
+    private void assertTheOldIdsWereReplaced() {
+        assertNotEquals(OLD_DEVICE_ID, this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
+        assertNotEquals(OLD_ADI_ID, this.preferences.getString(LocalAnisette.KEY_ADI_ID, null));
+        assertNotEquals(OLD_LOCAL_USER,
+                this.preferences.getString(LocalAnisette.KEY_LOCAL_USER, null));
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.name(),
+                this.preferences.getString(LocalAnisette.KEY_HARDWARE, null));
+    }
+
+    private void assertTheOldIdsWereKept() {
+        assertEquals(OLD_DEVICE_ID, this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
+        assertEquals(OLD_ADI_ID, this.preferences.getString(LocalAnisette.KEY_ADI_ID, null));
+        assertEquals(OLD_LOCAL_USER, this.preferences.getString(LocalAnisette.KEY_LOCAL_USER, null));
     }
 
     /**
      * The one that matters.
      *
      * <p>Three keys and no hardware key can only mean an install from before there was a
-     * choice, and the only thing this app ever claimed then was the Mac. Defaulting it to the
-     * new profile instead would present Apple with a different machine on an existing session:
-     * a sign-in the user did not ask for, and a second device-list entry beside a *Remove from
-     * Account* button.
+     * choice, and the only thing this app ever claimed then was the Mac - which Apple no longer
+     * lets sign in. Keeping it would be an install that can never sign in again, so it is
+     * replaced by the one profile that can, ids and all: a machine id provisioned under the
+     * Mac claim and presented under the Android one is answered with a re-sync demand, so a
+     * half-migration that kept the ids and changed the claim would not work either.
      */
     @Test
-    public void anIdentityWrittenBeforeProfilesExistedIsStillTheMac() throws Exception {
+    public void anIdentityWrittenBeforeProfilesExistedIsReplacedByTheAndroidPhone()
+            throws Exception {
         writeTheOldShape();
 
-        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(),
                 subject().hardwareProfileJson());
-        assertEquals("MacBookPro13,2", modelOf(subject().hardwareProfileJson()));
+        assertEquals("Pixel 7", modelOf(subject().hardwareProfileJson()));
+        assertTheOldIdsWereReplaced();
+    }
+
+    /** Nothing stored at all is a genuinely new install - and it claims the Android phone. */
+    @Test
+    public void afreshInstallIsTheAndroidPhone() throws Exception {
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(),
+                subject().hardwareProfileJson());
+        assertEquals("Pixel 7", modelOf(subject().hardwareProfileJson()));
     }
 
     /**
-     * Nothing stored at all is a genuinely new install - and it claims the Mac.
+     * An install that already claims the Android phone keeps everything it has.
      *
-     * <p>It claimed an iPhone until Apple answered 401 to {@code get_2fa_methods} for clients
-     * presenting that profile. See {@code AdiDeviceIdentity#generate()}.
+     * <p>This is the rule the replacement must not break: re-identifying an install that
+     * works would make its session look like a new machine, which is what two-factor
+     * authentication exists to notice.
      */
     @Test
-    public void afreshInstallIsTheMac() throws Exception {
-        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+    public void anInstallThatCanSignInKeepsItsIdentity() throws Exception {
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
+
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(),
                 subject().hardwareProfileJson());
-        assertEquals("MacBookPro13,2", modelOf(subject().hardwareProfileJson()));
+        assertTheOldIdsWereKept();
     }
 
     /**
-     * Reading the profile must not quietly rewrite an existing install's identity.
+     * A replaced identity is written down, so the replacement happens exactly once.
      *
-     * <p>Persisting {@code LEGACY_MAC} on read would be harmless today and a trap tomorrow: the
-     * derivation is what encodes "this predates the choice", and writing it down converts a
-     * fact that can be re-derived into stored state that can be wrong.
+     * <p>Left unwritten, every read would see the legacy shape again and mint another machine,
+     * which is the per-login regeneration the whole class exists to prevent.
      */
     @Test
-    public void readingALegacyProfileDoesNotWriteOneOverTheTopOfIt() {
+    public void thereplacementIsRecordedSoItHappensOnce() {
         writeTheOldShape();
 
         subject().hardwareProfileJson();
+        final String replacedDeviceId =
+                this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null);
 
-        assertFalse("the absence of this key is what marks a legacy install",
-                this.preferences.contains(LocalAnisette.KEY_HARDWARE));
-        assertEquals(OLD_DEVICE_ID, this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
-        assertEquals(OLD_ADI_ID, this.preferences.getString(LocalAnisette.KEY_ADI_ID, null));
-        assertEquals(OLD_LOCAL_USER,
-                this.preferences.getString(LocalAnisette.KEY_LOCAL_USER, null));
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.name(),
+                this.preferences.getString(LocalAnisette.KEY_HARDWARE, null));
+        subject().hardwareProfileJson();
+        assertEquals("asked again, the replacement was kept rather than replaced again",
+                replacedDeviceId, this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
     }
 
     /**
      * A fresh install's profile is written down, and written down <i>with</i> the identity.
      *
      * <p>If the three keys were persisted and the fourth were not, the very next read would see
-     * the legacy shape and decide this brand-new install was a Mac.
+     * the legacy shape, decide this brand-new install was a Mac, and replace it.
      */
     @Test
     public void afreshInstallRecordsWhatItDecided() {
         subject().hardwareProfileJson();
 
-        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.name(),
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.name(),
                 this.preferences.getString(LocalAnisette.KEY_HARDWARE, null));
         assertNotNull(this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
         assertNotNull(this.preferences.getString(LocalAnisette.KEY_ADI_ID, null));
@@ -173,41 +212,40 @@ public class LocalAnisetteIdentityTest {
     /**
      * A stored profile this version has never heard of falls back rather than throwing.
      *
-     * <p>The bad outcome is re-identifying that install; the worse one is an app that cannot
-     * start at all, which is what a {@code valueOf} straight off stored text would give after a
-     * profile was renamed or removed. It falls back to the Mac because the keys beside it say
-     * this install is not new.
+     * <p>The fallback is the Mac, because the keys beside it say this install is not new - and
+     * the Mac cannot sign in, so it is then replaced like any other. The outcome is a
+     * re-identified install, which is bad but recoverable; a {@code valueOf} straight off
+     * stored text would give an app that cannot start at all.
      */
     @Test
     public void anUnrecognisedStoredProfileFallsBackInsteadOfCrashing() {
         writeTheOldShape();
         this.preferences.edit().putString(LocalAnisette.KEY_HARDWARE, "VISION_PRO").commit();
 
-        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(),
                 subject().hardwareProfileJson());
+        assertTheOldIdsWereReplaced();
     }
 
-    /** A profile stored explicitly is honoured, which is the whole point of storing it. */
+    /** The iPhone was never a fresh install's default, but an install that has it is refused too. */
     @Test
-    public void astoredProfileIsUsedAsWritten() {
-        writeTheOldShape();
-        this.preferences.edit()
-                .putString(LocalAnisette.KEY_HARDWARE, AdiDeviceIdentity.Hardware.IPHONE.name())
-                .commit();
+    public void astoredIphoneIsReplacedAsWell() {
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.IPHONE);
 
-        assertEquals(AdiDeviceIdentity.Hardware.IPHONE.toJson(), subject().hardwareProfileJson());
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(), subject().hardwareProfileJson());
+        assertTheOldIdsWereReplaced();
     }
 
     /**
      * The ids handed to FindMy.py are the ones stored, not new ones.
      *
-     * <p>This is the whole alignment in one assertion: what a legacy install already told Apple
+     * <p>This is the whole alignment in one assertion: what an install already told Apple
      * during provisioning is what its next sign-in claims to be. Minting a pair here instead
      * would put it back to talking to Apple as two devices, silently.
      */
     @Test
     public void thestoredIdsAreTheOnesHandedOver() throws Exception {
-        writeTheOldShape();
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
 
         final JSONObject ids = new JSONObject(subject().deviceIdsJson());
 
@@ -222,14 +260,13 @@ public class LocalAnisetteIdentityTest {
      */
     @Test
     public void theuidIsHandedOverUnencoded() throws Exception {
-        writeTheOldShape();
-        final AdiDeviceIdentity.Hardware profile = AdiDeviceIdentity.Hardware.LEGACY_MAC;
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
 
         final String handedOver = new JSONObject(subject().deviceIdsJson()).getString("uid");
 
         assertEquals(OLD_LOCAL_USER, handedOver);
-        assertEquals("this install's header convention is raw, so these coincide here",
-                profile.localUserHeader(OLD_LOCAL_USER), handedOver);
+        assertNotEquals("this is the header form, and handing it over would encode it twice",
+                AdiDeviceIdentity.Hardware.ANDROID.localUserHeader(OLD_LOCAL_USER), handedOver);
     }
 
     /** A fresh install's ids are stable too - asking twice must not mint a second device. */
@@ -243,10 +280,9 @@ public class LocalAnisetteIdentityTest {
     /**
      * A fresh install hands over exactly what it stored, which is where a double-encode hides.
      *
-     * <p>The legacy tests above cannot see this one: that profile sends its local user id raw,
-     * so the stored value and the header value coincide and a bug that returned the header form
-     * would pass. On a fresh install they differ - base64 against the UUID - and only the UUID
-     * is correct, because FindMy.py encodes it again on the way out.
+     * <p>The Android profile sends its local user id as base64 of the stored UUID, so the
+     * stored value and the header value differ - and only the stored one is correct, because
+     * FindMy.py encodes it again on the way out.
      */
     @Test
     public void afreshInstallHandsOverTheStoredIdsAndNotTheHeaderForms() throws Exception {
@@ -257,7 +293,7 @@ public class LocalAnisetteIdentityTest {
         assertEquals(this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null),
                 ids.getString("devid"));
         assertNotEquals("this is the header form, and handing it over would encode it twice",
-                AdiDeviceIdentity.Hardware.IPHONE.localUserHeader(ids.getString("uid")),
+                AdiDeviceIdentity.Hardware.ANDROID.localUserHeader(ids.getString("uid")),
                 ids.getString("uid"));
     }
 
@@ -265,8 +301,7 @@ public class LocalAnisetteIdentityTest {
      * A partly written identity is not a legacy install.
      *
      * <p>SharedPreferences applies asynchronously, so a process killed mid-write can leave one
-     * key and not the others. Treating that as "from before profiles existed" would hand a
-     * brand-new install the Mac, permanently.
+     * key and not the others. It is treated as absent and a fresh identity written.
      */
     @Test
     public void ahalfWrittenIdentityIsTreatedAsAbsent() {
@@ -274,7 +309,7 @@ public class LocalAnisetteIdentityTest {
                 .putString(LocalAnisette.KEY_DEVICE_ID, OLD_DEVICE_ID)
                 .commit());
 
-        assertEquals(AdiDeviceIdentity.Hardware.LEGACY_MAC.toJson(),
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID.toJson(),
                 subject().hardwareProfileJson());
         // Not the point of this test, but worth pinning: it wrote a *new* identity rather than
         // adopting the orphaned device id.
@@ -285,14 +320,14 @@ public class LocalAnisetteIdentityTest {
     /**
      * An install from before serials were drawn keeps the one it has been presenting.
      *
-     * <p>Same shape as the hardware profile, and the same reason: three keys and no serial can
-     * only be an install that has been telling Apple {@code 0PENTAGVIEWR} for its whole life.
-     * Drawing it a new one now registers a <i>second</i> device beside the row the user already
-     * recognises, and may cost them a sign-in - to change a label.
+     * <p>Three keys and a profile that can sign in, but no serial, can only be an install that
+     * has been telling Apple {@code 0PENTAGVIEWR} for its whole life. Drawing it a new one now
+     * registers a <i>second</i> device beside the row the user already recognises, and may cost
+     * them a sign-in - to change a label.
      */
     @Test
     public void anIdentityWrittenBeforeSerialsWereDrawnStillPresentsTheOldOne() {
-        writeTheOldShape();
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
 
         assertEquals(AdiDeviceIdentity.LEGACY_SERIAL, subject().serial());
     }
@@ -300,12 +335,29 @@ public class LocalAnisetteIdentityTest {
     /** And it is not back-filled, so it stays distinguishable from a serial that was drawn. */
     @Test
     public void thelegacySerialIsNotWrittenBackOverTheOldShape() {
-        writeTheOldShape();
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
 
         subject().serial();
 
         assertNull("writing it back would make an old install look like one that drew it",
                 this.preferences.getString(LocalAnisette.KEY_SERIAL, null));
+    }
+
+    /**
+     * A replaced identity draws a serial with the rest of it.
+     *
+     * <p>It is a new device-list row either way, so there is nothing for the old serial to
+     * keep recognisable - and the old row is the one the user is about to see a second entry
+     * beside, which a different serial at least makes tellable apart.
+     */
+    @Test
+    public void areplacedIdentityDrawsASerial() {
+        writeTheOldShape();
+
+        final String drawn = subject().serial();
+
+        assertTrue(drawn.startsWith(AdiDeviceIdentity.SERIAL_PREFIX));
+        assertNotEquals(AdiDeviceIdentity.LEGACY_SERIAL, drawn);
     }
 
     /**
@@ -331,7 +383,7 @@ public class LocalAnisetteIdentityTest {
     /** A stored serial is presented unchanged, whatever it is. */
     @Test
     public void astoredSerialIsWhatGoesToApple() {
-        writeTheOldShape();
+        writeTheOldShapeAs(AdiDeviceIdentity.Hardware.ANDROID);
         assertTrue(this.preferences.edit()
                 .putString(LocalAnisette.KEY_SERIAL, "0PENTAGVK7QX").commit());
 
@@ -361,5 +413,21 @@ public class LocalAnisetteIdentityTest {
 
         assertEquals("the screen named a serial Apple never saw for this user",
                 drawn, LocalAnisette.serialToShow(this.context));
+    }
+
+    /**
+     * The screen shows the profile the next load will actually use, not the one about to go.
+     *
+     * <p>A stored Mac is replaced on the next identity read; telling the user to look for a
+     * MacBook row would describe the entry they are about to see a Pixel appear beside.
+     */
+    @Test
+    public void showingTheProfileShowsTheOneThisInstallWillSend() {
+        writeTheOldShape();
+
+        assertEquals(AdiDeviceIdentity.Hardware.ANDROID, LocalAnisette.profileToShow(this.context));
+        assertNull("reading it for a label must not replace anything",
+                this.preferences.getString(LocalAnisette.KEY_HARDWARE, null));
+        assertEquals(OLD_DEVICE_ID, this.preferences.getString(LocalAnisette.KEY_DEVICE_ID, null));
     }
 }

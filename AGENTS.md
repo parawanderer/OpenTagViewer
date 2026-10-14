@@ -151,6 +151,23 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   the pre-fix stub back and requires the job to fail. `native-stubs.yml` checks the stubs' exports
   and return conventions on their own, in seconds.
 
+- **The machine id carries its provenance, and Grand Slam reads it.** The libraries are Apple's
+  Android ADI binaries, and the `X-Apple-I-MD-M` they mint says so. Since 2026-10-12 the
+  GsService2 handler refuses SRP init with `ec=-80045` when that machine id is presented under a
+  client-info claiming macOS or iPhone — before the password, before the OTP (a wrong OTP still
+  gets `-80045`; a missing one gets `-80010`). An Android client-info over the same machine id is
+  answered `ec=0`. That is why `AdiDeviceIdentity` claims a Pixel 7 and why `canSignIn()` exists:
+  provenance is bound at provisioning, so a Mac-provisioned machine presented as Android is
+  answered `hsc=434` — the profile must be set before `ADISetProvisioningPath`, and moving an
+  install means wiping `anisette/provisioning`, not just the preference. The field-level matrix
+  is reproducible with `scripts/probe_gsa_signin.py --real-init`, which needs no credentials.
+- **`gsd.apple.com` chains to Apple Root CA - G3; nothing else in the world does.** The two
+  provisioning endpoints the URL bag points at are served under a root that is in no shipped
+  trust store — not Android's, not the anisette package's bundled one. It is in
+  `network_security_config.xml` for `gsa` and `gsd` only, as a PEM in `res/raw` so a diff can
+  review it. Remove it and provisioning fails the handshake; every public Anisette server
+  hitting `-45003`/502 in October 2026 was this.
+
 ### 5. Never bundle an AMap API key
 
 AMap issues keys per developer account, bound to a package name and signing fingerprint, and
