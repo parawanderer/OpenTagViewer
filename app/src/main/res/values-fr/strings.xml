@@ -423,4 +423,12 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="ring_failed_reason">Échec de la sonnerie : %1$s</string>
     <string name="server_url_not_https">Pas en https : le jeton d\'API sera envoyé sans chiffrement.</string>
     <string name="google_find_hub_setup_guide">Comment le configurer</string>
+    <string name="nearby_devices_title">Appareils à proximité</string>
+    <string name="nearby_devices_menu_open">Rechercher des appareils à proximité</string>
+    <string name="nearby_devices_empty">Aucun appareil Localiser à portée. Les AirTags et autres appareils Localiser d\'Apple apparaissent ici tant que cet écran est ouvert.</string>
+    <string name="nearby_devices_needs_permission">Autorisez l\'accès Bluetooth pour voir les appareils Localiser à proximité.</string>
+    <string name="nearby_device_unnamed">Appareil Localiser · %1$s</string>
+    <string name="nearby_device_distance_format">~%1$s m</string>
+    <string name="nearby_device_separated">séparé de son propriétaire</string>
+    <string name="nearby_device_with_owner">avec son propriétaire</string>
 </resources>

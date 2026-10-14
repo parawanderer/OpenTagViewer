@@ -423,4 +423,12 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="ring_failed_reason">鳴らせませんでした: %1$s</string>
     <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
     <string name="google_find_hub_setup_guide">設定方法</string>
+    <string name="nearby_devices_title">近くのデバイス</string>
+    <string name="nearby_devices_menu_open">近くのデバイスをスキャン</string>
+    <string name="nearby_devices_empty">範囲内に「探す」デバイスがありません。AirTag やその他の Apple「探す」対応デバイスは、この画面を開いている間ここに表示されます。</string>
+    <string name="nearby_devices_needs_permission">近くの「探す」デバイスを表示するには Bluetooth へのアクセスを許可してください。</string>
+    <string name="nearby_device_unnamed">「探す」デバイス · %1$s</string>
+    <string name="nearby_device_distance_format">約 %1$s m</string>
+    <string name="nearby_device_separated">持ち主と離れています</string>
+    <string name="nearby_device_with_owner">持ち主の近く</string>
 </resources>

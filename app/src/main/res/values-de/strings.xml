@@ -423,4 +423,12 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="ring_failed_reason">Klingeln fehlgeschlagen: %1$s</string>
     <string name="server_url_not_https">Kein https: Das API-Token wird unverschlüsselt gesendet.</string>
     <string name="google_find_hub_setup_guide">So richtest du das ein</string>
+    <string name="nearby_devices_title">Geräte in der Nähe</string>
+    <string name="nearby_devices_menu_open">Geräte in der Nähe scannen</string>
+    <string name="nearby_devices_empty">Keine Find-My-Geräte in Reichweite. AirTags und andere Apple-Geräte erscheinen hier, solange dieser Bildschirm geöffnet ist.</string>
+    <string name="nearby_devices_needs_permission">Bluetooth-Zugriff erlauben, um Find-My-Geräte in der Nähe zu sehen.</string>
+    <string name="nearby_device_unnamed">Find-My-Gerät · %1$s</string>
+    <string name="nearby_device_distance_format">~%1$s m</string>
+    <string name="nearby_device_separated">vom Besitzer getrennt</string>
+    <string name="nearby_device_with_owner">beim Besitzer</string>
 </resources>
