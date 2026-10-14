@@ -19,19 +19,32 @@
         not: this is an authentication flow, and disabling verification would make it
         interceptable by anything on the network path.
 
-        Instead the one missing root is added, and only for these hosts. The certificate is
-        Apple's own, published at https://www.apple.com/appleca/, SHA-256
-        b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024, and stored as PEM
-        text rather than a binary .cer so it can be reviewed in a diff.
+        Instead the missing roots are added, and only for these hosts. Both certificates are
+        Apple's own, published at https://www.apple.com/certificateauthority/, and stored as
+        PEM text rather than binary .cer so they can be reviewed in a diff:
 
-        "system" is kept alongside it so the usual roots still apply - this adds a trust
-        anchor, it does not replace them.
+          - "Apple Root CA" (2006), SHA-256
+            b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024 - what
+            gsa.apple.com (the URL bag and sign-in) chains to.
+          - "Apple Root CA - G3" (2014), SHA-256
+            63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179 - what
+            gsd.apple.com (the two provisioning endpoints the URL bag points at) chains to.
+            Without it, provisioning fails the handshake. Public Anisette servers running
+            the same libraries began answering "invalid Trust Key (-45003)" and 502s in
+            October 2026, which this is the likely cause of (issue #248).
+
+        "system" is kept alongside them so the usual roots still apply - this adds trust
+        anchors, it does not replace them. gsd.apple.com gets both because the URL bag decides
+        which host provisioning talks to, and a change of host must not become a handshake
+        failure that reads as Apple refusing the app.
     -->
     <domain-config>
         <domain includeSubdomains="false">gsa.apple.com</domain>
+        <domain includeSubdomains="false">gsd.apple.com</domain>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="@raw/apple_root_ca" />
+            <certificates src="@raw/apple_root_ca_g3" />
         </trust-anchors>
     </domain-config>
 </network-security-config>
