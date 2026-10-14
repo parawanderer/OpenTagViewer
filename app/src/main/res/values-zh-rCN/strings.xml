@@ -431,4 +431,5 @@
     <string name="nearby_device_distance_format">约 %1$s 米</string>
     <string name="nearby_device_separated">与物主分离</string>
     <string name="nearby_device_with_owner">在物主附近</string>
+    <string name="nearby_devices_scan_unavailable">蓝牙已关闭或不可用。打开后可查看附近的 Find My 设备 — 将自动重试。</string>
 </resources>

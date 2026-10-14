@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.ble;
 
 import androidx.annotation.Nullable;
 
+import java.util.Arrays;
+
 import lombok.Builder;
 import lombok.Getter;
 
@@ -91,18 +93,19 @@ public final class NearbyDeviceSighting {
     }
 
     /**
-     * The Find My TLV alone, or null when the blob does not start with one.
+     * The Find My TLV alone, wherever it sits in the blob, or null when the chain has none.
      *
-     * <p>{@link FindMyAdvertisement#parse} reads offset zero, so it is handed the whole blob as
-     * long as the Find My frame leads it - which {@link FindMyFrameKey#parse} already verified
-     * by the time this runs on the same data. Frames where 0x12 is not first fall out the same
-     * {@code null} both checks would produce anyway.
+     * <p>{@link FindMyAdvertisement#parse} reads offset zero, so it is handed just the record
+     * {@link FindMyFrameKey#findFindMyTlv} located - the same walk the key parser does. Apple
+     * devices routinely lead the blob with other TLVs (Nearby Info, Handoff) before the Find My
+     * frame; rejecting those would silently drop a real share of beacons.
      */
     @Nullable
     private static byte[] tlvBytes(@Nullable final byte[] data) {
-        if (data == null || data.length < 3 || data[0] != FindMyFrameKey.TYPE_OFFLINE_FINDING) {
+        final int start = FindMyFrameKey.findFindMyTlv(data);
+        if (start < 0) {
             return null;
         }
-        return data;
+        return Arrays.copyOfRange(data, start, start + 2 + (data[start + 1] & 0xFF));
     }
 }

@@ -28,10 +28,12 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * radio traffic and throws most of it away - anything whose address is not in the user's own
  * tag index - because answering "is this mine" is its whole job. This class answers the other
  * question, "what is out there at all", so it emits every frame that parses as a Find My
- * advertisement. It shares the watcher's scan shape deliberately: same hardware filter (the
- * controller discards non-Find-My frames so the callback only fires for ours), same restart
- * before the platform's long-scan downgrade, same contract of completing rather than erroring
- * when Bluetooth or permission is missing.
+ * advertisement. It shares the watcher's scan shape deliberately apart from the filter: the
+ * watcher can hardware-filter on the 0x12 record at offset zero because its own tags always
+ * lead with it, while this scanner filters on Apple's company ID alone and sorts the TLV
+ * chain in software - a Find My frame behind another Apple record must still be seen. Same
+ * restart before the platform's long-scan downgrade, same contract of completing rather than
+ * erroring when Bluetooth or permission is missing.
  *
  * <p>What it does not share is anything expensive. No index, no MAC resolver, no Python -
  * a frame goes from the radio to the emitter as pure byte parsing, which is also why this can
@@ -113,13 +115,15 @@ public class NearbyDeviceScanner {
                 }
             };
 
-            // Filtered in hardware for the same reason the watcher filters: the controller
-            // drops every non-Find-My frame itself, so an ordinary flat's dozens of stray BLE
-            // advertisements never reach this callback at all.
+            // Company ID only, no data mask: a mask can only match a fixed offset, but the
+            // Find My TLV does not have to lead Apple's TLV chain - Nearby Info and Handoff
+            // records routinely sit in front of it. Software parsing takes over the 0x12
+            // check in sightingFrom, so frames a mask cannot express still reach the list.
+            // The trade is callback traffic: every Apple advertisement lands here, including
+            // AirPods chatter - acceptable while a screen is open, wrong for a background
+            // service.
             final List<ScanFilter> findMyFramesOnly = List.of(new ScanFilter.Builder()
-                    .setManufacturerData(FindMyAdvertisement.APPLE_COMPANY_ID,
-                            new byte[]{FindMyAdvertisement.TYPE_OFFLINE_FINDING},
-                            new byte[]{(byte) 0xFF})
+                    .setManufacturerData(FindMyAdvertisement.APPLE_COMPANY_ID, new byte[0])
                     .build());
             scanner.startScan(findMyFramesOnly, settingsFor(this.scanMode), callback);
 

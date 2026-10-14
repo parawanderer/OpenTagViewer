@@ -431,4 +431,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="nearby_device_distance_format">~%1$s m</string>
     <string name="nearby_device_separated">gescheiden van de eigenaar</string>
     <string name="nearby_device_with_owner">bij de eigenaar</string>
+    <string name="nearby_devices_scan_unavailable">Bluetooth staat uit of is niet beschikbaar. Zet het aan om Find My-apparaten in de buurt te zien — automatisch opnieuw proberen.</string>
 </resources>

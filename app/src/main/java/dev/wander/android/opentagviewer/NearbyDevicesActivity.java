@@ -65,6 +65,9 @@ public class NearbyDevicesActivity extends AppCompatActivity {
      */
     private static final long REFRESH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(1);
 
+    /** Resubscribe interval after the scan ended mid-session; mirrors MapsActivity's choice. */
+    private static final long SCAN_RETRY_DELAY_MS = TimeUnit.SECONDS.toMillis(30);
+
     private final NearbyDeviceScanner scanner = new NearbyDeviceScanner();
     private final NearbyDeviceBook book = new NearbyDeviceBook();
     private ForeignTagNames names;
@@ -74,6 +77,19 @@ public class NearbyDevicesActivity extends AppCompatActivity {
 
     private Disposable scanSubscription;
     private Disposable refreshSubscription;
+
+    /**
+     * The pending resubscribe after the scan ended mid-session - Bluetooth toggled off or a
+     * failed scan both arrive as a quiet {@code onComplete}, so without this the screen keeps
+     * claiming "nothing in range" forever while showing a radio nobody listens on.
+     */
+    private Disposable scanRetrySubscription;
+
+    /**
+     * True between the scan completing mid-session and a resubscribe that stayed alive. The
+     * empty state reads from it: a dead radio needs "turn Bluetooth on", not "no devices".
+     */
+    private boolean scanUnavailable;
 
     /** Asked at most once per screen, for the same reason MapsActivity bounds its own request. */
     private boolean blePermissionRequested = false;
@@ -118,11 +134,7 @@ public class NearbyDevicesActivity extends AppCompatActivity {
             return;
         }
 
-        this.scanSubscription = this.scanner.scan(this.getApplicationContext())
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::onSighting,
-                        error -> Log.e(TAG, "Nearby device scan failed", error));
+        this.startScanning();
 
         this.refreshSubscription = Observable
                 .interval(REFRESH_INTERVAL_MS, TimeUnit.MILLISECONDS, Schedulers.computation())
@@ -141,6 +153,10 @@ public class NearbyDevicesActivity extends AppCompatActivity {
             this.refreshSubscription.dispose();
             this.refreshSubscription = null;
         }
+        if (this.scanRetrySubscription != null) {
+            this.scanRetrySubscription.dispose();
+            this.scanRetrySubscription = null;
+        }
         super.onPause();
     }
 
@@ -153,11 +169,43 @@ public class NearbyDevicesActivity extends AppCompatActivity {
         if (requestCode != NEARBY_PERMISSION_REQUEST_CODE) {
             return;
         }
-        // Granted: the next onResume starts the scan. Denied: the empty state already explains
-        // what is missing - re-prompting here would loop.
-        if (BlePermissions.granted(this)) {
-            this.onResume();
+        // The permission dialog pauses the activity, so the framework's own onResume after it
+        // starts the scan. Calling onResume here would subscribe twice - onPause then disposes
+        // only the second pair and leaves a scan running on a closed screen.
+        if (!BlePermissions.granted(this)) {
+            this.showEmptyState(R.string.nearby_devices_needs_permission);
         }
+    }
+
+    private void startScanning() {
+        this.scanUnavailable = false;
+        this.scanSubscription = this.scanner.scan(this.getApplicationContext())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::onSighting,
+                        error -> Log.e(TAG, "Nearby device scan failed", error),
+                        this::onScanEnded);
+    }
+
+    /**
+     * The scan completed while the screen was open: Bluetooth went off, or the platform
+     * refused the scan. Retry like {@code MapsActivity#onNearbyWatchEnded} - one attempt per
+     * 30 seconds stays far under the scan-start budget and self-heals when the radio returns.
+     */
+    private void onScanEnded() {
+        this.scanSubscription = null;
+        this.scanUnavailable = true;
+        this.rebuildList();
+
+        Log.i(TAG, "The nearby device scan ended mid-session; retrying in 30s");
+        this.scanRetrySubscription = Observable
+                .timer(SCAN_RETRY_DELAY_MS, TimeUnit.MILLISECONDS,
+                        AndroidSchedulers.mainThread())
+                .subscribe(tick -> {
+                    if (BlePermissions.granted(this)) {
+                        this.startScanning();
+                    }
+                });
     }
 
     private void onSighting(final NearbyDeviceSighting sighting) {
@@ -170,7 +218,9 @@ public class NearbyDevicesActivity extends AppCompatActivity {
                 this.book.snapshot(System.currentTimeMillis());
 
         if (rows.isEmpty()) {
-            this.showEmptyState(R.string.nearby_devices_empty);
+            this.showEmptyState(this.scanUnavailable
+                    ? R.string.nearby_devices_scan_unavailable
+                    : R.string.nearby_devices_empty);
             return;
         }
 
