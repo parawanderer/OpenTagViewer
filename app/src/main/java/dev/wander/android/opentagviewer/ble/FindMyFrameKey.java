@@ -136,7 +136,7 @@ public final class FindMyFrameKey {
      *         safe only if the caller checked {@code +2 + len <= data.length} itself - which is
      *         why this also bounds-checks each TLV before returning it.
      */
-    private static int findFindMyTlv(@Nullable final byte[] data) {
+    static int findFindMyTlv(@Nullable final byte[] data) {
         if (data == null) {
             return -1;
         }
