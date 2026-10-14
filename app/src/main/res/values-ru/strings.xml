@@ -465,4 +465,12 @@
     <string name="settings_section_tags">Метки</string>
     <string name="settings_section_app">Приложение</string>
     <string name="anisette_coreadi_card_title">Не удалось скачать файл от Apple</string>
+    <string name="nearby_devices_title">Устройства рядом</string>
+    <string name="nearby_devices_menu_open">Сканировать устройства рядом</string>
+    <string name="nearby_devices_empty">Устройств «Локатор» в зоне досягаемости нет. AirTag и другие устройства Apple «Локатор» появляются здесь, пока открыт этот экран.</string>
+    <string name="nearby_devices_needs_permission">Разрешите доступ к Bluetooth, чтобы видеть устройства «Локатор» рядом.</string>
+    <string name="nearby_device_unnamed">Устройство «Локатор» · %1$s</string>
+    <string name="nearby_device_distance_format">~%1$s м</string>
+    <string name="nearby_device_separated">отделено от владельца</string>
+    <string name="nearby_device_with_owner">рядом с владельцем</string>
 </resources>
