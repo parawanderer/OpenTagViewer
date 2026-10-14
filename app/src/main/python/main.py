@@ -398,7 +398,29 @@ def exportToString(account: AppleAccount) -> str:
     cannot hand it over and should not be asked to. A state name is not sensitive.
     """
     print(f"Storing account, login state: {account.login_state}")
+    _logServiceTokenNames(account)
     return json.dumps(account.to_json())
+
+
+def _logServiceTokenNames(account: AppleAccount) -> None:
+    """
+    Which iCloud service tokens this sign-in was issued, by name only.
+
+    **Names, never values.** Whether a token exists is the diagnostic - whether an
+    Android identity is issued `searchPartyToken` at all is the open question in
+    issue #248 and malmeloo/FindMy.py#278, and the only way it gets answered is
+    somebody looking at a live response - while a token's value is a credential
+    that must not reach a log file. Read here rather than in `loginSync`: the
+    mobileme delegate exchange that issues them also runs inside a 2FA `submit`,
+    which this bridge never sees, so the export path - which Java calls on every
+    completed sign-in - is the one place all flows pass through. Guarded because
+    `service_tokens` raises on anything short of LOGGED_IN.
+    """
+    try:
+        names = sorted(account.service_tokens.keys())
+        print(f"Sign-in issued {len(names)} service token(s): {names}")
+    except Exception:
+        print(f"Could not read the issued service tokens: {traceback.format_exc()}")
 
 
 # The anisette provider type accounts are stored with.
@@ -743,6 +765,7 @@ def acceptTerms(account: AppleAccount, pageId: str) -> str:
 
         state = account.complete_login()
         print(f"All terms accepted; signing in ended at {state}")
+        _logServiceTokenNames(account)
 
         return json.dumps({
             "ok": True,
