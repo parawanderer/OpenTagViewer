@@ -33,6 +33,32 @@ from findmy.reports.twofactor import (
 import identity as app_identity
 
 
+def _claimAppleMusicAtMobileme() -> None:
+    """
+    Make the mobileme delegate request claim the one Apple client that exists on
+    Android: Apple Music.
+
+    The stock request identifies as `accountsd` (`com.apple.AOSKit/282
+    (com.apple.accountsd/113)`) with an `iCloudHelper` user agent - both macOS
+    daemons - while the identity's platform half already claims a Pixel running
+    Android. An impossible pairing, and the same class of inconsistency Grand
+    Slam answers with -80045. Whether `com.apple.mobileme`'s `status=1` is that
+    check repeated at the delegate layer is what flipping these constants tests:
+    same machine, same account, different claim.
+
+    Module-level so it covers every path to `_login_mobileme` - the initial
+    login, the 2FA `submit`, and `complete_login` after terms - and done at
+    import so it precedes all of them.
+    """
+    import findmy.reports.account as _account_module
+    _account_module._ACCOUNTSD_BUNDLE = \
+        "com.apple.AuthKit/1 (com.apple.android.music/4.9.6)"
+    _account_module._ICLOUD_HELPER = "com.apple.android.music/4.9.6"
+
+
+_claimAppleMusicAtMobileme()
+
+
 class TwoFactorMethods(Enum):
     UNKNOWN = 0
     TRUSTED_DEVICE = 1
@@ -303,9 +329,14 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
         # before there was a choice keeps the Mac its ADI was provisioned with, and a fresh one
         # is an iPhone. Passed even when local Anisette turns out to be unusable, because a
         # sign-in relayed through a server must still claim the same machine.
+        # Experiment: force the remote server so the machine id presented is not
+        # provisioned by the local Android ADI libraries. If com.apple.mobileme
+        # answers status=0 here where the same account got status=1 under the
+        # local identity, the delegate gate keys on ADI provenance rather than on
+        # anything the request headers claim.
         anisette = _anisetteProvider(
             anisetteServerUrl,
-            localAnisette,
+            None,
             **app_identity.identityForNewSession(localAnisette),
         )
         # And the two ids the same install already used when it provisioned ADI, so this is one
