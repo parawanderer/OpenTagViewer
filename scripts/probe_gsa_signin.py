@@ -40,6 +40,13 @@ Examples:
     # Several variants in one run, compared against each other
     python scripts/probe_gsa_signin.py --set Accept="text/html" --unset Accept
 
+    # The handler layer: a structurally real SRP init, three Anisette variants --
+    # none, junk, provisioned -- each reported as the response plist's ec
+    python scripts/probe_gsa_signin.py --real-init
+    python scripts/probe_gsa_signin.py --real-init --anisette-junk
+    python scripts/probe_gsa_signin.py --real-init --anisette-json anisette.json \
+        --cpd-unset X-Apple-I-SRL-NO --cpd-unset X-Apple-I-MD
+
 Each probe is named by its variant and reported as `through` or `refused`, with the full
 answer (status, content type, length, and the first bytes of the body, which is where an
 `ec=` code or an HTML error page identifies itself). Repeating the same variant twice in
@@ -65,33 +72,105 @@ TIMEOUT_S = 20
 RETRY_SLEEP_S = 2
 
 BODY = b"t"
-"""The junk body every probe carries. Identical across variants by design.
+"""The junk body every edge probe carries. Identical across variants by design.
 
-**Where the extension point is.** This probes the edge only: an edge rule reads headers
-(and perhaps a body's shape, which is why the body is fixed), while the GsService2
-*handler* behind it reads the body's content -- the SRP exchange and the Anisette data
-inside it. A refusal that arrives as HTTP 200 with `ec=-80045` in a plist body is the
-handler, not the edge, and this script cannot see it: with a junk body it only ever asks
-"was the request let in", never "would it authenticate". The 2026-10-12 refusal is
-believed to be that kind (xtool's provisioning succeeds, then GsService init is refused),
-which is why the edge probes pass while every real sign-in fails.
-
-To probe the handler instead, the body has to be a structurally real SRP init:
-
-    {"o": "init", "u": <apple id>, "ps": ["s2k", "s2k_fo"], "A2k": <hex SRP A value>}
-
-built the way `AsyncAppleAccount._gsa_authenticate` in the pinned FindMy.py builds it
-(`srp.User(...).start_authentication()` for `A2k`), with the Anisette values carried in
-the same body (`X-Apple-I-MD`, `X-Apple-I-MD-M` and the rest -- see
-`BaseAnisetteProvider.headers`). None of that needs a password: init runs before any
-credential is checked, so a probe at this layer is still not a sign-in attempt. A
-`--real-init` mode would build that body, send it, and parse the response plist's `ec`
--- `ec=0` means the handler took the exchange and it is no longer the edge's answer that
-matters; `-80045` means the handler refused, and *then* varying the Anisette contents
-(fresh vs. stale provisioning, serial present vs. absent) is the experiment that localises
-the rule. Vary the body through the same `--set`/`--unset` mechanics by treating those
-keys as body fields rather than headers.
+**Where the extension point was.** The edge probes only ever asked "was the request
+let in"; the GsService2 *handler* behind the edge reads the body's content -- the SRP
+exchange and the Anisette data inside it -- and a refusal that arrives as HTTP 200 with
+`ec=-80045` in a plist body is the handler, not the edge. `--real-init` reaches that
+layer: it builds a structurally real SRP init, parses the response plist's `ec`, and
+lets the Anisette contents be varied through `--cpd-set`/`--cpd-unset`. A variant that
+flips the answer from `-80045` to anything else is the rule's location.
 """
+
+# A synthetic Apple ID, not a sign-in: init runs before any password is checked, so
+# probing with it is not an authentication attempt against any account.
+DEFAULT_PROBE_APPLE_ID = "probe-nonexistent@example.com"
+
+
+def _real_init_body(
+    apple_id: str,
+    cpd: dict,
+) -> bytes:
+    """The structurally real SRP init body `AsyncAppleAccount._gsa_authenticate` sends.
+
+    Identical shape to the library's: `srp.User.start_authentication()` mints a fresh
+    `A2k` every call, so two runs are never byte-identical -- which is also true of real
+    sign-ins, and means the handler cannot be answering on body equality.
+    """
+    import plistlib
+
+    import srp
+
+    usr = srp.User(apple_id, b"", hash_alg=srp.SHA256, ng_type=srp.NG_2048)
+    _, a2k = usr.start_authentication()
+    body = {
+        "Header": {"Version": "1.0.1"},
+        "Request": {
+            "cpd": cpd,
+            "A2k": a2k,
+            "u": apple_id,
+            "ps": ["s2k", "s2k_fo"],
+            "o": "init",
+        },
+    }
+    return plistlib.dumps(body)
+
+
+def _baseline_cpd() -> dict:
+    """The constant `cpd` flags `BaseAnisetteProvider.get_cpd` always sets.
+
+    Without `--anisette-json` or `--anisette-junk` this is the whole `cpd` -- the
+    "no Anisette data at all" variant, the cheapest possible question: does the
+    handler even reach the Anisette check before refusing?
+    """
+    return {
+        "bootstrap": True,
+        "icscrec": True,
+        "pbe": False,
+        "prkgen": True,
+        "svct": "iCloud",
+    }
+
+
+def _junk_anisette() -> dict[str, str]:
+    """Anisette-shaped values that are provably not provisioned data.
+
+    The "present but wrong" variant: every field a real `get_cpd` emits, filled
+    deterministically. If this and the missing-fields variant answer alike while a
+    provisioned set answers differently, the handler is reading the values; if all
+    three answer `-80045`, the refusal precedes the Anisette check.
+    """
+    return {
+        "X-Apple-I-Client-Time": "2000-01-01T00:00:00Z",
+        "X-Apple-I-TimeZone": "UTC",
+        "loc": "en_US",
+        "X-Apple-Locale": "en_US",
+        "X-Apple-I-MD": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "X-Apple-I-MD-LU": "AAAAAAAAAAA=",
+        "X-Apple-I-MD-M": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                          "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "X-Apple-I-MD-RINFO": "17106176",
+        "X-Mme-Device-Id": "00000000-0000-0000-0000-000000000000",
+        "X-Apple-I-SRL-NO": "PROBE000000",
+    }
+
+
+def _load_anisette_json(path: str) -> dict:
+    """Provisioned Anisette fields exported by a live provider.
+
+    Dump format is a flat string map, e.g. produced next to a working install by
+    `await anisette.get_headers(uid, devid)` serialised to JSON -- for this project,
+    the local provider behind `ani_libs.bin` on the backend host.
+    """
+    import json
+
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        msg = f"{path}: expected a JSON object of header names to values"
+        raise SystemExit(msg)
+    return {str(k): str(v) for k, v in data.items()}
 
 
 @dataclass(frozen=True)
@@ -103,6 +182,8 @@ class Answer:
     length: int
     server: str
     body_head: str
+    # The unabridged response -- the handler's plist can exceed body_head's window.
+    raw: bytes = b""
 
     @property
     def refused(self) -> bool:
@@ -122,7 +203,7 @@ def _baseline_headers(client_info: str) -> dict[str, str]:
     }
 
 
-def send(headers: dict[str, str]) -> Answer:
+def send(headers: dict[str, str], body: bytes = BODY) -> Answer:
     """One request, retried on connection failure but never on a refusal."""
     import urllib.error
     import urllib.request
@@ -132,7 +213,7 @@ def send(headers: dict[str, str]) -> Answer:
     tls = apple_trust_context()
     last: Exception | None = None
     for attempt in range(ATTEMPTS):
-        request = urllib.request.Request(GSA, data=BODY, headers=headers, method="POST")
+        request = urllib.request.Request(GSA, data=body, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=TIMEOUT_S, context=tls) as response:
                 return _answer(response.status, response.headers, response.read())
@@ -155,17 +236,44 @@ def _answer(status: int, headers, body: bytes) -> Answer:
         # or a plist's opening tag. 160 bytes is enough to tell those apart and small
         # enough to quote whole in an issue.
         body[:160].decode("utf-8", errors="replace").replace("\n", " "),
+        body,
     )
 
 
-def report(name: str, answer: Answer) -> None:
-    """One line per probe, plus the body head when it is an HTML refusal."""
-    verdict = "refused" if answer.refused else "through"
+def _handler_verdict(body: bytes) -> str | None:
+    """The plist `Status` a real init gets, or None when the answer is not a plist.
+
+    `ec=0` means the handler took the exchange; `-80045` is the 2026-10-12 refusal.
+    `em`/`au` are quoted when Apple sends them, because `em` is the only sentence the
+    handler ever writes back.
+    """
+    import plistlib
+
+    try:
+        parsed = plistlib.loads(body)
+    except Exception:
+        return None
+    status = (parsed.get("Response") or {}).get("Status") or {}
+    if not isinstance(status, dict) or "ec" not in status:
+        return None
+    parts = [f"ec={status['ec']}"]
+    for key in ("em", "au"):
+        if status.get(key) is not None:
+            parts.append(f"{key}={status[key]!r}")
+    return " ".join(parts)
+
+
+def report(name: str, answer: Answer, is_real_init: bool = False) -> None:
+    """One line per probe: the handler's `ec` when the request was a real init,
+    through/refused for edge probes, plus the body head on an HTML refusal."""
+    verdict = _handler_verdict(answer.raw) if is_real_init else None
+    if verdict is None:
+        verdict = "refused" if answer.refused else "through"
     print(
         f"{name}: {verdict} (HTTP {answer.status}, {answer.content_type or 'no content type'}, "
         f"{answer.length} bytes, Server {answer.server or '-'})",
     )
-    if answer.refused:
+    if verdict == "refused":
         print(f"    body: {answer.body_head}")
 
 
@@ -190,6 +298,36 @@ def main() -> int:
         "--repeat", type=int, default=1, metavar="N",
         help="Send each variant N times, to see whether the edge is in a steady state.",
     )
+    parser.add_argument(
+        "--real-init", action="store_true",
+        help="Probe the GsService2 handler instead of the edge: send a structurally "
+             "real SRP init body and report the response plist's Status.ec. "
+             "Still no account -- init runs before any password is checked.",
+    )
+    parser.add_argument(
+        "--apple-id", metavar="EMAIL", default=DEFAULT_PROBE_APPLE_ID,
+        help="The `u` value of the init. Default: a synthetic address, used so the "
+             "probe is never mistaken for a sign-in against a real account.",
+    )
+    parser.add_argument(
+        "--anisette-json", metavar="FILE",
+        help="JSON object of provisioned Anisette fields to merge into `cpd` "
+             "(e.g. a dump of a live provider's get_headers output).",
+    )
+    parser.add_argument(
+        "--anisette-junk", action="store_true",
+        help="Fill `cpd`'s Anisette fields with deterministic junk -- the "
+             "'present but not provisioned' variant.",
+    )
+    parser.add_argument(
+        "--cpd-set", action="append", default=[], metavar="NAME=VALUE", dest="cpd_sets",
+        help="Set or override a `cpd` field in a real-init body. Repeatable; "
+             "each becomes its own variant, like --set does for headers.",
+    )
+    parser.add_argument(
+        "--cpd-unset", action="append", default=[], metavar="NAME", dest="cpd_unsets",
+        help="Remove a `cpd` field in a real-init body. Repeatable.",
+    )
     args = parser.parse_args()
 
     from findmy.reports.anisette import _AKD_BUNDLE, CLIENT_IDENTITY
@@ -208,10 +346,36 @@ def main() -> int:
         headers.pop(name, None)
         variants.append((f"unset {name}", headers))
 
+    cpds: list[tuple[str, dict]] = []
+    if args.real_init:
+        cpd = _baseline_cpd()
+        if args.anisette_json:
+            cpd.update(_load_anisette_json(args.anisette_json))
+        if args.anisette_junk:
+            cpd.update(_junk_anisette())
+        cpds.append(("cpd:baseline", cpd))
+        for pair in args.cpd_sets:
+            name, _, value = pair.partition("=")
+            variant = dict(cpd)
+            variant[name] = value
+            cpds.append((f"cpd-set {pair}", variant))
+        for name in args.cpd_unsets:
+            variant = dict(cpd)
+            variant.pop(name, None)
+            cpds.append((f"cpd-unset {name}", variant))
+
     for name, headers in variants:
-        for attempt in range(args.repeat):
-            label = name if args.repeat == 1 else f"{name} [{attempt + 1}/{args.repeat}]"
-            report(label, send(headers))
+        if args.real_init:
+            for cpd_name, cpd in cpds:
+                label = f"{name} | {cpd_name}" if len(cpds) > 1 else name
+                body = _real_init_body(args.apple_id, cpd)
+                for attempt in range(args.repeat):
+                    suffix = f" [{attempt + 1}/{args.repeat}]" if args.repeat > 1 else ""
+                    report(label + suffix, send(headers, body), is_real_init=True)
+        else:
+            for attempt in range(args.repeat):
+                label = name if args.repeat == 1 else f"{name} [{attempt + 1}/{args.repeat}]"
+                report(label, send(headers))
 
     return 0
 

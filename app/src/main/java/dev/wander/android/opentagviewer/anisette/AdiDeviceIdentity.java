@@ -57,20 +57,25 @@ public final class AdiDeviceIdentity {
     /**
      * A fresh identity. Call once, persist, never call again.
      *
-     * <p><b>The Mac, not the iPhone, and that is a retreat from evidence rather than a
-     * preference.</b> Claiming an iPhone provisioned fine and signed in fine, and then Apple
-     * answered 401 to the very next request - {@code get_2fa_methods}, asking which phone
-     * numbers could receive a code. The desktop exporter makes the same call against the same
-     * account and is answered, and the largest remaining difference between them was this.
+     * <p><b>The Android phone, because since 2026-10-12 nothing else gets past sign-in.</b>
+     * The ADI libraries this app provisions with are Apple's <i>Android</i> binaries, taken
+     * from the Apple Music APK, and the machine id they mint says so. Apple's Grand Slam
+     * handler now compares that provenance against the platform {@code X-MMe-Client-Info}
+     * claims: a Mac or iPhone claim over an Android-minted machine id is refused at SRP init
+     * with {@code ec=-80045}, before any credential is looked at. A client-info naming Android
+     * over the same machine id is answered with the SRP challenge. Localised with
+     * {@code scripts/probe_gsa_signin.py --real-init}, issue #248; the same change fixed the
+     * identical lockout in xtool (xtool-org/xtool#337).
      *
-     * <p>An iPhone <i>is</i> a trusted device, so a client claiming to be one asking where to
-     * send an SMS code is a question a real iPhone would not ask. That is a guess at the
-     * mechanism; what is not a guess is that this profile works and that one did not get past
-     * sign-in, and a nicer icon is not worth an app nobody can log into.
+     * <p>The provenance is bound at provisioning, not at sign-in: a machine id provisioned
+     * under a Mac claim and then presented with an Android one is answered {@code hsc=434},
+     * a re-sync demand. So the profile has to be in place <i>before</i> ADI is provisioned,
+     * which is why {@link LocalAnisette} re-provisions an install it moves to this profile.
      *
-     * <p>These values are byte-identical to what the {@code anisette} package provisions with,
-     * which is what the exporter uses - so the app and the working program now introduce
-     * themselves to Apple as the same machine.
+     * <p>{@link Hardware#LEGACY_MAC} is what the {@code anisette} package and the desktop
+     * exporter still claim, and what every install before this shipped as. It was the right
+     * answer for as long as Apple did not look; it is kept so an install that has it can be
+     * recognised and moved, and for the record of why the iPhone was not chosen either.
      */
     /**
      * The eight characters every serial this app presents begins with.
@@ -167,11 +172,12 @@ public final class AdiDeviceIdentity {
     /**
      * The machine this install claims to be, chosen once and then kept.
      *
-     * <p>Two profiles, and <b>which one an install has is not a preference</b>: it is part of
+     * <p>Three profiles, and <b>which one an install has is not a preference</b>: it is part of
      * what Apple binds a session to, so moving an install from one to the other costs that user
-     * a sign-in and leaves a second entry in their device list. An install that already has an
-     * ADI identity keeps {@link #LEGACY_MAC}, and so, for now, does a fresh one - see
-     * {@link #generate()} for why {@link #IPHONE} is built but not chosen.
+     * a sign-in and leaves a second entry in their device list. That cost is paid exactly once,
+     * deliberately, for every install still on {@link #LEGACY_MAC} or {@link #IPHONE}: neither
+     * can sign in any more, and a session that cannot be renewed is worth less than one
+     * re-login - see {@link #generate()} and {@link #ANDROID}.
      *
      * <p>Each carries all six parts because <b>they describe one real release and move
      * together</b> - model, OS, build, CFNetwork and Darwin. FindMy.py's {@code DeviceIdentity}
@@ -263,6 +269,41 @@ public final class AdiDeviceIdentity {
                 return Base64.encodeToString(
                         localUserUuid.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
             }
+        },
+
+        /**
+         * A Pixel 7 on Android 14 - the platform the ADI libraries actually are.
+         *
+         * <p><b>The only profile Apple's Grand Slam handler accepts a sign-in from since
+         * 2026-10-12</b>, see {@link AdiDeviceIdentity#generate()}. The model and build are
+         * the ones xtool shipped in its fix (xtool-org/xtool#337); provisioning and SRP init
+         * under this exact string were verified from this repository against a freshly
+         * provisioned machine id and answered {@code ec=0}.
+         *
+         * <p>CFNetwork and Darwin are {@link #LEGACY_MAC}'s. They reach Apple only in the
+         * provisioning {@code User-Agent}, which the verified exchange sent unchanged beside
+         * the Android client info - the handler evidently reads the client info and not the
+         * agent - and inventing an Android CFNetwork build would be a value nothing real sends.
+         *
+         * <p>Local user id and its header follow {@link #IPHONE}: a UUID, base64 on the wire,
+         * so that provisioning and FindMy.py's sign-in carry the same bytes.
+         */
+        ANDROID(
+                "Pixel 7",
+                "Pixel 7", "Android", "14", "UQ1A.240205.002",
+                "1404.0.5", "22.3.0",
+                "com.apple.akd/1.0") {
+
+            @Override
+            String newLocalUserId(SecureRandom random) {
+                return UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
+            }
+
+            @Override
+            public String localUserHeader(String localUserUuid) {
+                return Base64.encodeToString(
+                        localUserUuid.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+            }
         };
 
         /**
@@ -292,7 +333,17 @@ public final class AdiDeviceIdentity {
          * would put one machine on screen and register another - which is the failure rule 11 is
          * about, arriving in the one place the user can actually see it.
          */
-        public static final Hardware DEFAULT = LEGACY_MAC;
+        public static final Hardware DEFAULT = ANDROID;
+
+        /**
+         * Whether Apple's Grand Slam handler still lets this profile sign in.
+         *
+         * <p>Read by {@link LocalAnisette} to decide whether a stored identity is worth keeping.
+         * Only {@link #ANDROID} is: see {@link AdiDeviceIdentity#generate()}.
+         */
+        public boolean canSignIn() {
+            return this == ANDROID;
+        }
 
         private final String marketingName;
         private final String model;

@@ -316,7 +316,7 @@ public final class LocalAnisette implements AnisetteSource {
         // Read before the library is opened rather than after: it touches only preferences, and
         // moving it lets the guarded window below hold exactly the calls into Apple's code.
         final AdiDeviceIdentity deviceIdentity = loadOrCreateIdentity();
-        final File provisioningDir = new File(this.context.getFilesDir(), "anisette/provisioning");
+        final File provisioningDir = provisioningDirectory();
 
         // **The window is the load and the initialise, and nothing longer.** Both are native,
         // both take milliseconds, and #232's crash is in the first. Provisioning is left out on
@@ -386,12 +386,32 @@ public final class LocalAnisette implements AnisetteSource {
         };
     }
 
+    /** Where ADI keeps the machine it provisioned; wiped when the identity has to change. */
+    private File provisioningDirectory() {
+        return new File(this.context.getFilesDir(), "anisette/provisioning");
+    }
+
     /**
-     * The device identity, generated once and then kept forever.
+     * The device identity, generated once and then kept - for as long as Apple lets it sign in.
      *
      * <p>Regenerating it would make every login look like a brand new machine to Apple, which
      * is exactly what two-factor authentication exists to notice. So it is written on first
      * use and read thereafter.
+     *
+     * <p><b>With one exception, and it is the exception that unbroke sign-in.</b> An identity
+     * whose profile Apple refuses outright - everything but
+     * {@link AdiDeviceIdentity.Hardware#ANDROID} since 2026-10-12, see
+     * {@link AdiDeviceIdentity#generate()} - is replaced rather than kept, and the machine ADI
+     * provisioned under it is wiped so the next load provisions afresh under the new claim.
+     * That re-identifies the install: a session established as the Mac stops being recognised
+     * and the user signs in again, under a profile that can. Kept, it would be a session that
+     * works until it expires and an install that can never sign in again; xtool made the same
+     * call for the same reason (its provider-id bump forces a re-provision on every install).
+     *
+     * <p>It has to happen here and not later, because this runs before Apple's library is
+     * opened: ADI reads its provisioning from the directory it is pointed at, and a directory
+     * emptied before {@code ADISetProvisioningPath} is a machine that is not provisioned yet.
+     * Emptied after, the loaded library would keep answering from memory.
      *
      * <p>SharedPreferences rather than the DataStore the rest of the app uses: this runs on a
      * background thread inside a blocking sequence, and does not want an Rx round trip in the
@@ -406,21 +426,24 @@ public final class LocalAnisette implements AnisetteSource {
         final String localUser = preferences.getString(KEY_LOCAL_USER, null);
 
         if (deviceId != null && adiId != null && localUser != null) {
-            // **An install that already has an identity keeps the machine it has always
-            // claimed to be.** The absence of the hardware key is what says "from before
-            // profiles existed", and that can only mean the Mac: it is the only thing this app
-            // ever sent. Defaulting a pre-existing install to the new profile instead would
-            // re-identify it to Apple, which costs the user a sign-in and leaves a second
-            // device-list entry - to change the icon on a row they already recognise.
+            // The absence of the hardware key is what says "from before profiles existed", and
+            // that can only mean the Mac: it is the only thing this app ever sent then.
             final AdiDeviceIdentity.Hardware hardware =
                     hardwareFrom(preferences.getString(KEY_HARDWARE, null),
                             AdiDeviceIdentity.Hardware.LEGACY_MAC);
 
-            // Same argument for the serial, for the same reason: an install with an identity
-            // and no stored serial has been telling Apple it is 0PENTAGVIEWR, and drawing it a
-            // new one now would register a second device beside the row it already has.
-            return new AdiDeviceIdentity(deviceId, adiId, localUser,
-                    serialFrom(preferences), hardware);
+            if (hardware.canSignIn()) {
+                // An install with an identity and no stored serial has been telling Apple it is
+                // 0PENTAGVIEWR, and drawing it a new one now would register a second device
+                // beside the row it already has.
+                return new AdiDeviceIdentity(deviceId, adiId, localUser,
+                        serialFrom(preferences), hardware);
+            }
+
+            Log.w(TAG, "stored identity claims " + hardware + ", which Apple no longer lets sign"
+                    + " in; replacing it and re-provisioning as "
+                    + AdiDeviceIdentity.Hardware.DEFAULT + " - this costs one sign-in");
+            deleteRecursively(provisioningDirectory());
         }
 
         final AdiDeviceIdentity fresh = AdiDeviceIdentity.generate();
@@ -437,6 +460,19 @@ public final class LocalAnisette implements AnisetteSource {
         return fresh;
     }
 
+    /** Removes a directory and everything under it; a path that does not exist is fine. */
+    private static void deleteRecursively(final File path) {
+        final File[] children = path.listFiles();
+        if (children != null) {
+            for (final File child : children) {
+                deleteRecursively(child);
+            }
+        }
+        if (path.exists() && !path.delete()) {
+            Log.w(TAG, "could not delete " + path + "; ADI may keep answering as the old machine");
+        }
+    }
+
     /**
      * Which machine this install presents as, for showing the user - and nothing else.
      *
@@ -451,10 +487,14 @@ public final class LocalAnisette implements AnisetteSource {
      * {@code ensureReady}, which is the expensive one.
      */
     public static AdiDeviceIdentity.Hardware profileToShow(final Context context) {
-        return hardwareFrom(
+        final AdiDeviceIdentity.Hardware stored = hardwareFrom(
                 context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                         .getString(KEY_HARDWARE, null),
                 AdiDeviceIdentity.Hardware.DEFAULT);
+        // A profile that can no longer sign in is what the next load replaces - see
+        // loadOrCreateIdentity - so showing it would describe a row that is about to be joined
+        // by another. The one the user will actually be asked to recognise is the default.
+        return stored.canSignIn() ? stored : AdiDeviceIdentity.Hardware.DEFAULT;
     }
 
     /**
