@@ -53,4 +53,13 @@
         android:id="@+id/action_import_history"
         android:title="@string/import_history" />
 
+    <!--
+        The other half of "what is around": this list is the user's own tags, the screen it
+        opens is every Find My device in earshot - most of them somebody else's. Kept last and
+        worded for what it is, so nobody mistakes a passive scan for a network lookup.
+    -->
+    <item
+        android:id="@+id/action_scan_nearby"
+        android:title="@string/nearby_devices_menu_open" />
+
 </menu>

@@ -423,4 +423,14 @@
     <string name="ring_failed_reason">Не удалось подать сигнал: %1$s</string>
     <string name="server_url_not_https">Не https: токен API будет передан без шифрования.</string>
     <string name="google_find_hub_setup_guide">Как это настроить</string>
+    <string name="nearby_devices_title">Устройства рядом</string>
+    <string name="nearby_devices_menu_open">Сканировать устройства рядом</string>
+    <string name="nearby_devices_empty">Устройств «Локатор» в зоне досягаемости нет. AirTag и другие устройства Apple «Локатор» появляются здесь, пока открыт этот экран.</string>
+    <string name="nearby_devices_needs_permission">Разрешите доступ к Bluetooth, чтобы видеть устройства «Локатор» рядом.</string>
+    <string name="nearby_device_unnamed">Устройство «Локатор» · %1$s</string>
+    <string name="nearby_device_distance_format">~%1$s м</string>
+    <string name="nearby_device_separated">отделено от владельца</string>
+    <string name="nearby_device_with_owner">рядом с владельцем</string>
+    <string name="nearby_devices_scan_unavailable">Bluetooth выключен или недоступен. Включите его, чтобы видеть устройства Find My рядом — повторная попытка автоматически.</string>
+    <string name="nearby_device_offline">не в сети</string>
 </resources>

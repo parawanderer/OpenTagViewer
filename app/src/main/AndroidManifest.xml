@@ -163,6 +163,11 @@
             android:exported="false"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
+            android:name=".NearbyDevicesActivity"
+            android:exported="false"
+            android:label="@string/nearby_devices_title"
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
+        <activity
             android:name=".FetchFromICloudActivity"
             android:exported="false"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
