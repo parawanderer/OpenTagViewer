@@ -1151,10 +1151,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         if (this.mapProvider == null) {
                             return;
                         }
+                        // Markers may have arrived while the fix was in flight - they own
+                        // the opening view, and a belated phone position must not stomp it.
+                        if (!this.currentMarkers.isEmpty()) {
+                            return;
+                        }
                         if (location != null) {
                             this.mapProvider.animateCamera(location.getLatitude(),
                                     location.getLongitude(), this.initialZoom(), null);
                         } else {
+                            this.applyLocaleOpeningView();
+                        }
+                    })
+                    .addOnFailureListener(this, e -> {
+                        // A failed fix is the same empty answer as a null one: fall back to
+                        // the locale view unless markers claimed the opening meanwhile.
+                        if (this.mapProvider != null && this.currentMarkers.isEmpty()) {
                             this.applyLocaleOpeningView();
                         }
                     });
@@ -1172,15 +1184,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         if (this.mapProvider == null) {
             return;
         }
-        switch (Locale.getDefault().getCountry()) {
-            case "DE":
-            case "AT":
-            case "CH":
-            case "LI":
-                this.mapProvider.moveCamera(50.96, 10.42, 5.5f);
-                return;
-            default:
-                this.mapProvider.moveCamera(30.0, 10.0, 2.5f);
+        // The activity's configured locale, not Locale.getDefault(): a per-app language set
+        // through locales_config never rewrites the default, and the tag is "de" with no
+        // country - so it is the language that decides, not the region.
+        final Locale appLocale = this.getResources().getConfiguration().getLocales().get(0);
+        if ("de".equals(appLocale.getLanguage())) {
+            this.mapProvider.moveCamera(50.96, 10.42, 5.5f);
+        } else {
+            this.mapProvider.moveCamera(30.0, 10.0, 2.5f);
         }
     }
 
