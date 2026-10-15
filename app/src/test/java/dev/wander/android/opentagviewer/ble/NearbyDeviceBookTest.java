@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.ble;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -61,13 +62,47 @@ public class NearbyDeviceBookTest {
     }
 
     @Test
-    public void prunesAPrefixThatWentQuiet() {
+    public void keepsAGonePrefixAsAnOfflineRow() {
         // Departure sends nothing: silence is the only signal. A tag unheard past
-        // GONE_AFTER_MS must fall out of the list rather than read as still present.
+        // GONE_AFTER_MS stays listed as offline rather than vanishing mid-glance.
         final NearbyDeviceBook book = new NearbyDeviceBook();
         book.hear(sighting("aabbccddeeff", -60, 1_000));
 
-        assertEquals(1, book.snapshot(30_999).size());
-        assertTrue(book.snapshot(31_001).isEmpty());
+        assertFalse(NearbyDeviceBook.isGone(book.snapshot(30_999).get(0), 30_999));
+
+        final List<NearbyDeviceSighting> rows = book.snapshot(31_001);
+        assertEquals(1, rows.size());
+        assertTrue(NearbyDeviceBook.isGone(rows.get(0), 31_001));
+    }
+
+    @Test
+    public void prunesAPrefixUnheardPastTheRetentionHorizon() {
+        final NearbyDeviceBook book = new NearbyDeviceBook();
+        book.hear(sighting("aabbccddeeff", -60, 1_000));
+
+        assertEquals(1, book.snapshot(1_000 + NearbyDeviceBook.RETAIN_GONE_MS).size());
+        assertTrue(book.snapshot(1_001 + NearbyDeviceBook.RETAIN_GONE_MS).isEmpty());
+    }
+
+    @Test
+    public void listsLiveRowsBeforeOfflineRows() {
+        final NearbyDeviceBook book = new NearbyDeviceBook();
+        book.hear(sighting("aabbccddeeff", -95, 1_000)); // strong-ranking but long gone
+        book.hear(sighting("111111111111", -50, 60_000)); // faint but live
+
+        final List<NearbyDeviceSighting> rows = book.snapshot(60_000);
+        assertEquals("111111111111", rows.get(0).getKeyPrefix());
+        assertEquals("aabbccddeeff", rows.get(1).getKeyPrefix());
+    }
+
+    @Test
+    public void sortsOfflineRowsByMostRecentlyHeard() {
+        final NearbyDeviceBook book = new NearbyDeviceBook();
+        book.hear(sighting("aabbccddeeff", -60, 1_000));
+        book.hear(sighting("111111111111", -60, 10_000));
+
+        final List<NearbyDeviceSighting> rows = book.snapshot(60_000);
+        assertEquals("111111111111", rows.get(0).getKeyPrefix());
+        assertEquals("aabbccddeeff", rows.get(1).getKeyPrefix());
     }
 }

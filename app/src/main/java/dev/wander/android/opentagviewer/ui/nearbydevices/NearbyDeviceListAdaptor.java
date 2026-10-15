@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.ble.FindMyAdvertisement;
+import dev.wander.android.opentagviewer.ble.NearbyDeviceBook;
 import dev.wander.android.opentagviewer.ble.NearbyDeviceSighting;
 import dev.wander.android.opentagviewer.util.nearby.ProximityDistance;
 import lombok.Getter;
@@ -32,6 +33,13 @@ import java.util.function.Function;
  */
 public class NearbyDeviceListAdaptor
         extends RecyclerView.Adapter<NearbyDeviceListAdaptor.ViewHolder> {
+
+    /**
+     * Opacity for a row whose device stopped advertising: dimmed but still readable -
+     * {@code colorControlHighlight}-like greys would fail contrast, so the whole row
+     * including icon and text fades to roughly half instead.
+     */
+    private static final float GONE_ROW_ALPHA = 0.5f;
 
     /** Click: select the device (future radar). Long click: rename - carries the row view as anchor. */
     private final Consumer<NearbyDeviceSighting> onClickCallback;
@@ -88,6 +96,7 @@ public class NearbyDeviceListAdaptor
     @Override
     public void onBindViewHolder(@NonNull final ViewHolder holder, final int position) {
         final NearbyDeviceSighting sighting = this.rows.get(position);
+        final boolean gone = NearbyDeviceBook.isGone(sighting, System.currentTimeMillis());
 
         final String givenName = this.nameResolver.apply(sighting.getKeyPrefix());
         final String title = givenName != null
@@ -96,21 +105,30 @@ public class NearbyDeviceListAdaptor
                         sighting.getKeyPrefix().substring(0, 4));
         holder.getDeviceName().setText(title);
 
-        // The details line is assembled from localized pieces: distance, battery, owner-state,
-        // then how stale the newest hearing is.
         final List<String> parts = new ArrayList<>();
-        parts.add(this.resources.getString(R.string.nearby_device_distance_format,
-                ProximityDistance.describe(sighting.getRssi())));
-        parts.add(this.resources.getString(batteryString(sighting.getBatteryLevel())));
-        parts.add(this.resources.getString(sighting.getState() == FindMyAdvertisement.State.SEPARATED
-                ? R.string.nearby_device_separated
-                : R.string.nearby_device_with_owner));
+        if (gone) {
+            // Distance, battery and owner-state would claim conditions from before the tag
+            // left; the row reports only that it went quiet and when it was last heard.
+            parts.add(this.resources.getString(R.string.nearby_device_offline));
+        } else {
+            // The details line is assembled from localized pieces: distance, battery,
+            // owner-state, then how stale the newest hearing is.
+            parts.add(this.resources.getString(R.string.nearby_device_distance_format,
+                    ProximityDistance.describe(sighting.getRssi())));
+            parts.add(this.resources.getString(batteryString(sighting.getBatteryLevel())));
+            parts.add(this.resources.getString(sighting.getState() == FindMyAdvertisement.State.SEPARATED
+                    ? R.string.nearby_device_separated
+                    : R.string.nearby_device_with_owner));
+        }
         parts.add(DateUtils.getRelativeTimeSpanString(
                 sighting.getSeenAtMs(), System.currentTimeMillis(),
                 DateUtils.SECOND_IN_MILLIS).toString());
         holder.getDetails().setText(String.join(" · ", parts));
 
         holder.getMac().setText(sighting.getMac());
+
+        // Rows are recycled, so the dimming has to be set unconditionally on every bind.
+        holder.getContainer().setAlpha(gone ? GONE_ROW_ALPHA : 1.0f);
 
         holder.getContainer().setOnClickListener(v -> this.onClickCallback.accept(sighting));
         holder.getContainer().setOnLongClickListener(v -> {

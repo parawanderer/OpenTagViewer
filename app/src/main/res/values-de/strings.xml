@@ -432,4 +432,5 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="nearby_device_separated">vom Besitzer getrennt</string>
     <string name="nearby_device_with_owner">beim Besitzer</string>
     <string name="nearby_devices_scan_unavailable">Bluetooth ist aus oder nicht verfügbar. Einschalten, um Geräte in der Nähe zu sehen — es wird automatisch erneut versucht.</string>
+    <string name="nearby_device_offline">offline</string>
 </resources>

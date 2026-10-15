@@ -432,4 +432,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="nearby_device_separated">持ち主と離れています</string>
     <string name="nearby_device_with_owner">持ち主の近く</string>
     <string name="nearby_devices_scan_unavailable">Bluetooth がオフか利用できません。オンにすると近くの Find My デバイスが表示されます — 自動で再試行します。</string>
+    <string name="nearby_device_offline">オフライン</string>
 </resources>

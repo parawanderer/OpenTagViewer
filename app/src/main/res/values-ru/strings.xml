@@ -432,4 +432,5 @@
     <string name="nearby_device_separated">отделено от владельца</string>
     <string name="nearby_device_with_owner">рядом с владельцем</string>
     <string name="nearby_devices_scan_unavailable">Bluetooth выключен или недоступен. Включите его, чтобы видеть устройства Find My рядом — повторная попытка автоматически.</string>
+    <string name="nearby_device_offline">не в сети</string>
 </resources>

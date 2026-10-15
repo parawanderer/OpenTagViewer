@@ -432,4 +432,5 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="nearby_device_separated">소유자와 떨어짐</string>
     <string name="nearby_device_with_owner">소유자와 함께 있음</string>
     <string name="nearby_devices_scan_unavailable">Bluetooth가 꺼져 있거나 사용할 수 없습니다. 켜면 근처 Find My 기기를 볼 수 있습니다 — 자동으로 다시 시도합니다.</string>
+    <string name="nearby_device_offline">오프라인</string>
 </resources>
