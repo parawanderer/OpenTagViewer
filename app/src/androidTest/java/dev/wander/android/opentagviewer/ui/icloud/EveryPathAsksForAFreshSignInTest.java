@@ -49,6 +49,10 @@ import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
+import dev.wander.android.opentagviewer.db.repo.UserAuthRepository;
+import dev.wander.android.opentagviewer.python.HardwareDescriber;
+import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 
 /**
  * Every way this app talks to the account, when Apple refuses the stored password.
@@ -147,7 +151,7 @@ public class EveryPathAsksForAFreshSignInTest {
         new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
                 new AppCryptographyUtil())
-                .store(new dev.wander.android.opentagviewer.python.icloud.KeychainMembership(
+                .store(new KeychainMembership(
                         "{\"peer_id\":\"peer-ours\"}", "ZW50cm9weQ==", "a-passcode",
                         "a-label", 2))
                 .blockingAwait();
@@ -181,7 +185,7 @@ public class EveryPathAsksForAFreshSignInTest {
      */
     private static void treatTheTagAsAnAccessory() {
         AppDependencies.replaceHardwareDescriber(
-                new dev.wander.android.opentagviewer.python.HardwareDescriber() {
+                new HardwareDescriber() {
                     @Override
                     public String describe(final String plistXml) {
                         return "AirTag";
@@ -233,7 +237,7 @@ public class EveryPathAsksForAFreshSignInTest {
 
         final Context context = getInstrumentation().getTargetContext();
         Eventually.check(() -> assertTrue("the refused session was kept",
-                new dev.wander.android.opentagviewer.db.repo.UserAuthRepository(
+                new UserAuthRepository(
                         UserAuthDataStore.getInstance(context), new AppCryptographyUtil())
                         .getUserAuth().blockingFirst().isEmpty()));
     }
@@ -289,7 +293,7 @@ public class EveryPathAsksForAFreshSignInTest {
 
         final List<String> held = new AccountRefresher(
                 memberships,
-                new dev.wander.android.opentagviewer.db.repo.BeaconRepository(this.db))
+                new BeaconRepository(this.db))
                 .refresh()
                 .onErrorReturnItem(List.of())
                 .blockingFirst();

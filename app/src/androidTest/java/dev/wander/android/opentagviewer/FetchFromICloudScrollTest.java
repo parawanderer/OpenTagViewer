@@ -27,6 +27,7 @@ import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import java.util.function.Function;
 
 /**
  * A long list of devices, with the button pinned under it.
@@ -76,7 +77,7 @@ public class FetchFromICloudScrollTest {
                 .check(matches(isDisplayed())));
     }
 
-    private <T> T fromActivity(final java.util.function.Function<FetchFromICloudActivity, T> read,
+    private <T> T fromActivity(final Function<FetchFromICloudActivity, T> read,
                                final T fallback) {
         final Object[] value = {fallback};
         this.scenario.onActivity(activity -> value[0] = read.apply(activity));

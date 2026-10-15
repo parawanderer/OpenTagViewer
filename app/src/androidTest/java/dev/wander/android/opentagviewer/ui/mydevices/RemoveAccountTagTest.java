@@ -38,6 +38,14 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import android.view.View;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
+import androidx.test.platform.app.InstrumentationRegistry;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import org.hamcrest.Matcher;
 
 /**
  * Removing a tag the app does not own.
@@ -360,12 +368,12 @@ public class RemoveAccountTagTest {
      * <p>So this reaches a view inside the window and draws upward from it. Whatever root that
      * view belongs to is the window it is in, by definition.
      */
-    private void captureWindowShowing(final org.hamcrest.Matcher<android.view.View> inside,
+    private void captureWindowShowing(final Matcher<View> inside,
                                       final String name) {
         final Bitmap[] shot = new Bitmap[1];
-        onView(inside).perform(new androidx.test.espresso.ViewAction() {
+        onView(inside).perform(new ViewAction() {
             @Override
-            public org.hamcrest.Matcher<android.view.View> getConstraints() {
+            public Matcher<View> getConstraints() {
                 return isDisplayed();
             }
 
@@ -375,8 +383,8 @@ public class RemoveAccountTagTest {
             }
 
             @Override
-            public void perform(final androidx.test.espresso.UiController controller,
-                                final android.view.View view) {
+            public void perform(final UiController controller,
+                                final View view) {
                 controller.loopMainThreadUntilIdle();
                 shot[0] = draw(view.getRootView());
             }
@@ -384,7 +392,7 @@ public class RemoveAccountTagTest {
         write(shot[0], name);
     }
 
-    private static Bitmap draw(final android.view.View view) {
+    private static Bitmap draw(final View view) {
         final Bitmap bitmap = Bitmap.createBitmap(
                 Math.max(view.getWidth(), 1), Math.max(view.getHeight(), 1),
                 Bitmap.Config.ARGB_8888);
@@ -393,16 +401,16 @@ public class RemoveAccountTagTest {
     }
 
     private static void write(final Bitmap bitmap, final String name) {
-        final String directory = androidx.test.platform.app.InstrumentationRegistry
+        final String directory = InstrumentationRegistry
                 .getArguments().getString("additionalTestOutputDir");
         if (directory == null || bitmap == null) {
             return;
         }
 
-        try (java.io.FileOutputStream out =
-                     new java.io.FileOutputStream(new java.io.File(directory, name))) {
+        try (FileOutputStream out =
+                     new FileOutputStream(new File(directory, name))) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-        } catch (final java.io.IOException e) {
+        } catch (final IOException e) {
             throw new AssertionError("could not write " + name, e);
         }
     }

@@ -15,6 +15,12 @@ import androidx.test.core.app.ActivityScenario;
 
 import java.util.ArrayList;
 import java.util.List;
+import android.widget.HorizontalScrollView;
+import android.widget.ListView;
+import android.widget.ScrollView;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.core.widget.NestedScrollView;
+import androidx.recyclerview.widget.RecyclerView;
 
 /**
  * Asks a screen whether it would keep its controls out of a navigation bar.
@@ -139,11 +145,11 @@ public final class TheNavigationBar {
                 parent = parent.getParent() instanceof ViewGroup
                         ? (ViewGroup) parent.getParent() : null) {
 
-            if (parent instanceof android.widget.ScrollView
-                    || parent instanceof android.widget.HorizontalScrollView
-                    || parent instanceof androidx.core.widget.NestedScrollView
-                    || parent instanceof androidx.recyclerview.widget.RecyclerView
-                    || parent instanceof android.widget.ListView) {
+            if (parent instanceof ScrollView
+                    || parent instanceof HorizontalScrollView
+                    || parent instanceof NestedScrollView
+                    || parent instanceof RecyclerView
+                    || parent instanceof ListView) {
                 return true;
             }
 
@@ -157,8 +163,8 @@ public final class TheNavigationBar {
             // it properly means the behaviour's peek height, which is a bigger change than the
             // one this test was written for.
             if (parent.getLayoutParams()
-                    instanceof androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
-                    && ((androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)
+                    instanceof CoordinatorLayout.LayoutParams
+                    && ((CoordinatorLayout.LayoutParams)
                             parent.getLayoutParams()).getBehavior() != null) {
                 return true;
             }

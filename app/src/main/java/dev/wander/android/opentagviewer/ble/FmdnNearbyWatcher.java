@@ -21,6 +21,7 @@ import dev.wander.android.opentagviewer.source.ExtraSourcesApi;
 import dev.wander.android.opentagviewer.source.ExtraSourcesSettings;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import java.util.Arrays;
 
 /**
  * "Nearby" for Google Find Hub trackers. They carry no Apple keys, so {@link NearbyTagWatcher}
@@ -75,7 +76,7 @@ public final class FmdnNearbyWatcher {
                     if (data == null || data.length < 21) return;
                     final int frame = data[0] & 0xFF;
                     if (frame != 0x40 && frame != 0x41) return;
-                    final String eid = FmdnRingCommand.hex(java.util.Arrays.copyOfRange(data, 1, 21));
+                    final String eid = FmdnRingCommand.hex(Arrays.copyOfRange(data, 1, 21));
                     final String beaconId = beaconByEid.get(eid);
                     if (beaconId != null && !emitter.isDisposed()) {
                         emitter.onNext(new NearbyTagSighting(beaconId, null, result.getRssi(), null,

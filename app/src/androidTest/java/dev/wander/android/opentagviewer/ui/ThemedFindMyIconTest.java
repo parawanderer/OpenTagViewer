@@ -29,6 +29,7 @@ import java.util.Set;
 
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.data.model.BeaconInformation;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 /**
  * The Find My accessory mark, which is the first icon here that colours itself.
@@ -352,7 +353,7 @@ public class ThemedFindMyIconTest {
     }
 
     private static void write(final Bitmap bitmap, final String name) throws IOException {
-        final String directory = androidx.test.platform.app.InstrumentationRegistry
+        final String directory = InstrumentationRegistry
                 .getArguments().getString("additionalTestOutputDir");
         if (directory == null) {
             return;

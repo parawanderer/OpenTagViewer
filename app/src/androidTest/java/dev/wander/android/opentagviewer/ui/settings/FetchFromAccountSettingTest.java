@@ -40,6 +40,8 @@ import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import android.content.Intent;
+import androidx.test.espresso.Espresso;
 
 /**
  * Reading the Apple account from Settings.
@@ -185,7 +187,7 @@ public class FetchFromAccountSettingTest {
      */
     @Test
     public void whatTheAccountScreenImportedIsPassedBackToWhoeverOpenedSettings() {
-        final android.content.Intent imported = new android.content.Intent();
+        final Intent imported = new Intent();
         imported.putExtra(FetchFromICloudActivity.RESULT_IMPORTED, true);
         intending(hasComponent(FetchFromICloudActivity.class.getName()))
                 .respondWith(new ActivityResult(Activity.RESULT_OK, imported));
@@ -201,7 +203,7 @@ public class FetchFromAccountSettingTest {
         // which is the method that sets the result at all - so the test reported RESULT_CANCELED
         // and said the flag had been dropped, for a screen that was never asked to report one.
         // Espresso's back goes through onBackPressed and therefore through the real exit.
-        androidx.test.espresso.Espresso.pressBackUnconditionally();
+        Espresso.pressBackUnconditionally();
 
         // ActivityScenario.getResult() hands back Instrumentation.ActivityResult, the same type
         // the stub above is built from.
@@ -234,9 +236,9 @@ public class FetchFromAccountSettingTest {
         onView(withId(R.id.settings_fetch_from_account)).perform(click());
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
 
-        androidx.test.espresso.Espresso.pressBackUnconditionally();
+        Espresso.pressBackUnconditionally();
 
-        final android.content.Intent data = this.scenario.getResult().getResultData();
+        final Intent data = this.scenario.getResult().getResultData();
         if (data != null) {
             assertFalse("a cancelled account screen was reported as an import",
                     data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false));

@@ -40,6 +40,7 @@ import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 /**
  * Every step of the iCloud screen, drawn from the running activity.
@@ -264,7 +265,7 @@ public class ICloudStepsRenderTest {
     }
 
     private static void write(final Bitmap bitmap, final String name) throws IOException {
-        final String directory = androidx.test.platform.app.InstrumentationRegistry
+        final String directory = InstrumentationRegistry
                 .getArguments().getString("additionalTestOutputDir");
         if (directory == null || bitmap == null) {
             return;

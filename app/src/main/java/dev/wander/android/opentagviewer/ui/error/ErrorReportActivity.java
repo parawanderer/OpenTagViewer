@@ -38,6 +38,7 @@ import dev.wander.android.opentagviewer.util.android.WebLink;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import android.view.View;
 
 /**
  * "This one is a bug" - the screen for a failure nobody here can fix.
@@ -199,7 +200,7 @@ public class ErrorReportActivity extends AppCompatActivity {
                             this.log = evidence.log;
                             note.setText(this.getString(
                                     R.string.error_report_log_cleaned, evidence.log.getSummary()));
-                            share.setVisibility(android.view.View.VISIBLE);
+                            share.setVisibility(View.VISIBLE);
                             share.setOnClickListener(v -> this.offerTheLog());
                         },
                         error -> {

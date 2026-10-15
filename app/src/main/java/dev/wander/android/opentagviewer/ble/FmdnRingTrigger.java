@@ -32,6 +32,7 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Rings a Google Find Hub tracker the way its owner's Find Hub app does: the tracker is
@@ -130,7 +131,7 @@ public final class FmdnRingTrigger implements AccessorySoundTrigger {
                 return;
             }
             final AtomicBoolean found = new AtomicBoolean(false);
-            final java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger();
+            final AtomicInteger seen = new AtomicInteger();
             Log.i(TAG, "Scanning for an FMDN tracker matching one of " + eids.size() + " EIDs");
             final ScanCallback callback = new ScanCallback() {
                 @Override

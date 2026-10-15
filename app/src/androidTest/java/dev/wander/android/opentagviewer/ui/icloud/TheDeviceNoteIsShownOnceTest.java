@@ -30,6 +30,7 @@ import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import androidx.lifecycle.Lifecycle;
 
 /**
  * The page explaining what this app put on somebody's Apple account, and when it is worth showing.
@@ -171,6 +172,6 @@ public class TheDeviceNoteIsShownOnceTest {
         onView(withId(R.id.icloud_primary_button)).perform(click());
 
         Eventually.check(() -> assertTrue("the screen should have closed",
-                this.scenario.getState() == androidx.lifecycle.Lifecycle.State.DESTROYED));
+                this.scenario.getState() == Lifecycle.State.DESTROYED));
     }
 }

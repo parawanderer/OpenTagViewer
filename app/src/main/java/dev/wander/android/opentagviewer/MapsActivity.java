@@ -156,6 +156,7 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import lombok.Data;
+import android.graphics.Bitmap;
 
 /**
  * TODO: this whole thing is a bit of a godclass. Decouple it.
@@ -2475,7 +2476,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         Log.d(TAG, "Going to add new marker for beaconId=" + beaconId);
 
         // 创建自定义标记图标
-        android.graphics.Bitmap iconBitmap;
+        Bitmap iconBitmap;
         // **Resolved from the theme, not read from the colour resource.** The two agree in every
         // built-in theme, including at night - and stop agreeing the moment system colours are
         // on, because DynamicColors rewrites the theme attribute and cannot rewrite a fixed

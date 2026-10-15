@@ -41,6 +41,9 @@ import dev.wander.android.opentagviewer.MapsActivity;
 import dev.wander.android.opentagviewer.MyDevicesListActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.SettingsActivity;
+import android.view.View;
+import androidx.test.espresso.matcher.ViewMatchers;
+import org.hamcrest.Matcher;
 
 /**
  * Every control on the map goes where it says it goes.
@@ -210,10 +213,10 @@ public class EveryButtonOnTheMapGoesSomewhereTest {
     }
 
     /** A control inside the first tag's card - there is more than one card on screen. */
-    private static org.hamcrest.Matcher<android.view.View> theFirstCard(final int controlId) {
-        return allOf(withId(controlId), androidx.test.espresso.matcher.ViewMatchers
+    private static Matcher<View> theFirstCard(final int controlId) {
+        return allOf(withId(controlId), ViewMatchers
                 .isDescendantOfA(allOf(withId(R.id.tag_item_container),
-                        androidx.test.espresso.matcher.ViewMatchers
+                        ViewMatchers
                                 .hasDescendant(withText("Bike")))));
     }
 

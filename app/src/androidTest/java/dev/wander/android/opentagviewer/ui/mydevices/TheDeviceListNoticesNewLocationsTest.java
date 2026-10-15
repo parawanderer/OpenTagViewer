@@ -30,6 +30,8 @@ import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
+import org.hamcrest.Matcher;
+import org.hamcrest.Matchers;
 
 /**
  * The device list noticing locations that arrived while it was in the background.
@@ -200,11 +202,11 @@ public class TheDeviceListNoticesNewLocationsTest {
                         withText(containsDays()))))));
     }
 
-    private static org.hamcrest.Matcher<String> containsThe(final String what) {
-        return org.hamcrest.Matchers.containsString(what);
+    private static Matcher<String> containsThe(final String what) {
+        return Matchers.containsString(what);
     }
 
-    private static org.hamcrest.Matcher<String> containsDays() {
+    private static Matcher<String> containsDays() {
         return containsThe("day");
     }
 }

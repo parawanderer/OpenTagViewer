@@ -752,7 +752,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     @Override
     public void finish() {
         if (this.importedSomething) {
-            final android.content.Intent data = new android.content.Intent();
+            final Intent data = new Intent();
             data.putExtra(RESULT_IMPORTED, true);
             this.setResult(RESULT_OK, data);
         }
@@ -786,7 +786,7 @@ public class FetchFromICloudActivity extends AppCompatActivity {
     }
 
     private void leaveForFileImport() {
-        final android.content.Intent data = new android.content.Intent();
+        final Intent data = new Intent();
         data.putExtra(RESULT_WANTS_FILE_IMPORT, true);
         this.setResult(RESULT_OK, data);
         this.finish();

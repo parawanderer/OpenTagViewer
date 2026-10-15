@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.HashMap;
 
 /**
  * The provisioning round trip: teaching Apple about this "machine" so it can produce Anisette
@@ -156,7 +157,7 @@ public final class AdiProvisioning {
                 throw new ProvisioningException("the URL bag came back empty");
             }
 
-            final Map<String, String> out = new java.util.HashMap<>();
+            final Map<String, String> out = new HashMap<>();
             for (final Map.Entry<String, Object> entry : bag.entrySet()) {
                 if (entry.getValue() instanceof String) {
                     out.put(entry.getKey(), (String) entry.getValue());

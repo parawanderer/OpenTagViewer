@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import dev.wander.android.opentagviewer.python.AccessoryMacResolver;
+import java.util.HashSet;
 
 /**
  * Looks further back for a tag nobody has heard, a little at a time, without being asked.
@@ -198,7 +199,7 @@ public final class WideningSearch {
             final Map<String, Long> lastHeardMsByBeaconId,
             final long nowMs) {
 
-        final Set<String> missing = new java.util.HashSet<>();
+        final Set<String> missing = new HashSet<>();
         for (final String beaconId : beaconIds) {
             final Long lastHeard = lastHeardMsByBeaconId.get(beaconId);
             if (lastHeard == null || nowMs - lastHeard >= HEARD_RECENTLY_MS) {

@@ -41,6 +41,9 @@ import dev.wander.android.opentagviewer.db.room.entity.BeaconNamingRecord;
 import dev.wander.android.opentagviewer.db.room.entity.Import;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
+import android.view.View;
+import android.widget.TextView;
+import androidx.test.espresso.ViewInteraction;
 
 /**
  * Putting the tag list in the order the user wants it.
@@ -279,7 +282,7 @@ public class ArrangingTheTagListTest {
      * aimed there passes for a disabled item and proves nothing. The enabled state lives on the
      * {@code ListMenuItemView} that contains it.
      */
-    private static androidx.test.espresso.ViewInteraction menuItem(final int title) {
+    private static ViewInteraction menuItem(final int title) {
         return onView(allOf(
                 withClassName(endsWith("ListMenuItemView")),
                 hasDescendant(withText(title))))
@@ -313,7 +316,7 @@ public class ArrangingTheTagListTest {
         this.scenario.onActivity(activity -> {
             final RecyclerView list = activity.findViewById(R.id.my_devices_list);
             for (int i = 0; i < list.getChildCount(); i++) {
-                names.add(((android.widget.TextView) list.getChildAt(i)
+                names.add(((TextView) list.getChildAt(i)
                         .findViewById(R.id.list_item_device_name)).getText().toString());
             }
         });
@@ -334,9 +337,9 @@ public class ArrangingTheTagListTest {
         this.scenario.onActivity(activity -> {
             final RecyclerView list = activity.findViewById(R.id.my_devices_list);
             for (int i = 0; i < list.getChildCount(); i++) {
-                final android.view.View handle =
+                final View handle =
                         list.getChildAt(i).findViewById(R.id.list_item_drag_handle);
-                if (handle != null && handle.getVisibility() == android.view.View.VISIBLE) {
+                if (handle != null && handle.getVisibility() == View.VISIBLE) {
                     count[0]++;
                 }
             }

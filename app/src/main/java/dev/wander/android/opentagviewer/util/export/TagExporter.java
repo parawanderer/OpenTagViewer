@@ -9,6 +9,7 @@ import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.python.BundleBuilder;
 import dev.wander.android.opentagviewer.util.parse.BundlePasscode;
+import java.io.IOException;
 
 /**
  * Turning a selection of tags into a locked zip somebody else can import.
@@ -86,7 +87,7 @@ public final class TagExporter {
             final String sourceUser,
             final long exportedAtMs)
             throws NothingToExportException, BundleBuilder.BundleBuildException,
-                   java.io.IOException {
+                   IOException {
 
         if (selection.isEmpty()) {
             throw new NothingToExportException("Nothing was selected.");

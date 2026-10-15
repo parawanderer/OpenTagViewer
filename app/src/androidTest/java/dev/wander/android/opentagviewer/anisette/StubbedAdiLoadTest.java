@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.ArrayList;
 
 /**
  * <p>libstoreservicescore.so imports symbols from only three libraries - libc++_shared (141),
@@ -98,7 +99,7 @@ public class StubbedAdiLoadTest {
         libraryDir = new File(context.getFilesDir(), "adi-test-stubbed/" + abi);
         nativeLibraryDir = new File(context.getApplicationInfo().nativeLibraryDir);
 
-        final java.util.List<String> everything = new java.util.ArrayList<>(FROM_APPLE);
+        final List<String> everything = new ArrayList<>(FROM_APPLE);
         everything.add(CORE_ADI);
 
         final long downloaded = AdiLibraryFetcher.fetchInto(libraryDir, abi, everything);

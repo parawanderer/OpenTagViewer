@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.Assert;
 
 /**
  * Tests for keeping the selected tag's marker on top of the ones it overlaps.
@@ -181,7 +182,7 @@ public class MarkerFocusTest {
     @Test
     public void theRaisedLevelIsAboveTheDefaultOne() {
         // Sounds trivial; it is the entire behaviour, and a swap would be silent.
-        org.junit.Assert.assertTrue(MarkerFocus.ZINDEX_TOP > MarkerFocus.ZINDEX_DEFAULT);
+        Assert.assertTrue(MarkerFocus.ZINDEX_TOP > MarkerFocus.ZINDEX_DEFAULT);
     }
 
     @Test

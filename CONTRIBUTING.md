@@ -62,8 +62,8 @@ Hooks are not versioned, so this is once per clone:
 git config core.hooksPath .githooks
 ```
 
-`.githooks/pre-commit` runs the translation check, plus flake8 and pyright over whatever
-Python you staged, and refuses to commit `secrets.properties`. It deliberately does not
+`.githooks/pre-commit` runs the translation check, flake8 and pyright over whatever Python you
+staged, the Java import check when you staged Java, and refuses to commit `secrets.properties`. It deliberately does not
 build or run tests — a hook that takes a minute gets bypassed with `--no-verify` within a
 day, and a routinely-bypassed hook is worse than none. Use `--no-verify` when you genuinely
 need to.
@@ -689,10 +689,8 @@ python scripts/check_java_imports.py --fix    # shorten them and add the imports
 ```
 
 It reads the source alone, so it needs no Gradle and runs in under a second. It runs in
-`static-checks.yml` but **does not fail the build yet**: the existing code has about 270 of these,
-and fixing them is being held back until the open pull requests are in, so the cleanup does not
-conflict with them. Once it is fixed, the step becomes blocking.
-
+`static-checks.yml` and fails the build, and the pre-commit hook runs it whenever a Java file is
+staged.
 ---
 
 ## Adding user-facing strings (Coding Agents)
@@ -877,7 +875,7 @@ run regardless: each AES entry carries a fresh random salt.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, tooling tests, Java import check (reported, not yet blocking). Seconds, no Android |
+| `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, tooling tests, Java import check. Seconds, no Android |
 | `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK. Also publishes the generated Room schemas as `room-schemas`, so a version bump made without an Android toolchain can still commit the JSON rule 1 requires |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
 | `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |

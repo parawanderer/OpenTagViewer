@@ -687,7 +687,7 @@ public class AppleZipImporterUtil {
     private static String plistToAccessoryJsonOrNull(
             final String plistXml, final String alignmentPlistXml) {
         try {
-            var py = com.chaquo.python.Python.getInstance();
+            var py = Python.getInstance();
             var module = py.getModule("main");
             var result = module.callAttr("convertPlistToJson", plistXml, alignmentPlistXml);
             return result == null ? null : result.toString();

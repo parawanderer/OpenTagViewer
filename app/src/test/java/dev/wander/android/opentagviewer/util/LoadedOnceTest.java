@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Building something at most once, however many threads want it.
@@ -92,7 +93,7 @@ public class LoadedOnceTest {
         }
 
         go.countDown();
-        assertTrue("threads did not finish", done.await(30, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue("threads did not finish", done.await(30, TimeUnit.SECONDS));
 
         assertEquals("it was built more than once under contention", 1, builds.get());
         assertEquals(20, got.size());

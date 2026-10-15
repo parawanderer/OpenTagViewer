@@ -6,6 +6,7 @@ import java.util.Map;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import java.util.Set;
 
 /**
  * Wraps the result of a {@link PythonAppleService} fetch call. With FindMy 0.9.x
@@ -28,7 +29,7 @@ public class FetchResult {
      * little - it may not have been near an iPhone this week. Only a wide search that stayed
      * wide says the tag has been silent for months, and Python is where the width is known.
      */
-    private final java.util.Set<String> exhaustedWideSearch;
+    private final Set<String> exhaustedWideSearch;
 
     /**
      * The accessories whose search was an expensive one - a wide key window.
@@ -39,5 +40,5 @@ public class FetchResult {
      * failure made healthy tags accrue strikes and start being asked less often, which is the
      * opposite of what the backoff is for.
      */
-    private final java.util.Set<String> wideSearch;
+    private final Set<String> wideSearch;
 }

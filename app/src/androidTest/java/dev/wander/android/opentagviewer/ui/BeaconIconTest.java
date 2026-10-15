@@ -27,6 +27,7 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import android.graphics.Color;
 
 /**
  * Which icon a tag with no emoji gets, and whether that icon actually draws anything.
@@ -309,7 +310,7 @@ public class BeaconIconTest {
         int painted = 0;
         for (int x = 0; x < size; x++) {
             for (int y = 0; y < size; y++) {
-                if (android.graphics.Color.alpha(bitmap.getPixel(x, y)) > 0) {
+                if (Color.alpha(bitmap.getPixel(x, y)) > 0) {
                     painted++;
                 }
             }

@@ -28,6 +28,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import dev.wander.android.opentagviewer.R;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import androidx.appcompat.content.res.AppCompatResources;
 
 /**
  * Renders the layouts that carried hard-coded palette colours, with and without wallpaper
@@ -243,9 +246,9 @@ public class SystemColorsLayoutTest {
     /** WCAG 2.1 relative luminance. */
     private static double relativeLuminance(final int color) {
         final double[] channel = {
-                android.graphics.Color.red(color) / 255d,
-                android.graphics.Color.green(color) / 255d,
-                android.graphics.Color.blue(color) / 255d,
+                Color.red(color) / 255d,
+                Color.green(color) / 255d,
+                Color.blue(color) / 255d,
         };
         for (int i = 0; i < channel.length; i++) {
             channel[i] = channel[i] <= 0.04045d
@@ -268,8 +271,8 @@ public class SystemColorsLayoutTest {
      * attributes inside the vector resolve - which is the entire thing under test.
      */
     private Bitmap renderDrawable(final Context context, final int drawableRes) {
-        android.graphics.drawable.Drawable drawable =
-                androidx.appcompat.content.res.AppCompatResources.getDrawable(context, drawableRes);
+        Drawable drawable =
+                AppCompatResources.getDrawable(context, drawableRes);
 
         if (drawable == null) {
             throw new AssertionError("could not load drawable " + drawableRes);

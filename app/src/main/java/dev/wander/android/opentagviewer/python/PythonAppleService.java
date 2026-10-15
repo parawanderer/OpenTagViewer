@@ -16,6 +16,8 @@ import java.util.Map;
 import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import java.util.HashSet;
+import java.util.Set;
 
 public class PythonAppleService {
     private static final String TAG = PythonAppleService.class.getSimpleName();
@@ -172,7 +174,7 @@ public class PythonAppleService {
 
     private static FetchResult emptyResult() {
         return new FetchResult(Collections.emptyMap(), Collections.emptyMap(),
-                java.util.Set.of(), java.util.Set.of());
+                Set.of(), Set.of());
     }
 
     /**
@@ -185,8 +187,8 @@ public class PythonAppleService {
     private static FetchResult mapResults(final PyObject locationReportsResult) {
         Map<String, List<BeaconLocationReport>> results = new HashMap<>();
         Map<String, String> updatedAccessoryJson = new HashMap<>();
-        java.util.Set<String> exhaustedWideSearch = new java.util.HashSet<>();
-        java.util.Set<String> wideSearch = new java.util.HashSet<>();
+        Set<String> exhaustedWideSearch = new HashSet<>();
+        Set<String> wideSearch = new HashSet<>();
 
         var mapBeaconIdToResult = locationReportsResult.asMap();
         for (var key : mapBeaconIdToResult.keySet()) {

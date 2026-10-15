@@ -10,6 +10,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import android.content.Context;
+import android.os.Bundle;
+import android.view.ViewGroup;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
 /**
  * 高德地图提供商实现
@@ -70,7 +76,7 @@ public class AMapProvider implements IMapProvider {
             // 高德地图3D地图使用 TextureMapView 或 MapView
             // TextureMapView 性能更好，推荐使用
             Class<?> mapViewClass = Class.forName("com.amap.api.maps.TextureMapView");
-            Object mapView = mapViewClass.getConstructor(android.content.Context.class)
+            Object mapView = mapViewClass.getConstructor(Context.class)
                     .newInstance(activity);
             
             this.mapView = (View) mapView;
@@ -78,21 +84,21 @@ public class AMapProvider implements IMapProvider {
             // 获取AMap对象
             // com.amap.api.maps.AMap
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method getMapMethod = mapViewClass.getMethod("getMap");
+            Method getMapMethod = mapViewClass.getMethod("getMap");
             this.aMap = getMapMethod.invoke(mapView);
             
             // 调用 onCreate 生命周期方法（高德地图必需）
             // TextureMapView.onCreate(Bundle savedInstanceState)
-            java.lang.reflect.Method onCreateMethod = mapViewClass.getMethod("onCreate", android.os.Bundle.class);
-            onCreateMethod.invoke(mapView, (android.os.Bundle) null);
+            Method onCreateMethod = mapViewClass.getMethod("onCreate", Bundle.class);
+            onCreateMethod.invoke(mapView, (Bundle) null);
             Log.d(TAG, "AMap TextureMapView onCreate() called");
             
             // 添加到容器，并设置 LayoutParams 确保 View 填充整个容器
-            android.view.ViewGroup container = activity.findViewById(containerViewId);
+            ViewGroup container = activity.findViewById(containerViewId);
             if (container != null) {
-                android.view.ViewGroup.LayoutParams layoutParams = new android.view.ViewGroup.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
                 );
                 container.addView((View) mapView, layoutParams);
                 Log.d(TAG, "AMap view added to container with MATCH_PARENT layout params");
@@ -121,7 +127,7 @@ public class AMapProvider implements IMapProvider {
 
         try {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method setMapTypeMethod = aMapClass.getMethod("setMapType", int.class);
+            Method setMapTypeMethod = aMapClass.getMethod("setMapType", int.class);
 
             int normalMapType = aMapClass.getField("MAP_TYPE_NORMAL").getInt(null);
             int nightMapType = aMapClass.getField("MAP_TYPE_NIGHT").getInt(null);
@@ -170,16 +176,16 @@ public class AMapProvider implements IMapProvider {
             Object latLng = latLngClass.getConstructor(double.class, double.class)
                     .newInstance(gcj02[0], gcj02[1]);
             
-            java.lang.reflect.Method positionMethod = markerOptionsClass.getMethod("position", latLngClass);
+            Method positionMethod = markerOptionsClass.getMethod("position", latLngClass);
             positionMethod.invoke(markerOptions, latLng);
             
             // 设置标题和片段
             if (marker.getTitle() != null) {
-                java.lang.reflect.Method titleMethod = markerOptionsClass.getMethod("title", String.class);
+                Method titleMethod = markerOptionsClass.getMethod("title", String.class);
                 titleMethod.invoke(markerOptions, marker.getTitle());
             }
             if (marker.getSnippet() != null) {
-                java.lang.reflect.Method snippetMethod = markerOptionsClass.getMethod("snippet", String.class);
+                Method snippetMethod = markerOptionsClass.getMethod("snippet", String.class);
                 snippetMethod.invoke(markerOptions, marker.getSnippet());
             }
             
@@ -187,10 +193,10 @@ public class AMapProvider implements IMapProvider {
             if (marker.getIconBitmap() != null) {
                 Class<?> bitmapDescriptorClass = Class.forName("com.amap.api.maps.model.BitmapDescriptor");
                 Class<?> bitmapDescriptorFactoryClass = Class.forName("com.amap.api.maps.model.BitmapDescriptorFactory");
-                java.lang.reflect.Method fromBitmapMethod = bitmapDescriptorFactoryClass.getMethod("fromBitmap", Bitmap.class);
+                Method fromBitmapMethod = bitmapDescriptorFactoryClass.getMethod("fromBitmap", Bitmap.class);
                 Object bitmapDescriptor = fromBitmapMethod.invoke(null, marker.getIconBitmap());
                 
-                java.lang.reflect.Method iconMethod = markerOptionsClass.getMethod("icon", bitmapDescriptorClass);
+                Method iconMethod = markerOptionsClass.getMethod("icon", bitmapDescriptorClass);
                 iconMethod.invoke(markerOptions, bitmapDescriptor);
             }
             
@@ -199,7 +205,7 @@ public class AMapProvider implements IMapProvider {
             // class talks to the SDK reflectively, so a rename in a future AMap version has to
             // degrade to an unordered marker rather than no marker at all.
             try {
-                java.lang.reflect.Method zIndexMethod = markerOptionsClass.getMethod("zIndex", float.class);
+                Method zIndexMethod = markerOptionsClass.getMethod("zIndex", float.class);
                 zIndexMethod.invoke(markerOptions, marker.getZIndex());
             } catch (Exception e) {
                 Log.w(TAG, "Could not set the marker draw order; overlapping tags may not raise on selection", e);
@@ -207,7 +213,7 @@ public class AMapProvider implements IMapProvider {
 
             // 添加标记
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method addMarkerMethod = aMapClass.getMethod("addMarker", markerOptionsClass);
+            Method addMarkerMethod = aMapClass.getMethod("addMarker", markerOptionsClass);
             Object amapMarker = addMarkerMethod.invoke(aMap, markerOptions);
             
             markers.put(marker.getId(), amapMarker);
@@ -224,7 +230,7 @@ public class AMapProvider implements IMapProvider {
         Object marker = markers.remove(markerId);
         if (marker != null) {
             try {
-                java.lang.reflect.Method removeMethod = marker.getClass().getMethod("remove");
+                Method removeMethod = marker.getClass().getMethod("remove");
                 removeMethod.invoke(marker);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to remove marker", e);
@@ -240,7 +246,7 @@ public class AMapProvider implements IMapProvider {
             return;
         }
         try {
-            java.lang.reflect.Method setZIndexMethod = marker.getClass().getMethod("setZIndex", float.class);
+            Method setZIndexMethod = marker.getClass().getMethod("setZIndex", float.class);
             setZIndexMethod.invoke(marker, zIndex);
         } catch (Exception e) {
             // Not fatal: the marker stays where it is, just possibly behind another one.
@@ -252,7 +258,7 @@ public class AMapProvider implements IMapProvider {
     public void clearMarkers() {
         for (Object marker : markers.values()) {
             try {
-                java.lang.reflect.Method removeMethod = marker.getClass().getMethod("remove");
+                Method removeMethod = marker.getClass().getMethod("remove");
                 removeMethod.invoke(marker);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to remove marker", e);
@@ -285,7 +291,7 @@ public class AMapProvider implements IMapProvider {
             // 添加点
             // com.amap.api.maps.model.LatLng
             Class<?> latLngClass = Class.forName("com.amap.api.maps.model.LatLng");
-            java.lang.reflect.Method addMethod = polylineOptionsClass.getMethod("add", latLngClass);
+            Method addMethod = polylineOptionsClass.getMethod("add", latLngClass);
             
             for (MapPolyline.LatLng point : gcj02Points) {
                 Object latLng = latLngClass.getConstructor(double.class, double.class)
@@ -294,15 +300,15 @@ public class AMapProvider implements IMapProvider {
             }
             
             // 设置颜色和宽度
-            java.lang.reflect.Method colorMethod = polylineOptionsClass.getMethod("color", int.class);
+            Method colorMethod = polylineOptionsClass.getMethod("color", int.class);
             colorMethod.invoke(polylineOptions, polyline.getColor());
             
-            java.lang.reflect.Method widthMethod = polylineOptionsClass.getMethod("width", float.class);
+            Method widthMethod = polylineOptionsClass.getMethod("width", float.class);
             widthMethod.invoke(polylineOptions, polyline.getWidth());
             
             // 添加路径线
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method addPolylineMethod = aMapClass.getMethod("addPolyline", polylineOptionsClass);
+            Method addPolylineMethod = aMapClass.getMethod("addPolyline", polylineOptionsClass);
             Object amapPolyline = addPolylineMethod.invoke(aMap, polylineOptions);
             
             polylines.put(polyline.getId(), amapPolyline);
@@ -319,7 +325,7 @@ public class AMapProvider implements IMapProvider {
         Object polyline = polylines.remove(polylineId);
         if (polyline != null) {
             try {
-                java.lang.reflect.Method removeMethod = polyline.getClass().getMethod("remove");
+                Method removeMethod = polyline.getClass().getMethod("remove");
                 removeMethod.invoke(polyline);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to remove polyline", e);
@@ -331,7 +337,7 @@ public class AMapProvider implements IMapProvider {
     public void clearPolylines() {
         for (Object polyline : polylines.values()) {
             try {
-                java.lang.reflect.Method removeMethod = polyline.getClass().getMethod("remove");
+                Method removeMethod = polyline.getClass().getMethod("remove");
                 removeMethod.invoke(polyline);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to remove polyline", e);
@@ -355,12 +361,12 @@ public class AMapProvider implements IMapProvider {
             
             // com.amap.api.maps.CameraUpdateFactory
             Class<?> cameraUpdateFactoryClass = Class.forName("com.amap.api.maps.CameraUpdateFactory");
-            java.lang.reflect.Method newLatLngZoomMethod = cameraUpdateFactoryClass.getMethod(
+            Method newLatLngZoomMethod = cameraUpdateFactoryClass.getMethod(
                     "newLatLngZoom", latLngClass, float.class);
             Object cameraUpdate = newLatLngZoomMethod.invoke(null, latLng, zoom);
             
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method moveCameraMethod = aMapClass.getMethod("moveCamera", 
+            Method moveCameraMethod = aMapClass.getMethod("moveCamera", 
                     Class.forName("com.amap.api.maps.CameraUpdate"));
             moveCameraMethod.invoke(aMap, cameraUpdate);
         } catch (Exception e) {
@@ -383,7 +389,7 @@ public class AMapProvider implements IMapProvider {
             
             // com.amap.api.maps.CameraUpdateFactory
             Class<?> cameraUpdateFactoryClass = Class.forName("com.amap.api.maps.CameraUpdateFactory");
-            java.lang.reflect.Method newLatLngZoomMethod = cameraUpdateFactoryClass.getMethod(
+            Method newLatLngZoomMethod = cameraUpdateFactoryClass.getMethod(
                     "newLatLngZoom", latLngClass, float.class);
             Object cameraUpdate = newLatLngZoomMethod.invoke(null, latLng, zoom);
             
@@ -393,7 +399,7 @@ public class AMapProvider implements IMapProvider {
                 // 创建回调
                 // com.amap.api.maps.AMap.CancelableCallback
                 Class<?> cancelableCallbackClass = Class.forName("com.amap.api.maps.AMap$CancelableCallback");
-                Object callbackObj = java.lang.reflect.Proxy.newProxyInstance(
+                Object callbackObj = Proxy.newProxyInstance(
                         cancelableCallbackClass.getClassLoader(),
                         new Class[]{cancelableCallbackClass},
                         (proxy, method, args) -> {
@@ -404,13 +410,13 @@ public class AMapProvider implements IMapProvider {
                         }
                 );
                 
-                java.lang.reflect.Method animateCameraMethod = aMapClass.getMethod("animateCamera",
+                Method animateCameraMethod = aMapClass.getMethod("animateCamera",
                         Class.forName("com.amap.api.maps.CameraUpdate"), 
                         long.class, 
                         cancelableCallbackClass);
                 animateCameraMethod.invoke(aMap, cameraUpdate, 1000L, callbackObj);
             } else {
-                java.lang.reflect.Method animateCameraMethod = aMapClass.getMethod("animateCamera",
+                Method animateCameraMethod = aMapClass.getMethod("animateCamera",
                         Class.forName("com.amap.api.maps.CameraUpdate"));
                 animateCameraMethod.invoke(aMap, cameraUpdate);
             }
@@ -428,15 +434,15 @@ public class AMapProvider implements IMapProvider {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             Class<?> onMapClickListenerClass = Class.forName("com.amap.api.maps.AMap$OnMapClickListener");
             
-            Object listenerObj = java.lang.reflect.Proxy.newProxyInstance(
+            Object listenerObj = Proxy.newProxyInstance(
                     onMapClickListenerClass.getClassLoader(),
                     new Class[]{onMapClickListenerClass},
                     (proxy, method, args) -> {
                         if (method.getName().equals("onMapClick")) {
                             Object latLng = args[0];
                             // 3D SDK中，LatLng的latitude和longitude是public字段
-                            java.lang.reflect.Field latitudeField = latLng.getClass().getField("latitude");
-                            java.lang.reflect.Field longitudeField = latLng.getClass().getField("longitude");
+                            Field latitudeField = latLng.getClass().getField("latitude");
+                            Field longitudeField = latLng.getClass().getField("longitude");
                             double lat = latitudeField.getDouble(latLng);
                             double lon = longitudeField.getDouble(latLng);
                             
@@ -450,7 +456,7 @@ public class AMapProvider implements IMapProvider {
                     }
             );
             
-            java.lang.reflect.Method setOnMapClickListenerMethod = aMapClass.getMethod("setOnMapClickListener", onMapClickListenerClass);
+            Method setOnMapClickListenerMethod = aMapClass.getMethod("setOnMapClickListener", onMapClickListenerClass);
             setOnMapClickListenerMethod.invoke(aMap, listenerObj);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set map click listener", e);
@@ -466,7 +472,7 @@ public class AMapProvider implements IMapProvider {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             Class<?> onMarkerClickListenerClass = Class.forName("com.amap.api.maps.AMap$OnMarkerClickListener");
             
-            Object listenerObj = java.lang.reflect.Proxy.newProxyInstance(
+            Object listenerObj = Proxy.newProxyInstance(
                     onMarkerClickListenerClass.getClassLoader(),
                     new Class[]{onMarkerClickListenerClass},
                     (proxy, method, args) -> {
@@ -481,7 +487,7 @@ public class AMapProvider implements IMapProvider {
                     }
             );
             
-            java.lang.reflect.Method setOnMarkerClickListenerMethod = aMapClass.getMethod("setOnMarkerClickListener", onMarkerClickListenerClass);
+            Method setOnMarkerClickListenerMethod = aMapClass.getMethod("setOnMarkerClickListener", onMarkerClickListenerClass);
             setOnMarkerClickListenerMethod.invoke(aMap, listenerObj);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set marker click listener", e);
@@ -510,22 +516,22 @@ public class AMapProvider implements IMapProvider {
         
         try {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method getCameraPositionMethod = aMapClass.getMethod("getCameraPosition");
+            Method getCameraPositionMethod = aMapClass.getMethod("getCameraPosition");
             Object cameraPosition = getCameraPositionMethod.invoke(aMap);
             
             // com.amap.api.maps.model.CameraPosition
             // 3D SDK中，target是public字段
-            java.lang.reflect.Field targetField = cameraPosition.getClass().getField("target");
+            Field targetField = cameraPosition.getClass().getField("target");
             Object target = targetField.get(cameraPosition);
             
             // LatLng的latitude和longitude是public字段
-            java.lang.reflect.Field latitudeField = target.getClass().getField("latitude");
-            java.lang.reflect.Field longitudeField = target.getClass().getField("longitude");
+            Field latitudeField = target.getClass().getField("latitude");
+            Field longitudeField = target.getClass().getField("longitude");
             double lat = latitudeField.getDouble(target);
             double lon = longitudeField.getDouble(target);
             
             // zoom也是public字段
-            java.lang.reflect.Field zoomField = cameraPosition.getClass().getField("zoom");
+            Field zoomField = cameraPosition.getClass().getField("zoom");
             float zoom = zoomField.getFloat(cameraPosition);
             
             // 坐标转换：GCJ02 -> WGS84
@@ -544,10 +550,10 @@ public class AMapProvider implements IMapProvider {
         try {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             Class<?> uiSettingsClass = Class.forName("com.amap.api.maps.UiSettings");
-            java.lang.reflect.Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
+            Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
             Object uiSettings = getUiSettingsMethod.invoke(aMap);
             
-            java.lang.reflect.Method setMyLocationButtonEnabledMethod = uiSettingsClass.getMethod("setMyLocationButtonEnabled", boolean.class);
+            Method setMyLocationButtonEnabledMethod = uiSettingsClass.getMethod("setMyLocationButtonEnabled", boolean.class);
             setMyLocationButtonEnabledMethod.invoke(uiSettings, enabled);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set my location button enabled", e);
@@ -561,7 +567,7 @@ public class AMapProvider implements IMapProvider {
             // Reflection, like everything else here: AMap is loaded at runtime only when the user
             // supplies a key, so this class must compile and run without its types on the path.
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
-            java.lang.reflect.Method setMyLocationEnabled =
+            Method setMyLocationEnabled =
                     aMapClass.getMethod("setMyLocationEnabled", boolean.class);
             setMyLocationEnabled.invoke(aMap, enabled);
         } catch (Exception e) {
@@ -577,10 +583,10 @@ public class AMapProvider implements IMapProvider {
         try {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             Class<?> uiSettingsClass = Class.forName("com.amap.api.maps.UiSettings");
-            java.lang.reflect.Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
+            Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
             Object uiSettings = getUiSettingsMethod.invoke(aMap);
             
-            java.lang.reflect.Method setRotateGesturesEnabledMethod = uiSettingsClass.getMethod("setRotateGesturesEnabled", boolean.class);
+            Method setRotateGesturesEnabledMethod = uiSettingsClass.getMethod("setRotateGesturesEnabled", boolean.class);
             setRotateGesturesEnabledMethod.invoke(uiSettings, enabled);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set rotate gestures enabled", e);
@@ -593,10 +599,10 @@ public class AMapProvider implements IMapProvider {
         try {
             Class<?> aMapClass = Class.forName("com.amap.api.maps.AMap");
             Class<?> uiSettingsClass = Class.forName("com.amap.api.maps.UiSettings");
-            java.lang.reflect.Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
+            Method getUiSettingsMethod = aMapClass.getMethod("getUiSettings");
             Object uiSettings = getUiSettingsMethod.invoke(aMap);
             
-            java.lang.reflect.Method setCompassEnabledMethod = uiSettingsClass.getMethod("setCompassEnabled", boolean.class);
+            Method setCompassEnabledMethod = uiSettingsClass.getMethod("setCompassEnabled", boolean.class);
             setCompassEnabledMethod.invoke(uiSettings, enabled);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set compass enabled", e);
@@ -627,7 +633,7 @@ public class AMapProvider implements IMapProvider {
     public void onResume() {
         if (mapView != null) {
             try {
-                java.lang.reflect.Method onResumeMethod = mapView.getClass().getMethod("onResume");
+                Method onResumeMethod = mapView.getClass().getMethod("onResume");
                 onResumeMethod.invoke(mapView);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to call onResume on map view", e);
@@ -642,7 +648,7 @@ public class AMapProvider implements IMapProvider {
     public void onPause() {
         if (mapView != null) {
             try {
-                java.lang.reflect.Method onPauseMethod = mapView.getClass().getMethod("onPause");
+                Method onPauseMethod = mapView.getClass().getMethod("onPause");
                 onPauseMethod.invoke(mapView);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to call onPause on map view", e);
@@ -657,7 +663,7 @@ public class AMapProvider implements IMapProvider {
     public void onDestroy() {
         if (mapView != null) {
             try {
-                java.lang.reflect.Method onDestroyMethod = mapView.getClass().getMethod("onDestroy");
+                Method onDestroyMethod = mapView.getClass().getMethod("onDestroy");
                 onDestroyMethod.invoke(mapView);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to call onDestroy on map view", e);

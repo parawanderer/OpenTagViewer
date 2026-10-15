@@ -45,6 +45,7 @@ import dev.wander.android.opentagviewer.SettingsActivity;
 import dev.wander.android.opentagviewer.Shot;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.ui.maps.AMapWithTagsOnIt;
+import android.os.SystemClock;
 
 /**
  * The screens that only exist once somebody is signed in, for the wiki.
@@ -160,7 +161,7 @@ public class WikiScreenshotsFromTheMapTest {
         // the one place in this repo where sleeping is the honest answer, because what is being
         // waited for is a third party's tile download and not anything the app decides.
         if (weArePhotographingTheMap) {
-            android.os.SystemClock.sleep(TILES_TAKE_A_MOMENT);
+            SystemClock.sleep(TILES_TAKE_A_MOMENT);
         }
     }
 

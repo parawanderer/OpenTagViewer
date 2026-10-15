@@ -61,6 +61,8 @@ import dev.wander.android.opentagviewer.ui.maps.FakeMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
+import android.view.View;
+import org.hamcrest.Matcher;
 
 /**
  * The app, from a signed-out install to a tag's history, without stopping.
@@ -490,7 +492,7 @@ public class TheWholeAppJourneyTest {
     // ------------------------------------------------------------------ helpers
 
     /** A control inside the Bike's card specifically - there are two cards on the screen. */
-    private static org.hamcrest.Matcher<android.view.View> theBikesCard(final int controlId) {
+    private static Matcher<View> theBikesCard(final int controlId) {
         return allOf(withId(controlId), isDescendantOfA(allOf(
                 withId(R.id.tag_item_container),
                 hasDescendant(withText(containsString(FakeICloudService.A_BIKE.getName()))))));

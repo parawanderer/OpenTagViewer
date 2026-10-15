@@ -21,6 +21,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
+import android.content.Context;
+import java.lang.reflect.Method;
 
 public class OpenAirTagApplication extends Application {
     private static final String TAG = OpenAirTagApplication.class.getSimpleName();
@@ -257,15 +259,15 @@ public class OpenAirTagApplication extends Application {
             // updatePrivacyShow(Context context, boolean isContains, boolean isShow)
             // isContains: 隐私权政策是否包含高德开平隐私权政策
             // isShow: 隐私权政策是否弹窗展示告知用户
-            java.lang.reflect.Method updatePrivacyShowMethod = mapsInitializerClass.getMethod(
-                    "updatePrivacyShow", android.content.Context.class, boolean.class, boolean.class);
+            Method updatePrivacyShowMethod = mapsInitializerClass.getMethod(
+                    "updatePrivacyShow", Context.class, boolean.class, boolean.class);
             updatePrivacyShowMethod.invoke(null, this, true, true);
             
             // 更新用户同意隐私政策状态
             // updatePrivacyAgree(Context context, boolean isAgree)
             // isAgree: 隐私权政策是否取得用户同意
-            java.lang.reflect.Method updatePrivacyAgreeMethod = mapsInitializerClass.getMethod(
-                    "updatePrivacyAgree", android.content.Context.class, boolean.class);
+            Method updatePrivacyAgreeMethod = mapsInitializerClass.getMethod(
+                    "updatePrivacyAgree", Context.class, boolean.class);
             updatePrivacyAgreeMethod.invoke(null, this, true);
             
             Log.i(TAG, "AMap privacy compliance initialized successfully");

@@ -22,6 +22,7 @@ import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import java.util.stream.Collectors;
 
 /**
  * Re-reading the Apple account with nobody watching.
@@ -83,7 +84,7 @@ public class AccountRefresherTest {
 
     private List<String> liveBeaconIds() {
         return this.db.ownedBeaconDao().getAll().stream().map(b -> b.id).collect(
-                java.util.stream.Collectors.toList());
+                Collectors.toList());
     }
 
     /** <b>A linked account is read and the tags land in the database.</b> */

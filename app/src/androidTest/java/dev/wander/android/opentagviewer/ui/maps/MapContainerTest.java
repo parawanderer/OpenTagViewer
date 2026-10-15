@@ -15,6 +15,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import dev.wander.android.opentagviewer.ui.TestHostActivity;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.ViewGroup;
 
 /**
  * Emptying the map container, which is what makes changing map provider take effect.
@@ -36,8 +39,8 @@ public class MapContainerTest {
     /** A fragment standing in for {@code SupportMapFragment}: restored the same way, no Maps. */
     public static class AFragmentInTheContainer extends Fragment {
         @Override
-        public View onCreateView(android.view.LayoutInflater inflater, android.view.ViewGroup c,
-                                 android.os.Bundle state) {
+        public View onCreateView(LayoutInflater inflater, ViewGroup c,
+                                 Bundle state) {
             return new TextView(this.requireContext());
         }
     }

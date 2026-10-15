@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.nio.file.Files;
 
 /**
  * What the derived-address cache has to guarantee, which is less than it looks.
@@ -147,7 +148,7 @@ public class DerivedAddressStoreTest {
                 BEACON + ".bin");
         assertTrue(file.isFile());
 
-        final byte[] whole = java.nio.file.Files.readAllBytes(file.toPath());
+        final byte[] whole = Files.readAllBytes(file.toPath());
         try (FileOutputStream out = new FileOutputStream(file)) {
             out.write(whole, 0, whole.length - 3);
         }
@@ -162,7 +163,7 @@ public class DerivedAddressStoreTest {
 
         final File file = new File(new File(this.files.getRoot(), "derived-addresses"),
                 BEACON + ".bin");
-        final byte[] whole = java.nio.file.Files.readAllBytes(file.toPath());
+        final byte[] whole = Files.readAllBytes(file.toPath());
         whole[3] = (byte) 99;
         try (FileOutputStream out = new FileOutputStream(file)) {
             out.write(whole);

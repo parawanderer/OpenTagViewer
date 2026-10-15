@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Pulls Apple's ADI libraries out of the Apple Music APK on Apple's own CDN, without
@@ -223,7 +225,7 @@ public final class AdiLibraryFetcher {
             final int commentLength = buffer.getShort(pos + 32) & 0xFFFF;
             final long localOffset = buffer.getInt(pos + 42) & 0xFFFFFFFFL;
 
-            final String name = new String(cd, pos + 46, nameLength, java.nio.charset.StandardCharsets.UTF_8);
+            final String name = new String(cd, pos + 46, nameLength, StandardCharsets.UTF_8);
             if (name.startsWith(prefix)) {
                 final String bare = name.substring(prefix.length());
                 if (wanted.contains(bare)) {
@@ -255,7 +257,7 @@ public final class AdiLibraryFetcher {
         }
         // Raw deflate - no zlib header, hence nowrap.
         try (InflaterInputStream inflater = new InflaterInputStream(
-                new java.io.ByteArrayInputStream(raw), new Inflater(true))) {
+                new ByteArrayInputStream(raw), new Inflater(true))) {
             return readFully(inflater);
         }
     }
