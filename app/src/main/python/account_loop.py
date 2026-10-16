@@ -91,6 +91,10 @@ class AccountLoop:
         # flag flips is on the loop by the time the close cancels what is there.
         self._state = threading.Lock()
         self._closed = False
+        # Whether report requests take turns of their own. Until they do, a fetch inside
+        # `interleaving` must take one turn for its whole length like anything else, or it would
+        # run with no exclusion at all.
+        self._turnsPerRequest = False
         self._thread = threading.Thread(
             target=self._runForever, name="findmy-account-loop", daemon=True)
         self._thread.start()
@@ -112,7 +116,7 @@ class AccountLoop:
     def run_until_complete(self, coro: Coroutine[Any, Any, _T]) -> _T:
         """What FindMy.py's sync wrapper calls: run this on the account's loop, in its turn."""
         try:
-            if getattr(_interleaving, "on", False):
+            if self._turnsPerRequest and getattr(_interleaving, "on", False):
                 return self._submit(coro)
 
             return self._submit(self.inTurn(lambda: coro))
@@ -266,8 +270,14 @@ def attach(account: Any) -> bool:
     attached = AccountLoop(current)
     _takeTurnsPerRequest(asyncAccount, attached)
     account._evt_loop = attached
-    # Holds the loop, never the account, or the account could never be collected to fire it.
-    weakref.finalize(account, attached.stopOnceIdle)
+
+    try:
+        # Holds the loop, never the account, or the account could never be collected to fire it.
+        weakref.finalize(account, attached.stopOnceIdle)
+    except TypeError:
+        # Only an object that cannot be weakly referenced, which FindMy.py's account can be.
+        # The thread then lives until `detach`, which is a leak and not a fault.
+        print("Account loop: this account cannot be watched for collection; close it explicitly.")
 
     return True
 
@@ -282,13 +292,24 @@ def _takeTurnsPerRequest(asyncAccount: Any, attached: AccountLoop) -> None:
     is the boundary where something else can be let in.
 
     Set on the instance, which is where the fetcher looks it up (`self._account.fetch_raw_reports`).
+
+    **Missing is survivable, so it is not an error.** Attaching still gives the loop its thread,
+    and fetches then take one turn each, exactly as they did before this module. Raising instead
+    would fail the restore, and a failed restore signs the user out.
     """
-    original = asyncAccount.fetch_raw_reports
+    original = getattr(asyncAccount, "fetch_raw_reports", None)
+
+    if original is None:
+        print(
+            "FindMy.py's account has no fetch_raw_reports, so location fetches cannot give way"
+            " between requests; each will hold the account until it finishes.")
+        return
 
     async def fetch_raw_reports(*args: Any, **kwargs: Any) -> Any:
         return await attached.inTurn(lambda: original(*args, **kwargs))
 
     asyncAccount.fetch_raw_reports = fetch_raw_reports
+    attached._turnsPerRequest = True
 
 
 def detach(account: Any) -> None:

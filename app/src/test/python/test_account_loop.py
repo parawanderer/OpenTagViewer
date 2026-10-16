@@ -18,6 +18,7 @@ import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -323,3 +324,57 @@ class TestWhereTheAppAttachesIt:
             assert loggedInOn == ["findmy-account-loop"]
         finally:
             main.closeAccount(signedIn["account"])
+
+
+class TestWhenTheInternalsMove:
+    """Degrading, never raising: a failed attach in `getAccount` would sign the user out."""
+
+    def test_an_account_without_fetch_raw_reports_still_gets_its_thread(self):
+        account = SimpleNamespace(_asyncacc=SimpleNamespace(), _evt_loop=asyncio.new_event_loop())
+
+        assert account_loop.attach(account)
+        try:
+            assert account._evt_loop.is_running()
+            assert not account._evt_loop._turnsPerRequest
+        finally:
+            account._evt_loop.shutDown()
+
+    def test_without_it_a_fetch_inside_interleaving_still_takes_a_whole_turn(self, apple):
+        """Otherwise the fetch would run beside `request_pet` with no exclusion at all."""
+        made = AppleAccount(RemoteAnisetteProvider("https://example.invalid"))
+
+        async def closing():
+            pass
+
+        # The real sync wrapper over an async account that has lost the method.
+        made._asyncacc = SimpleNamespace(request_pet=apple.request_pet, close=closing)
+
+        async def walk(devices):
+            # The fetcher's own loop over requests, standing in for a method FindMy.py renamed.
+            for _ in range(10):
+                await apple.fetch_raw_reports(devices)
+            return []
+
+        assert account_loop.attach(made)
+        try:
+            fetching_failures: list[BaseException] = []
+
+            def fetch():
+                try:
+                    with account_loop.interleaving():
+                        made._evt_loop.run_until_complete(walk([]))
+                except BaseException as e:  # noqa: BLE001
+                    fetching_failures.append(e)
+
+            fetching = threading.Thread(target=fetch)
+            fetching.start()
+            assert apple.firstRequest.wait(5)
+
+            made.request_pet()
+            fetching.join(30)
+
+            assert not fetching_failures
+            assert not apple.overlapped
+            assert apple.requestsWhenPetAsked == apple.requests
+        finally:
+            main.closeAccount(made)
