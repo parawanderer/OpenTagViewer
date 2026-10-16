@@ -694,6 +694,38 @@ already sent you, and then reasoning from a guess while you wait.
   had a phone number blacked out by hand, and the pixels either side of it were not. Quote the
   error text, never the surrounding screen, and never re-upload the image.
 
+### 21. The account takes turns. It is never used by two things at once
+
+The signed-in account's asyncio loop runs on a thread of its own (`app/src/main/python/account_loop.py`),
+so the iCloud screen no longer waits behind a location fetch. Before
+[#126](https://github.com/parawanderer/OpenTagViewer/issues/126) every call into Python held
+`PythonLock`, and a first import held it for minutes inside a single `fetch_location`.
+
+**That is interleaving, not concurrency, and it must stay that way.** FindMy.py's async account is
+not safe to use from two operations at once. `request_pet`, which opening a keychain session calls,
+swaps the account's login state out for a whole GSA round trip and restores it in a `finally`; a
+report request running in that window reads a `dsid` that is not there. A 401 inside
+`fetch_raw_reports` re-authenticates the same way. So every operation takes the account's turn:
+an ordinary call for its whole length, a location fetch inside `account_loop.interleaving()` once
+per request to Apple. An iCloud step waits for one request, not for the walk.
+
+Three things follow:
+
+- **Every account `main` hands Java is attached** (`account_loop.attach`, straight after it is built
+  and before its first call - the loop has to be idle to be handed over). `icloud_bridge.openSession`
+  refuses an account that is not, because without the thread the two flows would drive one loop
+  with `run_until_complete` at once - the failure the Java lock existed for.
+- **Only location fetches go inside `interleaving()`.** They are known to touch the account in
+  `fetch_raw_reports` alone, which is wrapped to take the turn. Anything else in that block runs
+  with no exclusion at all.
+- **Location fetches still take `PythonLock` against each other.** Two side by side would double the
+  request rate for the same keys (rule 6). The iCloud service is the only caller that dropped it.
+
+`test_account_loop.py` runs against the real pinned `AppleAccount` rather than a fake, because the
+whole arrangement leans on two private details of it - `_evt_loop.run_until_complete` and the
+fetcher looking `fetch_raw_reports` up on the instance - and a fake keeps both names after a rename
+(rule 3).
+
 ---
 
 ## Building and testing

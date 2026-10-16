@@ -4,21 +4,22 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * The one lock that every call into Python must be made under.
+ * One location fetch, or one change to which account is signed in, at a time.
  *
- * <p>FindMy.py's synchronous {@code AppleAccount} wraps an async one and drives it with a single
- * asyncio event loop. RxJava schedules our work on a thread pool, and the periodic refresh in
- * {@code MapsActivity} fires every 60 seconds regardless of whether the previous fetch has
- * finished. Two threads calling {@code run_until_complete} on the same loop fails with
- * <i>"RuntimeError: This event loop is already running"</i> and then keeps failing.
+ * <p>RxJava schedules our work on a thread pool, and the periodic refresh in {@code MapsActivity}
+ * fires every 60 seconds regardless of whether the previous fetch has finished. A fetch that
+ * takes longer than the refresh interval is entirely normal for an accessory with no alignment
+ * yet, so two fetches overlapping is not a rare race. Running them side by side would double the
+ * request rate against Apple for the same keys, which is the account-flagging risk rule 6 is
+ * about, and have both write back alignment for the same tags.
  *
- * <p>A fetch that takes longer than the refresh interval is entirely normal for an accessory with
- * no alignment yet, so this is not a rare race.
- *
- * <p><b>It lives here, rather than inside one service, because it is not one service's lock.</b>
- * The iCloud flow drives the <i>same</i> event loop - deliberately, since a second account would
- * be a second device to Apple - so a location fetch and a keychain unlock collide exactly as two
- * location fetches would. A second private lock in a second class would be no lock at all.
+ * <p><b>It is no longer what keeps the asyncio loop from being driven twice at once.</b> It used
+ * to be: FindMy.py's synchronous account entered its event loop per call, and two threads in
+ * {@code run_until_complete} failed with <i>"This event loop is already running"</i>. The loop now
+ * runs on its own thread and the account is shared out in turns on the Python side - see
+ * {@code account_loop.py}. That is why the iCloud flow does not take this lock any more: it used
+ * to wait for a whole fetch, which on a first import was minutes (issue #126), and now waits for
+ * one request at most.
  *
  * <p>Serialising alone is not enough: the periodic refresh would still queue up behind a slow
  * fetch, one entry per minute, and then fire the whole stale backlog at once when it finally
@@ -32,13 +33,12 @@ public final class PythonLock {
     }
 
     /**
-     * Run one call into Python, with nothing else in there at the same time.
+     * Run one call into Python, with no other fetch or account change in there at the same time.
      *
      * <p><b>Scope it to the call and nothing more.</b> The reason this is a method taking the
-     * work, rather than a lock to take and release, is the iCloud flow: it is several calls with
-     * a person answering a dialog between them, and holding this across one of those waits would
-     * stop every location refresh in the app until they got round to typing. Each step takes it,
-     * finishes, and gives it back; the waiting happens in Java with nothing held.
+     * work, rather than a lock to take and release, is that anything held across a wait for a
+     * person - a sign-in code, a passcode dialog - would stop every location refresh in the app
+     * until they got round to typing.
      */
     public static <T> T holding(final Callable<T> work) throws Exception {
         LOCK.lock();
@@ -50,7 +50,7 @@ public final class PythonLock {
     }
 
     /**
-     * Whether a call into Python is currently in progress.
+     * Whether a fetch or an account change is currently in progress.
      *
      * <p>Advisory only. A caller that acts on this can still be beaten to the lock, which is
      * harmless: it just waits, exactly as it did before.

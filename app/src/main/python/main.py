@@ -30,6 +30,7 @@ from findmy.reports.twofactor import (
     SyncSecondFactorMethod
 )
 
+import account_loop
 import identity as app_identity
 
 
@@ -318,6 +319,8 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
             timeout=LOGIN_TIMEOUT_SECONDS,
             **app_identity.deviceIdsForNewSession(localAnisette),
         )
+        # Before the first call, while the loop is still idle - see account_loop.attach.
+        account_loop.attach(acc)
 
         state = acc.login(email, password)
 
@@ -839,6 +842,7 @@ def getAccount(
 
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)
+        account_loop.attach(acc)
 
         print(f"Restored account, login state: {acc.login_state}")
 
@@ -975,6 +979,9 @@ def closeAccount(account: AppleAccount) -> bool:
 
         loop.run_until_complete(account.close())
         print("Closed the account's HTTP session and connector.")
+        # After the close, which takes its turn like any other call: the loop's thread is only
+        # stopped once nothing on it still needs the session.
+        account_loop.detach(account)
         return True
     except Exception:
         # Discarding this account regardless, so a failure here changes nothing the caller does.
@@ -1959,7 +1966,10 @@ def getLastReports(
             # which meant no beacon's updated alignment was persisted - so every later
             # fetch started from the same wide range again and never converged.
             try:
-                fetched = _fetchReportsForAccessory(account, airtag, start_dt, now_dt)
+                # Turns per request rather than per fetch, so the iCloud screen is not kept
+                # waiting for a whole key walk - see account_loop.
+                with account_loop.interleaving():
+                    fetched = _fetchReportsForAccessory(account, airtag, start_dt, now_dt)
                 reports = fetched.reports or []
             except Exception:
                 failures += 1
@@ -2097,7 +2107,8 @@ def getReports(
             width_before = _isAlignmentWide(airtag, start_dt, end_dt)
 
             try:
-                reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
+                with account_loop.interleaving():
+                    reports = _fetchReportsInRange(account, airtag, start_dt, end_dt) or []
             except Exception:
                 failures += 1
                 print(f"Fetch failed for {beaconId}, continuing with the rest: "

@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dev.wander.android.opentagviewer.python.PythonAppleAccount;
-import dev.wander.android.opentagviewer.python.PythonLock;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -195,10 +194,7 @@ public class PythonICloudService implements ICloudService {
     @Override
     public void close() {
         try {
-            PythonLock.holding(() -> {
-                this.session.callAttr("close");
-                return null;
-            });
+            this.session.callAttr("close");
         } catch (Exception e) {
             // Callers close from a `finally`. Throwing here would replace whatever real failure
             // sent them there with a confusing one about closing.
@@ -211,11 +207,12 @@ public class PythonICloudService implements ICloudService {
      *
      * <p>Two things happen here and both matter.
      *
-     * <p><b>The Python lock is taken for the call and given straight back.</b> The iCloud flow and
-     * the app's periodic location refresh drive the same asyncio event loop, and two threads in
-     * {@code run_until_complete} on one loop fails permanently. Scoping it to the call rather
-     * than the flow is what keeps a passcode dialog from freezing every location update in the
-     * app until the user types.
+     * <p><b>No {@code PythonLock} here, and that is the point of issue #126.</b> The iCloud flow
+     * and the location fetch share one account and one asyncio loop, and taking the Java lock
+     * made this wait for a whole fetch - minutes, on a first import. The loop now runs on a thread
+     * of its own and the account is shared out in turns on the Python side, a fetch giving way
+     * between requests to Apple, so a step here waits for one request at most. See
+     * {@code account_loop.py}.
      *
      * <p><b>A reported failure becomes an exception; a raised one is not expected.</b> The bridge
      * returns failures as values precisely so their message is never empty, so anything actually
@@ -223,8 +220,7 @@ public class PythonICloudService implements ICloudService {
      * {@link ICloudFailure#UNKNOWN} with whatever text it had.
      */
     private JSONObject answered(final String step, final Object... arguments) throws Exception {
-        final String returned = PythonLock.holding(
-                () -> this.session.callAttr(step, arguments).toString());
+        final String returned = this.session.callAttr(step, arguments).toString();
 
         final JSONObject answer = new JSONObject(returned);
 
