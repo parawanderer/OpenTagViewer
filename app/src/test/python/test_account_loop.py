@@ -12,6 +12,7 @@ a rename and keep passing (rule 3). Only the network is replaced: `fetch_raw_rep
 from __future__ import annotations
 
 import asyncio
+import gc
 import json
 import os
 import threading
@@ -230,6 +231,18 @@ class TestClosing:
         assert not attached._thread.is_alive()
         assert account._evt_loop is attached.loop
         assert not account._evt_loop.is_running()
+
+    def test_an_account_dropped_without_closing_does_not_leave_its_thread_behind(self):
+        """A failed sign-in, or a code screen walked away from, never reaches `closeAccount`."""
+        account = AppleAccount(RemoteAnisetteProvider("https://example.invalid"))
+        account_loop.attach(account)
+        thread = account._evt_loop._thread
+
+        del account
+        gc.collect()
+        thread.join(5)
+
+        assert not thread.is_alive()
 
     def test_a_call_waiting_its_turn_is_told_the_account_went_away(self, account, apple):
         fetching, _ = fetchingInTheBackground(account, interleaved=False)

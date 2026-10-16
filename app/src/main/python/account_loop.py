@@ -37,6 +37,7 @@ import concurrent.futures
 import contextvars
 import threading
 import traceback
+import weakref
 from contextlib import contextmanager
 from typing import Any, Awaitable, Callable, Coroutine, Iterator, TypeVar
 
@@ -167,6 +168,29 @@ class AccountLoop:
             raise RuntimeError(
                 "The account was closed while this call was waiting for it") from None
 
+    def stopOnceIdle(self) -> None:
+        """
+        Stop the thread once whatever is already on the loop has finished, without waiting here.
+
+        For an account dropped without being closed - a failed sign-in, a code screen somebody
+        walked away from - which used to cost two sockets until the collector ran, and would now
+        also cost a thread idling forever. Called from a finaliser, on whatever thread the
+        collector happens to be on, so it must not block.
+
+        **Finished, not cancelled.** FindMy.py's own finaliser has just scheduled the session's
+        `close` on this loop, and cancelling it would leak the very sockets it is closing.
+        """
+        with self._state:
+            if self._closed:
+                return
+            self._closed = True
+
+        try:
+            self._loop.call_soon_threadsafe(self._loop.create_task, _finishThenStop())
+        except RuntimeError:
+            # The loop is closed already, so there is no thread left to stop.
+            pass
+
     def shutDown(self) -> bool:
         """
         Cancel whatever is still waiting, stop the loop, and stop its thread.
@@ -204,6 +228,14 @@ async def _cancelEverythingElse() -> None:
     await asyncio.gather(*others, return_exceptions=True)
 
 
+async def _finishThenStop() -> None:
+    current = asyncio.current_task()
+    others = [task for task in asyncio.all_tasks() if task is not current]
+
+    await asyncio.gather(*others, return_exceptions=True)
+    asyncio.get_running_loop().stop()
+
+
 def attach(account: Any) -> bool:
     """
     Run this account's loop on a thread of its own, from now until :func:`detach`.
@@ -234,6 +266,8 @@ def attach(account: Any) -> bool:
     attached = AccountLoop(current)
     _takeTurnsPerRequest(asyncAccount, attached)
     account._evt_loop = attached
+    # Holds the loop, never the account, or the account could never be collected to fire it.
+    weakref.finalize(account, attached.stopOnceIdle)
 
     return True
 
