@@ -1,0 +1,55 @@
+name: Emulated Mac (host)
+
+# The emulated Mac's native core, built for the host and run against Apple's real macOS CoreADI.
+#
+# Builds app/src/main/cpp/macadi/ exactly as the app does (MacAdi.cmake is shared), fetches the
+# library with the same range request the app makes, checks both pinned hashes, and has the
+# emulator load it and answer "not provisioned". Nothing is sent to Apple but that one download:
+# provisioning, which would register a machine, is not run.
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/macadi/**"
+      - "app/src/test/macadi-host/**"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/MacCoreAdi*.java"
+      - "scripts/locate_mac_coreadi.py"
+      - ".github/workflows/macadi-host.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/macadi/**"
+      - "app/src/test/macadi-host/**"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/MacCoreAdi*.java"
+      - "scripts/locate_mac_coreadi.py"
+      - ".github/workflows/macadi-host.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch Apple's macOS CoreADI the way the app does, and check both hashes
+        run: python scripts/locate_mac_coreadi.py --remote --out "$RUNNER_TEMP/CoreADI.x86_64"
+
+      - name: Build the native core for the host
+        run: |
+          cmake -S app/src/test/macadi-host -B "$RUNNER_TEMP/macadi" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/macadi" --parallel
+
+      - name: Load the library and ask whether it is provisioned
+        run: |
+          out=$("$RUNNER_TEMP/macadi/macadi_cli" "$RUNNER_TEMP/CoreADI.x86_64" 979a0 /nonexistent \
+                00112233445566778899aabbccddeeff -1 --load-only)
+          echo "$out"
+          test "$out" = '{"loaded": true, "provisioned": false}'
