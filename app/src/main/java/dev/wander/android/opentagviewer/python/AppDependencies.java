@@ -13,6 +13,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
+import dev.wander.android.opentagviewer.anisette.EmulatedMacAnisette;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.ble.AccessorySoundTrigger;
 import dev.wander.android.opentagviewer.ble.BleAccessorySoundTrigger;
@@ -54,8 +55,12 @@ public final class AppDependencies {
      * How to build Anisette for a given settings object. A factory rather than an instance
      * because the real one needs a Context and the current settings, and neither exists when
      * this class is loaded.
+     *
+     * <p><b>The emulated Mac, not {@link LocalAnisette}.</b> The Android libraries that one runs
+     * mint Android machines, which Apple no longer lets reach Find My - see
+     * {@link EmulatedMacAnisette}.
      */
-    private static AnisetteFactory anisetteFactory = LocalAnisette::new;
+    private static AnisetteFactory anisetteFactory = EmulatedMacAnisette::new;
 
     /** Builds the Anisette source for a screen, given where it is running and who is signed in. */
     public interface AnisetteFactory {
@@ -293,7 +298,7 @@ public final class AppDependencies {
     @VisibleForTesting
     public static void reset() {
         authService = new PythonAppleAuthService();
-        anisetteFactory = LocalAnisette::new;
+        anisetteFactory = EmulatedMacAnisette::new;
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         accessoryMacResolver = new ChaquopyAccessoryMacResolver();

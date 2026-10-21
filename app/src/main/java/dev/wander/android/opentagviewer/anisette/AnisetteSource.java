@@ -94,6 +94,17 @@ public interface AnisetteSource {
      */
     String serial();
 
+    /**
+     * {@code X-Apple-I-MD-RINFO}: the routing number the machine was provisioned under.
+     *
+     * <p>FindMy.py's own providers send a constant - 17106176, which is what Android-backed
+     * Anisette servers use. That is right for {@link LocalAnisette}, which is one, and so is the
+     * default here. {@link EmulatedMacAnisette} answers with the number Apple assigned its Mac.
+     */
+    default String router() {
+        return "17106176";
+    }
+
     /** Short human-readable state, for logs and diagnostics. */
     String describe();
 }
