@@ -646,6 +646,26 @@ static constructor running. No provisioning and nothing sent to Apple beyond dow
 libraries. See [`app/src/test/adi-on-bionic/README.md`](app/src/test/adi-on-bionic/README.md) for how
 it works and what it measured.
 
+### The emulated Mac, on the host
+
+```bash
+python scripts/locate_mac_coreadi.py --remote --out /tmp/CoreADI.x86_64
+cmake -S app/src/test/macadi-host -B build/macadi && cmake --build build/macadi --parallel
+build/macadi/macadi_cli /tmp/CoreADI.x86_64 979a0 /nonexistent 00112233445566778899aabbccddeeff -1 --load-only
+```
+
+Since 2026-10-12 Apple gives the Find My token only to a sign-in whose Anisette machine was
+minted by a Mac or an iPhone, so the app runs Apple's **macOS** CoreADI under an x86_64 emulator
+(`app/src/main/cpp/macadi/`, see `EmulatedMacAnisette`). This builds the same native core for the
+machine you are on, through the same `MacAdi.cmake`, and loads Apple's library into it. The first
+line downloads 3.5 MB from Apple with exactly the range request the app makes and checks it
+against the pinned hashes; `--dmg iTunes12.8.3.dmg` does the same against a full copy of the
+installer and shows which of its chunks the range spans.
+
+Given a provisioned store directory and its host UUID instead of `--load-only`, `macadi_cli`
+prints one header set. Pass a fixed Unix time as the fifth argument to compare its output byte
+for byte against another implementation; never use a fixed clock for anything sent to Apple.
+
 ### Which Python each tree targets
 
 There are three, and they are not the same:
@@ -886,6 +906,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
 | `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
+| `macadi-host.yml` | `app/src/main/cpp/macadi/**`, `app/src/test/macadi-host/**`, `MacCoreAdi*.java`, `scripts/locate_mac_coreadi.py` | Fetches Apple's macOS CoreADI with the app's own range request, checks both pinned hashes, builds the emulated Mac's native core for the host and has it load the library. Nothing sent to Apple beyond the download. A few minutes, mostly building Unicorn |
 | `waiting-on-reporter.yml` | a comment on an issue, daily | Removes the `waiting on reporter` label when the issue's author replies. Daily, comments once on any labelled issue quiet for 14 days, and again only after somebody else has commented. Never closes anything. Both triggers run the copy on `main`, so a PR cannot exercise it; `workflow_dispatch` defaults to a dry run that prints what it would post |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same

@@ -88,7 +88,8 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
 - **FindMy's own local provider still does not work.** `anisette` needs `unicorn`, a CPU
   emulator Chaquopy cannot build for Android. `app/stubs/unicorn/` is a stand-in that makes
   the dependency tree resolve; every method raises. The stub is not a step toward enabling
-  `aniLocal`, and never will be.
+  `aniLocal`, and never will be. Unicorn *does* run in the app, but as native code built by
+  CMake for the emulated Mac (rule 21), never as the Python package.
 - **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
   loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
   back to a remote server when it cannot. That is unrelated to `aniLocal` and needs no
@@ -693,6 +694,49 @@ already sent you, and then reasoning from a guess while you wait.
 - **Assume it holds personal data, and do not repeat it back.** Reporters redact unevenly — #221's
   had a phone number blacked out by hand, and the pixels either side of it were not. Quote the
   error text, never the surrounding screen, and never re-upload the image.
+
+### 21. Anisette comes from an emulated Mac, and it is one machine for the life of the install
+
+Since 2026-10-12 Apple issues the Find My token (`searchPartyToken`) only to a sign-in whose
+Anisette machine was minted by a Mac or an iPhone; an Android-minted one gets `mmeAuthToken` alone
+and every report fetch answers 401 ([malmeloo/FindMy.py#278](https://github.com/malmeloo/FindMy.py/issues/278)).
+From about 2026-10-20 the edge also answers 503 to any `X-MMe-Client-Info` whose OS token is
+`Android`, whatever else is sent ([#261](https://github.com/parawanderer/OpenTagViewer/pull/261)).
+So `LocalAnisette`'s Android libraries can no longer reach Find My by any combination of headers.
+
+`EmulatedMacAnisette` runs Apple's **macOS** CoreADI - the x86_64 build in iTunes 12.8.3 - under
+Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-findmy-e; see its
+`NOTICE.md`). It is what `AppDependencies` hands out.
+
+- **The library is fetched from Apple, never shipped.** One HTTP range request: in that exact disk
+  image the package payload is stored uncompressed and contiguous, so its offset is a constant.
+  `scripts/locate_mac_coreadi.py` re-derives and checks every constant, reading them from the Java
+  sources. Both the payload and the library are pinned by SHA-256, and the dispatcher offset
+  (`0x979A0`) is only valid for that one build.
+- **One identity, kept forever** - rule 11, with more at stake. `files/anisette/mac/identity.json`
+  and `store/` belong together: the library hashes the host UUID into the machine id, Apple binds
+  the provisioning to the device id, and the Find My token only works alongside Anisette from the
+  machine that obtained it. Apple will provision a device id **once** (a second attempt answers
+  HTTP 433 / -29002), so a lost store means a new machine and a new device-list entry.
+- **Never leave `adi.pb` in the store.** Provisioning writes the legacy whole-machine blob beside
+  the per-user one, and while it exists the library says "not provisioned". A process that
+  provisioned and then asked for headers sent Apple an empty machine id, which surfaces as
+  **`ec -80009`, "MID is invalid"** - and looked like an emulation fault until a restart, which
+  never reloads the file, made it go away. `CoreAdi::beginSession` drops it before every session.
+- **A Mac's device id is not a UUID**, and FindMy.py's CloudKit client parses it as one. The
+  keychain and CloudKit clients get `icloud_bridge._forCloudKit`'s view of the account instead,
+  which answers `device_uuid` with the host UUID and forwards everything else. Anything new that
+  hands the account to CloudKit has to go through it.
+- **Never freeze the emulated clock outside a byte-for-byte comparison.** A constant OTP is
+  accepted for about a minute and then refused.
+- **Grand Slam now asks for a second factor with `hsc` 409 and no `au`**, which the pinned
+  FindMy.py reads as "no 2FA needed". `main._treatHsc409AsSecondFactor` fills `au` in.
+- **The APK carries GPL-2.0 code** (Unicorn). Keep it in `libmacadi.so`, not in
+  `libopentagviewer.so`.
+
+The emulator suite cannot cover any of this - it swaps the Anisette source for a fake. What does is
+`macadi-host.yml` (the library loads in the ported emulator), the JVM tests on the fetcher, the
+Python tests in `test_emulated_mac.py`, and a real sign-in on a phone.
 
 ---
 
