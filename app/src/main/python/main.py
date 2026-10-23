@@ -33,6 +33,157 @@ from findmy.reports.twofactor import (
 import identity as app_identity
 
 
+def _claimAppleMusicAtMobileme() -> None:
+    """
+    Make the mobileme delegate request claim the one Apple client that exists on
+    Android: Apple Music.
+
+    The stock request identifies as `accountsd` (`com.apple.AOSKit/282
+    (com.apple.accountsd/113)`) with an `iCloudHelper` user agent - both macOS
+    daemons - while the identity's platform half already claims a Pixel running
+    Android. An impossible pairing, and the same class of inconsistency Grand
+    Slam answers with -80045. Whether `com.apple.mobileme`'s `status=1` is that
+    check repeated at the delegate layer is what flipping these constants tests:
+    same machine, same account, different claim.
+
+    Module-level so it covers every path to `_login_mobileme` - the initial
+    login, the 2FA `submit`, and `complete_login` after terms - and done at
+    import so it precedes all of them.
+    """
+    import findmy.reports.account as _account_module
+    _account_module._ACCOUNTSD_BUNDLE = \
+        "com.apple.AuthKit/1 (com.apple.android.music/4.9.6)"
+    _account_module._ICLOUD_HELPER = "com.apple.android.music/4.9.6"
+
+
+_claimAppleMusicAtMobileme()
+
+
+def _probeMobilemeExchange() -> None:
+    """
+    Log what the mobileme delegate exchange carries and receives - lengths and
+    key names only, never values.
+
+    Two numbers decide between the live theories for `status=1`: if
+    `com.apple.gs.idms.pet` is absent from the GSA token set, the request below
+    goes out authenticating with an empty password and the refusal is mechanical
+    - hoorayman's log line shows `idms_pet_len=523`, so this build reports the
+    same field for a direct comparison. And if the request is complete, the
+    response's own keys say what a refusal actually contains: `dsid` present
+    means the account record was found and only the delegate declined it, which
+    is a different shape from the request being refused outright.
+    """
+    import findmy.reports.account as _account_module
+    from findmy.util.http import HttpSession
+
+    original_mobileme = _account_module.AsyncAppleAccount._login_mobileme
+
+    async def _probed_mobileme(self):  # noqa: ANN001
+        state_data = getattr(self, "_login_state_data", {}) or {}
+        print(
+            "[MOBILEME-PROBE] enter "
+            f"idms_pet_len={len(state_data.get('idms_pet') or '')} "
+            f"adsid_len={len(state_data.get('adsid') or '')} "
+            f"idms_hb_len={len(state_data.get('idms_hb') or '')} "
+            f"state_keys={sorted(state_data.keys())}"
+        )
+        return await original_mobileme(self)
+
+    _account_module.AsyncAppleAccount._login_mobileme = _probed_mobileme
+
+    original_post = HttpSession.post
+
+    def _describe_value(key, value):
+        if isinstance(value, str) and len(value) > 60:
+            return f"str[{len(value)}]"
+        if isinstance(value, dict):
+            return f"dict keys={sorted(map(str, value.keys()))}"
+        return repr(value)
+
+    async def _sniffing_post(self, url, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        resp = await original_post(self, url, **kwargs)
+        url_text = str(url)
+
+        if "GsService2" in url_text or "gsa.apple.com" in url_text:
+            try:
+                gsa = resp.plist()
+                response = gsa.get("Response", gsa)
+                status = response.get("Status", {})
+                print(
+                    "[GSA-PROBE] hsc=%r au=%r ec=%r response_keys=%s spd_is_bytes=%r"
+                    % (
+                        status.get("hsc"),
+                        status.get("au"),
+                        status.get("ec"),
+                        sorted(map(str, response.keys())),
+                        isinstance(response.get("spd"), bytes),
+                    )
+                )
+            except Exception as parse_error:
+                print(f"[GSA-PROBE] unreadable response: {parse_error!r}")
+            return resp
+
+        if "loginDelegates" not in url_text:
+            return resp
+        try:
+            data = resp.plist()
+        except Exception as parse_error:
+            print(f"[MOBILEME-PROBE] response not a plist: {parse_error!r}")
+            return resp
+        for key, value in sorted(data.items(), key=lambda item: str(item[0])):
+            print(f"[MOBILEME-PROBE]   {key}: {_describe_value(key, value)}")
+        delegates = data.get("delegates")
+        if isinstance(delegates, dict):
+            for name, delegate in delegates.items():
+                if isinstance(delegate, dict):
+                    print(
+                        f"[MOBILEME-PROBE]     {name}: "
+                        f"keys={sorted(map(str, delegate.keys()))} "
+                        f"status={delegate.get('status')!r} "
+                        f"status-message={delegate.get('status-message')!r}"
+                    )
+        return resp
+
+    HttpSession.post = _sniffing_post
+
+    # The complete-step `spd` arrives AES-encrypted under the SRP session key and
+    # is only readable after decryption, which the fork does through
+    # decrypt_spd_aes_cbc. What the token set actually contains answers why the
+    # pet is missing: an absent `t` means this identity is issued no tokens at
+    # all, while differently named entries would mean the fork reads the wrong
+    # key. Token names are a fixed vocabulary of Apple service ids - the values
+    # are credentials and stay unlogged.
+    import findmy.util.crypto as _crypto_module
+    import findmy.util.parsers as _parsers_module
+
+    original_decrypt = _crypto_module.decrypt_spd_aes_cbc
+
+    def _probed_decrypt(session_key, data):  # noqa: ANN001
+        plain = original_decrypt(session_key, data)
+        try:
+            spd = _parsers_module.decode_plist(plain)
+            tokens = spd.get("t", {}) if isinstance(spd, dict) else {}
+            token_summary = {
+                name: sorted(map(str, entry.keys())) if isinstance(entry, dict) else type(entry).__name__
+                for name, entry in tokens.items()
+            }
+            print(
+                "[GSA-PROBE] spd_keys=%s token_names=%s"
+                % (sorted(map(str, spd.keys())), token_summary)
+            )
+        except Exception as parse_error:
+            print(f"[GSA-PROBE] spd not readable: {parse_error!r}")
+        return plain
+
+    # Patched on the module the account code resolves it through: account.py
+    # calls `util.crypto.decrypt_spd_aes_cbc`, so the attribute on that module
+    # is what the call site sees.
+    _crypto_module.decrypt_spd_aes_cbc = _probed_decrypt
+
+
+_probeMobilemeExchange()
+
+
 class TwoFactorMethods(Enum):
     UNKNOWN = 0
     TRUSTED_DEVICE = 1
@@ -303,9 +454,14 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
         # before there was a choice keeps the Mac its ADI was provisioned with, and a fresh one
         # is an iPhone. Passed even when local Anisette turns out to be unusable, because a
         # sign-in relayed through a server must still claim the same machine.
+        # Experiment: force the remote server so the machine id presented is not
+        # provisioned by the local Android ADI libraries. If com.apple.mobileme
+        # answers status=0 here where the same account got status=1 under the
+        # local identity, the delegate gate keys on ADI provenance rather than on
+        # anything the request headers claim.
         anisette = _anisetteProvider(
             anisetteServerUrl,
-            localAnisette,
+            None,
             **app_identity.identityForNewSession(localAnisette),
         )
         # And the two ids the same install already used when it provisioned ADI, so this is one
@@ -398,7 +554,29 @@ def exportToString(account: AppleAccount) -> str:
     cannot hand it over and should not be asked to. A state name is not sensitive.
     """
     print(f"Storing account, login state: {account.login_state}")
+    _logServiceTokenNames(account)
     return json.dumps(account.to_json())
+
+
+def _logServiceTokenNames(account: AppleAccount) -> None:
+    """
+    Which iCloud service tokens this sign-in was issued, by name only.
+
+    **Names, never values.** Whether a token exists is the diagnostic - whether an
+    Android identity is issued `searchPartyToken` at all is the open question in
+    issue #248 and malmeloo/FindMy.py#278, and the only way it gets answered is
+    somebody looking at a live response - while a token's value is a credential
+    that must not reach a log file. Read here rather than in `loginSync`: the
+    mobileme delegate exchange that issues them also runs inside a 2FA `submit`,
+    which this bridge never sees, so the export path - which Java calls on every
+    completed sign-in - is the one place all flows pass through. Guarded because
+    `service_tokens` raises on anything short of LOGGED_IN.
+    """
+    try:
+        names = sorted(account.service_tokens.keys())
+        print(f"Sign-in issued {len(names)} service token(s): {names}")
+    except Exception:
+        print(f"Could not read the issued service tokens: {traceback.format_exc()}")
 
 
 # The anisette provider type accounts are stored with.
@@ -743,6 +921,7 @@ def acceptTerms(account: AppleAccount, pageId: str) -> str:
 
         state = account.complete_login()
         print(f"All terms accepted; signing in ended at {state}")
+        _logServiceTokenNames(account)
 
         return json.dumps({
             "ok": True,
