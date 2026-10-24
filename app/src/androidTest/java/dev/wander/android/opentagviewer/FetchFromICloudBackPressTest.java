@@ -245,10 +245,11 @@ public class FetchFromICloudBackPressTest {
      * the in-app arrow and the device's own back button alike - on the reasoning that there is
      * nothing to go back to mid-call. That reasoning holds for an unlock and for nothing else.
      *
-     * <p>What it produced in practice: every call into Python is serialised through
+     * <p>What it produced in practice: every call into Python was serialised through
      * {@code PythonLock}, because the iCloud flow and the location fetch drive the same asyncio
-     * loop, and a first import holds that lock for <b>minutes</b> walking key indices for tags
-     * with no alignment record. Opening this screen during that wait left the user on a spinner
+     * loop, and a first import held that lock for <b>minutes</b> walking key indices for tags
+     * with no alignment record. Issue #126 shortened that wait to one request to Apple, which is
+     * still a call genuinely in flight - so leaving has to keep working. Opening this screen during that wait left the user on a spinner
      * they could not leave by any means, reading "Looking for a device that can unlock it" -
      * which was not what was happening and, for an account already linked, never would be.
      *

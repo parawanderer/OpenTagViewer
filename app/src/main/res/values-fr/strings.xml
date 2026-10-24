@@ -248,7 +248,6 @@ Vous pourrez réassocier votre compte plus tard. Le code de votre appareil Apple
     <string name="icloud_unlink_failed">Impossible de dissocier votre compte Apple. Veuillez réessayer.</string>
     <string name="no_app_to_open_a_map_with">Aucune application de ce téléphone ne peut ouvrir une carte</string>
     <string name="icloud_loading_opening_account">Ouverture de votre compte Apple…</string>
-    <string name="icloud_loading_waiting_for_location_check">En attente de la fin de la recherche de position…</string>
     <string name="export_logs">Exporter les journaux</string>
     <string name="log_file_has_been_exported_successfully">Le fichier journal a bien été exporté</string>
     <string name="failed_to_export_log_file">Impossible d’exporter le fichier journal</string>
