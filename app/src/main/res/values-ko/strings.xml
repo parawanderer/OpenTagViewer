@@ -423,4 +423,5 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="ring_failed_reason">소리 재생 실패: %1$s</string>
     <string name="server_url_not_https">https가 아닙니다. API 토큰이 암호화되지 않은 채 전송됩니다.</string>
     <string name="google_find_hub_setup_guide">설정 방법</string>
+    <string name="google_named_place_x_y">Google: %1$s, %2$s</string>
 </resources>

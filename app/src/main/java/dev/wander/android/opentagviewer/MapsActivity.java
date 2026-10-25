@@ -105,6 +105,7 @@ import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.util.BeaconCombinerUtil;
 import dev.wander.android.opentagviewer.source.ExternalAccessory;
+import dev.wander.android.opentagviewer.source.ExtraSourcesApi;
 import dev.wander.android.opentagviewer.source.ExtraSourcesSettings;
 import dev.wander.android.opentagviewer.source.ReportSources;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
@@ -2706,7 +2707,17 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         ? this.getString(R.string.source_google)
                         : null;
                 final String updated = this.getString(R.string.last_updated_x, timeAgo);
-                deviceLastUpdate.setText(source == null ? updated : updated + " · " + source);
+                String line = source == null ? updated : updated + " · " + source;
+                // Google answers a refresh with a place name ("Home") rather than a position when
+                // the owner's own phone saw the tracker; say so, or the refresh looks unanswered
+                final ExtraSourcesApi.NamedPlace place =
+                        this.reportSources.newerNamedPlace(beaconId, lastLocation.getTimestamp());
+                if (place != null) {
+                    line += " · " + this.getString(R.string.google_named_place_x_y, place.name,
+                            DateUtils.getRelativeTimeSpanString(
+                                    place.timestampMs, now, DateUtils.MINUTE_IN_MILLIS).toString());
+                }
+                deviceLastUpdate.setText(line);
                 // Nothing live to pulse for once the sighting has aged out.
                 ((ImageView) v.findViewById(R.id.device_nearby_pulse)).setVisibility(GONE);
             }

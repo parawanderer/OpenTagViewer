@@ -125,22 +125,24 @@ public class ExtraSourcesApiTest {
     }
 
     /**
-     * A report with no coordinates ("home", a semantic location) is skipped, since there is
+     * A report with no coordinates ("Home", a semantic location) is not a position, since there is
      * nowhere to draw it. Times arrive in seconds and are stored in milliseconds.
      */
     @Test
-    public void reportsAreConvertedAndTheOnesWithoutAPositionSkipped() throws Exception {
+    public void reportsAreConvertedAndTheOnesWithoutAPositionLeftOut() throws Exception {
         this.server.answer("/api/devices/abc/reports", 200, "["
                 + "{\"time\":1700000000,\"received\":1700000060,\"latitude\":52.4,\"longitude\":16.9,"
                 + "\"accuracy\":12.6,\"status\":3},"
                 + "{\"time\":1700000100,\"latitude\":null,\"longitude\":null}"
                 + "]");
 
-        final List<BeaconLocationReport> reports = this.api().googleReports("abc", 1_699_999_000_123L);
+        final ExtraSourcesApi.GoogleReports answer = this.api().googleReports("abc", 1_699_999_000_123L);
 
         assertEquals("abc's reports since that second, capped",
                 "/api/devices/abc/reports?limit=5000&since=1699999000", this.server.lastRequest().target);
+        final List<BeaconLocationReport> reports = answer.positions;
         assertEquals(1, reports.size());
+        assertNull("no name, so no place either", answer.newestPlace);
         final BeaconLocationReport report = reports.get(0);
         assertEquals(1_700_000_000_000L, report.getTimestamp());
         assertEquals(1_700_000_060_000L, report.getPublishedAt());
@@ -148,6 +150,22 @@ public class ExtraSourcesApiTest {
         assertEquals(16.9, report.getLongitude(), 0);
         assertEquals(13, report.getHorizontalAccuracy());
         assertEquals(LocationReport.PROVENANCE_GOOGLE, report.getProvenance());
+    }
+
+    /** Google answers "Home" when the owner's phone saw the tracker; the newest such name is kept. */
+    @Test
+    public void theNewestNamedPlaceIsRead() throws Exception {
+        this.server.answer("/api/devices/abc/reports", 200, "["
+                + "{\"time\":1700000300,\"latitude\":null,\"longitude\":null,\"semantic\":\"Home\",\"status\":0},"
+                + "{\"time\":1700000100,\"latitude\":null,\"longitude\":null,\"semantic\":\"Work\",\"status\":0},"
+                + "{\"time\":1700000200,\"latitude\":null,\"longitude\":null,\"semantic\":null}"
+                + "]");
+
+        final ExtraSourcesApi.GoogleReports answer = this.api().googleReports("abc", 0);
+
+        assertTrue(answer.positions.isEmpty());
+        assertEquals("Home", answer.newestPlace.name);
+        assertEquals(1_700_000_300_000L, answer.newestPlace.timestampMs);
     }
 
     @Test

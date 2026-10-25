@@ -423,4 +423,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="ring_failed_reason">Ring failed: %1$s</string>
     <string name="server_url_not_https">Not https: the API token will be sent unencrypted.</string>
     <string name="google_find_hub_setup_guide">How to set this up</string>
+    <string name="google_named_place_x_y">Google: %1$s, %2$s</string>
 </resources>

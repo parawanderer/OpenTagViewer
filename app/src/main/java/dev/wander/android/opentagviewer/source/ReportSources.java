@@ -20,6 +20,8 @@ import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 import dev.wander.android.opentagviewer.python.AccessoryRequest;
 import dev.wander.android.opentagviewer.python.FetchResult;
 import dev.wander.android.opentagviewer.python.PythonAppleService;
+import dev.wander.android.opentagviewer.source.ExtraSourcesApi.GoogleReports;
+import dev.wander.android.opentagviewer.source.ExtraSourcesApi.NamedPlace;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
@@ -44,12 +46,19 @@ public final class ReportSources {
     private static final long GOOGLE_FIRST_LOCATE_EVERY_MS = 30 * 60_000L;
     /** Shared by every instance: a screen creates its own, and the throttle must outlive it. */
     private static final Map<String, Long> LAST_FIRST_LOCATE = new ConcurrentHashMap<>();
+    /**
+     * The newest place Google named for each device, by beacon id. Shared like the throttle: the
+     * map's cards read what any fetch found. Not stored, since every fetch reads it again.
+     */
+    private static final Map<String, NamedPlace> NEWEST_PLACE = new ConcurrentHashMap<>();
+    /** How far back a fetch reads Google's reports, whatever window it asked for. */
+    private static final long GOOGLE_WINDOW_MS = 7 * 86_400_000L;
 
     /** The googlefind calls this class makes. Real: {@link ExtraSourcesApi}. */
     interface Google {
         void locate(String googleId, int waitS) throws Exception;
 
-        List<BeaconLocationReport> reports(String googleId, long sinceMs) throws Exception;
+        GoogleReports reports(String googleId, long sinceMs) throws Exception;
     }
 
     private final BooleanSupplier googleConfigured;
@@ -57,6 +66,7 @@ public final class ReportSources {
     private final Google google;
     private final LongSupplier clock;
     private final Map<String, Long> lastFirstLocate;
+    private final Map<String, NamedPlace> newestPlace;
 
     /**
      * Seams rather than the settings, links and HTTP client themselves, which all need a
@@ -64,12 +74,14 @@ public final class ReportSources {
      * decision is tested on the JVM - see {@code ReportSourcesTest}.
      */
     ReportSources(final BooleanSupplier googleConfigured, final Function<String, String> linkedGoogleId,
-                  final Google google, final LongSupplier clock, final Map<String, Long> lastFirstLocate) {
+                  final Google google, final LongSupplier clock, final Map<String, Long> lastFirstLocate,
+                  final Map<String, NamedPlace> newestPlace) {
         this.googleConfigured = googleConfigured;
         this.linkedGoogleId = linkedGoogleId;
         this.google = google;
         this.clock = clock;
         this.lastFirstLocate = lastFirstLocate;
+        this.newestPlace = newestPlace;
     }
 
     public static ReportSources create(final Context context) {
@@ -83,10 +95,10 @@ public final class ReportSources {
             }
 
             @Override
-            public List<BeaconLocationReport> reports(final String googleId, final long sinceMs) throws Exception {
+            public GoogleReports reports(final String googleId, final long sinceMs) throws Exception {
                 return api.googleReports(googleId, sinceMs);
             }
-        }, System::currentTimeMillis, LAST_FIRST_LOCATE);
+        }, System::currentTimeMillis, LAST_FIRST_LOCATE, NEWEST_PLACE);
     }
 
     /**
@@ -131,25 +143,39 @@ public final class ReportSources {
             }
             // Google's answer is the last known position, often hours or days old, so a scheduled
             // one-hour window would hide it; the database drops what it already holds
-            final long googleSince = Math.min(sinceMs, this.clock.getAsLong() - 7 * 86_400_000L);
-            List<BeaconLocationReport> fetched = this.google.reports(googleId, googleSince);
-            if (!askGoogleNow && fetched.isEmpty() && this.google.reports(googleId, 0).isEmpty()) {
-                // Never located: ask Google once, rather than waiting for a refresh button that
-                // a device without a location does not have
-                final long now = this.clock.getAsLong();
-                final Long last = this.lastFirstLocate.get(googleId);
-                if (last == null || now - last > GOOGLE_FIRST_LOCATE_EVERY_MS) {
-                    this.lastFirstLocate.put(googleId, now);
-                    try {
-                        this.google.locate(googleId, GOOGLE_LOCATE_WAIT_S);
-                        fetched = this.google.reports(googleId, googleSince);
-                    } catch (final Exception e) {
-                        Log.w(TAG, "First Google locate failed for " + beaconId, e);
+            final long googleSince = Math.min(sinceMs, this.clock.getAsLong() - GOOGLE_WINDOW_MS);
+            GoogleReports fetched = this.google.reports(googleId, googleSince);
+            final List<BeaconLocationReport> positions = new ArrayList<>(fetched.positions);
+            if (positions.isEmpty()) {
+                final GoogleReports all = this.google.reports(googleId, 0);
+                if (!all.positions.isEmpty()) {
+                    // Nothing in the window, but Google located it before: the newest of those is
+                    // still where it was last seen, and without it a tracker that went quiet for
+                    // a week would have nothing on the map at all
+                    positions.add(newest(all.positions));
+                } else if (!askGoogleNow) {
+                    // Never located: ask Google once, rather than waiting for a refresh button
+                    // that a device without a location does not have
+                    final long now = this.clock.getAsLong();
+                    final Long last = this.lastFirstLocate.get(googleId);
+                    if (last == null || now - last > GOOGLE_FIRST_LOCATE_EVERY_MS) {
+                        this.lastFirstLocate.put(googleId, now);
+                        try {
+                            this.google.locate(googleId, GOOGLE_LOCATE_WAIT_S);
+                            fetched = this.google.reports(googleId, googleSince);
+                            positions.addAll(fetched.positions);
+                        } catch (final Exception e) {
+                            Log.w(TAG, "First Google locate failed for " + beaconId, e);
+                        }
                     }
                 }
             }
+            if (fetched.newestPlace != null) {
+                this.newestPlace.merge(beaconId, fetched.newestPlace,
+                        (held, found) -> found.timestampMs > held.timestampMs ? found : held);
+            }
             final List<BeaconLocationReport> reports = new ArrayList<>();
-            for (final BeaconLocationReport r : fetched) {
+            for (final BeaconLocationReport r : positions) {
                 if (r.getTimestamp() <= untilMs) reports.add(r);
             }
             return reports;
@@ -169,6 +195,24 @@ public final class ReportSources {
                     return new ArrayList<>();
                 }),
                 (fromApple, fromGoogle) -> merge(beaconId, fromApple, fromGoogle));
+    }
+
+    /**
+     * The place Google named for a device, if it is newer than the position the card shows: a
+     * refresh that Google answered with "Home" should not look like no answer at all.
+     */
+    @Nullable
+    public NamedPlace newerNamedPlace(final String beaconId, final long shownTimestampMs) {
+        final NamedPlace place = this.newestPlace.get(beaconId);
+        return place != null && place.timestampMs > shownTimestampMs ? place : null;
+    }
+
+    private static BeaconLocationReport newest(final List<BeaconLocationReport> reports) {
+        BeaconLocationReport newest = reports.get(0);
+        for (final BeaconLocationReport r : reports) {
+            if (r.getTimestamp() > newest.getTimestamp()) newest = r;
+        }
+        return newest;
     }
 
     private static FetchResult empty(final String beaconId) {

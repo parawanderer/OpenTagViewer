@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.source;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -40,6 +41,7 @@ public class ReportSourcesTest {
     /** The googlefind service, counting what it was asked. */
     private static final class FakeGoogle implements ReportSources.Google {
         final List<BeaconLocationReport> reports = new ArrayList<>();
+        final List<ExtraSourcesApi.NamedPlace> places = new ArrayList<>();
         int locates;
         boolean failing;
 
@@ -48,21 +50,34 @@ public class ReportSourcesTest {
             this.locates++;
         }
 
+        /** Like the service: what was recorded at or after {@code sinceMs}. */
         @Override
-        public List<BeaconLocationReport> reports(final String googleId, final long sinceMs) throws Exception {
+        public ExtraSourcesApi.GoogleReports reports(final String googleId, final long sinceMs) throws Exception {
             if (this.failing) {
                 throw new IOException("service down");
             }
-            return new ArrayList<>(this.reports);
+            final List<BeaconLocationReport> positions = new ArrayList<>();
+            for (final BeaconLocationReport r : this.reports) {
+                if (r.getTimestamp() >= sinceMs) positions.add(r);
+            }
+            ExtraSourcesApi.NamedPlace newest = null;
+            for (final ExtraSourcesApi.NamedPlace p : this.places) {
+                if (p.timestampMs >= sinceMs && (newest == null || p.timestampMs > newest.timestampMs)) {
+                    newest = p;
+                }
+            }
+            return new ExtraSourcesApi.GoogleReports(positions, newest);
         }
     }
 
     private final FakeGoogle google = new FakeGoogle();
     private final AtomicLong clock = new AtomicLong(NOW);
     private final Map<String, Long> firstLocates = new HashMap<>();
+    private final Map<String, ExtraSourcesApi.NamedPlace> places = new HashMap<>();
 
     private ReportSources sources(final boolean configured, final Map<String, String> links) {
-        return new ReportSources(() -> configured, links::get, this.google, this.clock::get, this.firstLocates);
+        return new ReportSources(() -> configured, links::get, this.google, this.clock::get, this.firstLocates,
+                this.places);
     }
 
     private static FetchResult appleResult(final String beaconId, final BeaconLocationReport... reports) {
@@ -198,6 +213,94 @@ public class ReportSourcesTest {
         this.clock.set(NOW + 31 * 60_000);
         this.fetch(sources, "google-g1", json, false, null);
         assertEquals("and again after it", 2, this.google.locates);
+    }
+
+    // --- a tracker Google has not seen for a while -----------------------------------------------------
+
+    /**
+     * Only the last week is read, so a tracker nobody has passed for longer used to come back with
+     * nothing and had no position on the map. The newest older one is still where it was last seen.
+     */
+    @Test
+    public void aTrackerQuietForOverAWeekStillHasItsLastKnownPosition() {
+        this.google.reports.add(report(NOW - 9 * 24 * HOUR, LocationReport.PROVENANCE_GOOGLE));
+        this.google.reports.add(report(NOW - 8 * 24 * HOUR, LocationReport.PROVENANCE_GOOGLE));
+
+        final FetchResult result = this.fetch(this.sources(true, Map.of()), "google-g1",
+                ExternalAccessory.newGoogle("g1", "Keys"), false, null);
+
+        final List<BeaconLocationReport> reports = result.getReports().get("google-g1");
+        assertEquals("only the newest of the old ones", 1, reports.size());
+        assertEquals(NOW - 8 * 24 * HOUR, reports.get(0).getTimestamp());
+    }
+
+    /** It was located once, so it is not the never-located case that asks Google by itself. */
+    @Test
+    public void aQuietTrackerIsNotAskedForLikeANeverLocatedOne() {
+        this.google.reports.add(report(NOW - 8 * 24 * HOUR, LocationReport.PROVENANCE_GOOGLE));
+
+        this.fetch(this.sources(true, Map.of()), "google-g1", ExternalAccessory.newGoogle("g1", "Keys"), false, null);
+
+        assertEquals(0, this.google.locates);
+    }
+
+    @Test
+    public void withReportsInTheWindowNothingOlderIsAdded() {
+        this.google.reports.add(report(NOW - 8 * 24 * HOUR, LocationReport.PROVENANCE_GOOGLE));
+        this.google.reports.add(report(NOW - 60_000, LocationReport.PROVENANCE_GOOGLE));
+
+        final FetchResult result = this.fetch(this.sources(true, Map.of()), "google-g1",
+                ExternalAccessory.newGoogle("g1", "Keys"), false, null);
+
+        assertEquals(1, result.getReports().get("google-g1").size());
+        assertEquals(NOW - 60_000, result.getReports().get("google-g1").get(0).getTimestamp());
+    }
+
+    // --- places Google names instead of giving a position ------------------------------------------
+
+    /**
+     * When the owner's own phone sees the tracker, Google answers "Home" with no coordinates. It is
+     * not a position, but the card should say Google answered.
+     */
+    @Test
+    public void aNamedPlaceNewerThanTheShownPositionIsOffered() {
+        this.google.places.add(new ExtraSourcesApi.NamedPlace("Home", NOW - 60_000));
+        final ReportSources sources = this.sources(true, Map.of("tag", "g1"));
+
+        final FetchResult result = this.fetch(sources, "tag", APPLE_TAG, true,
+                Observable.just(appleResult("tag", report(NOW - HOUR, LocationReport.PROVENANCE_APPLE))));
+
+        assertEquals("a name is not a position", 1, result.getReports().get("tag").size());
+        final ExtraSourcesApi.NamedPlace place = sources.newerNamedPlace("tag", NOW - HOUR);
+        assertEquals("Home", place == null ? null : place.name);
+    }
+
+    @Test
+    public void aNamedPlaceOlderThanTheShownPositionIsNot() {
+        this.google.places.add(new ExtraSourcesApi.NamedPlace("Home", NOW - 2 * HOUR));
+        final ReportSources sources = this.sources(true, Map.of("tag", "g1"));
+
+        this.fetch(sources, "tag", APPLE_TAG, false,
+                Observable.just(appleResult("tag", report(NOW - HOUR, LocationReport.PROVENANCE_APPLE))));
+
+        assertNull(sources.newerNamedPlace("tag", NOW - HOUR));
+    }
+
+    /** A history fetch for an earlier day must not replace a newer place with an older one. */
+    @Test
+    public void theNewestNamedPlaceIsKept() {
+        final ReportSources sources = this.sources(true, Map.of());
+        final String json = ExternalAccessory.newGoogle("g1", "Keys");
+        this.google.reports.add(report(NOW - 60_000, LocationReport.PROVENANCE_GOOGLE));
+        this.google.places.add(new ExtraSourcesApi.NamedPlace("Home", NOW - 30_000));
+        this.fetch(sources, "google-g1", json, false, null);
+
+        this.google.places.clear();
+        this.google.places.add(new ExtraSourcesApi.NamedPlace("Work", NOW - 3 * HOUR));
+        this.fetch(sources, "google-g1", json, false, null);
+
+        final ExtraSourcesApi.NamedPlace place = sources.newerNamedPlace("google-g1", 0);
+        assertEquals("Home", place == null ? null : place.name);
     }
 
     // --- merging ------------------------------------------------------------------------------------

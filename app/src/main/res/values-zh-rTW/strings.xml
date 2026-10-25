@@ -423,4 +423,5 @@
     <string name="ring_failed_reason">響鈴失敗：%1$s</string>
     <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
     <string name="google_find_hub_setup_guide">如何設定</string>
+    <string name="google_named_place_x_y">Google：%1$s，%2$s</string>
 </resources>
