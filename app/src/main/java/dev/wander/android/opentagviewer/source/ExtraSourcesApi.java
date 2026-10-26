@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.source;
 
 import android.util.Base64;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -166,16 +168,52 @@ public final class ExtraSourcesApi {
         return new JSONObject(text).optBoolean("answered");
     }
 
+    /**
+     * A place Google named instead of giving a position - "Home", typically, when the owner's
+     * own phone saw the tracker there. Nothing to draw, but it does say the tracker was seen.
+     */
+    public static final class NamedPlace {
+        public final String name;
+        public final long timestampMs;
+
+        public NamedPlace(final String name, final long timestampMs) {
+            this.name = name;
+            this.timestampMs = timestampMs;
+        }
+    }
+
+    /** What the service holds for one tracker. */
+    public static final class GoogleReports {
+        /** Reports with a position. */
+        public final List<BeaconLocationReport> positions;
+        /** The newest named place, if Google sent any. */
+        @Nullable
+        public final NamedPlace newestPlace;
+
+        public GoogleReports(final List<BeaconLocationReport> positions, @Nullable final NamedPlace newestPlace) {
+            this.positions = positions;
+            this.newestPlace = newestPlace;
+        }
+    }
+
     /** Reports recorded at or after {@code sinceMs} (the service keeps what Google sent it). */
-    public List<BeaconLocationReport> googleReports(final String googleId, final long sinceMs) throws Exception {
+    public GoogleReports googleReports(final String googleId, final long sinceMs) throws Exception {
         final JSONArray arr = new JSONArray(this.google("GET",
                 "/api/devices/" + googleId + "/reports?limit=5000&since=" + (sinceMs / 1000), 30000));
         final List<BeaconLocationReport> out = new ArrayList<>();
+        NamedPlace newestPlace = null;
         for (int i = 0; i < arr.length(); i++) {
             final JSONObject r = arr.getJSONObject(i);
-            // A "semantic" report ("home") has no position to draw
-            if (r.isNull("latitude") || r.isNull("longitude")) continue;
             final long timeMs = r.getLong("time") * 1000L;
+            if (r.isNull("latitude") || r.isNull("longitude")) {
+                // A semantic report ("Home") has no position to draw, only a name
+                final String name = r.optString("semantic", "");
+                if (!r.isNull("semantic") && !name.isEmpty()
+                        && (newestPlace == null || timeMs > newestPlace.timestampMs)) {
+                    newestPlace = new NamedPlace(name, timeMs);
+                }
+                continue;
+            }
             out.add(BeaconLocationReport.builder()
                     .publishedAt(r.optLong("received", r.getLong("time")) * 1000L)
                     .description(r.optBoolean("own") ? "Google Find Hub (own device)" : "Google Find Hub")
@@ -188,6 +226,6 @@ public final class ExtraSourcesApi {
                     .provenance(LocationReport.PROVENANCE_GOOGLE)
                     .build());
         }
-        return out;
+        return new GoogleReports(out, newestPlace);
     }
 }
