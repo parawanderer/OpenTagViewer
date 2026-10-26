@@ -247,7 +247,6 @@ Du kannst sie später wieder verknüpfen. Dafür brauchst du den Gerätecode dei
     <string name="icloud_unlink_failed">Die Verknüpfung mit deinem Apple-Konto konnte nicht aufgehoben werden. Bitte versuche es erneut.</string>
     <string name="no_app_to_open_a_map_with">Keine App auf diesem Telefon kann eine Karte öffnen</string>
     <string name="icloud_loading_opening_account">Apple-Konto wird geöffnet …</string>
-    <string name="icloud_loading_waiting_for_location_check">Warten auf den Abschluss der Standortprüfung …</string>
     <string name="export_logs">Protokolle exportieren</string>
     <string name="log_file_has_been_exported_successfully">Protokolldatei wurde exportiert</string>
     <string name="failed_to_export_log_file">Protokolldatei konnte nicht exportiert werden</string>

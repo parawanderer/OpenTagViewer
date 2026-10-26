@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
 
+import account_loop
 from exporter import icloud
 
 _originals: dict[str, Any] = {}
@@ -245,13 +246,25 @@ def anAccount() -> Any:
     asserting it reached the join cannot pass against code that never read the session at all:
     that path falls back to `identity.LEGACY_SERIAL`, and the two must not be the same string.
     """
-    return SimpleNamespace(
-        _asyncacc=SimpleNamespace(
-            serial=SESSION_SERIAL,
-            identity=SimpleNamespace(
-                model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
-                os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0")),
-        _evt_loop=asyncio.new_event_loop())
+    account = _Account()
+    account._asyncacc = SimpleNamespace(
+        serial=SESSION_SERIAL,
+        identity=SimpleNamespace(
+            model="iPhone17,1", os_name="iPhone OS", os_version="18.1",
+            os_build="22B83", cfnetwork="1568.100.1", darwin="24.1.0"))
+    account._evt_loop = asyncio.new_event_loop()
+
+    # As `main` does for every account it hands Java, or `openSession` refuses it.
+    account_loop.attach(account)
+
+    return account
+
+
+class _Account:
+    """A plain class rather than a SimpleNamespace, so `attach` can watch it for collection."""
+
+    _asyncacc: Any
+    _evt_loop: Any
 
 
 def whatReachedTheAccount() -> dict[str, Any]:

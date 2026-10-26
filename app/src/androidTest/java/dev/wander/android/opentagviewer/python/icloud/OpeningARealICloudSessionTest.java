@@ -4,6 +4,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.chaquo.python.Kwarg;
 import com.chaquo.python.PyObject;
@@ -108,19 +109,22 @@ public class OpeningARealICloudSessionTest {
      *
      * <p>The account is assembled here rather than mocked at the Java seam, which is the whole
      * point: {@code openSession} looks for the two private attributes FindMy.py's account carries,
-     * and a {@code SimpleNamespace} with those is enough to get a real {@code ICloudSession} back
-     * across the real bridge. No Apple account, no network, and no fake standing where the bug was.
+     * and a {@code SimpleNamespace} with those - attached, as {@code main} attaches every account -
+     * is enough to get a real {@code ICloudSession} back across the real bridge. No Apple account, no network, and no fake standing where the bug was.
      */
     @Test
     public void asessionThatOpensIsHandedBackRatherThanLostInConversion() {
         final Python python = Python.getInstance();
 
-        // What `openSession` guards on: an async account and a loop to drive it. Nothing is
-        // called on either here - opening a session only stores them.
+        // What `openSession` guards on: an async account and a loop to drive it, with the loop
+        // on its own thread as `main` leaves every account (issue #126). Nothing is called on
+        // either here - opening a session only stores them.
         final PyObject account = python.getModule("types").callAttr(
                 "SimpleNamespace",
                 new Kwarg("_asyncacc", python.getModule("types").callAttr("SimpleNamespace")),
                 new Kwarg("_evt_loop", python.getModule("asyncio").callAttr("new_event_loop")));
+        assertTrue("the account's loop could not be given its own thread",
+                python.getModule("account_loop").callAttr("attach", account).toBoolean());
 
         assertNotNull("a session that opened must reach Java, not be lost converting it",
                 PythonICloudService.openFor(new PythonAppleAccount(account)));
