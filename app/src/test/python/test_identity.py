@@ -24,7 +24,7 @@ import pytest
 from findmy.reports import AppleAccount, RemoteAnisetteProvider
 from findmy.reports.anisette import CLIENT_IDENTITY, CLIENT_SERIAL, DeviceIdentity
 
-# What Java sends for each of its two profiles. Copies, and only usable as copies: nothing here
+# What Java sends for each of its three profiles. Copies, and only usable as copies: nothing here
 # can reach the Java enum, so these say "given this shape, do that". That the shapes are the
 # ones Java actually produces is asserted on device, by IdentityBridgeTest.
 LEGACY_MAC = {
@@ -43,6 +43,17 @@ IPHONE = {
     "os_build": "21E219",
     "cfnetwork": "1494.0.7",
     "darwin": "23.4.0",
+}
+
+# A fresh install since 2026-10-14: the one profile Apple's Grand Slam handler still answers an
+# SRP init for over an Android-provisioned machine id (issue #248).
+ANDROID = {
+    "model": "Pixel 7",
+    "os_name": "Android",
+    "os_version": "14",
+    "os_build": "UQ1A.240205.002",
+    "cfnetwork": "1404.0.5",
+    "darwin": "22.3.0",
 }
 
 
@@ -159,15 +170,31 @@ class TestTheIdentityANewSessionPresents:
         constant any more.
 
         Java sends the same six values in the client info it provisions ADI under. Which six
-        depends on the install — one that predates the choice keeps the Mac, a fresh one is an
-        iPhone — so a copy on this side would be right for one of them and wrong for the other.
+        depends on the install — Java decides, and replaces a profile Apple refuses — so a copy
+        on this side would be right for one install and wrong for another.
         """
         assert identity.hardwareProfile(Bridge(LEGACY_MAC)) == DeviceIdentity(**LEGACY_MAC)
         assert identity.hardwareProfile(Bridge(IPHONE)) == DeviceIdentity(**IPHONE)
+        assert identity.hardwareProfile(Bridge(ANDROID)) == DeviceIdentity(**ANDROID)
 
-    def test_neither_profile_is_the_librarys(self):
+    def test_no_profile_is_the_librarys(self):
         assert DeviceIdentity(**LEGACY_MAC) != CLIENT_IDENTITY
         assert DeviceIdentity(**IPHONE) != CLIENT_IDENTITY
+        assert DeviceIdentity(**ANDROID) != CLIENT_IDENTITY
+
+    def test_the_android_profile_renders_the_client_info_apple_accepts(self):
+        """
+        The exact string verified against the handler with probe_gsa_signin.py --real-init.
+
+        Rendered through FindMy.py's own composer, because that is what reaches Apple at
+        sign-in: Java's copy of the string is pinned in AdiDeviceIdentityTest, and this pins
+        that the six values survive the bridge and come out as the same bytes.
+        """
+        from findmy.reports.anisette import _AKD_BUNDLE
+
+        assert DeviceIdentity(**ANDROID).client_info(_AKD_BUNDLE) == (
+            "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+        )
 
     def test_a_new_login_uses_it_on_both_transports(self):
         """

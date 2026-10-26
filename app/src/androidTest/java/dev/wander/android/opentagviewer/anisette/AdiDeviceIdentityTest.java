@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.anisette;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -106,9 +107,12 @@ public class AdiDeviceIdentityTest {
         for (final Hardware hardware : Hardware.values()) {
             final JSONObject json = new JSONObject(hardware.toJson());
             final boolean phone = json.getString("model").startsWith("iPhone");
+            final boolean android = "Android".equals(json.getString("os_name"));
 
             assertEquals(hardware + " names a phone in one field and a Mac in another",
                     phone, "iPhone OS".equals(json.getString("os_name")));
+            assertEquals(hardware + " names Android in one field and Apple hardware in another",
+                    android, "Pixel 7".equals(json.getString("model")));
             assertEquals(hardware + "'s user agent describes a different release",
                     hardware.userAgent(),
                     "akd/1.0 CFNetwork/" + hardware.cfnetwork()
@@ -119,8 +123,34 @@ public class AdiDeviceIdentityTest {
     /** Two profiles that were the same machine would make the distinction meaningless. */
     @Test
     public void theProfilesAreActuallyDifferentMachines() {
-        assertNotEquals(Hardware.LEGACY_MAC.toJson(), Hardware.IPHONE.toJson());
-        assertNotEquals(Hardware.LEGACY_MAC.clientInfo(), Hardware.IPHONE.clientInfo());
+        final Hardware[] all = Hardware.values();
+        for (int i = 0; i < all.length; i++) {
+            for (int j = i + 1; j < all.length; j++) {
+                assertNotEquals(all[i] + " and " + all[j] + " are one machine",
+                        all[i].toJson(), all[j].toJson());
+                assertNotEquals(all[i] + " and " + all[j] + " are one machine",
+                        all[i].clientInfo(), all[j].clientInfo());
+            }
+        }
+    }
+
+    /**
+     * The Android profile is the exact string the Grand Slam handler was verified to accept.
+     *
+     * <p>Verified on 2026-10-14 with {@code scripts/probe_gsa_signin.py --real-init}: a machine
+     * id provisioned under this client info, presented with this client info, is answered
+     * {@code ec=0} and an SRP challenge; the same machine id under the Mac's is answered
+     * {@code ec=-80045}. It is also the string xtool shipped in xtool-org/xtool#337. One
+     * character of drift here is a sign-in nobody can complete, so the whole string is pinned.
+     */
+    @Test
+    public void theAndroidProfileIsTheOneAppleAccepts() {
+        assertEquals("<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 "
+                        + "(com.apple.akd/1.0)>",
+                Hardware.ANDROID.clientInfo());
+        assertTrue(Hardware.ANDROID.canSignIn());
+        assertFalse(Hardware.LEGACY_MAC.canSignIn());
+        assertFalse(Hardware.IPHONE.canSignIn());
     }
 
     /**
@@ -148,20 +178,20 @@ public class AdiDeviceIdentityTest {
     }
 
     /**
-     * A fresh install claims the Mac.
+     * A fresh install claims the Android phone.
      *
-     * <p>It claimed the iPhone until Apple began answering 401 to {@code get_2fa_methods} for
-     * clients presenting that profile - provisioning and password auth both succeeded, and the
-     * very next request did not. The desktop exporter makes the same call against the same
-     * account and is answered, and this profile is byte-identical to what it provisions with.
+     * <p>Since 2026-10-12 the Grand Slam handler refuses SRP init for a Mac or iPhone claim
+     * over the Android-provisioned machine id this app's ADI libraries mint
+     * ({@code ec=-80045}); the Android claim is answered. See
+     * {@code AdiDeviceIdentity#generate()} and issue #248.
      *
-     * <p>So this asserts a decision taken from evidence, not a preference. If it ever changes
-     * back, that has to be because the 2FA question was answered - not because an iPhone icon
-     * looks better in a device list.
+     * <p>So this asserts a decision taken from evidence, not a preference. If it ever changes,
+     * that has to be because the handler's rule changed - re-run the probe first.
      */
     @Test
-    public void afreshIdentityIsTheMacTheExporterAlsoUses() {
-        assertEquals(Hardware.LEGACY_MAC, AdiDeviceIdentity.generate().hardware());
+    public void afreshIdentityIsTheAndroidPhoneAppleStillAccepts() {
+        assertEquals(Hardware.ANDROID, AdiDeviceIdentity.generate().hardware());
+        assertEquals(Hardware.ANDROID, Hardware.DEFAULT);
     }
 
     /**
