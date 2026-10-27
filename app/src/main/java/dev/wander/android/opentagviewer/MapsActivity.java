@@ -401,6 +401,12 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
     private Optional<UserMapCameraPosition> lastCameraPositionOnLoad;
 
+    /** Whether the opening camera decision was already made - see applyOpeningCameraIfReady. */
+    private boolean openingCameraApplied;
+
+    /** The opening view came from the stored position, so marker auto-navigation must not stomp it. */
+    private boolean openingCameraRestored;
+
     private int windowWidth = 0;
 
     private final ActivityResultLauncher<Intent> pickZipActivityLauncher = registerForActivityResult(
@@ -569,17 +575,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         var async = this.getLastCameraPosition()
             .subscribe(pos -> {
                 Log.d(TAG, "Got previous camera position to reset us to: " + pos);
-
-                pos.ifPresent(userMapCameraPosition -> {
-                    if (this.mapProvider != null) {
-                        this.mapProvider.moveCamera(
-                                userMapCameraPosition.getLat(),
-                                userMapCameraPosition.getLon(),
-                                userMapCameraPosition.getZoom()
-                        );
-                    }
-                });
-
+                // The camera position arrives off a different async path than the
+                // provider - whichever lands second has to make the move, or a saved
+                // view is silently dropped whenever the datastore answers first.
+                this.applyOpeningCameraIfReady();
             }, error -> Log.e(TAG, "Failed to get last camera position!", error));
 
         this.handleAuthAndShowDevices();
@@ -633,6 +632,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         mapProvider.setMapStyle(this.getPreferredMapStyle());
 
         this.enableMyLocation(false);
+        this.applyOpeningCameraIfReady();
 
         // 地图准备好后，刷新一次当前显示的信标位置
         this.showLastDeviceLocations();
@@ -1113,6 +1113,86 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     public void onClickMyLocation(View view) {
         Log.d(TAG, "My location button was clicked");
         this.animateCameraToMyLocation();
+    }
+
+    /**
+     * Where the map opens, decided once both async sides have arrived: the provider
+     * (onMapReady) and the persisted camera position (getLastCameraPosition). The
+     * decision is made exactly once - the second call, from whichever side landed
+     * last, is the one that moves the camera.
+     */
+    private void applyOpeningCameraIfReady() {
+        if (this.openingCameraApplied || this.mapProvider == null
+                || this.lastCameraPositionOnLoad == null) {
+            return;
+        }
+        this.openingCameraApplied = true;
+
+        final Optional<UserMapCameraPosition> saved = this.lastCameraPositionOnLoad;
+        if (saved.isPresent()) {
+            final UserMapCameraPosition pos = saved.get();
+            this.mapProvider.moveCamera(pos.getLat(), pos.getLon(), pos.getZoom());
+            this.openingCameraRestored = true;
+            return;
+        }
+
+        // Nothing was ever stored. The provider's own default zooms out until the
+        // planet tiles across the screen, so pick a deliberate opening view instead:
+        // the phone's position when permission allows, else a country-scale view for
+        // the app language, else a zoom that shows the world exactly once. Markers
+        // that exist already own the opening view through their own navigation.
+        if (!this.currentMarkers.isEmpty()) {
+            return;
+        }
+        if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
+            this.fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(this, location -> {
+                        if (this.mapProvider == null) {
+                            return;
+                        }
+                        // Markers may have arrived while the fix was in flight - they own
+                        // the opening view, and a belated phone position must not stomp it.
+                        if (!this.currentMarkers.isEmpty()) {
+                            return;
+                        }
+                        if (location != null) {
+                            this.mapProvider.animateCamera(location.getLatitude(),
+                                    location.getLongitude(), this.initialZoom(), null);
+                        } else {
+                            this.applyLocaleOpeningView();
+                        }
+                    })
+                    .addOnFailureListener(this, e -> {
+                        // A failed fix is the same empty answer as a null one: fall back to
+                        // the locale view unless markers claimed the opening meanwhile.
+                        if (this.mapProvider != null && this.currentMarkers.isEmpty()) {
+                            this.applyLocaleOpeningView();
+                        }
+                    });
+            return;
+        }
+        this.applyLocaleOpeningView();
+    }
+
+    /**
+     * The opening view when neither a stored camera position nor a phone fix exists:
+     * a country-scale frame for the app language, or a world view tight enough that
+     * the planet appears once rather than tiled.
+     */
+    private void applyLocaleOpeningView() {
+        if (this.mapProvider == null) {
+            return;
+        }
+        // The activity's configured locale, not Locale.getDefault(): a per-app language set
+        // through locales_config never rewrites the default, and the tag is "de" with no
+        // country - so it is the language that decides, not the region.
+        final Locale appLocale = this.getResources().getConfiguration().getLocales().get(0);
+        if ("de".equals(appLocale.getLanguage())) {
+            this.mapProvider.moveCamera(50.96, 10.42, 5.5f);
+        } else {
+            this.mapProvider.moveCamera(30.0, 10.0, 2.5f);
+        }
     }
 
     private void animateCameraToMyLocation() {
@@ -2511,8 +2591,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         String markerId = this.mapProvider.addMarker(marker);
         this.currentMarkers.put(beaconId, markerId); // 存储markerId而不是Marker对象
 
-        if (this.currentMarkers.size() == 1) {
-            // for the first marker, navigate to it smoothly on the map!
+        if (this.currentMarkers.size() == 1 && !this.openingCameraRestored) {
+            // The first marker steers the camera - unless the user's own stored view
+            // was just put back, which outranks any pin.
             this.goToBeaconOnMap(beaconId, this.initialZoom());
         }
     }
