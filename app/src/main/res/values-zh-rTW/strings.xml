@@ -423,4 +423,14 @@
     <string name="ring_failed_reason">響鈴失敗：%1$s</string>
     <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
     <string name="google_find_hub_setup_guide">如何設定</string>
+    <string name="nearby_devices_title">附近的裝置</string>
+    <string name="nearby_devices_menu_open">掃描附近的裝置</string>
+    <string name="nearby_devices_empty">附近沒有「尋找」裝置。AirTag 和其他 Apple「尋找」裝置會在此畫面開啟期間顯示在這裡。</string>
+    <string name="nearby_devices_needs_permission">允許藍牙存取以查看附近的「尋找」裝置。</string>
+    <string name="nearby_device_unnamed">「尋找」裝置 · %1$s</string>
+    <string name="nearby_device_distance_format">約 %1$s 公尺</string>
+    <string name="nearby_device_separated">與物主分離</string>
+    <string name="nearby_device_with_owner">在物主附近</string>
+    <string name="nearby_devices_scan_unavailable">藍牙已關閉或無法使用。開啟後可查看附近的 Find My 裝置 — 將自動重試。</string>
+    <string name="nearby_device_offline">離線</string>
 </resources>

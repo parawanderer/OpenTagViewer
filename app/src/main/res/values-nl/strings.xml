@@ -423,4 +423,14 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="ring_failed_reason">Laten afgaan mislukt: %1$s</string>
     <string name="server_url_not_https">Geen https: het API-token wordt onversleuteld verstuurd.</string>
     <string name="google_find_hub_setup_guide">Zo stel je dit in</string>
+    <string name="nearby_devices_title">Apparaten in de buurt</string>
+    <string name="nearby_devices_menu_open">Apparaten in de buurt scannen</string>
+    <string name="nearby_devices_empty">Geen Zoek-mijn-apparaten in bereik. AirTags en andere Apple Zoek mijn-apparaten verschijnen hier zolang dit scherm open is.</string>
+    <string name="nearby_devices_needs_permission">Sta Bluetooth-toegang toe om Zoek-mijn-apparaten in de buurt te zien.</string>
+    <string name="nearby_device_unnamed">Zoek mijn-apparaat · %1$s</string>
+    <string name="nearby_device_distance_format">~%1$s m</string>
+    <string name="nearby_device_separated">gescheiden van de eigenaar</string>
+    <string name="nearby_device_with_owner">bij de eigenaar</string>
+    <string name="nearby_devices_scan_unavailable">Bluetooth staat uit of is niet beschikbaar. Zet het aan om Find My-apparaten in de buurt te zien — automatisch opnieuw proberen.</string>
+    <string name="nearby_device_offline">offline</string>
 </resources>
