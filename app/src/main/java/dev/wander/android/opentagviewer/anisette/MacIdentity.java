@@ -25,6 +25,14 @@ import java.util.Locale;
  * inconsistent with itself - provisioning sends Darwin 22.3.0 and the login 22.2.0 - it is copied
  * rather than corrected, because the consistent version is the untested one.
  *
+ * <p><b>The model and the OS do not describe a real Mac either, and that is kept on purpose.</b>
+ * {@code MacBookPro13,2} is the 2016 13-inch MacBook Pro, whose last supported release is macOS 12
+ * Monterey, so it never ran macOS 13.1 (22C65). AGENTS.md rule 11 asks for a model, OS, build,
+ * CFNetwork and Darwin that describe one real release, and this is the exception: these are the
+ * exact values os-findmy-e was observed to receive {@code searchPartyToken} with, and a corrected
+ * pair is a configuration nobody has seen Apple accept. Changing either later is a new machine to
+ * Apple (a second device-list entry), so it waits for evidence that a consistent pair works.
+ *
  * <p>The serial is this app's own {@code 0PENTAGV} serial, so the device-list entry stays
  * recognisable (rule 11). Apple has not been seen to check serials at all.
  */
