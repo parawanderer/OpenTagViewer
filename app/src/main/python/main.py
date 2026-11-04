@@ -31,6 +31,11 @@ from findmy.reports.twofactor import (
 )
 
 import identity as app_identity
+from findmy.reports import account as _findmy_account
+
+_FINDMY_READS_HSC_409 = hasattr(_findmy_account, "_normalize_2fa_status")
+"""Whether the pinned FindMy.py reads `hsc` 409 as a second factor itself. See
+`_treatHsc409AsSecondFactor`."""
 
 
 class TwoFactorMethods(Enum):
@@ -792,9 +797,18 @@ def _treatHsc409AsSecondFactor(acc: AppleAccount) -> None:
     parawanderer/OpenTagViewer#248; the remedy, setting `au` to `trustedDeviceSecondaryAuth`, is
     the one sacca97/os-findmy-e signed in with.
 
-    Wraps the instance's `_gsa_request`, which `_gsa_authenticate` looks up on the instance. If a
-    later FindMy.py renames it, this says so and changes nothing, and the 2FA bug comes back.
+    **A stopgap until the pin moves.** The fix belongs in FindMy.py's `_gsa_authenticate`, which is
+    where malmeloo/FindMy.py#279 puts it, as `_normalize_2fa_status`; the same change is proposed
+    for parawanderer/FindMy.py. A FindMy.py that has it is left alone here, so moving the pin (rule
+    14) makes this a no-op, and the next change deletes it.
+
+    Until then it wraps the instance's `_gsa_request`, which `_gsa_authenticate` looks up on the
+    instance. If a later FindMy.py renames it, this says so and changes nothing, and the 2FA bug
+    comes back.
     """
+    if _FINDMY_READS_HSC_409:
+        return
+
     inner = getattr(acc, "_asyncacc", None)
     original = getattr(inner, "_gsa_request", None) if inner is not None else None
     if inner is None or original is None:

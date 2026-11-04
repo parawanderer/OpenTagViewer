@@ -152,3 +152,24 @@ class TestWhenTheInternalsMove:
         account = SimpleNamespace(_asyncacc=SimpleNamespace())
         main._treatHsc409AsSecondFactor(account)  # type: ignore[arg-type]
         assert "hsc 409 will not be read as 2FA" in capsys.readouterr().out
+
+
+class TestWhenFindMyReadsTheHsc409Itself:
+    """The pin moving to a FindMy.py with `_normalize_2fa_status` makes the stopgap a no-op."""
+
+    def test_the_account_is_left_alone(
+            self, account: AppleAccount, monkeypatch: pytest.MonkeyPatch) -> None:
+        asked = answersFromGrandSlam(account, {"ec": 0, "hsc": 409})
+        wrapped = account._asyncacc._gsa_request
+        monkeypatch.setattr(main, "_FINDMY_READS_HSC_409", True)
+
+        main._treatHsc409AsSecondFactor(account)
+
+        assert account._asyncacc._gsa_request is wrapped
+        response = asyncio.run(account._asyncacc._gsa_request({"o": "complete"}))
+        assert asked == [{"o": "complete"}]
+        assert "au" not in response["Status"]
+
+    def test_the_pinned_findmy_does_not_yet(self) -> None:
+        """When this fails, the pin has moved: delete `_treatHsc409AsSecondFactor` and this class."""
+        assert not main._FINDMY_READS_HSC_409
