@@ -12,6 +12,7 @@ import com.chaquo.python.android.AndroidPlatform;
 import com.google.android.material.color.DynamicColors;
 
 import dev.wander.android.opentagviewer.anisette.AppleLibraryProbeService;
+import dev.wander.android.opentagviewer.anisette.MacAdiService;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -35,7 +36,8 @@ public class OpenAirTagApplication extends Application {
         // like any other process of the app, and it exists to load one library and possibly die.
         // Starting Python there would unpack Chaquopy's assets from two processes at once, and
         // resuming the background scan would start a second scanner. See AppleLibraryProbeService.
-        if (isTheAppleLibraryProbe()) {
+        // The emulated Mac's process is the same: it exists to run one emulator. See MacAdiService.
+        if (isTheAppleLibraryProbe() || isTheEmulatedMac()) {
             return;
         }
 
@@ -54,6 +56,10 @@ public class OpenAirTagApplication extends Application {
 
     private boolean isTheAppleLibraryProbe() {
         return this.processName().endsWith(AppleLibraryProbeService.PROCESS_SUFFIX);
+    }
+
+    private boolean isTheEmulatedMac() {
+        return this.processName().endsWith(MacAdiService.PROCESS_SUFFIX);
     }
 
     private String processName() {

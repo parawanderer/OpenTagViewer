@@ -46,3 +46,28 @@ What is derived, and where it lives:
 
   Apache-2.0 terms continue to apply to the derived portion above. AirGuard
   ships no NOTICE file of its own, so there is none to propagate here.
+
+--------------------------------------------------------------------------------
+
+Unicorn (https://github.com/unicorn-engine/unicorn), version 2.1.4
+Licensed under the GNU General Public License, version 2
+
+Linked into libmacadi.so, the emulated Mac that signs in to Find My, which the
+APK carries and runs in a process of its own (":macadi"), reached from the rest of
+the app over binder. Nothing else in the APK contains it. Unicorn is fetched from
+source at build time, pinned by SHA-256 in app/src/main/cpp/macadi/MacAdi.cmake.
+
+The APK carries Unicorn's licence files and a notice saying where the
+corresponding source is, under assets/licences/unicorn/. Each release that ships
+libmacadi.so has the exact Unicorn source tarball attached beside the APK.
+
+--------------------------------------------------------------------------------
+
+sacca97/os-findmy-e (https://github.com/sacca97/os-findmy-e)
+Copyright (c) 2026 sacca
+Licensed under the MIT License
+
+What is derived, and where it lives: app/src/main/cpp/macadi/{macho,vm,core_adi}.*
+are a C++ port of its native/adi-core, and the provisioning requests and machine
+identity in anisette/MacProvisioning.java and anisette/MacIdentity.java follow its
+tools/machoadi. The full licence text is in app/src/main/cpp/macadi/NOTICE.md.

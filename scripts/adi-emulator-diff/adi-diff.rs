@@ -65,6 +65,22 @@ fn run() {
         }
         println!("store {}", store_sha(&mut adi));
     }
+
+    // Optional: a provisioned store, then one header session on it with the clock still frozen.
+    // That is the OTP path, which every call above stops short of. compare-libmacadi.sh passes it
+    // through; macadi_diff.cpp prints the same lines.
+    if let Some(store) = std::env::args().nth(2) {
+        for entry in std::fs::read_dir(&store).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            adi.store_put(&name, &std::fs::read(entry.path()).unwrap());
+        }
+        println!("provisioned begin_session {:?}", adi.begin_session());
+        println!("provisioned is_machine_provisioned {:?}", adi.is_machine_provisioned(-2));
+        println!("provisioned request_otp {:?}", adi.request_otp(-2).map(|o| (o.reply, hex(&o.mid), hex(&o.otp))));
+        println!("provisioned get_routing {:?}", adi.get_routing(-2));
+        println!("provisioned store {}", store_sha(&mut adi));
+    }
     eprintln!("calls {:?}", t.elapsed());
     #[cfg(feature = "icicle")]
     eprintln!("guest instructions {}", adi.vm().icount());

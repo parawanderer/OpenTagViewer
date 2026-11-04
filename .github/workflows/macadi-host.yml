@@ -1,0 +1,80 @@
+name: Emulated Mac (host)
+
+# The emulated Mac's native core, built for the host and run against Apple's real macOS CoreADI.
+#
+# Builds app/src/main/cpp/macadi/ exactly as the app does (MacAdi.cmake is shared), fetches the
+# library with the same range request the app makes, checks both pinned hashes, and has the
+# emulator load it and answer "not provisioned". Nothing is sent to Apple but that one download:
+# provisioning, which would register a machine, is not run.
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/macadi/**"
+      - "app/src/test/macadi-host/**"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/MacCoreAdi*.java"
+      - "scripts/locate_mac_coreadi.py"
+      - "scripts/adi-emulator-diff/**"
+      - ".github/workflows/macadi-host.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/macadi/**"
+      - "app/src/test/macadi-host/**"
+      - "app/src/main/java/dev/wander/android/opentagviewer/anisette/MacCoreAdi*.java"
+      - "scripts/locate_mac_coreadi.py"
+      - "scripts/adi-emulator-diff/**"
+      - ".github/workflows/macadi-host.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch Apple's macOS CoreADI the way the app does, and check both hashes
+        run: python scripts/locate_mac_coreadi.py --remote --out "$RUNNER_TEMP/CoreADI.x86_64"
+
+      - name: Build the native core for the host
+        run: |
+          cmake -S app/src/test/macadi-host -B "$RUNNER_TEMP/macadi" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/macadi" --parallel
+
+      - name: Load the library and ask whether it is provisioned
+        run: |
+          out=$("$RUNNER_TEMP/macadi/macadi_cli" "$RUNNER_TEMP/CoreADI.x86_64" 979a0 /nonexistent \
+                00112233445566778899aabbccddeeff -1 --load-only)
+          echo "$out"
+          test "$out" = '{"loaded": true, "provisioned": false}'
+
+  # The C++ port against the Rust it was ported from, byte for byte: os-findmy-e's adi-core and
+  # app/src/test/macadi-host/macadi_diff.cpp make the same offline CoreADI calls with a frozen
+  # clock and a fixed host UUID, and the outputs must be identical. A difference is a port bug a
+  # successful sign-in would not show. Nothing is sent to Apple beyond the library download.
+  against-adi-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch Apple's macOS CoreADI the way the app does, and check both hashes
+        run: python scripts/locate_mac_coreadi.py --remote --out "$RUNNER_TEMP/CoreADI.x86_64"
+
+      # unicorn-engine-sys runs bindgen, which needs libclang.
+      - name: Install libclang
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libclang-dev
+
+      - name: Compare libmacadi with adi-core
+        run: scripts/adi-emulator-diff/compare-libmacadi.sh "$RUNNER_TEMP/CoreADI.x86_64" "" "$RUNNER_TEMP/diff"

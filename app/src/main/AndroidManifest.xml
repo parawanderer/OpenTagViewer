@@ -143,6 +143,19 @@
             android:exported="false"
             android:process=":adiprobe" />
 
+        <!--
+            The emulated Mac: Apple's macOS CoreADI under Unicorn, in libmacadi.so, which is
+            loaded in this process and never in the app's. A native fault there kills this
+            process rather than the sign-in screen (AGENTS.md rule 4), and Unicorn, which is
+            GPL-2.0, stays a separate program from the rest of the APK. See MacAdiService.
+
+            Not exported: only the app binds it.
+        -->
+        <service
+            android:name=".anisette.MacAdiService"
+            android:exported="false"
+            android:process=":macadi" />
+
         <!-- Reached only when the app cannot name what went wrong - see the class doc. -->
         <activity
             android:name=".ui.error.ErrorReportActivity"
