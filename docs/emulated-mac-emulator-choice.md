@@ -68,13 +68,35 @@ the hash of every file the library wrote.
   would have to carry them or a precompiled form.
 - **#274's C++ port is a third implementation.** This compares os-findmy-e's Rust under two
   emulators; it says nothing about whether `app/src/main/cpp/macadi/` matches either. The same
-  driver pointed at `libmacadi.so` would.
+  driver pointed at `libmacadi.so` would, and now does - see below.
+
+## The C++ port against the Rust
+
+`scripts/adi-emulator-diff/compare-libmacadi.sh` replays `adi-diff.rs`'s calls through
+`app/src/test/macadi-host/macadi_diff.cpp`, which drives the port's `CoreAdi` and prints the same
+lines, and diffs that against `adi-core` under Unicorn. `macadi-host.yml` runs it on every change to
+the port.
+
+Result on x86_64 Linux, 2026-11-04, the same CoreADI 4.19: all 20 lines **byte-identical** - every
+return code, and the hash of every file the library wrote. That is with the port on Unicorn 2.1.4
+(`MacAdi.cmake`) and `adi-core` on the `unicorn-engine` crate 2.1.5 (its `Cargo.lock`), so the patch
+release between them makes no difference to these calls either.
+
+**How much that covers, measured rather than assumed.** The diff was checked for teeth by breaking
+the port on purpose. Creating files with one stray byte in `vm.cpp`'s `open` stub turned six `store`
+lines red. Changing every byte `arc4random_buf` returns, or truncating every `write`, changed
+nothing: the offline calls never reach either. So this pins the loader, the dispatcher, the request
+framing and the filesystem paths `Initialize` takes, and says nothing yet about the code a real OTP
+or a real provisioning runs. Both drivers take an optional provisioned store directory for that,
+which runs one header session on that machine with the clock frozen; it has not been run, because no
+provisioned store was available offline.
 
 ## Running it
 
 ```bash
 python scripts/locate_mac_coreadi.py --remote --out /tmp/CoreADI.x86_64   # from #274
-scripts/adi-emulator-diff/run.sh /tmp/CoreADI.x86_64
+scripts/adi-emulator-diff/run.sh /tmp/CoreADI.x86_64                # Unicorn against icicle
+scripts/adi-emulator-diff/compare-libmacadi.sh /tmp/CoreADI.x86_64  # the port against adi-core
 ```
 
 Needs git, cargo and cmake. It clones os-findmy-e, icicle and a sparse Ghidra at pinned commits

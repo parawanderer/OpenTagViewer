@@ -9,3 +9,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp/macadi/MacAdi.cmake)
 
 add_executable(macadi_cli macadi_cli.cpp)
 target_link_libraries(macadi_cli PRIVATE macadi_core)
+
+# scripts/adi-emulator-diff/compare-libmacadi.sh: this port against os-findmy-e's adi-core.
+add_executable(macadi_diff macadi_diff.cpp)
+target_link_libraries(macadi_diff PRIVATE macadi_core)

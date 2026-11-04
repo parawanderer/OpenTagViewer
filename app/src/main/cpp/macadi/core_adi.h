@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -55,12 +56,40 @@ public:
     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> sync(int64_t dsId,
                                                                const std::vector<uint8_t> &sim);
 
-private:
+    // ---- The raw calls, one dispatcher call each, for scripts/adi-emulator-diff/ ----------------
+    //
+    // These are the operations os-findmy-e's adi-core exposes, with the same inputs and the same
+    // outputs, so its offline driver can be replayed here call for call and the two printed side by
+    // side (app/src/test/macadi-host/macadi_diff.cpp). The high-level calls above are built from
+    // them, so the comparison covers the code the app runs.
     struct Reply {
         int32_t rc;   // the dispatcher's status
         int32_t ret;  // the operation's own, negative on failure
     };
+    struct Otp {
+        Reply reply;
+        std::vector<uint8_t> mid;
+        std::vector<uint8_t> otp;
+    };
+    struct ProvisioningStart {
+        Reply reply;
+        std::vector<uint8_t> cpim;
+        uint32_t session;
+    };
 
+    // adi-core's begin_session: back to the post-load state, then Initialize. Unlike the app's
+    // beginSession it leaves adi.pb in place, as adi-core does - see beginSession for why the app
+    // removes it.
+    Reply rawBeginSession();
+    Reply isMachineProvisioned(int64_t dsId);
+    Otp requestOtp(int64_t dsId);
+    std::pair<Reply, uint64_t> getRouting(int64_t dsId);
+    ProvisioningStart provisioningStart(int64_t dsId, const std::vector<uint8_t> &spim);
+
+    // Every file in the virtual filesystem, by full path, as adi-core's Vm::files().
+    const std::map<std::string, std::vector<uint8_t>> &vmFiles() { return vm_.files(); }
+
+private:
     void beginSession();
     Reply call(uint32_t code, const std::vector<uint8_t> &message);
     uint64_t cell(uint64_t v);
@@ -69,7 +98,6 @@ private:
     static void check(const char *op, Reply r);
 
     Reply initialize();
-    Reply isMachineProvisioned(int64_t dsId);
     Reply storageDispose(uint64_t ptr);
     Reply setRouting(int64_t dsId, uint64_t routing);
 

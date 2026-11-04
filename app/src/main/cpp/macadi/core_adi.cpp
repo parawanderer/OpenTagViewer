@@ -96,8 +96,12 @@ void CoreAdi::beginSession() {
     // headers in the same process would, and sent Apple an empty machine id (ec -80009). So it
     // goes before every session, not only on load.
     vm_.files().erase(std::string(STORE_DIR) + "/" + LEGACY_STORE);
+    rawBeginSession();
+}
+
+CoreAdi::Reply CoreAdi::rawBeginSession() {
     vm_.resetSession();
-    initialize();
+    return initialize();
 }
 
 CoreAdi::Reply CoreAdi::initialize() {
@@ -108,6 +112,40 @@ CoreAdi::Reply CoreAdi::initialize() {
 CoreAdi::Reply CoreAdi::isMachineProvisioned(int64_t dsId) {
     vm_.scratchReset();
     return call(IS_MACHINE_PROVISIONED, dsIdMessage(dsId));
+}
+
+CoreAdi::Otp CoreAdi::requestOtp(int64_t dsId) {
+    vm_.scratchReset();
+    const uint64_t midP = cell(0), midL = cell(0), otpP = cell(0), otpL = cell(0);
+    std::vector<uint8_t> m = dsIdMessage(dsId);
+    for (const uint64_t v : {midP, midL, otpP, otpL}) be64(m, v);
+    const Reply reply = call(REQUEST_OTP, m);
+    Otp out{reply, slice(midP, midL), slice(otpP, otpL)};
+    // The library hands back pointers into its own storage; release them.
+    if (!out.mid.empty() && !out.otp.empty()) storageDispose(vm_.readU64(midP));
+    return out;
+}
+
+std::pair<CoreAdi::Reply, uint64_t> CoreAdi::getRouting(int64_t dsId) {
+    vm_.scratchReset();
+    const uint64_t routingCell = cell(0);
+    std::vector<uint8_t> r = dsIdMessage(dsId);
+    be64(r, routingCell);
+    const Reply reply = call(GET_IDMS_ROUTING, r);
+    return {reply, vm_.readU64(routingCell)};
+}
+
+CoreAdi::ProvisioningStart CoreAdi::provisioningStart(int64_t dsId,
+                                                      const std::vector<uint8_t> &spim) {
+    vm_.scratchReset();
+    const uint64_t spimBuf = input(spim);
+    const uint64_t cpimP = cell(0), cpimL = cell(0), session = cell(0);
+    std::vector<uint8_t> m = dsIdMessage(dsId);
+    be64(m, spimBuf);
+    be32(m, static_cast<uint32_t>(spim.size()));
+    for (const uint64_t v : {cpimP, cpimL, session}) be64(m, v);
+    const Reply reply = call(PROVISIONING_START, m);
+    return {reply, slice(cpimP, cpimL), vm_.readU32(session)};
 }
 
 CoreAdi::Reply CoreAdi::storageDispose(uint64_t ptr) {
@@ -144,23 +182,12 @@ Headers CoreAdi::headers(int64_t dsId) {
     beginSession();
     if (isMachineProvisioned(dsId).ret != 0) throw NotProvisioned();
 
-    vm_.scratchReset();
-    const uint64_t midP = cell(0), midL = cell(0), otpP = cell(0), otpL = cell(0);
-    std::vector<uint8_t> m = dsIdMessage(dsId);
-    for (const uint64_t v : {midP, midL, otpP, otpL}) be64(m, v);
-    const Reply otpReply = call(REQUEST_OTP, m);
-    Headers h{slice(midP, midL), slice(otpP, otpL), 0};
-    // The library hands back pointers into its own storage; release them.
-    if (!h.mid.empty() && !h.otp.empty()) storageDispose(vm_.readU64(midP));
-    check("RequestOTP", otpReply);
+    const Otp otp = requestOtp(dsId);
+    check("RequestOTP", otp.reply);
 
-    vm_.scratchReset();
-    const uint64_t routingCell = cell(0);
-    std::vector<uint8_t> r = dsIdMessage(dsId);
-    be64(r, routingCell);
-    check("GetIDMSRouting", call(GET_IDMS_ROUTING, r));
-    h.routing = vm_.readU64(routingCell);
-    return h;
+    const std::pair<Reply, uint64_t> routing = getRouting(dsId);
+    check("GetIDMSRouting", routing.first);
+    return Headers{otp.mid, otp.otp, routing.second};
 }
 
 std::pair<std::vector<uint8_t>, uint32_t> CoreAdi::provisioningBegin(
@@ -168,15 +195,9 @@ std::pair<std::vector<uint8_t>, uint32_t> CoreAdi::provisioningBegin(
     beginSession();
     if (isMachineProvisioned(dsId).ret == 0) throw AlreadyProvisioned();
 
-    vm_.scratchReset();
-    const uint64_t spimBuf = input(spim);
-    const uint64_t cpimP = cell(0), cpimL = cell(0), session = cell(0);
-    std::vector<uint8_t> m = dsIdMessage(dsId);
-    be64(m, spimBuf);
-    be32(m, static_cast<uint32_t>(spim.size()));
-    for (const uint64_t v : {cpimP, cpimL, session}) be64(m, v);
-    check("ProvisioningStart", call(PROVISIONING_START, m));
-    return {slice(cpimP, cpimL), vm_.readU32(session)};
+    const ProvisioningStart started = provisioningStart(dsId, spim);
+    check("ProvisioningStart", started.reply);
+    return {started.cpim, started.session};
 }
 
 void CoreAdi::provisioningFinish(int64_t dsId, uint32_t session, const std::vector<uint8_t> &ptm,

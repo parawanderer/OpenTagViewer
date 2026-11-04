@@ -666,6 +666,20 @@ Given a provisioned store directory and its host UUID instead of `--load-only`, 
 prints one header set. Pass a fixed Unix time as the fifth argument to compare its output byte
 for byte against another implementation; never use a fixed clock for anything sent to Apple.
 
+#### Against os-findmy-e's Rust, byte for byte
+
+```bash
+scripts/adi-emulator-diff/compare-libmacadi.sh /tmp/CoreADI.x86_64 [provisioned store dir]
+```
+
+Builds os-findmy-e's `adi-core` (pinned commit) and this port's `macadi_diff`, has both make the same
+offline CoreADI calls with a frozen clock and a fixed host UUID, and diffs the output; it exits
+non-zero on any difference. Needs git, cargo, cmake and libclang (`unicorn-engine-sys` runs bindgen).
+`macadi-host.yml` runs it on every change to the port. Without a store, the calls stop short of the
+OTP path; a **copy** of a provisioned store (`files/anisette/mac/store/` from an install, through
+`adb shell run-as`) takes both drivers through one header session on that machine as well, still
+offline.
+
 ### Which Python each tree targets
 
 There are three, and they are not the same:
@@ -883,7 +897,8 @@ scripts/adi-emulator-diff/run.sh /tmp/CoreADI.x86_64
 ```
 
 Runs Apple's macOS CoreADI under Unicorn and under icicle with the same inputs and diffs the
-output; it exits non-zero on any difference. Unlike the scripts above it does need the network,
+output; it exits non-zero on any difference. (`compare-libmacadi.sh`, above, uses the same driver
+to compare this repository's C++ port with the Rust it came from.) Unlike the scripts above it does need the network,
 to clone three repositories at pinned commits, but it sends nothing to Apple. Nobody needs to run
 it routinely; it exists for whoever wants to replace Unicorn. Why, what it showed and what it
 does not cover: [docs/emulated-mac-emulator-choice.md](docs/emulated-mac-emulator-choice.md).
@@ -918,7 +933,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
 | `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
-| `macadi-host.yml` | `app/src/main/cpp/macadi/**`, `app/src/test/macadi-host/**`, `MacCoreAdi*.java`, `scripts/locate_mac_coreadi.py` | Fetches Apple's macOS CoreADI with the app's own range request, checks both pinned hashes, builds the emulated Mac's native core for the host and has it load the library. Nothing sent to Apple beyond the download. A few minutes, mostly building Unicorn |
+| `macadi-host.yml` | `app/src/main/cpp/macadi/**`, `app/src/test/macadi-host/**`, `MacCoreAdi*.java`, `scripts/locate_mac_coreadi.py`, `scripts/adi-emulator-diff/**` | Fetches Apple's macOS CoreADI with the app's own range request, checks both pinned hashes, builds the emulated Mac's native core for the host and has it load the library; a second job runs `compare-libmacadi.sh`, the port against os-findmy-e's `adi-core` byte for byte. Nothing sent to Apple beyond the download. A few minutes each, mostly building Unicorn |
 | `waiting-on-reporter.yml` | a comment on an issue, daily | Removes the `waiting on reporter` label when the issue's author replies. Daily, comments once on any labelled issue quiet for 14 days, and again only after somebody else has commented. Never closes anything. Both triggers run the copy on `main`, so a PR cannot exercise it; `workflow_dispatch` defaults to a dry run that prints what it would post |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
