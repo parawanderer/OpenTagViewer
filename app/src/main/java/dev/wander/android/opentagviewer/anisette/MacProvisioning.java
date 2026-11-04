@@ -1,6 +1,5 @@
 package dev.wander.android.opentagviewer.anisette;
 
-import android.util.Base64;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -38,7 +37,7 @@ import java.util.TimeZone;
 final class MacProvisioning {
     private static final String TAG = "MacProvisioning";
 
-    private static final String URL_BAG = "https://gsa.apple.com/grandslam/GsService2/lookup";
+    static final String URL_BAG = "https://gsa.apple.com/grandslam/GsService2/lookup";
 
     private static final String START_REQUEST =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -58,11 +57,31 @@ final class MacProvisioning {
             + "</dict></plist>";
 
     private final MacIdentity identity;
-    private final MacCoreAdi adi;
+    private final MacAdi adi;
+    private final String urlBag;
+    private final Base64Codec base64;
+    private final PlistParser plists;
 
-    MacProvisioning(MacIdentity identity, MacCoreAdi adi) {
+    /**
+     * Reads a plist document. {@link SimplePlist#parse} in the app; on the JVM, where
+     * {@code android.util.Xml} is a stub, the tests supply one.
+     */
+    interface PlistParser {
+        Object parse(String xml) throws Exception;
+    }
+
+    MacProvisioning(MacIdentity identity, MacAdi adi) {
+        this(identity, adi, URL_BAG, Base64Codec.ANDROID, SimplePlist::parse);
+    }
+
+    /** @param urlBag where to ask for the provisioning endpoints; a local fake in the JVM tests */
+    MacProvisioning(MacIdentity identity, MacAdi adi, String urlBag, Base64Codec base64,
+                    PlistParser plists) {
         this.identity = identity;
         this.adi = adi;
+        this.urlBag = urlBag;
+        this.base64 = base64;
+        this.plists = plists;
     }
 
     /** @return the routing number Apple assigned the machine */
@@ -81,14 +100,14 @@ final class MacProvisioning {
         final int[] session = new int[1];
         final byte[] cpim;
         try {
-            cpim = this.adi.provisioningBegin(MacCoreAdi.ANONYMOUS_DS_ID, spim, session);
+            cpim = this.adi.provisioningBegin(MacAdi.ANONYMOUS_DS_ID, spim, session);
         } catch (final IllegalStateException e) {
             throw new AdiProvisioning.ProvisioningException(
                     "the emulated Mac could not start provisioning: " + e.getMessage(), e);
         }
 
         final Object finished = parse(request(finishUrl, String.format(
-                FINISH_REQUEST, Base64.encodeToString(cpim, Base64.NO_WRAP))),
+                FINISH_REQUEST, this.base64.encode(cpim))),
                 "midFinishProvisioning");
         final byte[] persistentToken = decode(finished, "ptm");
         final byte[] trustKey = decode(finished, "tk");
@@ -104,7 +123,7 @@ final class MacProvisioning {
         }
 
         try {
-            this.adi.provisioningFinish(MacCoreAdi.ANONYMOUS_DS_ID, session[0], persistentToken,
+            this.adi.provisioningFinish(MacAdi.ANONYMOUS_DS_ID, session[0], persistentToken,
                     trustKey, routing);
         } catch (final IllegalStateException e) {
             throw new AdiProvisioning.ProvisioningException(
@@ -115,7 +134,7 @@ final class MacProvisioning {
     }
 
     private Map<String, String> loadUrlBag() throws AdiProvisioning.ProvisioningException {
-        final Object plist = parse(request(URL_BAG, null), "the URL bag");
+        final Object plist = parse(request(this.urlBag, null), "the URL bag");
         if (!(plist instanceof Map)) {
             throw new AdiProvisioning.ProvisioningException("the URL bag is not a dictionary");
         }
@@ -132,23 +151,23 @@ final class MacProvisioning {
         return out;
     }
 
-    private static Object parse(String body, String what)
+    private Object parse(String body, String what)
             throws AdiProvisioning.ProvisioningException {
         try {
-            return SimplePlist.parse(body);
+            return this.plists.parse(body);
         } catch (final Exception e) {
             throw new AdiProvisioning.ProvisioningException("could not read " + what, e);
         }
     }
 
-    private static byte[] decode(Object plist, String key)
+    private byte[] decode(Object plist, String key)
             throws AdiProvisioning.ProvisioningException {
         final String value = SimplePlist.string(plist, "Response", key);
         if (value == null) {
             throw new AdiProvisioning.ProvisioningException("Apple's response has no Response/"
                     + key + " - the request was refused, or the protocol has changed");
         }
-        return Base64.decode(value, Base64.DEFAULT);
+        return this.base64.decode(value);
     }
 
     private String request(String url, String body) throws AdiProvisioning.ProvisioningException {

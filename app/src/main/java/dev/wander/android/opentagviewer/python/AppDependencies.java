@@ -12,6 +12,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import dev.wander.android.opentagviewer.anisette.AnisetteForSession;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.EmulatedMacAnisette;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
@@ -56,11 +57,13 @@ public final class AppDependencies {
      * because the real one needs a Context and the current settings, and neither exists when
      * this class is loaded.
      *
-     * <p><b>The emulated Mac, not {@link LocalAnisette}.</b> The Android libraries that one runs
-     * mint Android machines, which Apple no longer lets reach Find My - see
-     * {@link EmulatedMacAnisette}.
+     * <p><b>The emulated Mac for a fresh sign-in, and the machine that signed it in for a
+     * restore.</b> The Android libraries {@link LocalAnisette} runs mint Android machines, which
+     * Apple no longer lets sign in to Find My, so new sign-ins get {@link EmulatedMacAnisette}.
+     * A session {@link LocalAnisette} established keeps it and is never moved onto a new machine:
+     * see {@link AnisetteForSession}.
      */
-    private static AnisetteFactory anisetteFactory = EmulatedMacAnisette::new;
+    private static AnisetteFactory anisetteFactory = AnisetteForSession::create;
 
     /** Builds the Anisette source for a screen, given where it is running and who is signed in. */
     public interface AnisetteFactory {
@@ -298,7 +301,7 @@ public final class AppDependencies {
     @VisibleForTesting
     public static void reset() {
         authService = new PythonAppleAuthService();
-        anisetteFactory = EmulatedMacAnisette::new;
+        anisetteFactory = AnisetteForSession::create;
         serverTesterFactory = AnisetteServerTesterService::new;
         hardwareDescriber = new ChaquopyHardwareDescriber();
         accessoryMacResolver = new ChaquopyAccessoryMacResolver();

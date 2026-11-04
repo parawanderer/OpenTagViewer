@@ -1,6 +1,5 @@
 package dev.wander.android.opentagviewer.anisette;
 
-import java.io.Closeable;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,9 +20,15 @@ import java.util.Map;
  * {@link #provisioningBegin} and {@link #provisioningFinish} share one session and nothing may run
  * between them.
  *
- * <p><b>Not thread-safe.</b> Callers hold their own lock; {@link EmulatedMacAnisette} does.
+ * <p><b>Only ever loaded in the {@code :macadi} process</b>, by {@link MacAdiService}. Touching this
+ * class loads {@code libmacadi.so}, which is Unicorn (GPL-2.0) and Apple's code under emulation, and
+ * neither may share a process with the app: a native crash there would take the app with it
+ * (AGENTS.md rule 4), and the GPL code would share a program with the Apache-2.0 libraries and the
+ * map SDKs. The app reaches it through {@link RemoteMacAdi}.
+ *
+ * <p><b>Not thread-safe.</b> Callers hold their own lock; {@link MacAdiService} does.
  */
-public final class MacCoreAdi implements Closeable {
+final class MacCoreAdi implements MacAdi {
 
     /** The one build this knows how to drive: iTunes 12.8.3, CoreADI 4.19, x86_64 slice. */
     public static final String BUILD_SHA256 =
@@ -36,32 +41,6 @@ public final class MacCoreAdi implements Closeable {
      * and a different build at this offset would run arbitrary code as if it were the dispatcher.
      */
     static final long DISPATCH_OFFSET = 0x979A0L;
-
-    /** Apple's "no account" pseudo-DSID, which machine-level Anisette is always asked for. */
-    public static final long ANONYMOUS_DS_ID = -2L;
-
-    /** The library's own answer that this machine has never been provisioned. */
-    public static final class NotProvisionedException extends IllegalStateException {
-        public NotProvisionedException(String message) {
-            super(message);
-        }
-    }
-
-    /** One Anisette header set. */
-    public static final class Headers {
-        /** {@code X-Apple-I-MD-M}, raw. */
-        public final byte[] machineId;
-        /** {@code X-Apple-I-MD}, raw. */
-        public final byte[] oneTimePassword;
-        /** {@code X-Apple-I-MD-RINFO}. */
-        public final long routing;
-
-        Headers(byte[] machineId, byte[] oneTimePassword, long routing) {
-            this.machineId = machineId;
-            this.oneTimePassword = oneTimePassword;
-            this.routing = routing;
-        }
-    }
 
     static {
         System.loadLibrary("macadi");
@@ -80,6 +59,7 @@ public final class MacCoreAdi implements Closeable {
     }
 
     /** What the library hashes into the machine id. Fixed per machine; see {@link MacIdentity}. */
+    @Override
     public void setHostUuid(byte[] uuid) {
         nativeSetHostUuid(live(), uuid);
     }
@@ -89,11 +69,12 @@ public final class MacCoreAdi implements Closeable {
         nativeSetFrozenTime(live(), unixSeconds);
     }
 
+    @Override
     public void storePut(String name, byte[] contents) {
         nativeStorePut(live(), name, contents);
     }
 
-    /** The library's provisioning state, by file name. Persist it after every call. */
+    @Override
     public Map<String, byte[]> storeFiles() {
         final Object[] flat = nativeStoreFiles(live());
         final Map<String, byte[]> out = new LinkedHashMap<>();
@@ -103,22 +84,19 @@ public final class MacCoreAdi implements Closeable {
         return out;
     }
 
-    /** @throws NotProvisionedException if this machine has never been provisioned */
+    @Override
     public Headers headers(long dsId) {
         final long[] routing = new long[1];
         final byte[][] both = nativeHeaders(live(), dsId, routing);
         return new Headers(both[0], both[1], routing[0]);
     }
 
-    /**
-     * Turn Apple's {@code spim} into the {@code cpim} to send back.
-     *
-     * @param sessionOut receives the session id {@link #provisioningFinish} needs
-     */
+    @Override
     public byte[] provisioningBegin(long dsId, byte[] spim, int[] sessionOut) {
         return nativeProvisioningBegin(live(), dsId, spim, sessionOut);
     }
 
+    @Override
     public void provisioningFinish(long dsId, int session, byte[] persistentTokenMetadata,
                                    byte[] trustKey, long routing) {
         nativeProvisioningFinish(live(), dsId, session, persistentTokenMetadata, trustKey, routing);

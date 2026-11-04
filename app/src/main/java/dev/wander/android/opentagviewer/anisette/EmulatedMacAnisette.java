@@ -2,9 +2,9 @@ package dev.wander.android.opentagviewer.anisette;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Base64;
 import android.util.Log;
 
+import dev.wander.android.opentagviewer.BuildConfig;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 
 import org.json.JSONException;
@@ -19,11 +19,17 @@ import java.util.Map;
 /**
  * Anisette from an emulated Mac on this device: Apple's macOS CoreADI under an x86_64 emulator.
  *
- * <p><b>Why this replaced {@link LocalAnisette}.</b> That one runs Apple's Android libraries,
- * which mint Android machines. Since 2026-10-12 Apple issues the Find My token only to a sign-in
- * made with a Mac- or iPhone-minted machine, and from about 2026-10-20 its edge refuses any client
- * that admits to being Android - so an Android-minted machine can no longer sign in to Find My by
- * any combination of headers. A Mac-minted one can, and this mints them. See {@link MacCoreAdi}.
+ * <p><b>Why fresh sign-ins use this rather than {@link LocalAnisette}.</b> That one runs Apple's
+ * Android libraries, which mint Android machines. Since 2026-10-12 Apple issues the Find My token
+ * only to a sign-in made with a Mac- or iPhone-minted machine, and from about 2026-10-20 its edge
+ * refuses any client that admits to being Android - so an Android-minted machine can no longer
+ * sign in to Find My by any combination of headers. A Mac-minted one can, and this mints them.
+ *
+ * <p><b>Sessions {@link LocalAnisette} signed in stay on it.</b> {@link AnisetteForSession} decides,
+ * from {@link SessionProvenance}. This class is only handed a restored session that it signed in
+ * itself, as {@link Purpose#RESTORE}, and then it <b>never provisions</b>: a Mac that has lost its
+ * provisioning cannot be the machine that obtained the session's token, so registering a new one
+ * would only add a device-list entry to a session that is going to fail anyway.
  *
  * <p><b>The machine must be the same one for the life of the session</b>, and not only at
  * sign-in: the Find My token only works alongside Anisette from the machine that obtained it
@@ -31,89 +37,221 @@ import java.util.Map;
  * stored under {@code files/anisette/mac/}, and the same identity answers before and after it is
  * ready.
  *
- * <p><b>Once per process.</b> The emulator, the library and the identity are static, for the same
- * reason {@link LocalAnisette}'s are: {@code AppDependencies} builds a new source for every caller,
- * and two emulators over one store would each think they owned it.
+ * <p><b>The emulator runs in another process.</b> {@link RemoteMacAdi} reaches
+ * {@link MacAdiService} in {@code :macadi}; nothing here loads native code. A native fault there
+ * reaches this class as {@link MacAdi.EmulatorDiedException}, is recorded per app version and
+ * library build, and from then on this answers "unavailable" without trying - the same contract
+ * {@link TryItElsewhereFirst} keeps for {@link LocalAnisette}.
+ *
+ * <p><b>Once per process.</b> The emulator connection and the identity are {@link Shared}, for the
+ * same reason {@link LocalAnisette}'s are: {@code AppDependencies} builds a new source for every
+ * caller, and two emulators over one store would each think they owned it.
+ *
+ * <p>Every collaborator can be replaced, so the state machine below is tested on the JVM
+ * (AGENTS.md rule 13) - see {@code EmulatedMacAnisetteTest}.
  */
 public final class EmulatedMacAnisette implements AnisetteSource {
     private static final String TAG = "EmulatedMacAnisette";
 
-    private static final String PREFERENCES = "anisette-emulated-mac";
-    private static final String KEY_SESSION_WAS_LOCAL = "sessionEstablishedLocally";
+    /** Why this was asked for. See {@link AnisetteForSession}. */
+    public enum Purpose {
+        /** Nobody is signed in: may create and provision a Mac. */
+        SIGN_IN,
+        /** Restoring a session this Mac signed in: never creates or provisions anything. */
+        RESTORE
+    }
+
+    /**
+     * In {@link LocalAnisette#PREFERENCES}, beside its own crash records: the attempt (app version,
+     * library build) whose emulator process died during a call.
+     */
+    static final String KEY_EMULATOR_DIED = "emulatedMacDied";
+
+    /** What {@link #unavailableReason()} says once the emulator has died on this device. */
+    public static final String CRASHES_HERE_REASON =
+            "The emulated Mac crashed its process on this device, so a remote Anisette server is"
+                    + " used instead";
 
     /** How long one generated set is reused. See {@code LocalAnisette.CACHE_FOR_MS}. */
     private static final long CACHE_FOR_MS = 5_000;
 
-    /** Guards everything static below, and every call into the emulator. */
-    private static final Object LOCK = new Object();
-    private static MacCoreAdi adi;
-    private static MacIdentity identity;
-    private static Map<String, String> cached;
-    private static long cachedAt;
-
-    private final Context context;
-    private final UserSettings settings;
-    private final boolean hasExistingSession;
-    private volatile String unavailableReason;
-
-    public EmulatedMacAnisette(Context context, UserSettings settings, boolean hasExistingSession) {
-        this.context = context.getApplicationContext();
-        this.settings = settings;
-        this.hasExistingSession = hasExistingSession;
+    /** Gets CoreADI onto disk, checked against its pinned hash, and says where. */
+    interface Library {
+        File ensure() throws Exception;
     }
 
-    private File directory() {
-        return new File(this.context.getFilesDir(), "anisette/mac");
+    /** Registers a machine with Apple and returns the routing number Apple assigned it. */
+    interface Provisioner {
+        long provision(MacIdentity identity, MacAdi adi) throws Exception;
+    }
+
+    /** Everything that is one per process. Guarded by {@link #lock}. */
+    static final class Shared {
+        final Object lock = new Object();
+        MacAdi adi;
+        MacIdentity identity;
+        Map<String, String> cached;
+        long cachedAt;
+    }
+
+    private static final Shared SHARED = new Shared();
+
+    private final File directory;
+    private final UserSettings settings;
+    private final Purpose purpose;
+    private final SessionProvenance provenance;
+    private final MacAdi.Opener opener;
+    private final Library library;
+    private final Provisioner provisioner;
+    private final NativeLoadGuard.Store deaths;
+    private final String attempt;
+    private final Base64Codec base64;
+    private final Shared shared;
+    private volatile String unavailableReason;
+
+    public EmulatedMacAnisette(Context context, UserSettings settings, Purpose purpose) {
+        this(directoryFor(context.getApplicationContext()), settings, purpose,
+                SessionProvenance.of(context),
+                RemoteMacAdi.opener(context),
+                libraryIn(directoryFor(context.getApplicationContext())),
+                (identity, adi) -> new MacProvisioning(identity, adi).provision(),
+                deathStore(context.getApplicationContext()),
+                NativeLoadGuard.attemptFor(BuildConfig.VERSION_CODE, "macadi",
+                        MacCoreAdi.BUILD_SHA256),
+                Base64Codec.ANDROID,
+                SHARED);
+    }
+
+    EmulatedMacAnisette(File directory, UserSettings settings, Purpose purpose,
+                        SessionProvenance provenance, MacAdi.Opener opener, Library library,
+                        Provisioner provisioner, NativeLoadGuard.Store deaths, String attempt,
+                        Base64Codec base64, Shared shared) {
+        this.directory = directory;
+        this.settings = settings;
+        this.purpose = purpose;
+        this.provenance = provenance;
+        this.opener = opener;
+        this.library = library;
+        this.provisioner = provisioner;
+        this.deaths = deaths;
+        this.attempt = attempt;
+        this.base64 = base64;
+        this.shared = shared;
+    }
+
+    private static File directoryFor(Context context) {
+        return new File(context.getFilesDir(), "anisette/mac");
+    }
+
+    private static Library libraryIn(File directory) {
+        return () -> {
+            final File target = new File(directory, "CoreADI-4.19-x86_64");
+            MacCoreAdiFetcher.ensure(target);
+            return target;
+        };
+    }
+
+    /** {@code commit()}, never {@code apply()}: see {@link NativeLoadGuard.Store}. */
+    private static NativeLoadGuard.Store deathStore(Context context) {
+        final SharedPreferences preferences =
+                context.getSharedPreferences(LocalAnisette.PREFERENCES, Context.MODE_PRIVATE);
+        return new NativeLoadGuard.Store() {
+            @Override
+            public String get() {
+                return preferences.getString(KEY_EMULATOR_DIED, null);
+            }
+
+            @Override
+            public void set(String value) {
+                if (!preferences.edit().putString(KEY_EMULATOR_DIED, value).commit()) {
+                    Log.w(TAG, "could not record that the emulated Mac crashed");
+                }
+            }
+
+            @Override
+            public void clear() {
+                preferences.edit().remove(KEY_EMULATOR_DIED).commit();
+            }
+        };
     }
 
     private File storeDirectory() {
-        return new File(directory(), "store");
+        return new File(this.directory, "store");
     }
 
     @Override
     public boolean ensureReady() {
-        synchronized (LOCK) {
-            if (adi != null) {
-                return true;
+        synchronized (this.shared.lock) {
+            if (this.shared.adi != null) {
+                if (!this.shared.adi.isGone()) {
+                    return true;
+                }
+                // Gone between calls, which is not a fault: open a new one from the store on disk.
+                this.shared.adi = null;
+                this.shared.cached = null;
             }
-            if (!this.settings.usesLocalAnisette(this.hasExistingSession)) {
+            if (!this.settings.usesLocalAnisette(this.purpose == Purpose.RESTORE)) {
                 this.unavailableReason = "a remote Anisette server is selected in Settings";
                 return false;
             }
+            if (this.purpose == Purpose.RESTORE && !this.provenance.establishedLocally()) {
+                // Signed in through a server when the emulated Mac was unavailable. That server's
+                // machine holds the session now, and moving it onto this one is a different
+                // machine to Apple.
+                this.unavailableReason = "this session was signed in through a remote Anisette"
+                        + " server, and stays on it";
+                return false;
+            }
+            if (emulatorDiedHereBefore()) {
+                this.unavailableReason = CRASHES_HERE_REASON;
+                return false;
+            }
 
-            MacCoreAdi opened = null;
+            MacAdi opened = null;
             try {
-                final byte[] library = MacCoreAdiFetcher.ensure(
-                        new File(directory(), "CoreADI-4.19-x86_64"));
+                final File image = this.library.ensure();
 
-                MacIdentity current = loadOrCreateIdentity();
-                opened = open(library, current);
+                MacIdentity current = this.purpose == Purpose.RESTORE
+                        ? storedIdentity() : loadOrCreateIdentity();
+                opened = open(image, current);
 
                 if (current.provisionedAtMillis() == 0) {
+                    if (this.purpose == Purpose.RESTORE) {
+                        throw new IllegalStateException("the emulated Mac that signed this session"
+                                + " in was never provisioned; sign in again to register it");
+                    }
                     current = provision(opened, current);
                 } else if (!isProvisioned(opened)) {
+                    if (this.purpose == Purpose.RESTORE) {
+                        throw new IllegalStateException("the emulated Mac has lost its provisioning,"
+                                + " so it is no longer the machine this session was signed in with;"
+                                + " sign in again");
+                    }
                     // The identity says provisioned but the store has lost it. Apple will not
                     // provision the same device id twice (HTTP 433), so this is a new machine:
                     // a second device-list entry, which is better than never signing in again.
                     Log.w(TAG, "the emulated Mac's store no longer holds its provisioning;"
                             + " registering a new machine");
                     opened.close();
+                    opened = null;
                     current = MacIdentity.generate();
-                    current.save(directory());
+                    current.save(this.directory);
                     clearStore();
-                    opened = open(library, current);
+                    opened = open(image, current);
                     current = provision(opened, current);
                 }
 
-                adi = opened;
-                identity = current;
-                cached = null;
+                this.shared.adi = opened;
+                this.shared.identity = current;
+                this.shared.cached = null;
                 this.unavailableReason = null;
                 Log.i(TAG, "ready as an emulated Mac, device " + current.deviceId());
                 return true;
+            } catch (final MacAdi.EmulatorDiedException e) {
+                recordEmulatorDeath(e);
+                this.unavailableReason = CRASHES_HERE_REASON;
+                return false;
             } catch (final Exception | LinkageError e) {
-                // LinkageError too: an UnsatisfiedLinkError loading libmacadi.so is the likeliest
-                // failure on a device nobody has tried, and it must fall back, not crash sign-in.
                 if (opened != null) {
                     opened.close();
                 }
@@ -125,25 +263,56 @@ public final class EmulatedMacAnisette implements AnisetteSource {
         }
     }
 
-    private MacCoreAdi open(byte[] library, MacIdentity current) throws IOException {
-        final MacCoreAdi opened = new MacCoreAdi(library);
-        opened.setHostUuid(current.hostUuidBytes());
-        final File[] stored = storeDirectory().listFiles();
-        if (stored != null) {
-            for (final File file : stored) {
-                if (file.isFile() && !file.getName().endsWith(".partial")) {
-                    opened.storePut(file.getName(), MacCoreAdiFetcher.readFile(file));
-                }
-            }
+    /**
+     * Whether this app version's emulator has already died during a call on this device. A record
+     * from another version or library build is stale, and cleared, so an update tries again.
+     */
+    private boolean emulatorDiedHereBefore() {
+        final String recorded = this.deaths.get();
+        if (recorded == null) {
+            return false;
         }
-        return opened;
+        if (recorded.equals(this.attempt)) {
+            return true;
+        }
+        this.deaths.clear();
+        return false;
     }
 
-    private static boolean isProvisioned(MacCoreAdi opened) {
+    private void recordEmulatorDeath(MacAdi.EmulatorDiedException e) {
+        Log.w(TAG, "the emulated Mac's process died during a call; using a remote Anisette server"
+                + " until the app or the library changes", e);
+        this.deaths.set(this.attempt);
+        this.shared.adi = null;
+        this.shared.cached = null;
+    }
+
+    private MacAdi open(File image, MacIdentity current) throws IOException {
+        final MacAdi opened = this.opener.open(image);
         try {
-            opened.headers(MacCoreAdi.ANONYMOUS_DS_ID);
+            opened.setHostUuid(current.hostUuidBytes());
+            final File[] stored = storeDirectory().listFiles();
+            if (stored != null) {
+                for (final File file : stored) {
+                    if (file.isFile() && !file.getName().endsWith(".partial")) {
+                        opened.storePut(file.getName(), MacCoreAdiFetcher.readFile(file));
+                    }
+                }
+            }
+            return opened;
+        } catch (final IOException | RuntimeException e) {
+            if (!(e instanceof MacAdi.EmulatorDiedException)) {
+                opened.close();
+            }
+            throw e;
+        }
+    }
+
+    private static boolean isProvisioned(MacAdi opened) {
+        try {
+            opened.headers(MacAdi.ANONYMOUS_DS_ID);
             return true;
-        } catch (final MacCoreAdi.NotProvisionedException e) {
+        } catch (final MacAdi.NotProvisionedException e) {
             return false;
         }
     }
@@ -156,15 +325,15 @@ public final class EmulatedMacAnisette implements AnisetteSource {
      * library refuses to provision again, and the failure is visible - rather than the other way
      * round, an identity marked provisioned over an empty store, which costs a second device.
      */
-    private MacIdentity provision(MacCoreAdi opened, MacIdentity current) throws Exception {
-        final long routing = new MacProvisioning(current, opened).provision();
+    private MacIdentity provision(MacAdi opened, MacIdentity current) throws Exception {
+        final long routing = this.provisioner.provision(current, opened);
         saveStore(opened);
         final MacIdentity done = current.provisioned(routing, System.currentTimeMillis());
-        done.save(directory());
+        done.save(this.directory);
         return done;
     }
 
-    private void saveStore(MacCoreAdi opened) throws IOException {
+    private void saveStore(MacAdi opened) throws IOException {
         final File dir = storeDirectory();
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new IOException("could not create " + dir);
@@ -198,21 +367,36 @@ public final class EmulatedMacAnisette implements AnisetteSource {
         }
     }
 
+    /** The stored identity, for a restore, which must not create one. */
+    private MacIdentity storedIdentity() throws IOException {
+        synchronized (this.shared.lock) {
+            if (this.shared.identity != null) {
+                return this.shared.identity;
+            }
+            final MacIdentity stored = MacIdentity.load(this.directory);
+            if (stored == null) {
+                throw new IllegalStateException("this install has no emulated Mac, so it cannot be"
+                        + " the machine this session was signed in with; sign in again");
+            }
+            return stored;
+        }
+    }
+
     /**
      * The identity, read or - on a fresh install - created and saved. Never provisions: that
      * needs the library, and this has to answer without it.
      */
     private MacIdentity loadOrCreateIdentity() throws IOException {
-        synchronized (LOCK) {
-            if (identity != null) {
-                return identity;
+        synchronized (this.shared.lock) {
+            if (this.shared.identity != null) {
+                return this.shared.identity;
             }
-            final MacIdentity stored = MacIdentity.load(directory());
+            final MacIdentity stored = MacIdentity.load(this.directory);
             if (stored != null) {
                 return stored;
             }
             final MacIdentity fresh = MacIdentity.generate();
-            fresh.save(directory());
+            fresh.save(this.directory);
             Log.i(TAG, "generated a new emulated Mac identity - this must now be kept");
             return fresh;
         }
@@ -260,43 +444,50 @@ public final class EmulatedMacAnisette implements AnisetteSource {
         if (!ensureReady()) {
             return "";
         }
-        synchronized (LOCK) {
+        synchronized (this.shared.lock) {
             final long now = System.currentTimeMillis();
-            if (cached == null || now - cachedAt > CACHE_FOR_MS) {
+            if (this.shared.cached == null || now - this.shared.cachedAt > CACHE_FOR_MS) {
                 try {
-                    final MacCoreAdi.Headers generated =
-                            adi.headers(MacCoreAdi.ANONYMOUS_DS_ID);
+                    final MacAdi.Headers generated =
+                            this.shared.adi.headers(MacAdi.ANONYMOUS_DS_ID);
                     // RequestOTP rewrites the store, and a store that goes back in time is a
                     // machine Apple has seen move backwards.
-                    saveStore(adi);
-                    cached = Map.of(
-                            "X-Apple-I-MD-M",
-                            Base64.encodeToString(generated.machineId, Base64.NO_WRAP),
-                            "X-Apple-I-MD",
-                            Base64.encodeToString(generated.oneTimePassword, Base64.NO_WRAP),
+                    saveStore(this.shared.adi);
+                    this.shared.cached = Map.of(
+                            "X-Apple-I-MD-M", this.base64.encode(generated.machineId),
+                            "X-Apple-I-MD", this.base64.encode(generated.oneTimePassword),
                             "X-Apple-I-MD-RINFO", Long.toString(generated.routing));
-                    cachedAt = now;
+                    this.shared.cachedAt = now;
+                } catch (final MacAdi.EmulatorDiedException e) {
+                    recordEmulatorDeath(e);
+                    this.unavailableReason = CRASHES_HERE_REASON;
+                    return "";
                 } catch (final Exception e) {
                     Log.w(TAG, "could not produce Anisette data", e);
                     this.unavailableReason = String.valueOf(e.getMessage());
                     return "";
                 }
             }
-            final String value = cached.get(name);
+            final String value = this.shared.cached.get(name);
             return value == null ? "" : value;
         }
     }
 
+    /**
+     * Recorded in {@link SessionProvenance}, in {@link LocalAnisette}'s file, as a session the
+     * emulated Mac signed in - so the next restore comes back here rather than to the Android
+     * machine, and the Android machine's sessions keep reading as its own.
+     */
     @Override
     public void recordSessionProvenance(boolean establishedLocally) {
-        preferences().edit().putBoolean(KEY_SESSION_WAS_LOCAL, establishedLocally).apply();
+        this.provenance.recordEmulatedMacSession(establishedLocally);
         Log.i(TAG, "session established with " + (establishedLocally ? "the emulated Mac" : "remote")
                 + " Anisette");
     }
 
     @Override
     public boolean wasSessionEstablishedLocally() {
-        return preferences().getBoolean(KEY_SESSION_WAS_LOCAL, false);
+        return this.provenance.establishedLocally();
     }
 
     @Override
@@ -337,15 +528,11 @@ public final class EmulatedMacAnisette implements AnisetteSource {
 
     @Override
     public String describe() {
-        synchronized (LOCK) {
-            if (identity == null) {
+        synchronized (this.shared.lock) {
+            if (this.shared.identity == null) {
                 return "emulated Mac not ready: " + this.unavailableReason;
             }
-            return "ready as an emulated Mac, device " + identity.deviceId();
+            return "ready as an emulated Mac, device " + this.shared.identity.deviceId();
         }
-    }
-
-    private SharedPreferences preferences() {
-        return this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
     }
 }

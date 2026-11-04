@@ -563,8 +563,6 @@ public final class LocalAnisette implements AnisetteSource {
         return this.unavailableReason;
     }
 
-    private static final String KEY_SESSION_WAS_LOCAL = "sessionEstablishedLocally";
-
     /**
      * Record which kind of Anisette established the current session.
      *
@@ -577,14 +575,13 @@ public final class LocalAnisette implements AnisetteSource {
      * you may need to sign in again" and leaving them in a 2FA loop with no explanation.
      *
      * <p>Written on every successful login, not only local ones, so it cannot go stale when
-     * somebody signs in again over a remote server.
+     * somebody signs in again over a remote server. The record is {@link SessionProvenance}, in
+     * this class's preferences under the key it has always had, so a restore can tell this
+     * machine's sessions from the emulated Mac's.
      */
     @Override
     public synchronized void recordSessionProvenance(boolean establishedLocally) {
-        this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(KEY_SESSION_WAS_LOCAL, establishedLocally)
-                .apply();
+        SessionProvenance.of(this.context).recordAndroidSession(establishedLocally);
         Log.i(TAG, "session established with " + (establishedLocally ? "local" : "remote")
                 + " Anisette");
     }
@@ -592,8 +589,7 @@ public final class LocalAnisette implements AnisetteSource {
     /** Whether the stored session was established with local Anisette. */
     @Override
     public synchronized boolean wasSessionEstablishedLocally() {
-        return this.context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .getBoolean(KEY_SESSION_WAS_LOCAL, false);
+        return SessionProvenance.of(this.context).establishedLocally();
     }
 
     /**

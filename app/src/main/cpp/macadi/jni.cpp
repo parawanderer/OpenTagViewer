@@ -18,7 +18,7 @@ namespace {
 
 constexpr const char *STATE_EXCEPTION = "java/lang/IllegalStateException";
 constexpr const char *NOT_PROVISIONED =
-        "dev/wander/android/opentagviewer/anisette/MacCoreAdi$NotProvisionedException";
+        "dev/wander/android/opentagviewer/anisette/MacAdi$NotProvisionedException";
 
 macadi::CoreAdi *adi(jlong handle) { return reinterpret_cast<macadi::CoreAdi *>(handle); }
 
