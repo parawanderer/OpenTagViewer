@@ -95,7 +95,7 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   [docs/emulated-mac-emulator-choice.md](./docs/emulated-mac-emulator-choice.md): a replacement
   is invisible to users **only if it produces the same bytes**, because the emulator is not part
   of the machine identity but its output is. `scripts/adi-emulator-diff/` is the check, and it has
-  not yet been run over the OTP path. The same doc says what the GPL obliges: a notice, and the
+  not yet been run over the OTP path (both drivers take a provisioned store for that). The same doc says what the GPL obliges: a notice, and the
   library kept in its own process.
 - **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
   loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
@@ -713,7 +713,29 @@ So `LocalAnisette`'s Android libraries can no longer reach Find My by any combin
 
 `EmulatedMacAnisette` runs Apple's **macOS** CoreADI - the x86_64 build in iTunes 12.8.3 - under
 Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-findmy-e; see its
-`NOTICE.md`). It is what `AppDependencies` hands out.
+`NOTICE.md`). **A fresh sign-in gets it; a restored session keeps the machine that signed it in.**
+
+- **Never move an existing session onto the emulated Mac.** A session `LocalAnisette` signed in
+  before 2026-10-12 still fetches reports, and its token only works with Anisette from the Android
+  machine that obtained it (#248). Handing it the emulated Mac at restore downloads CoreADI,
+  provisions a new Mac at app start, and sends that Mac's `X-Apple-I-MD-M` beside the account's
+  Android `X-Mme-Device-Id` - a working session made to answer 401. `AnisetteForSession` decides,
+  from `SessionProvenance`: `LocalAnisette` for every session but the emulated Mac's own, and
+  `EmulatedMacAnisette.Purpose.RESTORE` for those, which **never provisions** - a Mac that lost its
+  store is not the machine that holds the token. `RestoringASessionOnTheMachineThatSignedItInTest`
+  pins it.
+- **Provenance has one home**: `sessionEstablishedLocally` in `LocalAnisette.PREFERENCES`, the key
+  every older install already has, plus `sessionMachine = emulatedMac` beside it for the Mac's
+  sessions. A new preferences file reads "nothing recorded" for every upgrader, which silently
+  turned off the machine-change warning in `_preferLocalAnisette`.
+- **`libmacadi.so` is loaded only in `:macadi`.** `MacAdiService` hosts the emulator and the app
+  reaches it over binder through `RemoteMacAdi`; nothing in the app process may touch `MacCoreAdi`,
+  whose static initialiser loads the library. Two reasons: a SIGSEGV from Unicorn or Apple's code
+  is a native crash no `catch` sees (rule 4, #232), and the GPL-2.0 emulator must stay a separate
+  program from the Apache-2.0 libraries and the map SDKs. A death during a call arrives as
+  `MacAdi.EmulatorDiedException`, is recorded per app version and library build, and the Mac is not
+  tried again until one of those changes. `OpenAirTagApplication` returns early in that process,
+  as it does in `:adiprobe`. `TheEmulatedMacInItsOwnProcessTest` checks the boundary for real.
 
 - **The library is fetched from Apple, never shipped.** One HTTP range request: in that exact disk
   image the package payload is stored uncompressed and contiguous, so its offset is a constant.
@@ -737,13 +759,25 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
 - **Never freeze the emulated clock outside a byte-for-byte comparison.** A constant OTP is
   accepted for about a minute and then refused.
 - **Grand Slam now asks for a second factor with `hsc` 409 and no `au`**, which the pinned
-  FindMy.py reads as "no 2FA needed". `main._treatHsc409AsSecondFactor` fills `au` in.
+  FindMy.py reads as "no 2FA needed". The fix belongs in FindMy.py's `_gsa_authenticate`
+  (`_normalize_2fa_status`, as malmeloo/FindMy.py#279 has it). Until the pin reaches a commit with
+  it, `main._treatHsc409AsSecondFactor` fills `au` in by wrapping `_gsa_request`, and it steps aside
+  by itself once FindMy.py has the function. `test_the_pinned_findmy_does_not_yet` fails on the
+  pin move, which is the cue to delete the wrapper.
 - **The APK carries GPL-2.0 code** (Unicorn). Keep it in `libmacadi.so`, not in
-  `libopentagviewer.so`.
+  `libopentagviewer.so`, and keep its obligations met: `assets/licences/unicorn/` carries the
+  licence files and a notice naming the exact source (`UnicornNoticeTest` keeps it in step with
+  `MacAdi.cmake`), and `build-release.yml` attaches that source tarball to every release.
+- **The C++ port is checked against os-findmy-e's Rust byte for byte**, offline:
+  `scripts/adi-emulator-diff/compare-libmacadi.sh`, in `macadi-host.yml`. Change `vm.cpp`,
+  `core_adi.cpp` or `macho.cpp` and that job is what says whether the port still matches.
 
-The emulator suite cannot cover any of this - it swaps the Anisette source for a fake. What does is
-`macadi-host.yml` (the library loads in the ported emulator), the JVM tests on the fetcher, the
-Python tests in `test_emulated_mac.py`, and a real sign-in on a phone.
+The emulator suite's sign-in tests cannot cover any of this - they swap the Anisette source for a
+fake. What does: the JVM tests (`EmulatedMacAnisetteTest`, `MacIdentityTest`,
+`MacProvisioningTest` against `FakeGrandSlam`, `RestoringASessionOnTheMachineThatSignedItInTest`,
+the fetcher's), `macadi-host.yml` (the library loads in the ported emulator, and matches adi-core),
+`TheEmulatedMacInItsOwnProcessTest` on the device, the Python tests in `test_emulated_mac.py`, and a
+real sign-in on a phone.
 
 ---
 
