@@ -156,11 +156,28 @@ jobs:
       # here, and fails with 403 "Resource not accessible by integration" after the APK has
       # already been built and signed. That is exactly how the 1.0.5 exporter release went out
       # with no assets attached; this workflow had the same wiring and was never re-run.
+      # The APK carries libmacadi.so, which links Unicorn (GPL-2.0). GPL-2.0 section 3 asks for the
+      # corresponding source to be offered from the same place as the binary, and FetchContent
+      # downloads Unicorn's at build time rather than it being in this repository's tag. So the
+      # exact tarball the build used goes on the release beside the APK, checked against the hash
+      # MacAdi.cmake pins, and the APK's assets/licences/unicorn/NOTICE.txt says where it is.
+      - name: Fetch Unicorn's source, as the APK was built from it
+        if: github.event_name == 'release'
+        run: |
+          url=$(sed -n 's/^ *URL \(https:[^ ]*unicorn[^ ]*\.tar\.gz\)$/\1/p' app/src/main/cpp/macadi/MacAdi.cmake)
+          sha=$(sed -n 's/^ *URL_HASH SHA256=\([0-9a-f]*\).*/\1/p' app/src/main/cpp/macadi/MacAdi.cmake)
+          test -n "$url" && test -n "$sha"
+          curl -sSfL "$url" -o "unicorn-$(basename "$url")"
+          echo "$sha  unicorn-$(basename "$url")" | sha256sum -c -
+          echo "UNICORN_SOURCE=unicorn-$(basename "$url")" >> "$GITHUB_ENV"
+
       - name: Upload APK Release Asset to GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'release'
         with:
-          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
+          files: |
+            ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
+            ${{ env.UNICORN_SOURCE }}
           name: ${{ env.app_name }} Android App ${{ steps.extract_version.outputs.APP_VERSION }}
           token: ${{ secrets.ANDROID_BUILD_RELEASE_GITHUB_TOKEN }}
 

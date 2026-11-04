@@ -37,6 +37,18 @@ SOFTWARE.
 (`MacAdi.cmake`, pinned by SHA-256) and linked into `libmacadi.so`. It is licensed under
 **GPL-2.0**, so an APK containing `libmacadi.so` contains GPL-2.0 code.
 
+What that obliges, and where each part is done:
+
+- **The licence and a notice travel with the APK**: `app/src/main/assets/licences/unicorn/` holds
+  Unicorn's own `COPYING` (GPL-2.0), its QEMU licence files, and `NOTICE.txt`, which says where the
+  corresponding source is. `UnicornNoticeTest` fails if the version or hash there stops matching
+  `MacAdi.cmake`.
+- **The corresponding source is offered from the same place as the binary**: `build-release.yml`
+  attaches the exact Unicorn tarball, checked against the pinned hash, to the release.
+- **It is a separate program**: `libmacadi.so` is loaded only in the `:macadi` process, by
+  `MacAdiService`, and the app reaches it over binder (`RemoteMacAdi`). See
+  `docs/emulated-mac-emulator-choice.md`.
+
 ## Apple's CoreADI
 
 Not part of this repository or of any build. The app downloads it at runtime from Apple's own
