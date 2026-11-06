@@ -1,5 +1,6 @@
 package dev.wander.android.opentagviewer.ble;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
 
 import dev.wander.android.opentagviewer.R;
@@ -31,6 +32,25 @@ public final class NearbyTagLabel {
             case VERY_LOW: return R.string.battery_short_very_low;
             case FULL:
             default: return R.string.battery_short_full;
+        }
+    }
+
+    /**
+     * The battery icon for a tag card, in place of the {@link #shortBatteryLabel} word.
+     *
+     * <p>Material Symbols' horizontal {@code battery_android_*} set, so it sits on a text line
+     * instead of standing a full line tall. The bar counts follow the {@code battery_level_*}
+     * ranges: full, about half, a sliver, and the alert glyph for critical, so the level that
+     * needs attention is the one that does not look like the others.
+     */
+    @DrawableRes
+    public static int batteryIcon(final FindMyAdvertisement.BatteryLevel level) {
+        switch (level) {
+            case MEDIUM: return R.drawable.battery_android_3_24px;
+            case LOW: return R.drawable.battery_android_1_24px;
+            case VERY_LOW: return R.drawable.battery_android_alert_24px;
+            case FULL:
+            default: return R.drawable.battery_android_full_24px;
         }
     }
 
