@@ -149,15 +149,35 @@
                             android:visibility="gone"
                             tools:visibility="visible" />
 
+                        <!--
+                            wrap_content rather than a weight, so the battery icon below follows
+                            the text instead of being pushed to the far end of the card.
+                        -->
                         <TextView
                             android:id="@+id/device_last_update"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
                             android:fontFamily="@font/nunito_semi_bold"
                             android:text="@string/last_updated_x"
                             android:textColor="?attr/colorOutline"
                             android:textSize="12sp" />
+
+                        <!--
+                            The sighting's battery level, in place of the "· Battery medium" the
+                            line used to spell out - see NearbyBatteryIcon. Tinted the same
+                            colorOutline as the text beside it. GONE with the pulse, whenever the
+                            line is the ordinary "last updated" one, and for Google trackers,
+                            whose battery flags are encrypted.
+                        -->
+                        <ImageView
+                            android:id="@+id/device_nearby_battery"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="4dp"
+                            android:src="@drawable/battery_android_full_24px"
+                            android:visibility="gone"
+                            app:tint="?attr/colorOutline"
+                            tools:visibility="visible" />
                     </LinearLayout>
                 </LinearLayout>
 

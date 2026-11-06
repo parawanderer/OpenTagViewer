@@ -333,7 +333,6 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="battery_short_low">laag</string>
     <string name="battery_short_very_low">kritiek</string>
     <string name="battery">Batterij</string>
-    <string name="nearby_now_with_battery_and_signal">In de buurt (%2$s) · Batterij %1$s</string>
     <string name="heard_over_bluetooth">Via bluetooth</string>
     <string name="last_seen">Laatst gehoord</string>
     <string name="signal">Signaal</string>
@@ -423,4 +422,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="ring_failed_reason">Laten afgaan mislukt: %1$s</string>
     <string name="server_url_not_https">Geen https: het API-token wordt onversleuteld verstuurd.</string>
     <string name="google_find_hub_setup_guide">Zo stel je dit in</string>
+    <string name="battery_icon_description">Batterij %1$s</string>
 </resources>

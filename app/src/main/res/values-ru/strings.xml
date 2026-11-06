@@ -333,7 +333,6 @@
     <string name="battery_short_low">низкий</string>
     <string name="battery_short_very_low">критический</string>
     <string name="battery">Батарея</string>
-    <string name="nearby_now_with_battery_and_signal">Рядом (%2$s) · Батарея %1$s</string>
     <string name="heard_over_bluetooth">По Bluetooth</string>
     <string name="last_seen">Последний сигнал</string>
     <string name="signal">Сигнал</string>
@@ -423,4 +422,5 @@
     <string name="ring_failed_reason">Не удалось подать сигнал: %1$s</string>
     <string name="server_url_not_https">Не https: токен API будет передан без шифрования.</string>
     <string name="google_find_hub_setup_guide">Как это настроить</string>
+    <string name="battery_icon_description">Батарея %1$s</string>
 </resources>
