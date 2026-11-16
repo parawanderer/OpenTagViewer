@@ -856,6 +856,18 @@ python scripts/make_test_beacon_plist.py out.plist --days-old 730
 python scripts/make_locked_bundle_fixture.py
 ```
 
+### Comparing CPU emulators for the emulated Mac
+
+```bash
+scripts/adi-emulator-diff/run.sh /tmp/CoreADI.x86_64
+```
+
+Runs Apple's macOS CoreADI under Unicorn and under icicle with the same inputs and diffs the
+output; it exits non-zero on any difference. Unlike the scripts above it does need the network,
+to clone three repositories at pinned commits, but it sends nothing to Apple. Nobody needs to run
+it routinely; it exists for whoever wants to replace Unicorn. Why, what it showed and what it
+does not cover: [docs/emulated-mac-emulator-choice.md](docs/emulated-mac-emulator-choice.md).
+
 ### The locked-bundle fixture
 
 `app/src/androidTest/assets/locked_bundle_fixture.zip` is committed rather than built by the

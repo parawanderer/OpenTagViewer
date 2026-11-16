@@ -89,6 +89,14 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   emulator Chaquopy cannot build for Android. `app/stubs/unicorn/` is a stand-in that makes
   the dependency tree resolve; every method raises. The stub is not a step toward enabling
   `aniLocal`, and never will be.
+- **Unicorn ships as native code, GPL-2.0 and all, and that was decided rather than missed.**
+  The emulated Mac (#274, in review) runs it in `libmacadi.so`. Before replacing it with a permissive
+  emulator for licence reasons, read
+  [docs/emulated-mac-emulator-choice.md](./docs/emulated-mac-emulator-choice.md): a replacement
+  is invisible to users **only if it produces the same bytes**, because the emulator is not part
+  of the machine identity but its output is. `scripts/adi-emulator-diff/` is the check, and it has
+  not yet been run over the OTP path. The same doc says what the GPL obliges: a notice, and the
+  library kept in its own process.
 - **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
   loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
   back to a remote server when it cannot. That is unrelated to `aniLocal` and needs no
