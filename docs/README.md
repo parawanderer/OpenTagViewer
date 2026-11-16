@@ -12,6 +12,7 @@ no natural home in a source comment.
 | [how-to-export-with-the-cli.md](./how-to-export-with-the-cli.md) | How to export AirTags out of iCloud with no Mac. Written for whoever is running it rather than for whoever is changing it, which is why it is the one page here addressed to a user. |
 | [android-import-handover.md](./android-import-handover.md) | What the Android app has to do to catch up with the exporter: the shared package's Chaquopy wiring, encrypted bundles, self-generated tags. A task brief - delete it when the work lands. |
 | [anisette-native-android.md](./anisette-native-android.md) | Proof-of-concept log for running Apple's ADI libraries in-process on Android, and the measurements that came out of it. Historical; the implementation shipped. |
+| [emulated-mac-emulator-choice.md](./emulated-mac-emulator-choice.md) | Why the emulated Mac (#274) runs on Unicorn despite GPL-2.0, which permissive emulators exist, and an offline byte-for-byte comparison of Unicorn against icicle. Read before replacing the emulator. |
 | [findmy-export/](./findmy-export/) | Clean-room specification of the protocol for reading FindMy accessory keys from iCloud without a Mac. Stage 1 written; five stages to go. |
 | [owner-connected-tags.md](./owner-connected-tags.md) | Reading list for the one case the app cannot handle: matching or ringing a tag while it is with its owner, so the Find My network never sees it. Links plus what each one actually establishes — including that authorised and unauthorised ringing are different protocols. |
 
