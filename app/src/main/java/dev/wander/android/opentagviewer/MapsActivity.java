@@ -63,6 +63,7 @@ import dev.wander.android.opentagviewer.ui.maps.GoogleMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapMarker;
 import dev.wander.android.opentagviewer.ui.maps.MapPolyline;
 import dev.wander.android.opentagviewer.ui.maps.MarkerPalette;
+import dev.wander.android.opentagviewer.ui.maps.NearbyBatteryIcon;
 import com.google.android.libraries.places.api.Places;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -901,13 +902,13 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void showNearbyStatusOn(
             final FrameLayout card, final NearbyTagSighting sighting, final long nowMs) {
         final TextView line = card.findViewById(R.id.device_last_update);
-        // Google trackers encrypt their battery flags, so their sightings carry none
-        line.setText(sighting.getBatteryLevel() == null
-                ? this.getString(R.string.nearby_now_with_signal,
-                        NearbyTagLabel.signalStrengthBars(sighting.getRssi()))
-                : this.getString(R.string.nearby_now_with_battery_and_signal,
-                        this.getString(NearbyTagLabel.shortBatteryLabel(sighting.getBatteryLevel())),
-                        NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+        line.setText(this.getString(R.string.nearby_now_with_signal,
+                NearbyTagLabel.signalStrengthBars(sighting.getRssi())));
+        // An icon rather than "· Battery medium": the row also carries the name's line, the
+        // signal dots and the pulse. Hidden for Google trackers, whose battery flags are
+        // encrypted, so their sightings carry none.
+        NearbyBatteryIcon.show(card.findViewById(R.id.device_nearby_battery),
+                sighting.getBatteryLevel());
 
         // Never negative: nowMs can be a hair behind seenAtMs when this runs right off the scan
         // callback, before the clock the caller reads has ticked past it.
@@ -2707,8 +2708,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         : null;
                 final String updated = this.getString(R.string.last_updated_x, timeAgo);
                 deviceLastUpdate.setText(source == null ? updated : updated + " · " + source);
-                // Nothing live to pulse for once the sighting has aged out.
+                // Nothing live to pulse for once the sighting has aged out, and no battery
+                // reading that is current either.
                 ((ImageView) v.findViewById(R.id.device_nearby_pulse)).setVisibility(GONE);
+                NearbyBatteryIcon.show(v.findViewById(R.id.device_nearby_battery), null);
             }
 
             // **Put an existing card where it now belongs.** Cards are created once and reused,

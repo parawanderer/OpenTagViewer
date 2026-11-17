@@ -333,7 +333,6 @@
     <string name="battery_short_low">少</string>
     <string name="battery_short_very_low">危険</string>
     <string name="battery">バッテリー</string>
-    <string name="nearby_now_with_battery_and_signal">近くにあります（%2$s）· 電池 %1$s</string>
     <string name="heard_over_bluetooth">Bluetooth 経由</string>
     <string name="last_seen">最後の受信</string>
     <string name="signal">信号強度</string>
@@ -423,4 +422,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="ring_failed_reason">鳴らせませんでした: %1$s</string>
     <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
     <string name="google_find_hub_setup_guide">設定方法</string>
+    <string name="battery_icon_description">電池 %1$s</string>
 </resources>
