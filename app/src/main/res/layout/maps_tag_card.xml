@@ -165,7 +165,9 @@
                         <!--
                             The sighting's battery level, in place of the "· Battery medium" the
                             line used to spell out - see NearbyBatteryIcon. Tinted the same
-                            colorOutline as the text beside it. GONE with the pulse, whenever the
+                            colorOutline as the text beside it, with android:tint and not app:tint:
+                            only AppCompat's inflater reads the latter, so a plain LayoutInflater
+                            drew the vector's own colorControlNormal instead. GONE with the pulse, whenever the
                             line is the ordinary "last updated" one, and for Google trackers,
                             whose battery flags are encrypted.
                         -->
@@ -175,8 +177,8 @@
                             android:layout_height="16dp"
                             android:layout_marginStart="4dp"
                             android:src="@drawable/battery_android_full_24px"
+                            android:tint="?attr/colorOutline"
                             android:visibility="gone"
-                            app:tint="?attr/colorOutline"
                             tools:visibility="visible" />
                     </LinearLayout>
                 </LinearLayout>

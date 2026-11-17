@@ -169,6 +169,37 @@ public class TagCardBatteryIconTest {
         this.writeText("tag_card_battery_contrast.txt", figures.toString());
     }
 
+    /**
+     * The icon is drawn in the colour of the text beside it.
+     *
+     * <p>Samples the rendered pixels, because the contrast test above only resolves
+     * {@code colorOutline} from the theme and says nothing about what the view paints. {@code
+     * app:tint} is read by AppCompat's inflater and ignored by a plain {@code LayoutInflater},
+     * so a tint written that way leaves the vector's own {@code colorControlNormal}, which was
+     * visibly darker than the text in light mode and lighter in dark.
+     */
+    @Test
+    public void theIconIsPaintedInTheColourOfTheTextBesideIt() {
+        for (final Context theme : new Context[]{lightTheme(), darkTheme()}) {
+            final String name = isNight(theme) ? "dark" : "light";
+            final int outline = resolve(theme, com.google.android.material.R.attr.colorOutline);
+            final FrameLayout card = this.inflateCard(theme, NEARBY_LINE, BatteryLevel.MEDIUM);
+            final Bitmap bitmap = this.draw(card.findViewById(R.id.device_nearby_battery));
+            int solid = 0;
+            for (int y = 0; y < bitmap.getHeight(); y++) {
+                for (int x = 0; x < bitmap.getWidth(); x++) {
+                    final int pixel = bitmap.getPixel(x, y);
+                    if (Color.alpha(pixel) == 255) {
+                        solid++;
+                        assertEquals(name + " icon pixel (" + x + "," + y + ") is not colorOutline",
+                                outline & 0xFFFFFF, pixel & 0xFFFFFF);
+                    }
+                }
+            }
+            assertTrue(name + " icon has no solid pixels to sample", solid > 0);
+        }
+    }
+
     /** Not an assertion: the before/after images for the pull request. */
     @Test
     public void writeBeforeAndAfterScreenshots() {
