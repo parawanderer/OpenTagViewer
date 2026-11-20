@@ -33,13 +33,19 @@ import java.util.Locale;
  * pair is a configuration nobody has seen Apple accept. Changing either later is a new machine to
  * Apple (a second device-list entry), so it waits for evidence that a consistent pair works.
  *
+ * <p><b>Except the OS name, which Apple forced.</b> os-findmy-e sends {@code macOS}, and since
+ * 2026-11-20 Apple's edge refuses every Grand Slam sign-in that spells it that way (#289). This
+ * says {@code Mac OS X}, as macOS's own {@code akd} does and as {@code LEGACY_MAC} now does; the
+ * edge lets it through. That Apple then issues {@code searchPartyToken} to it as it did to the
+ * {@code macOS} spelling has not been seen yet.
+ *
  * <p>The serial is this app's own {@code 0PENTAGV} serial, so the device-list entry stays
  * recognisable (rule 11). Apple has not been seen to check serials at all.
  */
 public final class MacIdentity {
 
     static final String MODEL = "MacBookPro13,2";
-    static final String OS_NAME = "macOS";
+    static final String OS_NAME = "Mac OS X";
     static final String OS_VERSION = "13.1";
     static final String OS_BUILD = "22C65";
     static final String CFNETWORK = "1404.0.5";

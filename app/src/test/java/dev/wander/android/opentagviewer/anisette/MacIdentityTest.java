@@ -122,7 +122,7 @@ public class MacIdentityTest {
         assertEquals(MacIdentity.OS_BUILD, hardware.getString("os_build"));
         assertEquals(MacIdentity.CFNETWORK, hardware.getString("cfnetwork"));
         assertEquals(MacIdentity.LOGIN_DARWIN, hardware.getString("darwin"));
-        assertEquals("<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+        assertEquals("<MacBookPro13,2> <Mac OS X;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
                 MacIdentity.CLIENT_INFO);
     }
 }
