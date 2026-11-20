@@ -571,16 +571,19 @@ with `widget.bind("<Key>")` rather than `event_generate`: a Toplevel under a wit
 focus from nobody, so a generated keypress is dropped in silence and the test passes without
 having pressed anything.
 
-**CI runs them on one job in four.** The matrix is 3.10 to 3.13 on `macos-14`, and only its 3.13
-has `_tkinter` — the other three skip both files at collection, so a green square there says
-nothing about the window. `-rs` is what tells you which you got:
+**CI runs them on two jobs in five.** The matrix is 3.10 to 3.13 on `macos-15`, plus 3.13 on
+`ubuntu-latest` under Xvfb. Only the two 3.13 jobs have `_tkinter` — the other three skip both
+files at collection, so a green square there says nothing about the window. `-rs` is what tells you
+which you got, and CI passes it:
 
 ```bash
 uv run pytest ./test -rs
 ```
 
-`361 passed, 4 skipped` means Tk was missing and neither file ran. `378 passed, 2 skipped` means
-they did, and the two remaining skips are the macOS-14-only decryptor tests.
+Read the skip reasons rather than the count, which moves with every test added. `Requires macOS
+version ≤ 14` is the two decryptor tests for the macOS-local route: **they skip in CI, always**,
+since GitHub stopped offering macOS 14 runners in November 2026, and run only by hand on a Mac
+that old. A skip naming `_tkinter` means the window tests did not run.
 
 ### Tooling tests
 
@@ -890,7 +893,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, tooling tests, Java import check. Seconds, no Android |
 | `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK. Also publishes the generated Room schemas as `room-schemas`, so a version bump made without an Android toolchain can still commit the JSON rule 1 requires |
 | `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
-| `macos-scripts-python.yml` | `python/**` changes | Exporter and shared-package tests across Python 3.10–3.13 on macOS 14 |
+| `macos-scripts-python.yml` | `python/**` or its own changes, or by hand | Exporter and shared-package tests across Python 3.10–3.13 on macOS 15, and 3.13 on Ubuntu under Xvfb |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary and starts it. The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
 | `update-contributors.yml` | weekly, **and on merging a PR by anyone but the owner** | Regenerates the contributor list on the Information page, opens a PR if it changed. The merge run names who it expected to find and fails if GitHub's cached stats did not have them yet — the weekly run is still the guarantee |
