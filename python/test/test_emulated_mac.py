@@ -15,6 +15,8 @@ import json
 import os
 import re
 import struct
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -257,3 +259,52 @@ class TestTheRealEngine:
 
         assert info["provisioned"] is False
         assert "<Mac OS X;" in info["identity"]["client_info"]
+
+
+class TestTheFrozenExportersWayIn:
+    """A PyInstaller build has no interpreter, so it runs itself with `--run-emulated-mac`."""
+
+    def test_the_engines_modules_are_found_under_the_names_they_import_each_other_by(self):
+        """
+        In a frozen bundle they cannot be found on disk, so each must already be loaded - as the
+        same module object, or the engine would hold two copies of its own state.
+        """
+        script = (
+            "import sys; from exporter import macadi; macadi.load_engine();"
+            "print(all(sys.modules[n] is sys.modules['machoadi.' + n] for n in macadi._ENGINE_MODULES))"
+        )
+        done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                              cwd=Path(__file__).resolve().parents[1], check=True)
+
+        assert done.stdout.strip() == "True"
+
+    def test_a_failure_reaches_the_parent_through_the_error_file(self, tmp_path: Path):
+        out, err = tmp_path / "out", tmp_path / "err"
+
+        code = _engine_here(out, err, "no-such-command")
+
+        assert code != 0
+        assert "invalid choice" in err.read_text(encoding="utf-8")
+
+    def test_the_wizard_hands_over_before_anything_else(self):
+        source = (Path(__file__).resolve().parents[1] / "exporter" / "wizard.py").read_text("utf-8")
+        main = source[source.index('if __name__ == "__main__":'):]
+
+        assert main.index("macadi.ENGINE_FLAG") < main.index("--self-test")
+
+    @pytest.mark.skipif(not os.environ.get("OTV_COREADI"), reason="set OTV_COREADI to a fetched library")
+    def test_it_runs_the_real_engine(self, tmp_path: Path):
+        out, err = tmp_path / "out", tmp_path / "err"
+
+        code = _engine_here(out, err, "info", "--state", str(tmp_path / "machine"),
+                            env={**os.environ, "COREADI_PATH": os.environ["OTV_COREADI"]})
+
+        assert code == 0, err.read_text(encoding="utf-8")
+        assert json.loads(out.read_text(encoding="utf-8"))["provisioned"] is False
+
+
+def _engine_here(out: Path, err: Path, *command: str, env: dict | None = None) -> int:
+    """`run_engine_here` in a fresh interpreter, as the frozen child would be."""
+    script = "import sys; from exporter import macadi; sys.exit(macadi.run_engine_here(sys.argv[1:]))"
+    return subprocess.run([sys.executable, "-c", script, str(out), str(err), *command],
+                          cwd=Path(__file__).resolve().parents[1], env=env, check=False).returncode

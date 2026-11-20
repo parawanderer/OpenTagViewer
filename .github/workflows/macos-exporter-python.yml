@@ -260,6 +260,7 @@ jobs:
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
           --collect-all unicorn \
+          --collect-submodules machoadi \
           --collect-data findmy \
           --collect-data anisette \
           --noconfirm \
@@ -279,6 +280,7 @@ jobs:
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
           --collect-all unicorn `
+          --collect-submodules machoadi `
           --collect-data findmy `
           --collect-data anisette `
           --noconfirm `
@@ -315,6 +317,7 @@ jobs:
         uv run --frozen pyinstaller \
           --name "OpenTagViewer" \
           --collect-all unicorn \
+          --collect-submodules machoadi \
           --collect-data findmy \
           --collect-data anisette \
           --noconfirm \

@@ -32,13 +32,16 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import importlib
 import json
 import logging
 import os
 import struct
 import subprocess
 import sys
+import tempfile
 import time
+import traceback
 import urllib.request
 import uuid
 from pathlib import Path
@@ -194,36 +197,97 @@ def _sha256(data: bytes) -> str:
 # -- the engine, in its own process ------------------------------------------------------------
 
 
-def _engine(command: str, state: Path, library: Path, *extra: str) -> str:
-    """Run one `machoadi` command and return what it printed."""
-    if getattr(sys, "frozen", False):
-        # A PyInstaller build has no interpreter to hand `-m` to. Not silently degraded to the
-        # Android ADI: that is the machine Apple stopped serving, and it would fail later and
-        # less legibly.
-        msg = (
-            "The emulated Mac is not available in the packaged build yet. Run the exporter from"
-            " source (`uv run python -m exporter.cli`), or pass --anisette-url."
-        )
-        raise EmulatedMacError(msg)
+ENGINE_FLAG = "--run-emulated-mac"
+"""
+The argument that makes a *frozen* exporter run the engine instead of the window.
 
+A PyInstaller build has no interpreter to hand `-m` to, so it runs itself: `exporter.wizard` checks
+for this before it does anything else and calls :func:`run_engine_here`. It is still a separate
+process - which the engine needs, and which keeps the GPL code at arm's length - and on Windows it
+is the same executable, so it inherits the Control Flow Guard setting Unicorn needs.
+"""
+
+_ENGINE_MODULES = ("macho", "harness", "stubs", "adi_run", "gsa", "mac_anisette")
+"""`machoadi`'s modules, leaves first: each imports only names earlier in this list."""
+
+
+def load_engine() -> Any:
+    """
+    Import the engine so that its modules find each other, and return `mac_anisette`.
+
+    **They import one another by bare name** - `from harness import ...` - after putting their own
+    directory on `sys.path`. A frozen build keeps them in an archive rather than a directory, so
+    that resolves to nothing. Importing each as `machoadi.<name>`, leaves first, and registering it
+    under its bare name as well makes every one of those imports find the module already loaded.
+    """
+    for name in _ENGINE_MODULES:
+        if name not in sys.modules:
+            sys.modules[name] = importlib.import_module(f"machoadi.{name}")
+    return sys.modules["mac_anisette"]
+
+
+def run_engine_here(argv: list[str]) -> int:
+    """
+    Run one engine command in this process: `out err command [args...]`.
+
+    **Its output goes to files the parent names, not to stdout.** A windowed Windows build may have
+    no standard streams at all, and the answer is JSON the parent has to parse. Both are opened
+    before the engine is imported, so even an import failure reaches the parent.
+    """
+    out_path, err_path, *command = argv
+    with open(out_path, "w", encoding="utf-8") as out, open(err_path, "w", encoding="utf-8") as err:
+        sys.stdout, sys.stderr = out, err
+        try:
+            mac_anisette = load_engine()
+            sys.argv = ["mac_anisette", *command]
+            return int(mac_anisette.main() or 0)
+        except SystemExit as e:
+            # The engine reports failures as `raise SystemExit("message")`.
+            if isinstance(e.code, str):
+                print(e.code, file=err)
+                return 1
+            return int(e.code or 0)
+        except Exception:  # noqa: BLE001 - reported to the parent, which raises EmulatedMacError
+            traceback.print_exc(file=err)
+            return 1
+
+
+def _engine(command: str, state: Path, library: Path, *extra: str) -> str:
+    """Run one `machoadi` command in its own process and return what it printed."""
+    args = [command, "--state", str(state), *extra]
+    env = {**os.environ, "COREADI_PATH": str(library)}
     try:
-        done = subprocess.run(
-            [sys.executable, "-m", "machoadi.mac_anisette", command, "--state", str(state), *extra],
-            capture_output=True,
-            text=True,
-            timeout=ENGINE_TIMEOUT_SECONDS,
-            env={**os.environ, "COREADI_PATH": str(library)},
-            check=False,
-        )
+        if getattr(sys, "frozen", False):
+            code, stdout, stderr = _run_frozen(args, env)
+        else:
+            done = subprocess.run(
+                [sys.executable, "-m", "machoadi.mac_anisette", *args],
+                capture_output=True, text=True, timeout=ENGINE_TIMEOUT_SECONDS, env=env,
+                check=False)
+            code, stdout, stderr = done.returncode, done.stdout, done.stderr
     except subprocess.TimeoutExpired as e:
         msg = f"The emulated Mac did not answer `{command}` within {ENGINE_TIMEOUT_SECONDS}s"
         raise EmulatedMacError(msg) from e
 
-    if done.returncode != 0:
-        detail = (done.stderr or done.stdout).strip().splitlines()
-        msg = f"The emulated Mac failed `{command}`: {detail[-1] if detail else done.returncode}"
+    if code != 0:
+        detail = (stderr or stdout).strip().splitlines()
+        msg = f"The emulated Mac failed `{command}`: {detail[-1] if detail else code}"
         raise EmulatedMacError(msg)
-    return done.stdout
+    return stdout
+
+
+def _run_frozen(args: list[str], env: dict[str, str]) -> tuple[int, str, str]:
+    """This executable again, with :data:`ENGINE_FLAG`. See :func:`run_engine_here`."""
+    with tempfile.TemporaryDirectory(prefix="otv-engine-") as scratch:
+        out, err = Path(scratch) / "out", Path(scratch) / "err"
+        done = subprocess.run(
+            [sys.executable, ENGINE_FLAG, str(out), str(err), *args],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=ENGINE_TIMEOUT_SECONDS, env=env, check=False,
+            # A windowed parent starting a child must not flash a console window on Windows.
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        read = lambda path: path.read_text(encoding="utf-8") if path.is_file() else ""  # noqa: E731
+        return done.returncode, read(out), read(err)
 
 
 class EmulatedMac:
