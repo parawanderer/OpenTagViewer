@@ -7,6 +7,9 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Which Anisette each caller gets: a fresh sign-in the emulated Mac, a restore the machine that
  * signed the session in.
@@ -82,5 +85,55 @@ public class RestoringASessionOnTheMachineThatSignedItInTest {
         assertNull(file.values.get("sessionMachine"));
         assertFalse(file.provenance().signedInAsEmulatedMac());
         assertEquals(AnisetteForSession.Choice.ANDROID, restoring(file));
+    }
+
+    // ----- what create() builds from the choice ------------------------------------------------
+
+    /** Records which constructor {@link AnisetteForSession#create} ran; builds nothing real. */
+    private static final class Built implements AnisetteForSession.Machines {
+        final List<String> calls = new ArrayList<>();
+
+        @Override
+        public AnisetteSource android() {
+            this.calls.add("android");
+            return null;
+        }
+
+        @Override
+        public AnisetteSource emulatedMac(final EmulatedMacAnisette.Purpose purpose) {
+            this.calls.add("emulatedMac " + purpose);
+            return null;
+        }
+    }
+
+    @Test
+    public void anUpgradersSessionIsRestoredByLocalAnisetteAndTheMacIsNeverBuilt() {
+        final MemoryProvenance olderInstall = new MemoryProvenance();
+        olderInstall.values.put("sessionEstablishedLocally", true);
+        final Built built = new Built();
+
+        AnisetteForSession.create(true, olderInstall.provenance(), built);
+
+        assertEquals(List.of("android"), built.calls);
+    }
+
+    @Test
+    public void aMacSessionIsRestoredByTheMacForRestoreOnly() {
+        final MemoryProvenance file = new MemoryProvenance();
+        file.provenance().recordEmulatedMacSession(true);
+        final Built built = new Built();
+
+        AnisetteForSession.create(true, file.provenance(), built);
+
+        assertEquals(List.of("emulatedMac RESTORE"), built.calls);
+    }
+
+    @Test
+    public void onlyTheSignInScreenGetsAMacThatMayProvision() {
+        final Built built = new Built();
+
+        AnisetteForSession.create(false, new MemoryProvenance().provenance(), built);
+
+        assertEquals(List.of("emulatedMac SIGN_IN"), built.calls);
     }
 }

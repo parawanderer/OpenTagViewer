@@ -4,8 +4,8 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * {@link EmulatedMacAnisette}'s state machine, with the emulator, Apple and the disk image faked.
@@ -46,6 +48,9 @@ public class EmulatedMacAnisetteTest {
     private MemoryDeaths deaths;
     private List<MacIdentity> provisioned;
     private Exception provisioningFails;
+    /** Device ids Apple has provisioned already, and answers HTTP 433 for. */
+    private Set<String> appleHasProvisioned;
+    private int libraryFetches;
 
     /** {@link NativeLoadGuard.Store} in memory. */
     private static final class MemoryDeaths implements NativeLoadGuard.Store {
@@ -75,6 +80,8 @@ public class EmulatedMacAnisetteTest {
         this.provenanceFile = new MemoryProvenance();
         this.deaths = new MemoryDeaths();
         this.provisioned = new ArrayList<>();
+        this.appleHasProvisioned = new HashSet<>();
+        this.libraryFetches = 0;
     }
 
     private static UserSettings local() {
@@ -90,10 +97,18 @@ public class EmulatedMacAnisetteTest {
                                    final EmulatedMacAnisette.Purpose purpose,
                                    final UserSettings settings) {
         return new EmulatedMacAnisette(this.directory, settings, purpose,
-                this.provenanceFile.provenance(), this.opener, () -> this.library,
+                this.provenanceFile.provenance(), this.opener, () -> {
+                    this.libraryFetches++;
+                    return this.library;
+                },
                 (identity, adi) -> {
                     if (this.provisioningFails != null) {
                         throw this.provisioningFails;
+                    }
+                    if (!this.appleHasProvisioned.add(identity.deviceId())) {
+                        throw new AdiProvisioning.ProvisioningException(
+                                "Apple returned HTTP 433 for /finish: -29002",
+                                AdiProvisioning.ProvisioningException.ALREADY_PROVISIONED);
                     }
                     this.provisioned.add(identity);
                     adi.provisioningFinish(MacAdi.ANONYMOUS_DS_ID, 1, FakeMacAdi.bytes("ptm"),
@@ -244,6 +259,18 @@ public class EmulatedMacAnisetteTest {
         assertNull(identity());
         assertTrue(this.provisioned.isEmpty());
         assertTrue(this.opener.opened.isEmpty());
+        assertEquals("CoreADI is not downloaded for a Mac that does not exist", 0, this.libraryFetches);
+    }
+
+    @Test
+    public void askingARestoreWithNoMacWhoItIsCreatesNone() {
+        this.provenanceFile.provenance().recordEmulatedMacSession(true);
+        final EmulatedMacAnisette restore = inANewProcess(EmulatedMacAnisette.Purpose.RESTORE);
+
+        assertThrows(IllegalStateException.class, restore::serial);
+        assertThrows(IllegalStateException.class, restore::deviceIdsJson);
+
+        assertFalse(new File(this.directory, "identity.json").exists());
     }
 
     @Test
@@ -255,7 +282,8 @@ public class EmulatedMacAnisetteTest {
 
         assertFalse(restore.ensureReady());
         assertTrue(this.provisioned.isEmpty());
-        assertTrue(this.opener.last().closed);
+        assertTrue(this.opener.opened.isEmpty());
+        assertEquals(0, this.libraryFetches);
     }
 
     @Test
@@ -297,14 +325,48 @@ public class EmulatedMacAnisetteTest {
 
     @Test
     public void aRefusedProvisioningFallsBackAndLeavesTheMachineUnprovisioned() throws Exception {
-        this.provisioningFails = new AdiProvisioning.ProvisioningException("Apple returned HTTP 433");
+        this.provisioningFails = new AdiProvisioning.ProvisioningException("Apple returned HTTP 403");
+        final EmulatedMacAnisette mac = inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN);
+
+        assertFalse(mac.ensureReady());
+        assertEquals("Apple returned HTTP 403", mac.unavailableReason());
+        assertEquals(0, identity().provisionedAtMillis());
+        assertEquals("only an HTTP 433 is worth a new machine", 1, this.opener.opened.size());
+        assertTrue(this.opener.last().closed);
+        assertTrue(storedFiles().isEmpty());
+    }
+
+    @Test
+    public void aMacAppleProvisionedButThisInstallNeverStoredIsReplaced() throws Exception {
+        // The process died between midFinishProvisioning and saveStore: the identity on disk is
+        // unprovisioned, and Apple will not provision its device id again.
+        final MacIdentity orphan = MacIdentity.generate();
+        orphan.save(this.directory);
+        this.appleHasProvisioned.add(orphan.deviceId());
+
+        final EmulatedMacAnisette mac = inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN);
+
+        assertTrue(mac.unavailableReason(), mac.ensureReady());
+        assertNotEquals(orphan.deviceId(), identity().deviceId());
+        assertTrue(identity().provisionedAtMillis() > 0);
+        assertEquals(1, this.provisioned.size());
+        assertEquals(identity().deviceId(), this.provisioned.get(0).deviceId());
+        assertTrue("the orphan's emulator is let go", this.opener.opened.get(0).closed);
+        assertEquals(List.of(FakeMacAdi.PROVISIONED_FILE), storedFiles());
+    }
+
+    @Test
+    public void aSecond433IsNotChasedWithAThirdMachine() throws Exception {
+        this.provisioningFails = new AdiProvisioning.ProvisioningException(
+                "Apple returned HTTP 433", AdiProvisioning.ProvisioningException.ALREADY_PROVISIONED);
         final EmulatedMacAnisette mac = inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN);
 
         assertFalse(mac.ensureReady());
         assertEquals("Apple returned HTTP 433", mac.unavailableReason());
+        assertEquals(2, this.opener.opened.size());
+        assertTrue(this.opener.opened.get(0).closed);
+        assertTrue(this.opener.opened.get(1).closed);
         assertEquals(0, identity().provisionedAtMillis());
-        assertTrue(this.opener.last().closed);
-        assertTrue(storedFiles().isEmpty());
     }
 
     @Test
@@ -315,6 +377,42 @@ public class EmulatedMacAnisetteTest {
 
         this.provisioningFails = null;
         assertTrue(in(shared, EmulatedMacAnisette.Purpose.SIGN_IN, local()).ensureReady());
+    }
+
+    // ----- letting an idle emulator go ----------------------------------------------------------
+
+    @Test
+    public void anIdleEmulatorIsClosedAndReopenedFromItsStoreOnTheNextAsk() throws Exception {
+        final EmulatedMacAnisette.Shared shared = new EmulatedMacAnisette.Shared();
+        final EmulatedMacAnisette mac = in(shared, EmulatedMacAnisette.Purpose.SIGN_IN, local());
+        assertTrue(mac.ensureReady());
+        final String machine = mac.machine();
+        final String deviceId = identity().deviceId();
+
+        assertFalse("used just now", shared.closeIfIdle(System.currentTimeMillis()));
+        assertTrue(shared.closeIfIdle(System.currentTimeMillis() + EmulatedMacAnisette.IDLE_CLOSE_MS));
+        assertTrue(this.opener.last().closed);
+
+        assertEquals(machine, mac.machine());
+        assertEquals(2, this.opener.opened.size());
+        assertFalse(this.opener.last().closed);
+        assertEquals("reopening is not a new machine", 1, this.provisioned.size());
+        assertEquals(deviceId, identity().deviceId());
+    }
+
+    @Test
+    public void aRestoredSessionsEmulatorReopensAsTheSameMacAfterIdling() throws Exception {
+        assertTrue(inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN).ensureReady());
+        this.provenanceFile.provenance().recordEmulatedMacSession(true);
+        final EmulatedMacAnisette.Shared shared = new EmulatedMacAnisette.Shared();
+        final EmulatedMacAnisette restore = in(shared, EmulatedMacAnisette.Purpose.RESTORE, local());
+        assertTrue(restore.ensureReady());
+
+        assertTrue(shared.closeIfIdle(System.currentTimeMillis() + EmulatedMacAnisette.IDLE_CLOSE_MS));
+
+        assertTrue(restore.ensureReady());
+        assertEquals(1, this.provisioned.size());
+        assertFalse(restore.isChangingMachineIdentity());
     }
 
     // ----- the emulator's process dying ---------------------------------------------------------
@@ -407,9 +505,6 @@ public class EmulatedMacAnisetteTest {
         assertEquals(ids.getString("devid"), this.provisioned.get(0).deviceId());
         assertEquals(ids.getString("uid"), this.provisioned.get(0).localUserUuid());
         assertEquals(serial, this.provisioned.get(0).serial());
-        assertNotNull(mac.cloudKitDeviceUuid());
-        assertTrue(mac.cloudKitDeviceUuid().matches(
-                "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"));
     }
 
     private static byte[] readQuietly(final File file) {

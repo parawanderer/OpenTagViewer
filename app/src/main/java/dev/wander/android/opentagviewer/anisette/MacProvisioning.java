@@ -199,7 +199,7 @@ final class MacProvisioning {
                     ? connection.getErrorStream() : connection.getInputStream());
             if (status >= 400) {
                 throw new AdiProvisioning.ProvisioningException(
-                        "Apple returned HTTP " + status + " for " + url + ": " + response);
+                        "Apple returned HTTP " + status + " for " + url + ": " + response, status);
             }
             return response;
         } catch (final AdiProvisioning.ProvisioningException e) {

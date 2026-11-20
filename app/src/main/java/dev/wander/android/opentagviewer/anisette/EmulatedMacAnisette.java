@@ -13,8 +13,10 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Anisette from an emulated Mac on this device: Apple's macOS CoreADI under an x86_64 emulator.
@@ -75,6 +77,27 @@ public final class EmulatedMacAnisette implements AnisetteSource {
     /** How long one generated set is reused. See {@code LocalAnisette.CACHE_FOR_MS}. */
     private static final long CACHE_FOR_MS = 5_000;
 
+    /**
+     * How long the emulator's process is kept with nothing asking it for headers. Once used it
+     * holds tens of MB (QEMU's TLB alone grows to about 60 MB over the first dozen calls), and a
+     * bound service lives as long as the app's process does - which a foreground service such as
+     * the nearby scan stretches to hours. Longer than the map's one-minute refresh, so an open map
+     * never pays for reopening it.
+     */
+    static final long IDLE_CLOSE_MS = 5 * 60_000;
+
+    private static final ScheduledThreadPoolExecutor IDLE = idleTimer();
+
+    private static ScheduledThreadPoolExecutor idleTimer() {
+        final ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1, r -> {
+            final Thread t = new Thread(r, "emulated-mac-idle");
+            t.setDaemon(true);
+            return t;
+        });
+        timer.setRemoveOnCancelPolicy(true);
+        return timer;
+    }
+
     /** Gets CoreADI onto disk, checked against its pinned hash, and says where. */
     interface Library {
         File ensure() throws Exception;
@@ -92,6 +115,35 @@ public final class EmulatedMacAnisette implements AnisetteSource {
         MacIdentity identity;
         Map<String, String> cached;
         long cachedAt;
+        long lastUsed;
+        ScheduledFuture<?> idleClose;
+
+        /** Mark the emulator used now, and close it if nothing uses it again for a while. */
+        void touch(final long now) {
+            this.lastUsed = now;
+            if (this.idleClose != null) {
+                this.idleClose.cancel(false);
+            }
+            this.idleClose = IDLE.schedule(() -> closeIfIdle(System.currentTimeMillis()),
+                    IDLE_CLOSE_MS, TimeUnit.MILLISECONDS);
+        }
+
+        /**
+         * Let the emulator's process go if it has not been used for {@link #IDLE_CLOSE_MS}. The
+         * store is saved after every call, so nothing is lost: the next ask reopens it from disk.
+         */
+        boolean closeIfIdle(final long now) {
+            synchronized (this.lock) {
+                if (this.adi == null || now - this.lastUsed < IDLE_CLOSE_MS) {
+                    return false;
+                }
+                this.adi.close();
+                this.adi = null;
+                this.cached = null;
+                Log.i(TAG, "closed the idle emulated Mac; it reopens on the next request");
+                return true;
+            }
+        }
     }
 
     private static final Shared SHARED = new Shared();
@@ -209,18 +261,38 @@ public final class EmulatedMacAnisette implements AnisetteSource {
 
             MacAdi opened = null;
             try {
-                final File image = this.library.ensure();
-
+                // A restore asks for the stored Mac before anything else, so an install that has
+                // none fails here, without downloading CoreADI for a machine that cannot exist.
                 MacIdentity current = this.purpose == Purpose.RESTORE
                         ? storedIdentity() : loadOrCreateIdentity();
+                if (this.purpose == Purpose.RESTORE && current.provisionedAtMillis() == 0) {
+                    throw new IllegalStateException("the emulated Mac that signed this session"
+                            + " in was never provisioned; sign in again to register it");
+                }
+                final File image = this.library.ensure();
                 opened = open(image, current);
 
                 if (current.provisionedAtMillis() == 0) {
-                    if (this.purpose == Purpose.RESTORE) {
-                        throw new IllegalStateException("the emulated Mac that signed this session"
-                                + " in was never provisioned; sign in again to register it");
+                    try {
+                        current = provision(opened, current);
+                    } catch (final AdiProvisioning.ProvisioningException e) {
+                        if (e.httpStatus()
+                                != AdiProvisioning.ProvisioningException.ALREADY_PROVISIONED) {
+                            throw e;
+                        }
+                        // Apple provisioned this device id and the store never got the result:
+                        // the process died between midFinishProvisioning and saveStore. Apple
+                        // will not do it twice, so retrying this identity fails forever.
+                        Log.w(TAG, "Apple has already provisioned " + current.deviceId()
+                                + ", but this install never stored it; registering a new machine");
+                        opened.close();
+                        opened = null;
+                        current = MacIdentity.generate();
+                        current.save(this.directory);
+                        clearStore();
+                        opened = open(image, current);
+                        current = provision(opened, current);
                     }
-                    current = provision(opened, current);
                 } else if (!isProvisioned(opened)) {
                     if (this.purpose == Purpose.RESTORE) {
                         throw new IllegalStateException("the emulated Mac has lost its provisioning,"
@@ -244,6 +316,7 @@ public final class EmulatedMacAnisette implements AnisetteSource {
                 this.shared.adi = opened;
                 this.shared.identity = current;
                 this.shared.cached = null;
+                this.shared.touch(System.currentTimeMillis());
                 this.unavailableReason = null;
                 Log.i(TAG, "ready as an emulated Mac, device " + current.deviceId());
                 return true;
@@ -404,7 +477,8 @@ public final class EmulatedMacAnisette implements AnisetteSource {
 
     private MacIdentity currentIdentity() {
         try {
-            return loadOrCreateIdentity();
+            // A restore reads what Python asks about, and must not create a Mac to answer it.
+            return this.purpose == Purpose.RESTORE ? storedIdentity() : loadOrCreateIdentity();
         } catch (final IOException e) {
             throw new IllegalStateException("could not read or create the emulated Mac", e);
         }
@@ -445,6 +519,10 @@ public final class EmulatedMacAnisette implements AnisetteSource {
             return "";
         }
         synchronized (this.shared.lock) {
+            // Closed for idleness between ensureReady and here: reopen (the lock is reentrant).
+            if (this.shared.adi == null && !ensureReady()) {
+                return "";
+            }
             final long now = System.currentTimeMillis();
             if (this.shared.cached == null || now - this.shared.cachedAt > CACHE_FOR_MS) {
                 try {
@@ -458,6 +536,7 @@ public final class EmulatedMacAnisette implements AnisetteSource {
                             "X-Apple-I-MD", this.base64.encode(generated.oneTimePassword),
                             "X-Apple-I-MD-RINFO", Long.toString(generated.routing));
                     this.shared.cachedAt = now;
+                    this.shared.touch(now);
                 } catch (final MacAdi.EmulatorDiedException e) {
                     recordEmulatorDeath(e);
                     this.unavailableReason = CRASHES_HERE_REASON;
@@ -511,19 +590,6 @@ public final class EmulatedMacAnisette implements AnisetteSource {
     @Override
     public String serial() {
         return currentIdentity().serial();
-    }
-
-    /**
-     * What CloudKit is told this device is, as an uppercase UUID: the emulated Mac's host UUID.
-     *
-     * <p>Called from Python's {@code icloud_bridge._forCloudKit}. FindMy.py's CloudKit client
-     * parses the account's device id as a UUID, and a Mac's is not one. Not on
-     * {@link AnisetteSource}: no other source has a device id that needs it.
-     */
-    public String cloudKitDeviceUuid() {
-        final String h = currentIdentity().hostUuid().toUpperCase(Locale.ROOT);
-        return h.substring(0, 8) + "-" + h.substring(8, 12) + "-" + h.substring(12, 16) + "-"
-                + h.substring(16, 20) + "-" + h.substring(20);
     }
 
     @Override

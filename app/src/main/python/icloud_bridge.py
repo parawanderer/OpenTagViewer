@@ -927,14 +927,11 @@ def _forCloudKit(asyncAccount: Any) -> Any:
     except ValueError:
         pass
 
-    # The emulated Mac's host UUID when Java can say, as os-findmy-e used; otherwise one derived
-    # from the device id, which is as stable as the device id is.
-    bridge = getattr(getattr(asyncAccount, "_anisette", None), "_bridge", None)
-    ask = getattr(bridge, "cloudKitDeviceUuid", None)
-    if ask is not None:
-        stable = str(ask())
-    else:
-        stable = str(uuid.uuid5(uuid.NAMESPACE_URL, f"opentagviewer:device:{deviceId}")).upper()
+    # Derived from the device id, which travels with the session. It used to be the emulated
+    # Mac's host UUID when Java was reachable and this otherwise, so one session told CloudKit two
+    # different devices depending on whether it was restored onto the Mac or a remote server - and
+    # on the second the Mac's store, and its host UUID with it, may no longer exist.
+    stable = str(uuid.uuid5(uuid.NAMESPACE_URL, f"opentagviewer:device:{deviceId}")).upper()
     print(f"The device id is not a UUID; CloudKit is told {stable} instead")
     return _CloudKitDeviceView(asyncAccount, stable)
 

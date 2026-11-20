@@ -64,20 +64,26 @@ class TestWhatCloudKitIsToldTheDeviceIs:
         account = SimpleNamespace(device_uuid="9F1C2D3E-4B5A-4C6D-8E7F-001122334455")
         assert icloud_bridge._forCloudKit(account) is account
 
-    def test_a_mac_device_id_gets_the_host_uuid_java_reports(self) -> None:
-        bridge = SimpleNamespace(cloudKitDeviceUuid=lambda: "00112233-4455-6677-8899-AABBCCDDEEFF")
-        account = SimpleNamespace(device_uuid=MAC_DEVICE_ID,
-                                  _anisette=SimpleNamespace(_bridge=bridge), serial="0PENTAGVTEST")
+    def test_a_mac_device_id_gets_a_uuid_and_everything_else_is_the_accounts(self) -> None:
+        account = SimpleNamespace(device_uuid=MAC_DEVICE_ID, serial="0PENTAGVTEST")
 
         view = icloud_bridge._forCloudKit(account)
 
-        assert view.device_uuid == "00112233-4455-6677-8899-AABBCCDDEEFF"
         # What the CloudKit client does with it, and what failed before.
-        assert uuid.UUID(view.device_uuid).hex.upper() == "00112233445566778899AABBCCDDEEFF"
-        # Everything else is the real account's.
+        uuid.UUID(view.device_uuid)
+        assert view.device_uuid == view.device_uuid.upper()
         assert view.serial == "0PENTAGVTEST"
 
-    def test_without_a_bridge_it_is_derived_and_stable(self) -> None:
+    def test_it_is_the_same_whichever_anisette_the_session_restored_onto(self) -> None:
+        """A Mac session on its own Mac, and the same session fallen back to a remote server."""
+        onTheMac = SimpleNamespace(device_uuid=MAC_DEVICE_ID, _anisette=SimpleNamespace(
+            _bridge=SimpleNamespace(cloudKitDeviceUuid=lambda: "00112233-4455-6677-8899-AABBCCDDEEFF")))
+        onAServer = SimpleNamespace(device_uuid=MAC_DEVICE_ID, _anisette=SimpleNamespace())
+
+        assert icloud_bridge._forCloudKit(onTheMac).device_uuid \
+            == icloud_bridge._forCloudKit(onAServer).device_uuid
+
+    def test_it_is_stable(self) -> None:
         first = icloud_bridge._forCloudKit(SimpleNamespace(device_uuid=MAC_DEVICE_ID))
         again = icloud_bridge._forCloudKit(SimpleNamespace(device_uuid=MAC_DEVICE_ID))
 

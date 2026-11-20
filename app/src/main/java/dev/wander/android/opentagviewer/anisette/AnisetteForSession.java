@@ -45,19 +45,39 @@ public final class AnisetteForSession {
                 ? Choice.EMULATED_MAC_FOR_RESTORE : Choice.ANDROID;
     }
 
+    /** The two constructors {@link #create} picks between, so a test can see which ran. */
+    interface Machines {
+        AnisetteSource android();
+
+        AnisetteSource emulatedMac(EmulatedMacAnisette.Purpose purpose);
+    }
+
     /** {@code AppDependencies}' factory. */
     public static AnisetteSource create(final Context context, final UserSettings settings,
                                         final boolean hasExistingSession) {
-        switch (choose(hasExistingSession, SessionProvenance.of(context))) {
+        return create(hasExistingSession, SessionProvenance.of(context), new Machines() {
+            @Override
+            public AnisetteSource android() {
+                return new LocalAnisette(context, settings, hasExistingSession);
+            }
+
+            @Override
+            public AnisetteSource emulatedMac(final EmulatedMacAnisette.Purpose purpose) {
+                return new EmulatedMacAnisette(context, settings, purpose);
+            }
+        });
+    }
+
+    static AnisetteSource create(final boolean hasExistingSession,
+                                 final SessionProvenance provenance, final Machines machines) {
+        switch (choose(hasExistingSession, provenance)) {
             case EMULATED_MAC_FOR_SIGN_IN:
-                return new EmulatedMacAnisette(context, settings,
-                        EmulatedMacAnisette.Purpose.SIGN_IN);
+                return machines.emulatedMac(EmulatedMacAnisette.Purpose.SIGN_IN);
             case EMULATED_MAC_FOR_RESTORE:
-                return new EmulatedMacAnisette(context, settings,
-                        EmulatedMacAnisette.Purpose.RESTORE);
+                return machines.emulatedMac(EmulatedMacAnisette.Purpose.RESTORE);
             case ANDROID:
             default:
-                return new LocalAnisette(context, settings, hasExistingSession);
+                return machines.android();
         }
     }
 }
