@@ -677,6 +677,19 @@ line downloads 3.5 MB from Apple with exactly the range request the app makes an
 against the pinned hashes; `--dmg iTunes12.8.3.dmg` does the same against a full copy of the
 installer and shows which of its chunks the range spans.
 
+`macadi_selftest` checks what a comparison cannot: that a guest call which never returns is
+stopped by the call timeout (`macadi-host.yml` runs this part), and, given a copy of a provisioned
+store, its host UUID and a count, that one engine serves that many header sets in a row with the
+same machine id and without its resident memory growing past the first fifty calls:
+
+```bash
+build/macadi/macadi_selftest /tmp/CoreADI.x86_64 979a0 [store-copy <host uuid, 32 hex> 1000]
+```
+
+Unicorn's default translation cache is 1 GiB and only flushes when full, which grew `:macadi` by
+about 20 KB a call without the cap `Vm` now sets; QEMU's TLB also doubles to about 60 MB over the
+first dozen calls and then stops, which is expected.
+
 Given a provisioned store directory and its host UUID instead of `--load-only`, `macadi_cli`
 prints one header set. Pass a fixed Unix time as the fifth argument to compare its output byte
 for byte against another implementation; never use a fixed clock for anything sent to Apple.
@@ -692,8 +705,12 @@ offline CoreADI calls with a frozen clock and a fixed host UUID, and diffs the o
 non-zero on any difference. Needs git, cargo, cmake and libclang (`unicorn-engine-sys` runs bindgen).
 `macadi-host.yml` runs it on every change to the port. Without a store, the calls stop short of the
 OTP path; a **copy** of a provisioned store (`files/anisette/mac/store/` from an install, through
-`adb shell run-as`) takes both drivers through one header session on that machine as well, still
-offline.
+`adb shell run-as`, or an exporter's `emulated-mac/machine/store/`) takes both drivers through one
+header session on that machine as well, still offline. Set `ADI_DIFF_HOST_UUID` to that machine's
+host UUID (`identity.json`): the machine id is derived from it, and without it both drivers just
+report "not provisioned", which matches and proves nothing. The script refuses that case when the
+variable is set. Run this way on 2026-11-20 against a store the exporter's Python engine had
+provisioned with Apple: identical machine id, OTP and routing.
 
 ### Which Python each tree targets
 

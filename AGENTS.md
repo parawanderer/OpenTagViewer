@@ -94,8 +94,9 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   emulator for licence reasons, read
   [docs/emulated-mac-emulator-choice.md](./docs/emulated-mac-emulator-choice.md): a replacement
   is invisible to users **only if it produces the same bytes**, because the emulator is not part
-  of the machine identity but its output is. `scripts/adi-emulator-diff/` is the check, and it has
-  not yet been run over the OTP path (both drivers take a provisioned store for that). The same doc says what the GPL obliges: a notice, and the
+  of the machine identity but its output is. `scripts/adi-emulator-diff/` is the check. CI runs it offline only; the OTP path was compared
+  by hand on 2026-11-20, identical, and needs `ADI_DIFF_HOST_UUID` set to the store's host UUID or
+  both sides just say "not provisioned" (CONTRIBUTING.md). The same doc says what the GPL obliges: a notice, and the
   library kept in its own process.
 - **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
   loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
@@ -758,7 +759,10 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
   and `store/` belong together: the library hashes the host UUID into the machine id, Apple binds
   the provisioning to the device id, and the Find My token only works alongside Anisette from the
   machine that obtained it. Apple will provision a device id **once** (a second attempt answers
-  HTTP 433 / -29002), so a lost store means a new machine and a new device-list entry.
+  HTTP 433 / -29002), so a lost store means a new machine and a new device-list entry. The same
+  holds for a process that died after Apple answered `midFinishProvisioning` and before the store
+  was saved: a sign-in that gets 433 for a never-provisioned identity draws a new one and tries
+  once more, or it would fall back to a server on every sign-in after.
 - **Never leave `adi.pb` in the store.** Provisioning writes the legacy whole-machine blob beside
   the per-user one, and while it exists the library says "not provisioned". A process that
   provisioned and then asked for headers sent Apple an empty machine id, which surfaces as
@@ -766,7 +770,9 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
   never reloads the file, made it go away. `CoreAdi::beginSession` drops it before every session.
 - **A Mac's device id is not a UUID**, and FindMy.py's CloudKit client parses it as one. The
   keychain and CloudKit clients get `icloud_bridge._forCloudKit`'s view of the account instead,
-  which answers `device_uuid` with the host UUID and forwards everything else. Anything new that
+  which answers `device_uuid` with a UUID derived from the device id and forwards everything
+  else. Not the Mac's host UUID: a session that falls back to a remote server has no Mac to ask,
+  and it would tell CloudKit a second device. Anything new that
   hands the account to CloudKit has to go through it.
 - **Never freeze the emulated clock outside a byte-for-byte comparison.** A constant OTP is
   accepted for about a minute and then refused.
@@ -781,6 +787,12 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
 - **The C++ port is checked against os-findmy-e's Rust byte for byte**, offline:
   `scripts/adi-emulator-diff/compare-libmacadi.sh`, in `macadi-host.yml`. Change `vm.cpp`,
   `core_adi.cpp` or `macho.cpp` and that job is what says whether the port still matches.
+- **`:macadi` is long-lived, so the emulator must not grow or hang.** One engine serves every
+  header set for the process's life. Unicorn's default 1 GiB translation cache, flushed only when
+  full, grew it ~20 KB a call without end; `Vm` caps it at 8 MiB. A guest call has a 30 s timeout,
+  because a loop under emulation would otherwise hold a core and the app's binder call forever.
+  The process is let go after five idle minutes (`EmulatedMacAnisette.IDLE_CLOSE_MS`) and reopened
+  from the store. `macadi_selftest` checks the timeout in CI and memory over many calls by hand.
 
 The emulator suite's sign-in tests cannot cover any of this - they swap the Anisette source for a
 fake. What does: the JVM tests (`EmulatedMacAnisetteTest`, `MacIdentityTest`,
