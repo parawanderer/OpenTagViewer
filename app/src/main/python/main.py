@@ -836,6 +836,7 @@ def getAccount(
             return None
 
         data = json.loads(serializedAccountData)
+        app_identity.respellRefusedOsName(data)
 
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)

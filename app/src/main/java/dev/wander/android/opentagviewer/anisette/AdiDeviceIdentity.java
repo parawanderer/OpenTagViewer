@@ -187,10 +187,19 @@ public final class AdiDeviceIdentity {
          * it has always been wrong, and changing it now would re-identify every existing
          * install to fix a contradiction Apple has evidently never minded. The new profile does
          * not have it.
+         *
+         * <p><b>Except the OS name, which Apple forced.</b> This said {@code macOS} until
+         * 2026-11-20, when Apple's edge began refusing every Grand Slam sign-in whose client info
+         * spells it that way - a 190-byte HTML 503, before a credential is looked at (#289).
+         * {@code Mac OS X} is what macOS's own {@code akd} sends and is let through; model,
+         * version, build and bundle made no difference either way. Provisioning and the report
+         * fetch accept both spellings, so nothing else moved. Stored sessions are respelt on
+         * restore by {@code identity.respellRefusedOsName}, or they would be refused at their
+         * next re-authentication.
          */
         LEGACY_MAC(
                 "MacBook Pro 13\"",
-                "MacBookPro13,2", "macOS", "13.1", "22C65",
+                "MacBookPro13,2", "Mac OS X", "13.1", "22C65",
                 "1404.0.5", "22.3.0",
                 "com.apple.dt.Xcode/3594.4.19") {
 
