@@ -29,7 +29,7 @@ from findmy.reports.anisette import CLIENT_IDENTITY, CLIENT_SERIAL, DeviceIdenti
 # ones Java actually produces is asserted on device, by IdentityBridgeTest.
 LEGACY_MAC = {
     "model": "MacBookPro13,2",
-    "os_name": "macOS",
+    "os_name": "Mac OS X",
     "os_version": "13.1",
     "os_build": "22C65",
     "cfnetwork": "1404.0.5",
@@ -201,7 +201,7 @@ class TestTheIdentityANewSessionPresents:
         kwargs = identity.identityForNewSession(bridge)
 
         assert kwargs["identity"] == DeviceIdentity(**LEGACY_MAC)
-        assert kwargs["identity"].platform == "<MacBookPro13,2> <macOS;13.1;22C65>"
+        assert kwargs["identity"].platform == "<MacBookPro13,2> <Mac OS X;13.1;22C65>"
 
     def test_the_serial_is_this_installs_even_for_a_legacy_machine_profile(self):
         """
@@ -565,3 +565,58 @@ class TestWhatSurvivesBeingStored:
 
         assert "serial" not in stored
         assert "identity" not in stored
+
+
+class TestAStoredMacOsSpellingIsRespelt:
+    """
+    #289: since 2026-11-20 Apple's edge refuses any sign-in whose client info says `<macOS;…>`.
+
+    Every legacy-Mac session was stored saying that, with its password, so FindMy.py would
+    re-authenticate under it the next time a PET ran out - and be refused. The restore is the one
+    place all of them pass through.
+    """
+
+    REFUSED = {**LEGACY_MAC, "os_name": "macOS"}
+
+    def _restored(self, stored_identity):
+        from findmy.reports.state import LoginState
+
+        imposed = {"identity": DeviceIdentity(**stored_identity)} if stored_identity else {}
+        account = AppleAccount(RemoteAnisetteProvider(
+            "https://example.invalid", serial=DRAWN_SERIAL, **imposed,
+        ))
+        stored = account.to_json()
+        stored["login"]["state"] = LoginState.LOGGED_IN.value
+
+        restored = main.getAccount(json.dumps(stored))
+        assert restored is not None
+        return restored._asyncacc._anisette
+
+    def test_a_session_stored_as_macos_comes_back_as_mac_os_x(self):
+        provider = self._restored(self.REFUSED)
+
+        assert provider.identity == DeviceIdentity(**LEGACY_MAC)
+        assert provider.identity.platform == "<MacBookPro13,2> <Mac OS X;13.1;22C65>"
+
+    def test_only_the_spelling_moves(self):
+        """The serial and every other field are what Apple has the session bound to."""
+        provider = self._restored(self.REFUSED)
+
+        assert provider.serial == DRAWN_SERIAL
+        assert {k: v for k, v in provider.identity.to_json().items() if k != "os_name"} == {
+            k: v for k, v in self.REFUSED.items() if k != "os_name"
+        }
+
+    def test_other_identities_are_left_exactly_as_stored(self):
+        assert self._restored(IPHONE).identity == DeviceIdentity(**IPHONE)
+        assert self._restored(None).identity == CLIENT_IDENTITY
+
+    def test_the_mapping_is_untouched_when_there_is_nothing_to_respell(self):
+        state = {"anisette": {"type": "aniRemote", "url": "https://example.invalid"}}
+
+        assert identity.respellRefusedOsName(json.loads(json.dumps(state))) == state
+
+    def test_java_no_longer_hands_a_new_session_the_refused_spelling(self):
+        # The copy at the top of this file is what Java sends; IdentityBridgeTest pins that on
+        # device. This pins that the copy was moved with it.
+        assert LEGACY_MAC["os_name"] not in identity.REFUSED_OS_NAMES

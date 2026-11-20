@@ -45,10 +45,13 @@ public class AdiDeviceIdentityTest {
      * <p>Reproduced from the constant this replaced. The whole point of {@code LEGACY_MAC} is
      * that it did not change, so this string is the specification and the enum is the thing
      * being checked.
+     *
+     * <p>One deliberate exception: the OS name, {@code macOS} until Apple's edge began refusing
+     * that spelling at sign-in on 2026-11-20 (#289). It must never go back.
      */
     @Test
     public void theLegacyMacsClientInfoHasNotMoved() {
-        assertEquals("<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 "
+        assertEquals("<MacBookPro13,2> <Mac OS X;13.1;22C65> <com.apple.AuthKit/1 "
                         + "(com.apple.dt.Xcode/3594.4.19)>",
                 Hardware.LEGACY_MAC.clientInfo());
     }

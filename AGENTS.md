@@ -618,6 +618,18 @@ curl -so /dev/null -w '%{http_code}\n' -X POST --data-binary t \
 app and the exporter send, and opens an issue when one is refused. It would have caught this before
 the first report. `python scripts/check_gsa_edge.py` asks from your own connection.
 
+**It did, on 2026-11-20 ([#289](https://github.com/parawanderer/OpenTagViewer/issues/289)), and
+the rule was a different one.** The edge began refusing any sign-in whose client info spells the OS
+`<macOS;…>`, while the identical request saying `<Mac OS X;…>` — what macOS's own `akd` sends —
+got through. The legacy Mac profile said `macOS`. Model, version, build and bundle made no
+difference; provisioning and the report fetch accept both. Finding it took a dozen requests with
+one field changed at a time (the script's `Probe` shape does this), not a day. Two lessons: **any
+field in that header can become the one Apple keys on**, so copy Apple's own spelling of each and
+not a plausible one; and **a stored session carries its identity and its password**, so it
+re-authenticates under the old value on its own. Fixing the profile alone would have left every
+existing user to break at their next PET renewal — `identity.respellRefusedOsName` corrects it on
+restore.
+
 **So check the neighbours first.** This project shares an authentication path with AltStore,
 SideStore, Macless Haystack, OpenBubbles and every Anisette server, because they all copied it
 from the same place. When something that worked yesterday fails for everybody, half an hour

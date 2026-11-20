@@ -44,7 +44,7 @@ def test_the_legacy_profile_is_read_despite_its_escaped_quote():
     legacy = next(p for p in edge.read_profiles() if p.name == "LEGACY_MAC")
 
     assert legacy.model == "MacBookPro13,2"
-    assert (legacy.os_name, legacy.os_version, legacy.os_build) == ("macOS", "13.1", "22C65")
+    assert (legacy.os_name, legacy.os_version, legacy.os_build) == ("Mac OS X", "13.1", "22C65")
 
 
 def test_a_constant_the_pattern_cannot_read_fails_loudly(tmp_path):
@@ -132,7 +132,7 @@ def test_the_control_getting_through_is_news_not_a_failure():
     ])
 
     assert code == 0
-    assert "no longer refuses the Xcode identifier" in out
+    assert "sign-in, Xcode control: Apple no longer refuses this" in out
 
 
 def test_apple_unreachable_is_its_own_exit_code():
@@ -150,22 +150,39 @@ def test_apple_unreachable_is_its_own_exit_code():
 def test_the_legacy_profile_signs_in_with_what_the_app_sent():
     """
     Pinned to the wire, not to this script: the header below is copied from the app's refusal
-    log on 2026-09-13. If the check ever composes something else, it is probing a request the
-    app does not make.
+    log on 2026-09-13, with the OS name respelt `Mac OS X` after Apple began refusing `macOS`
+    on 2026-11-20 (#289). If the check ever composes something else, it is probing a request
+    the app does not make.
     """
     pytest.importorskip("findmy")
     legacy = next(p for p in edge.probes(edge.read_profiles()) if p.name == "sign-in, app LEGACY_MAC")
 
     assert legacy.headers["X-MMe-Client-Info"] == (
-        "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+        "<MacBookPro13,2> <Mac OS X;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
     )
     assert legacy.headers["User-Agent"] == "akd/1.0 CFNetwork/978.0.7 Darwin/18.7.0"
 
 
-def test_only_the_control_names_xcode_on_sign_in():
+def test_only_the_controls_send_what_apple_refuses_on_sign_in():
     pytest.importorskip("findmy")
     sign_ins = [p for p in edge.probes(edge.read_profiles()) if p.name.startswith("sign-in")]
 
     for probe in sign_ins:
-        names_xcode = "com.apple.dt.Xcode" in probe.headers["X-MMe-Client-Info"]
-        assert names_xcode == (probe.expect == edge.REFUSED), probe.name
+        client_info = probe.headers["X-MMe-Client-Info"]
+        refusable = "com.apple.dt.Xcode" in client_info or "<macOS;" in client_info
+        assert refusable == (probe.expect == edge.REFUSED), probe.name
+
+
+def test_the_macos_control_differs_from_the_legacy_profile_only_in_the_os_name():
+    """
+    The control is only evidence about the spelling if the spelling is all that differs.
+    Otherwise a pass for the app and a refusal for the control could be about anything.
+    """
+    pytest.importorskip("findmy")
+    found = {p.name: p for p in edge.probes(edge.read_profiles())}
+    legacy, control = found["sign-in, app LEGACY_MAC"], found["sign-in, macOS spelling control"]
+
+    assert control.headers["X-MMe-Client-Info"] == (
+        legacy.headers["X-MMe-Client-Info"].replace("<Mac OS X;", "<macOS;")
+    )
+    assert control.expect == edge.REFUSED

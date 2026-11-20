@@ -25,9 +25,11 @@ page on an error status is the edge refusing. Anything else means the request go
 which is all this checks: with a junk body a request that got through is usually a 404 or a 401
 rather than a success, and that is fine.
 
-**The Xcode control.** One probe sends the identifier Apple blocked, and is expected to be
-refused. It proves the probe can still see the rule. If it starts getting through, Apple has
-lifted or reshaped the block; that is reported but is not a failure.
+**The controls.** Two probes send what Apple is known to refuse, and are expected to be refused:
+the Xcode identifier (September 2026), and the legacy Mac profile with its OS spelt `macOS`
+rather than `Mac OS X` (November 2026, #289 - the profile said `macOS` until then, and only the
+spelling differs). They prove the probe can still see each rule. If one starts getting through,
+Apple has lifted or reshaped that block; that is reported but is not a failure.
 
 Exit codes: 0 all as expected, 1 one of this project's identities was refused, 2 Apple could
 not be reached at all.
@@ -180,7 +182,10 @@ def probes(profiles: list[Profile]) -> list[Probe]:
         }
 
     found: list[Probe] = []
+    legacy: Profile | None = None
     for profile in profiles:
+        if profile.name == "LEGACY_MAC":
+            legacy = profile
         identity = DeviceIdentity.from_json(profile.identity_json())  # type: ignore[arg-type]
         found.append(Probe(
             f"sign-in, app {profile.name}", "POST", GSA,
@@ -206,6 +211,12 @@ def probes(profiles: list[Profile]) -> list[Probe]:
         "sign-in, Xcode control", "POST", GSA,
         sign_in(CLIENT_IDENTITY.client_info(_XCODE_BUNDLE)), REFUSED,
     ))
+    if legacy is not None:
+        spelt = DeviceIdentity.from_json({**legacy.identity_json(), "os_name": "macOS"})  # type: ignore[arg-type]
+        found.append(Probe(
+            "sign-in, macOS spelling control", "POST", GSA,
+            sign_in(spelt.client_info(_AKD_BUNDLE)), REFUSED,
+        ))
     return found
 
 
@@ -274,8 +285,8 @@ def run(checks: list[Probe], ask: Callable[[Probe], Answer] = fetch, out=sys.std
             refused.append(probe.name)
         elif probe.expect == REFUSED and verdict == THROUGH:
             print(
-                f"note {probe.name}: Apple no longer refuses the Xcode identifier. The block this "
-                "check was written for has been lifted or has changed shape. Not a failure.",
+                f"note {probe.name}: Apple no longer refuses this. The block it was written "
+                "for has been lifted or has changed shape. Not a failure.",
                 file=out,
             )
 
