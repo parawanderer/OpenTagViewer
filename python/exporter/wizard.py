@@ -32,7 +32,7 @@ from tkinter import messagebox, ttk
 from typing import Callable, Sequence
 from tkinter.filedialog import askopenfilenames, asksaveasfilename
 
-from exporter import icloud, localsource, source, terms
+from exporter import icloud, localsource, macadi, source, terms
 from exporter.asyncui import Asker, Cancelled, run_with_progress
 from exporter.certs import ensure_ca_bundle
 from exporter.codes import (
@@ -1531,6 +1531,16 @@ def self_test() -> int:
     if not _emulator_runs():
         return 1
 
+    # The emulated Mac's engine is imported by nothing at build time - the frozen exporter runs it
+    # as a child of itself - so PyInstaller bundles it only because it was told to. A build that
+    # dropped it would start, show the window, and fail at sign-in.
+    try:
+        macadi.load_engine()
+    except Exception as e:  # noqa: BLE001 - reported, and fails the self-test
+        _say(f"emulated mac engine: MISSING ({type(e).__name__}: {e})")
+        return 1
+    _say("emulated mac engine: bundled")
+
     _say("self-test passed")
     return 0
 
@@ -1622,6 +1632,11 @@ def _emu_run(state: dict) -> None:
 
 
 if __name__ == "__main__":
+    # First, before anything that could open a window: the frozen exporter runs itself as the
+    # emulated Mac's engine, because it has no other interpreter to run it with. exporter.macadi.
+    if sys.argv[1:2] == [macadi.ENGINE_FLAG]:
+        sys.exit(macadi.run_engine_here(sys.argv[2:]))
+
     if "--self-test" in sys.argv[1:]:
         import anisette  # noqa: F401, PLC0415 - imported for its path, above
 
