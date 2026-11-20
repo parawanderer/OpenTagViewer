@@ -5,6 +5,9 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import dev.wander.android.opentagviewer.R;
 
 /** A JVM test: {@link NearbyTagLabel} chooses resources without touching a {@code Context}. */
@@ -20,6 +23,18 @@ public class NearbyTagLabelTest {
                 NearbyTagLabel.shortBatteryLabel(FindMyAdvertisement.BatteryLevel.LOW));
         assertEquals(R.string.battery_short_very_low,
                 NearbyTagLabel.shortBatteryLabel(FindMyAdvertisement.BatteryLevel.VERY_LOW));
+    }
+
+    @Test
+    public void batteryIconGivesEveryLevelItsOwnIcon() {
+        final Set<Integer> icons = new HashSet<>();
+        for (final FindMyAdvertisement.BatteryLevel level : FindMyAdvertisement.BatteryLevel.values()) {
+            icons.add(NearbyTagLabel.batteryIcon(level));
+        }
+        // Two levels sharing an icon would read as the same battery on the card.
+        assertEquals(FindMyAdvertisement.BatteryLevel.values().length, icons.size());
+        assertEquals(R.drawable.battery_android_alert_24px,
+                NearbyTagLabel.batteryIcon(FindMyAdvertisement.BatteryLevel.VERY_LOW));
     }
 
     @Test

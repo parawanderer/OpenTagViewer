@@ -334,7 +334,6 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="battery_short_low">faible</string>
     <string name="battery_short_very_low">critique</string>
     <string name="battery">Batterie</string>
-    <string name="nearby_now_with_battery_and_signal">À proximité (%2$s) · Batterie %1$s</string>
     <string name="heard_over_bluetooth">Par Bluetooth</string>
     <string name="last_seen">Dernière détection</string>
     <string name="signal">Signal</string>
@@ -423,4 +422,5 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="ring_failed_reason">Échec de la sonnerie : %1$s</string>
     <string name="server_url_not_https">Pas en https : le jeton d\'API sera envoyé sans chiffrement.</string>
     <string name="google_find_hub_setup_guide">Comment le configurer</string>
+    <string name="battery_icon_description">Batterie %1$s</string>
 </resources>
