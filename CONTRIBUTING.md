@@ -585,6 +585,18 @@ version ≤ 14` is the two decryptor tests for the macOS-local route: **they ski
 since GitHub stopped offering macOS 14 runners in November 2026, and run only by hand on a Mac
 that old. A skip naming `_tkinter` means the window tests did not run.
 
+#### The emulated Mac's engine, for real
+
+`test_emulated_mac.py` runs Apple's macOS CoreADI under Unicorn only when `OTV_COREADI` names a
+copy of the library, and otherwise skips that one class. It sends Apple nothing: `info` is
+`Initialize` and `IsMachineProvisioned`. Fetching the library is one 3.5 MB range request to
+Apple, and is the only network use:
+
+```bash
+uv run python -c "from pathlib import Path; from exporter import macadi; macadi.ensure_library(Path('/tmp/CoreADI.x86_64'))"
+OTV_COREADI=/tmp/CoreADI.x86_64 uv run pytest test/test_emulated_mac.py -rs
+```
+
 ### Tooling tests
 
 ```bash
