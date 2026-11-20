@@ -70,6 +70,14 @@ fn run() {
     // That is the OTP path, which every call above stops short of. compare-libmacadi.sh passes it
     // through; macadi_diff.cpp prints the same lines.
     if let Some(store) = std::env::args().nth(2) {
+        // The machine id is derived from the host UUID, so the store's own is needed to reach it.
+        if let Ok(h) = std::env::var("ADI_DIFF_HOST_UUID") {
+            let mut uuid = [0u8; 16];
+            for (i, b) in uuid.iter_mut().enumerate() {
+                *b = u8::from_str_radix(&h[i * 2..i * 2 + 2], 16).expect("ADI_DIFF_HOST_UUID is 32 hex");
+            }
+            adi.set_host_uuid(uuid);
+        }
         for entry in std::fs::read_dir(&store).unwrap() {
             let entry = entry.unwrap();
             let name = entry.file_name().to_string_lossy().into_owned();

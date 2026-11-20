@@ -124,7 +124,15 @@ int main(int argc, char **argv) {
         }
 
         if (argc > 3) {
-            // A provisioned machine, then one header session on it: the OTP path.
+            // A provisioned machine, then one header session on it: the OTP path. The machine id
+            // is derived from the host UUID, so the store's own is needed to reach it.
+            if (const char *h = std::getenv("ADI_DIFF_HOST_UUID")) {
+                const std::string hexUuid = h;
+                if (hexUuid.size() != 32) throw macadi::Error("ADI_DIFF_HOST_UUID is 32 hex");
+                uint8_t own[16];
+                for (int i = 0; i < 16; i++) own[i] = static_cast<uint8_t>(std::stoul(hexUuid.substr(i * 2, 2), nullptr, 16));
+                adi.setHostUuid(own);
+            }
             DIR *dir = opendir(argv[3]);
             if (dir == nullptr) throw macadi::Error(std::string("cannot open store ") + argv[3]);
             while (const dirent *e = readdir(dir)) {

@@ -15,6 +15,10 @@
 # and nothing needs Apple but the library itself:
 #     python scripts/locate_mac_coreadi.py --remote --out /tmp/CoreADI.x86_64
 #
+# The machine id is derived from the host UUID, so set ADI_DIFF_HOST_UUID (32 hex) to the store's
+# own, or the "provisioned" lines are both just "not provisioned" and the OTP path is never reached.
+# The store's adi.pb, if any, is left out: while it exists the library reports not provisioned.
+#
 # Needs git, cargo, cmake and a C++17 compiler.
 set -euo pipefail
 
@@ -28,8 +32,16 @@ store=""
 if [ -n "${2:-}" ]; then
     store="$(cd "$2" && pwd)"
 fi
+if [ -n "$store" ] && [ -z "${ADI_DIFF_HOST_UUID:-}" ]; then
+    echo "warning: no ADI_DIFF_HOST_UUID, so the store will read as not provisioned" >&2
+fi
 work="${3:-${TMPDIR:-/tmp}/adi-emulator-diff-libmacadi}"
 mkdir -p "$work" && cd "$work"
+if [ -n "$store" ]; then
+    rm -rf store && mkdir store
+    find "$store" -maxdepth 1 -type f ! -name adi.pb -exec cp {} store/ \;
+    store="$work/store"
+fi
 
 if [ ! -d os-findmy-e ]; then
     git init -q os-findmy-e
@@ -50,6 +62,11 @@ cmake --build macadi-host --parallel --target macadi_diff > /dev/null
 "$core/target-unicorn/release/adi-diff" "$dylib" ${store:+"$store"} > adi-core.txt
 macadi-host/macadi_diff "$dylib" "$DISPATCH" ${store:+"$store"} > libmacadi.txt
 
+if [ -n "${ADI_DIFF_HOST_UUID:-}" ] && ! grep -q '^provisioned request_otp Ok((Reply { rc: 0, ret: 0 }' adi-core.txt; then
+    cat adi-core.txt
+    echo "the store did not read as provisioned under ADI_DIFF_HOST_UUID; the OTP path was not reached" >&2
+    exit 1
+fi
 cat adi-core.txt
 if diff -u adi-core.txt libmacadi.txt; then
     echo "libmacadi: identical to adi-core ($(wc -l < adi-core.txt) lines)"
