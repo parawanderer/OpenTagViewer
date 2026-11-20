@@ -1,26 +1,18 @@
 """
 The two Python halves of signing in as the emulated Mac.
 
-**Against the real `AppleAccount`**, with only Grand Slam's answers replaced: the 409 shim works
-by replacing `_gsa_request` on the instance, and a fake account would keep that name after a
-rename (rule 3).
-
-**Not covered here:** that the library, given `au`, then asks for a code. That decision is in
-`_gsa_authenticate` after the SRP exchange, which needs Apple's half to reach. It is the line
-`if au in ("secondaryAuth", "trustedDeviceSecondaryAuth")` in the pinned `account.py`.
+Grand Slam's `hsc` 409 with no `au` is read as a second factor by the pinned FindMy.py itself
+(`_normalize_2fa_status`, parawanderer/FindMy.py#9), which tests it through a full offline SRP
+exchange. The app's runtime wrapper for it is gone; `TestHsc409` only pins that the library still
+has it.
 """
 
 from __future__ import annotations
 
-import asyncio
 import uuid
-from collections.abc import Iterator
 from types import SimpleNamespace
-from typing import Any
 
-import pytest
-
-from findmy.reports import AppleAccount, RemoteAnisetteProvider
+from findmy.reports import RemoteAnisetteProvider
 
 import icloud_bridge
 import main
@@ -50,59 +42,18 @@ class TestTheRoutingNumber:
         assert provider.router == RemoteAnisetteProvider("https://example.invalid").router
 
 
-@pytest.fixture
-def account() -> Iterator[AppleAccount]:
-    made = AppleAccount(RemoteAnisetteProvider("https://example.invalid"))
-    yield made
-    main.closeAccount(made)
+class TestHsc409:
+    def test_the_pinned_findmy_reads_it_as_a_second_factor(self) -> None:
+        """
+        Since 2026-10-12 Apple asks for a code with `hsc` 409 and no `au` (#248). The app used to
+        patch that in at runtime; the pin now carries it. If this fails, the pin moved to a
+        FindMy.py without it, and every sign-in that needs a code skips the code and fails.
+        """
+        from findmy.reports.account import _normalize_2fa_status
 
-
-def answersFromGrandSlam(account: AppleAccount, status: dict[str, Any]) -> list[dict]:
-    """
-    Make the account's Grand Slam exchange answer every request with `status`, without SRP: the
-    password check itself needs Apple's half, and the shim only reads what comes back.
-    """
-    asked: list[dict] = []
-
-    async def gsa_request(parameters: dict[str, Any]) -> dict[str, Any]:
-        asked.append(parameters)
-        return {"Status": dict(status)}
-
-    account._asyncacc._gsa_request = gsa_request
-    return asked
-
-
-class TestHsc409WithNoAu:
-    def test_a_complete_answered_409_without_au_is_read_as_a_second_factor(
-            self, account: AppleAccount) -> None:
-        asked = answersFromGrandSlam(account, {"ec": 0, "hsc": 409})
-        main._treatHsc409AsSecondFactor(account)
-
-        response = asyncio.run(account._asyncacc._gsa_request({"o": "complete"}))
-
-        assert asked == [{"o": "complete"}]
-        assert response["Status"]["au"] == "trustedDeviceSecondaryAuth"
-
-    @pytest.mark.parametrize("status", [
-        {"ec": 0, "hsc": 200},
-        {"ec": 0, "hsc": 409, "au": "secondaryAuth"},
-    ])
-    def test_anything_else_is_left_as_apple_sent_it(
-            self, account: AppleAccount, status: dict) -> None:
-        answersFromGrandSlam(account, status)
-        main._treatHsc409AsSecondFactor(account)
-
-        response = asyncio.run(account._asyncacc._gsa_request({"o": "complete"}))
-
-        assert response["Status"] == status
-
-    def test_an_init_answered_409_is_not_touched(self, account: AppleAccount) -> None:
-        answersFromGrandSlam(account, {"ec": 0, "hsc": 409})
-        main._treatHsc409AsSecondFactor(account)
-
-        response = asyncio.run(account._asyncacc._gsa_request({"o": "init"}))
-
-        assert "au" not in response["Status"]
+        status = {"ec": 0, "hsc": 409}
+        _normalize_2fa_status(status)
+        assert status["au"] == "trustedDeviceSecondaryAuth"
 
 
 MAC_DEVICE_ID = "00006000-0123456789ABCDEF"
@@ -145,31 +96,3 @@ class TestWhatCloudKitIsToldTheDeviceIs:
         real = Account()
         icloud_bridge._forCloudKit(real).change()
         assert real.state == "after"
-
-
-class TestWhenTheInternalsMove:
-    def test_an_account_without_gsa_request_is_left_alone(self, capsys) -> None:
-        account = SimpleNamespace(_asyncacc=SimpleNamespace())
-        main._treatHsc409AsSecondFactor(account)  # type: ignore[arg-type]
-        assert "hsc 409 will not be read as 2FA" in capsys.readouterr().out
-
-
-class TestWhenFindMyReadsTheHsc409Itself:
-    """The pin moving to a FindMy.py with `_normalize_2fa_status` makes the stopgap a no-op."""
-
-    def test_the_account_is_left_alone(
-            self, account: AppleAccount, monkeypatch: pytest.MonkeyPatch) -> None:
-        asked = answersFromGrandSlam(account, {"ec": 0, "hsc": 409})
-        wrapped = account._asyncacc._gsa_request
-        monkeypatch.setattr(main, "_FINDMY_READS_HSC_409", True)
-
-        main._treatHsc409AsSecondFactor(account)
-
-        assert account._asyncacc._gsa_request is wrapped
-        response = asyncio.run(account._asyncacc._gsa_request({"o": "complete"}))
-        assert asked == [{"o": "complete"}]
-        assert "au" not in response["Status"]
-
-    def test_the_pinned_findmy_does_not_yet(self) -> None:
-        """When this fails, the pin has moved: delete `_treatHsc409AsSecondFactor` and this class."""
-        assert not main._FINDMY_READS_HSC_409

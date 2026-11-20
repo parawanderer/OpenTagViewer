@@ -758,12 +758,10 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
   hands the account to CloudKit has to go through it.
 - **Never freeze the emulated clock outside a byte-for-byte comparison.** A constant OTP is
   accepted for about a minute and then refused.
-- **Grand Slam now asks for a second factor with `hsc` 409 and no `au`**, which the pinned
-  FindMy.py reads as "no 2FA needed". The fix belongs in FindMy.py's `_gsa_authenticate`
-  (`_normalize_2fa_status`, as malmeloo/FindMy.py#279 has it). Until the pin reaches a commit with
-  it, `main._treatHsc409AsSecondFactor` fills `au` in by wrapping `_gsa_request`, and it steps aside
-  by itself once FindMy.py has the function. `test_the_pinned_findmy_does_not_yet` fails on the
-  pin move, which is the cue to delete the wrapper.
+- **Grand Slam now asks for a second factor with `hsc` 409 and no `au`**, which FindMy.py before
+  parawanderer/FindMy.py#9 read as "no 2FA needed". The pinned FindMy.py handles it in
+  `_gsa_authenticate` (`_normalize_2fa_status`, as malmeloo/FindMy.py#279 has it), so the app no
+  longer wraps `_gsa_request`. `test_emulated_mac.TestHsc409` fails if a pin move loses it.
 - **The APK carries GPL-2.0 code** (Unicorn). Keep it in `libmacadi.so`, not in
   `libopentagviewer.so`, and keep its obligations met: `assets/licences/unicorn/` carries the
   licence files and a notice naming the exact source (`UnicornNoticeTest` keeps it in step with

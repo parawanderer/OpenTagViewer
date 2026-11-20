@@ -31,11 +31,6 @@ from findmy.reports.twofactor import (
 )
 
 import identity as app_identity
-from findmy.reports import account as _findmy_account
-
-_FINDMY_READS_HSC_409 = hasattr(_findmy_account, "_normalize_2fa_status")
-"""Whether the pinned FindMy.py reads `hsc` 409 as a second factor itself. See
-`_treatHsc409AsSecondFactor`."""
 
 
 class TwoFactorMethods(Enum):
@@ -345,8 +340,6 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
             timeout=LOGIN_TIMEOUT_SECONDS,
             **app_identity.deviceIdsForNewSession(localAnisette),
         )
-        _treatHsc409AsSecondFactor(acc)
-
         state = acc.login(email, password)
 
         # Which Anisette established this session decides whether continuing it against the
@@ -787,47 +780,6 @@ def acceptTerms(account: AppleAccount, pageId: str) -> str:
         })
 
 
-def _treatHsc409AsSecondFactor(acc: AppleAccount) -> None:
-    """Read Grand Slam's new way of asking for a second factor as asking for one.
-
-    Since 2026-10-12, a password Apple accepts but wants a code for is answered at SRP `complete`
-    with `hsc` 409 and **no `au`** - the field the pinned FindMy.py reads to decide that 2FA is
-    needed. Seeing no `au`, the library concludes the sign-in is complete, skips the code, and the
-    `mobileme` step after it fails with `status=1`. Reported in malmeloo/FindMy.py#278 and on
-    parawanderer/OpenTagViewer#248; the remedy, setting `au` to `trustedDeviceSecondaryAuth`, is
-    the one sacca97/os-findmy-e signed in with.
-
-    **A stopgap until the pin moves.** The fix belongs in FindMy.py's `_gsa_authenticate`, which is
-    where malmeloo/FindMy.py#279 puts it, as `_normalize_2fa_status`; the same change is proposed
-    for parawanderer/FindMy.py. A FindMy.py that has it is left alone here, so moving the pin (rule
-    14) makes this a no-op, and the next change deletes it.
-
-    Until then it wraps the instance's `_gsa_request`, which `_gsa_authenticate` looks up on the
-    instance. If a later FindMy.py renames it, this says so and changes nothing, and the 2FA bug
-    comes back.
-    """
-    if _FINDMY_READS_HSC_409:
-        return
-
-    inner = getattr(acc, "_asyncacc", None)
-    original = getattr(inner, "_gsa_request", None) if inner is not None else None
-    if inner is None or original is None:
-        print("FindMy's account internals have changed; hsc 409 will not be read as 2FA")
-        return
-
-    async def _gsa_request(parameters: Any, *args: Any, **kwargs: Any) -> Any:
-        response = await original(parameters, *args, **kwargs)
-        status = response.get("Status") if isinstance(response, dict) else None
-        if (isinstance(parameters, dict) and parameters.get("o") == "complete"
-                and isinstance(status, dict) and status.get("hsc") == 409
-                and not status.get("au")):
-            print("Grand Slam answered hsc 409 with no au: treating it as a second factor")
-            status["au"] = "trustedDeviceSecondaryAuth"
-        return response
-
-    inner._gsa_request = _gsa_request
-
-
 def _preferLocalAnisette(acc: AppleAccount, localAnisette: Any) -> None:
     """Swap a restored account's anisette provider for the local one, if it is usable.
 
@@ -908,8 +860,6 @@ def getAccount(
 
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)
-        # A restored session re-authenticates on its own after a 401, through the same exchange.
-        _treatHsc409AsSecondFactor(acc)
 
         print(f"Restored account, login state: {acc.login_state}")
 
