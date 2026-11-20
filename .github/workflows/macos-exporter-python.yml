@@ -30,7 +30,9 @@ env:
 
 jobs:
   test-release-version:
-    runs-on: macos-14
+    # 15: GitHub stopped offering 14 in November 2026. It runs the exporter's whole suite, Tk
+    # included, so it stays on macOS; the two macOS-14-only decryptor tests skip here now.
+    runs-on: macos-15
 
     # Only run this for exporter release tags. `macos-exporter-v` is the old spelling, still
     # accepted by scripts/release_version.py so that existing tags and existing habits keep
@@ -128,7 +130,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14         # Apple Silicon
+          # Apple Silicon. 15 because GitHub no longer offers 14. Building on a newer macOS than
+          # users run is safe here for the same reasons the Intel job below is:
+          # MACOSX_DEPLOYMENT_TARGET, Homebrew's OpenSSL unlinked, and check_macos_min_version.py
+          # refusing any binary that would not start on 14.
+          - runner: macos-15
             os: macos
             arch: arm64
           - runner: macos-15-intel   # macos-13 no longer exists; this is the current x64 label
@@ -202,8 +208,8 @@ jobs:
     # the binary demanded macOS 15. A uv-managed CPython carries tkinter, targets 11.0, and ships
     # no OpenSSL dylib at all, which removes the offending file rather than arguing with it.
     #
-    # The arm64 job only passed because its runner is macos-14 and 14.0 is the threshold; it would
-    # have failed the same way the moment GitHub moved that label to 15.
+    # The arm64 job only passed because its runner was macos-14 and 14.0 is the threshold; it would
+    # have failed the same way on 15, which is where it runs now.
 
     - name: Install tkinter (Linux)
       if: matrix.os == 'linux'
@@ -222,7 +228,7 @@ jobs:
     # already fails harmlessly for `libssl.so.1.1.0` and `libssl.32.dylib` in every build that has
     # ever succeeded - so not finding one more name is the normal case, not a new risk.
     #
-    # The arm64 job was never green for a good reason either: its runner is macos-14, so the copy
+    # The arm64 job was never green for a good reason either: its runner was macos-14, so the copy
     # it collected happened to be built for 14 and slipped under the threshold.
     - name: Keep Homebrew's OpenSSL out of the bundle (macOS)
       if: matrix.os == 'macos'
@@ -254,6 +260,7 @@ jobs:
           --osx-bundle-identifier "dev.wander.opentagviewer" \
           --icon=OpenTagViewer.icns \
           --collect-all unicorn \
+          --collect-submodules machoadi \
           --collect-data findmy \
           --collect-data anisette \
           --noconfirm \
@@ -273,6 +280,7 @@ jobs:
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
           --collect-all unicorn `
+          --collect-submodules machoadi `
           --collect-data findmy `
           --collect-data anisette `
           --noconfirm `
@@ -309,6 +317,7 @@ jobs:
         uv run --frozen pyinstaller \
           --name "OpenTagViewer" \
           --collect-all unicorn \
+          --collect-submodules machoadi \
           --collect-data findmy \
           --collect-data anisette \
           --noconfirm \

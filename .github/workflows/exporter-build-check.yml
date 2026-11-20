@@ -92,6 +92,7 @@ jobs:
           --name "OpenTagViewer" `
           --icon=OpenTagViewer.ico `
           --collect-all unicorn `
+          --collect-submodules machoadi `
           --collect-data findmy `
           --collect-data anisette `
           --noconfirm `
@@ -141,5 +142,36 @@ jobs:
         if ($output -notmatch 'self-test passed') {
           Write-Host "The self-test did not report success. The last line above is the call that"
           Write-Host "killed it - a native fault raises nothing, so there is no traceback to find."
+          exit 1
+        }
+
+    # **The emulated Mac, run by the frozen binary the way a sign-in runs it.** The exporter has no
+    # interpreter once frozen, so it starts itself with --run-emulated-mac and the engine answers
+    # through two files (exporter/macadi.py). This is that, for real: Apple's CoreADI under Unicorn
+    # inside the PyInstaller bundle, with Control Flow Guard already cleared above. `info` is
+    # Initialize and IsMachineProvisioned - nothing is sent to Apple but the library download.
+    - name: Run the emulated Mac's engine from the binary
+      shell: pwsh
+      run: |
+        $lib = Join-Path $env:RUNNER_TEMP 'CoreADI.x86_64'
+        Push-Location python
+        uv run --frozen python -c "import sys; from pathlib import Path; from exporter import macadi; macadi.ensure_library(Path(sys.argv[1]))" $lib
+        Pop-Location
+
+        $out = Join-Path $env:RUNNER_TEMP 'engine.out'
+        $err = Join-Path $env:RUNNER_TEMP 'engine.err'
+        $env:COREADI_PATH = $lib
+        & ./python/dist/OpenTagViewer/OpenTagViewer --run-emulated-mac $out $err info --state (Join-Path $env:RUNNER_TEMP 'mac') | Out-Null
+        $code = $LASTEXITCODE
+
+        $answer = if (Test-Path $out) { Get-Content $out -Raw } else { '' }
+        $problem = if (Test-Path $err) { Get-Content $err -Raw } else { '' }
+        Write-Host $answer
+        Write-Host $problem
+        Write-Host ("engine exit code: '{0}'" -f $code)
+
+        # On the answer, like the self-test above: an exit code from a killed process proves nothing.
+        if ($answer -notmatch '"provisioned": false') {
+          Write-Host "The frozen engine did not report an unprovisioned machine."
           exit 1
         }
