@@ -56,6 +56,9 @@ jobs:
           echo "$out"
           test "$out" = '{"loaded": true, "provisioned": false}'
 
+      - name: A guest call that never returns is stopped by the call timeout
+        run: '"$RUNNER_TEMP/macadi/macadi_selftest" "$RUNNER_TEMP/CoreADI.x86_64" 979a0'
+
   # The C++ port against the Rust it was ported from, byte for byte: os-findmy-e's adi-core and
   # app/src/test/macadi-host/macadi_diff.cpp make the same offline CoreADI calls with a frozen
   # clock and a fixed host UUID, and the outputs must be identical. A difference is a port bug a

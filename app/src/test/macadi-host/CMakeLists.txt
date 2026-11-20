@@ -13,3 +13,7 @@ target_link_libraries(macadi_cli PRIVATE macadi_core)
 # scripts/adi-emulator-diff/compare-libmacadi.sh: this port against os-findmy-e's adi-core.
 add_executable(macadi_diff macadi_diff.cpp)
 target_link_libraries(macadi_diff PRIVATE macadi_core)
+
+# The call timeout, and many header sets from one engine. macadi-host.yml.
+add_executable(macadi_selftest macadi_selftest.cpp)
+target_link_libraries(macadi_selftest PRIVATE macadi_core)

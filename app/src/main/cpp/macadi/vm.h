@@ -65,6 +65,11 @@ public:
     // machine for about a minute and refuses it after (os-findmy-e EVIDENCE.md sections 8-9).
     void setFrozenTime(int64_t secs) { frozenTime_ = secs; }
 
+    // A ceiling on one invoke(), in microseconds. Real calls finish in well under a second; this
+    // is so a call that loops under emulation stops, rather than holding a core until Android
+    // kills the process while the app's binder call waits on it.
+    void setCallTimeout(uint64_t micros) { callTimeoutUs_ = micros; }
+
 private:
     enum class Kind {
         Abort, Ret, Arc4Buf, HostUuid, TimeOfDay, Errno, ObjcMsgSend, Malloc, Open, Close, Read,
@@ -127,6 +132,7 @@ private:
     std::map<uint64_t, std::string> urls_;
     uint8_t hostUuid_[16];
     int64_t frozenTime_ = -1;
+    uint64_t callTimeoutUs_ = 30ULL * 1000 * 1000;
     std::string fault_;
 
     Snapshot snapshot_;

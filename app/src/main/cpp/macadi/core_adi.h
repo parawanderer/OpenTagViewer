@@ -36,6 +36,8 @@ public:
 
     void setHostUuid(const uint8_t uuid[16]) { vm_.setHostUuid(uuid); }
     void setFrozenTime(int64_t secs) { vm_.setFrozenTime(secs); }
+    void setCallTimeout(uint64_t micros) { vm_.setCallTimeout(micros); }
+    Vm &vm() { return vm_; }
 
     // The store, as (file name, bytes). Persist it after every call that can change it - which is
     // every call, since RequestOTP rewrites it.

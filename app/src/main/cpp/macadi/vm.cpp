@@ -28,6 +28,7 @@ constexpr uint64_t SCRATCH_SIZE = 0x40000;
 constexpr uint64_t OBJECT_ADDRESS = 0x60080000;
 constexpr uint64_t OBJECT_SIZE = 0x40000;
 constexpr uint64_t SLOT = 0x10;
+constexpr uint32_t TCG_BUFFER_SIZE = 8u * 1024 * 1024;
 
 constexpr size_t STAT_SIZE = 144;
 constexpr size_t STATFS_SIZE = 2168;
@@ -132,6 +133,11 @@ void Vm::check(uc_err err, const char *what) const {
 Vm::Vm(const std::vector<uint8_t> &image) {
     const MachO macho = MachO::parse(image);
     check(uc_open(UC_ARCH_X86, UC_MODE_64, &uc_), "open");
+    // Unicorn reserves a 1 GiB translation cache by default and flushes it only when full, so one
+    // engine serving header sets for the life of :macadi grew by ~20 KB a call on its way there
+    // (150 MB resident after 3000 calls; macadi_selftest). With 8 MiB it levels off and a call
+    // takes no longer: what CoreADI runs translates into less than that.
+    check(uc_ctl_set_tcg_buffer_size(uc_, TCG_BUFFER_SIZE), "set translation cache size");
 
     try {
         const std::pair<uint64_t, uint64_t> regions[] = {
@@ -581,15 +587,24 @@ uint64_t Vm::invoke(uint64_t address, const std::vector<uint64_t> &args) {
     check(uc_reg_write(uc_, UC_X86_REG_RBP, &zero), "set rbp");
     fault_.clear();
 
-    const uc_err err = uc_emu_start(uc_, address, RETURN_ADDRESS, 0, 0);
+    const uc_err err = uc_emu_start(uc_, address, RETURN_ADDRESS, callTimeoutUs_, 0);
     if (!fault_.empty()) {
         const std::string message = fault_;
         fault_.clear();
         throw Error("emulation: " + message);
     }
+    uint64_t rip = 0;
+    uc_reg_read(uc_, UC_X86_REG_RIP, &rip);
+    // Unicorn reports a timeout as success, with the guest stopped wherever it was.
+    if (err == UC_ERR_OK && rip != RETURN_ADDRESS) {
+        char message[160];
+        std::snprintf(message, sizeof message,
+                      "emulation: no return within %llu ms, stopped at rip=%#llx",
+                      static_cast<unsigned long long>(callTimeoutUs_ / 1000),
+                      static_cast<unsigned long long>(rip));
+        throw Error(message);
+    }
     if (err != UC_ERR_OK) {
-        uint64_t rip = 0;
-        uc_reg_read(uc_, UC_X86_REG_RIP, &rip);
         char message[160];
         std::snprintf(message, sizeof message, "emulation failed at rip=%#llx: %s",
                       static_cast<unsigned long long>(rip), uc_strerror(err));
