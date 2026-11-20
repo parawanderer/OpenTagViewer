@@ -5,7 +5,8 @@
 `macho.*`, `vm.*` and `core_adi.*` are a C++ port of
 [sacca97/os-findmy-e](https://github.com/sacca97/os-findmy-e) `native/adi-core/src/{macho,vm,adi}.rs`,
 and the provisioning headers in `MacProvisioning.java` and the identity shapes in `MacIdentity.java`
-follow its `tools/machoadi/{gsa,mac_anisette}.py`. Its licence:
+follow its `tools/machoadi/{gsa,mac_anisette}.py`. Its licence at commit `374d838` (2026-10-19),
+the last before the repository was relicensed GPL-2.0-only in `7896dc3` on 2026-10-27:
 
 ```
 MIT License
