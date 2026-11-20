@@ -428,6 +428,7 @@ def assertAnisetteIsSupported(serializedAccountData: str) -> str | None:
     """
     try:
         data = json.loads(serializedAccountData)
+        app_identity.respellRefusedOsName(data)
         anisette_type = (data.get("anisette") or {}).get("type")
 
         if anisette_type == SUPPORTED_ANISETTE_TYPE:
@@ -836,6 +837,7 @@ def getAccount(
             return None
 
         data = json.loads(serializedAccountData)
+        app_identity.respellRefusedOsName(data)
 
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)

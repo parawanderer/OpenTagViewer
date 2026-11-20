@@ -263,6 +263,37 @@ def serialOfSession(asyncAccount: Any) -> str:
     return serial
 
 
+REFUSED_OS_NAMES = {"macOS": "Mac OS X"}
+"""
+OS names Apple's edge refuses at sign-in, and the spelling it accepts for each.
+
+Since 2026-11-20 every Grand Slam sign-in whose client info says `<macOS;…>` gets a 190-byte
+HTML 503, whatever the model, version or bundle, and the same request saying `<Mac OS X;…>` is
+let through (#289). Every install on the legacy Mac profile said `macOS`, and a stored session
+keeps the identity it was established with - including the password, so FindMy.py
+re-authenticates on its own when a PET runs out or a fetch gets a 401. Left alone, every such
+session would be refused at that moment and its owner told to sign in again for nothing.
+"""
+
+
+def respellRefusedOsName(accountState: dict) -> dict:
+    """
+    Correct a stored account's OS spelling in place, before FindMy.py restores it.
+
+    **An exception to `identityForRestore` keeping everything, and a narrow one.** Model,
+    version, build, serial and ids stay as they were; only the spelling moves, to the one macOS's
+    own `akd` uses. Nothing Apple binds a session to is in that string - ADI provisioning and the
+    report fetch accept either - and the alternative is a session that cannot re-authenticate.
+    """
+    stored = (accountState.get("anisette") or {}).get("identity")
+    if isinstance(stored, dict) and stored.get("os_name") in REFUSED_OS_NAMES:
+        before = stored["os_name"]
+        stored["os_name"] = REFUSED_OS_NAMES[before]
+        print(f"Stored identity said {before!r}, which Apple now refuses at sign-in; "
+              f"presenting {stored['os_name']!r} instead (#289)")
+    return accountState
+
+
 def identityForRestore(previous: Any) -> dict:
     """
     The identity a *restored* account should keep: whatever it already had.
