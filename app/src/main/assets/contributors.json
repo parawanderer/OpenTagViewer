@@ -4,7 +4,7 @@
       "login": "parawanderer",
       "profileUrl": "https://github.com/parawanderer",
       "avatar": "parawanderer.png",
-      "commits": 724
+      "commits": 725
     },
     {
       "login": "ubrt",
@@ -46,6 +46,12 @@
       "login": "rubo77",
       "profileUrl": "https://github.com/rubo77",
       "avatar": "rubo77.png",
+      "commits": 1
+    },
+    {
+      "login": "NaoCoding",
+      "profileUrl": "https://github.com/NaoCoding",
+      "avatar": "naocoding.png",
       "commits": 1
     },
     {
