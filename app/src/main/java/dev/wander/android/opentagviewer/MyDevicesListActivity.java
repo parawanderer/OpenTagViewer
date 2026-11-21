@@ -673,6 +673,10 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this.openHistoryZipLauncher.launch(new String[]{"application/zip"});
                 return true;
             }
+            if (id == R.id.action_scan_nearby) {
+                this.startActivity(new Intent(this, NearbyDevicesActivity.class));
+                return true;
+            }
             return false;
         });
 
