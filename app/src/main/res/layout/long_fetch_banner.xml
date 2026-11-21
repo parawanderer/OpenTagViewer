@@ -23,7 +23,11 @@
         android:layout_height="wrap_content"
         android:layout_marginRight="10dp"
         android:indeterminate="true"
+        app:hideAnimationBehavior="inward"
         app:indicatorSize="16dp"
+        app:showAnimationBehavior="inward"
+        app:trackColor="?attr/colorSurfaceVariant"
+        app:trackCornerRadius="2dp"
         app:trackThickness="2dp" />
 
     <TextView
