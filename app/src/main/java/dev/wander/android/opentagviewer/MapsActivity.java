@@ -49,6 +49,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 
 import dev.wander.android.opentagviewer.ui.importing.ExternalDeviceImporter;
+import dev.wander.android.opentagviewer.ui.importing.ImportChooser;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.importing.BundlePasscodeDialog;
 import dev.wander.android.opentagviewer.ui.importing.ImportOutcome;
@@ -1090,11 +1091,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             final int itemId = menuItem.getItemId();
 
             if (itemId == R.id.do_import) {
-                this.handleImport();
-            } else if (itemId == R.id.add_openhaystack) {
-                this.openKeysFileLauncher.launch(new String[]{"*/*"});
-            } else if (itemId == R.id.add_google) {
-                this.externalImporter.importFromGoogle();
+                ImportChooser.show(this, new ImportChooser.Choices() {
+                    @Override
+                    public void exporterZip() {
+                        MapsActivity.this.handleImport();
+                    }
+
+                    @Override
+                    public void openHaystackKeys() {
+                        MapsActivity.this.openKeysFileLauncher.launch(new String[]{"*/*"});
+                    }
+
+                    @Override
+                    public void googleFindHub() {
+                        MapsActivity.this.externalImporter.importFromGoogle();
+                    }
+                });
             } else if (itemId == R.id.settings) {
                 this.showSettingsPage();
             } else if (itemId == R.id.information) {

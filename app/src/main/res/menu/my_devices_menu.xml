@@ -38,17 +38,11 @@
         android:id="@+id/action_refresh_from_account"
         android:title="@string/refresh_from_account" />
 
+    <!-- One entry, as on the map: the exporter's zip, an OpenHaystack key, or Google Find Hub,
+         chosen in ImportChooser. Not "from a file": Find Hub is not one. -->
     <item
-        android:id="@+id/action_import_from_file"
-        android:title="@string/icloud_import_from_file" />
-
-    <!-- Devices that are not in an Apple export: see ExternalDeviceImporter -->
-    <item
-        android:id="@+id/action_add_openhaystack"
-        android:title="@string/add_openhaystack_key" />
-    <item
-        android:id="@+id/action_add_google"
-        android:title="@string/add_from_google" />
+        android:id="@+id/action_import"
+        android:title="@string/do_import" />
     <item
         android:id="@+id/action_import_history"
         android:title="@string/import_history" />

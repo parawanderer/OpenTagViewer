@@ -425,4 +425,7 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="anisette_login_needs_coreadi">이 휴대폰에서 Apple로부터 필요한 파일(macOS CoreADI)을 다운로드하지 못했습니다. 아래 링크에서 iTunes 12.8.3 디스크 이미지를 컴퓨터나 브라우저로 다운로드해 이 휴대폰에 넣은 뒤 여기서 선택하세요. 서버로도 로그인은 할 수 있지만 태그 위치는 불러오지 못합니다.</string>
     <string name="anisette_local_needs_coreadi">이 휴대폰에서 Apple로부터 필요한 파일(macOS CoreADI)을 다운로드하지 못했습니다. iTunes 12.8.3 디스크 이미지를 컴퓨터나 브라우저로 다운로드해 이 휴대폰에 넣은 뒤 여기서 선택하세요.</string>
     <string name="anisette_coreadi_copy_link">다운로드 링크 복사</string>
+    <string name="import_choice_exporter">OpenTagViewer 내보내기 도구의 태그 (.zip)</string>
+    <string name="import_choice_openhaystack">OpenHaystack 키 (.keys)</string>
+    <string name="import_choice_google">Google Find Hub (실험적)</string>
 </resources>

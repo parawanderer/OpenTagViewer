@@ -3,6 +3,7 @@ package dev.wander.android.opentagviewer.ui.maps;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
@@ -10,6 +11,7 @@ import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasDataString;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasType;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -130,10 +132,52 @@ public class EveryButtonOnTheMapGoesSomewhereTest {
     @Test
     public void themenuOpensTheFilePickerToImportAZip() {
         this.pickFromTheOverflow(R.string.do_import);
+        this.choose(R.string.import_choice_exporter);
 
         Eventually.check(() -> intended(allOf(
                 hasAction(Intent.ACTION_GET_CONTENT),
                 hasType("application/zip"))));
+    }
+
+    /** One Import entry; the chooser offers all three, and each reaches its own picker. */
+    @Test
+    public void importOffersAllThreeKinds() {
+        this.pickFromTheOverflow(R.string.do_import);
+
+        Eventually.check(() -> onView(withText(R.string.import_choice_exporter))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withText(R.string.import_choice_openhaystack)).inRoot(isDialog())
+                .check(matches(isDisplayed()));
+        onView(withText(R.string.import_choice_google)).inRoot(isDialog())
+                .check(matches(isDisplayed()));
+    }
+
+    @Test
+    public void anOpenHaystackKeyOpensTheDocumentPicker() {
+        this.pickFromTheOverflow(R.string.do_import);
+        this.choose(R.string.import_choice_openhaystack);
+
+        Eventually.check(() -> intended(hasAction(Intent.ACTION_OPEN_DOCUMENT)));
+    }
+
+    /** The old separate items are gone from the menu. */
+    @Test
+    public void theMenuNoLongerListsEachKindSeparately() {
+        Eventually.check(() -> onView(withId(R.id.button_more_settings))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.button_more_settings)).perform(click());
+
+        onView(withText(R.string.do_import)).inRoot(isPlatformPopup())
+                .check(matches(isDisplayed()));
+        onView(withText(R.string.add_openhaystack_key)).check(doesNotExist());
+        onView(withText(R.string.add_from_google)).check(doesNotExist());
+    }
+
+    private void choose(final int label) {
+        // A click opens a dialog and cannot tear the screen down, so check-then-click.
+        Eventually.check(() -> onView(withText(label)).inRoot(isDialog())
+                .check(matches(isDisplayed())));
+        onView(withText(label)).inRoot(isDialog()).perform(click());
     }
 
     // ------------------------------------------------------------------ the tag card

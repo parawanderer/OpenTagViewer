@@ -425,4 +425,7 @@
     <string name="anisette_login_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 по ссылке ниже — на компьютере или в браузере, — перенесите его на этот телефон и выберите здесь. Сервер по-прежнему может выполнить вход, но местоположения ваших меток через него не загрузятся.</string>
     <string name="anisette_local_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 на компьютере или в браузере, перенесите его на этот телефон и выберите здесь.</string>
     <string name="anisette_coreadi_copy_link">Скопировать ссылку для загрузки</string>
+    <string name="import_choice_exporter">Метки из экспортёра OpenTagViewer (.zip)</string>
+    <string name="import_choice_openhaystack">Ключ OpenHaystack (.keys)</string>
+    <string name="import_choice_google">Google Find Hub (экспериментально)</string>
 </resources>

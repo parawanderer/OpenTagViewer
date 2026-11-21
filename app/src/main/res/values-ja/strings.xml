@@ -425,4 +425,7 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="anisette_login_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。下のリンクから iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。サーバーでもサインインはできますが、タグの位置情報は読み込まれません。</string>
     <string name="anisette_local_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。</string>
     <string name="anisette_coreadi_copy_link">ダウンロードリンクをコピー</string>
+    <string name="import_choice_exporter">OpenTagViewer エクスポーターのタグ (.zip)</string>
+    <string name="import_choice_openhaystack">OpenHaystack キー (.keys)</string>
+    <string name="import_choice_google">Google Find Hub（試験運用）</string>
 </resources>

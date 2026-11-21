@@ -425,4 +425,7 @@
     <string name="anisette_login_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請透過下方連結在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。伺服器仍可讓你登入，但無法透過它載入標籤的位置。</string>
     <string name="anisette_local_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。</string>
     <string name="anisette_coreadi_copy_link">複製下載連結</string>
+    <string name="import_choice_exporter">OpenTagViewer 匯出工具的標籤 (.zip)</string>
+    <string name="import_choice_openhaystack">OpenHaystack 金鑰 (.keys)</string>
+    <string name="import_choice_google">Google Find Hub（實驗性）</string>
 </resources>
