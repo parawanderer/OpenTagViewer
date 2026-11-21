@@ -289,11 +289,30 @@ public class OsmMapProvider implements IMapProvider {
         this.mapView.invalidate();
     }
 
+    /**
+     * Runs {@code action} once the map view has a size - immediately when it already has one.
+     *
+     * <p>osmdroid scrolls in pixels, and a camera call on a zero-sized MapView centers half a
+     * screen wrong: the restored view then opens consistently off to one side. onMapReady
+     * fires straight out of {@link #initialize}, before the first layout, so the camera
+     * restore is the call that reliably hits this.
+     */
+    private void whenLaidOut(final Runnable action) {
+        if (this.mapView.getWidth() == 0) {
+            this.mapView.addOnFirstLayoutListener(
+                    (v, left, top, right, bottom) -> action.run());
+        } else {
+            action.run();
+        }
+    }
+
     @Override
     public void moveCamera(double latitude, double longitude, float zoom) {
         if (this.controller == null) return;
-        this.controller.setCenter(new GeoPoint(latitude, longitude));
-        this.controller.setZoom((double) zoom);
+        this.whenLaidOut(() -> {
+            this.controller.setCenter(new GeoPoint(latitude, longitude));
+            this.controller.setZoom((double) zoom);
+        });
     }
 
     @Override
@@ -308,7 +327,8 @@ public class OsmMapProvider implements IMapProvider {
         // API (unlike Google's AMap.CancelableCallback), so the caller's callback runs once the
         // animation has had time to finish rather than on a true completion event. 300ms is
         // osmdroid's own default MapView animation speed.
-        this.controller.animateTo(new GeoPoint(latitude, longitude), (double) zoom, 300L);
+        this.whenLaidOut(() -> this.controller.animateTo(
+                new GeoPoint(latitude, longitude), (double) zoom, 300L));
         if (callback != null) {
             this.mapView.postDelayed(callback, 300);
         }
