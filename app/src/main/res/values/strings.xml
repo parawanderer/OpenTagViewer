@@ -245,8 +245,6 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="vendor_lookup_hint">%1$s is a Bluetooth SIG company identifier. Tap to look it up and find out who made this.</string>
     <string name="rename_failed_title">The name was not changed</string>
     <string name="rename_failed_message">This tag is named in your Apple account, so renaming it has to reach Apple — and that did not work just now. Nothing has changed. Check your connection and try again.</string>
-    <string name="icloud_fetch_from_settings_subtitle">Add the tags on your account, or update the ones already here</string>
-    <string name="icloud_fetch_from_settings_linked">Linked to your Apple account. Tap to check for new or changed tags.</string>
     <string name="icloud_link_account_action">Link tags via Apple account</string>
     <string name="tag_ignored_summary">No updates for months — paused checking</string>
     <string name="tag_ignored_retry">Check now</string>
@@ -267,7 +265,6 @@ Your tags and their location history stay on this phone — nothing has been los
     <string name="battery_level_very_low">Critically low (~5-10%) — near death</string>
     <string name="battery_level_icloud_only">Only tags read from iCloud ever update this. A tag imported from a file keeps whatever value it had when the export was made.</string>
     <string name="icloud_unlink_title">Unlink my Apple account</string>
-    <string name="icloud_unlink_subtitle">Stop this app reading tags from your account</string>
     <string name="icloud_unlink_confirm_title">Unlink your Apple account?</string>
     <string name="icloud_unlink_confirm_message">This app will stop reading your tags from Apple. Tags you have already imported stay on this device, along with their location history — but they will no longer be updated from your account.
 
@@ -463,4 +460,10 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="icloud_link_subtitle_unlinked">Not linked. Tap to fetch your tags from your Apple account.</string>
     <string name="settings_google_find_hub">Google Find Hub (experimental)</string>
     <string name="settings_google_find_hub_subtitle">Trackers on your Google account</string>
+    <string name="icloud_link_status_linked">Linked to your Apple account</string>
+    <string name="icloud_link_status_linked_detail">This phone can read your tags from iCloud again without a device passcode.</string>
+    <string name="icloud_link_status_unlinked">Not linked</string>
+    <string name="icloud_link_status_unlinked_detail">Connect once with the passcode of one of your Apple devices. After that, checking for new tags takes one tap.</string>
+    <string name="icloud_link_connect_button">Connect tags from iCloud</string>
+    <string name="icloud_link_check_button">Check for new tags</string>
 </resources>

@@ -211,8 +211,6 @@
     <string name="vendor_lookup_hint">%1$s は Bluetooth SIG の企業識別子です。タップすると、どこの製品か調べられます。</string>
     <string name="rename_failed_title">名前は変更されませんでした</string>
     <string name="rename_failed_message">このタグの名前は Apple アカウントにあるため、変更するには Apple に届く必要がありますが、今回は届きませんでした。何も変更されていません。接続を確認してもう一度お試しください。</string>
-    <string name="icloud_fetch_from_settings_subtitle">アカウントのタグを追加、または取り込み済みのタグを更新します</string>
-    <string name="icloud_fetch_from_settings_linked">Apple アカウントと連携済みです。タップすると新しいタグや変更を確認します。</string>
     <string name="icloud_link_account_action">Apple アカウントでタグを連携</string>
     <string name="tag_ignored_summary">数か月間更新がありません — 検索を停止中</string>
     <string name="tag_ignored_retry">今すぐ確認</string>
@@ -233,7 +231,6 @@
     <string name="battery_level_very_low">非常に低い（約5〜10%）— ほぼ空です</string>
     <string name="battery_level_icloud_only">この値を更新するのは iCloud から読み取ったタグだけです。ファイルから読み込んだタグは、書き出し時の値のままになります。</string>
     <string name="icloud_unlink_title">Apple アカウントの連携を解除</string>
-    <string name="icloud_unlink_subtitle">このアプリがアカウントからタグを読み取るのをやめます</string>
     <string name="icloud_unlink_confirm_title">Apple アカウントの連携を解除しますか？</string>
     <string name="icloud_unlink_confirm_message">このアプリは Apple からタグを読み取らなくなります。すでにインポートしたタグと位置情報履歴はこの端末に残りますが、アカウントからは更新されなくなります。
 
@@ -428,4 +425,10 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="icloud_link_subtitle_unlinked">未連携。タップして Apple アカウントからタグを取得します。</string>
     <string name="settings_google_find_hub">Google Find Hub（試験運用）</string>
     <string name="settings_google_find_hub_subtitle">Google アカウントのトラッカー</string>
+    <string name="icloud_link_status_linked">Apple アカウントと連携済み</string>
+    <string name="icloud_link_status_linked_detail">この端末はデバイスのパスコードなしで iCloud からタグを再取得できます。</string>
+    <string name="icloud_link_status_unlinked">未連携</string>
+    <string name="icloud_link_status_unlinked_detail">Apple デバイスのパスコードで一度だけ接続します。以降はワンタップで新しいタグを確認できます。</string>
+    <string name="icloud_link_connect_button">iCloud のタグを接続</string>
+    <string name="icloud_link_check_button">新しいタグを確認</string>
 </resources>

@@ -72,50 +72,51 @@ public class ICloudLinkActivity extends AppCompatActivity {
         }
 
         this.binding.setHandleClickBack(this::finish);
-        this.binding.setOnClickFetchFromAccount(() ->
+        // The same screen either way: it links when there is no membership and re-reads when
+        // there is one. Only the button's wording changes.
+        this.binding.icloudLinkPrimaryButton.setOnClickListener(v ->
                 this.fetchFromICloudLauncher.launch(new Intent(this, FetchFromICloudActivity.class)));
-        this.binding.setOnClickUnlinkAccount(this::onClickUnlinkAccount);
+        this.binding.icloudLinkUnlinkButton.setOnClickListener(v -> this.onClickUnlinkAccount());
 
         this.sayWhetherTheAccountIsLinked();
     }
 
     /**
-     * Say whether this app has already joined the account's keychain, and offer to undo it.
+     * Say whether this app has already joined the account's keychain, and offer what fits.
      *
-     * <p>Set to the unlinked wording first and corrected when the store answers: reading it is a
-     * decryption on a background thread, and a row that grows its subtitle a moment later is
-     * worse than one that starts with a sentence. The unlink row follows the same answer, hidden
-     * rather than disabled while there is nothing to undo.
+     * <p>Drawn as unlinked first and corrected when the store answers: reading it is a decryption
+     * on a background thread, and a card that changes its mind a moment later is better than one
+     * that starts empty. Unlink is hidden rather than disabled while there is nothing to undo.
      */
     private void sayWhetherTheAccountIsLinked() {
-        this.binding.setFetchFromAccountSubtitle(
-                this.getString(R.string.icloud_fetch_from_settings_subtitle));
-        this.showTheUnlinkRow(false);
+        this.showLinked(false);
 
         this.membershipLookup = this.memberships().get()
                 .firstOrError()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        held -> {
-                            this.binding.setFetchFromAccountSubtitle(this.getString(
-                                    held.isPresent()
-                                            ? R.string.icloud_fetch_from_settings_linked
-                                            : R.string.icloud_fetch_from_settings_subtitle));
-                            this.showTheUnlinkRow(held.isPresent());
-                        },
+                        held -> this.showLinked(held.isPresent()),
                         error -> Log.w(TAG, "Could not read whether the account is linked;"
-                                + " leaving the row describing the unlinked case", error));
+                                + " leaving the page describing the unlinked case", error));
+    }
+
+    private void showLinked(final boolean linked) {
+        this.binding.icloudLinkStatusIcon.setImageResource(
+                linked ? R.drawable.check_circle_24px : R.drawable.link_off_24px);
+        this.binding.icloudLinkStatus.setText(
+                linked ? R.string.icloud_link_status_linked : R.string.icloud_link_status_unlinked);
+        this.binding.icloudLinkStatusDetail.setText(linked
+                ? R.string.icloud_link_status_linked_detail
+                : R.string.icloud_link_status_unlinked_detail);
+        this.binding.icloudLinkPrimaryButton.setText(
+                linked ? R.string.icloud_link_check_button : R.string.icloud_link_connect_button);
+        this.binding.icloudLinkUnlinkButton.setVisibility(linked ? View.VISIBLE : View.GONE);
     }
 
     private KeychainMembershipRepository memberships() {
         return new KeychainMembershipRepository(
                 UserAuthDataStore.getInstance(this.getApplicationContext()),
                 new AppCryptographyUtil());
-    }
-
-    private void showTheUnlinkRow(final boolean visible) {
-        this.binding.settingsUnlinkAccount.getRoot()
-                .setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 
     /**
@@ -143,9 +144,7 @@ public class ICloudLinkActivity extends AppCompatActivity {
                 .subscribe(
                         () -> {
                             Log.i(TAG, "The keychain membership has been forgotten");
-                            this.binding.setFetchFromAccountSubtitle(this.getString(
-                                    R.string.icloud_fetch_from_settings_subtitle));
-                            this.showTheUnlinkRow(false);
+                            this.showLinked(false);
                             Toast.makeText(this, R.string.icloud_unlink_done,
                                     Toast.LENGTH_LONG).show();
                         },

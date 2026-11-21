@@ -211,8 +211,6 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="vendor_lookup_hint">%1$s ist eine Firmenkennung der Bluetooth SIG. Tippe darauf, um nachzuschlagen, wer das hergestellt hat.</string>
     <string name="rename_failed_title">Der Name wurde nicht geändert</string>
     <string name="rename_failed_message">Dieser Tag wird in deinem Apple-Konto benannt, eine Umbenennung muss also Apple erreichen – und das hat gerade nicht geklappt. Es wurde nichts geändert. Prüfe deine Verbindung und versuche es erneut.</string>
-    <string name="icloud_fetch_from_settings_subtitle">Die Tags aus deinem Konto hinzufügen oder die vorhandenen aktualisieren</string>
-    <string name="icloud_fetch_from_settings_linked">Mit deinem Apple-Konto verknüpft. Tippe, um nach neuen oder geänderten Tags zu suchen.</string>
     <string name="icloud_link_account_action">Tags über Apple-Konto verknüpfen</string>
     <string name="tag_ignored_summary">Seit Monaten keine Updates – Suche pausiert</string>
     <string name="tag_ignored_retry">Jetzt prüfen</string>
@@ -233,7 +231,6 @@ Ihre Tags und deren Standortverlauf bleiben auf diesem Telefon – es ist nichts
     <string name="battery_level_very_low">Kritisch niedrig (~5-10%) – fast leer</string>
     <string name="battery_level_icloud_only">Nur aus iCloud gelesene Tags aktualisieren diesen Wert. Ein aus einer Datei importierter Tag behält den Wert, den er beim Export hatte.</string>
     <string name="icloud_unlink_title">Verknüpfung mit meinem Apple-Konto aufheben</string>
-    <string name="icloud_unlink_subtitle">Diese App liest dann keine Tags mehr aus deinem Konto</string>
     <string name="icloud_unlink_confirm_title">Verknüpfung mit dem Apple-Konto aufheben?</string>
     <string name="icloud_unlink_confirm_message">Diese App liest deine Tags dann nicht mehr von Apple. Bereits importierte Tags bleiben mit ihrem Standortverlauf auf diesem Gerät — sie werden aber nicht mehr aus deinem Konto aktualisiert.
 
@@ -428,4 +425,10 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="icloud_link_subtitle_unlinked">Nicht verknüpft. Tippe, um deine Tags aus deinem Apple-Konto zu holen.</string>
     <string name="settings_google_find_hub">Google Find Hub (experimentell)</string>
     <string name="settings_google_find_hub_subtitle">Tracker in deinem Google-Konto</string>
+    <string name="icloud_link_status_linked">Mit deinem Apple-Konto verknüpft</string>
+    <string name="icloud_link_status_linked_detail">Dieses Telefon kann deine Tags ohne Gerätecode erneut aus iCloud lesen.</string>
+    <string name="icloud_link_status_unlinked">Nicht verknüpft</string>
+    <string name="icloud_link_status_unlinked_detail">Verbinde einmalig mit dem Code eines deiner Apple-Geräte. Danach genügt ein Tippen, um nach neuen Tags zu suchen.</string>
+    <string name="icloud_link_connect_button">Tags aus iCloud verbinden</string>
+    <string name="icloud_link_check_button">Nach neuen Tags suchen</string>
 </resources>

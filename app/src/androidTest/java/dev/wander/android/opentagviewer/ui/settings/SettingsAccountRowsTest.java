@@ -35,6 +35,10 @@ import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.SettingsActivity;
 import dev.wander.android.opentagviewer.Shot;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
+import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
+import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
+import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
+import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 
 /**
@@ -65,6 +69,7 @@ public class SettingsAccountRowsTest {
         }
         Intents.release();
         AppDependencies.reset();
+        this.memberships().forget().blockingAwait();
         getInstrumentation().runOnMainSync(
                 () -> AppCompatDelegate.setDefaultNightMode(this.nightModeBefore));
     }
@@ -143,7 +148,7 @@ public class SettingsAccountRowsTest {
     @Test
     public void theLinkPageInLightMode() {
         this.scenario = ActivityScenario.launch(ICloudLinkActivity.class);
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_primary_button))
                 .check(matches(isDisplayed())));
         this.shot("icloud_link_light");
     }
@@ -153,9 +158,40 @@ public class SettingsAccountRowsTest {
         getInstrumentation().runOnMainSync(
                 () -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES));
         this.scenario = ActivityScenario.launch(ICloudLinkActivity.class);
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_primary_button))
                 .check(matches(isDisplayed())));
         this.shot("icloud_link_dark");
+    }
+
+    private KeychainMembershipRepository memberships() {
+        return new KeychainMembershipRepository(
+                UserAuthDataStore.getInstance(getInstrumentation().getTargetContext()),
+                new AppCryptographyUtil());
+    }
+
+    private void openTheLinkPageLinked(final boolean night) {
+        this.memberships().store(new KeychainMembership(
+                "{\"peer_id\":\"peer-ours\"}", "ZW50cm9weQ==", "a-generated-passcode",
+                "a-label", 2)).blockingAwait();
+        if (night) {
+            getInstrumentation().runOnMainSync(
+                    () -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES));
+        }
+        this.scenario = ActivityScenario.launch(ICloudLinkActivity.class);
+        Eventually.check(() -> onView(withId(R.id.icloud_link_unlink_button))
+                .check(matches(isDisplayed())));
+    }
+
+    @Test
+    public void theLinkedPageInLightMode() {
+        this.openTheLinkPageLinked(false);
+        this.shot("icloud_link_linked_light");
+    }
+
+    @Test
+    public void theLinkedPageInDarkMode() {
+        this.openTheLinkPageLinked(true);
+        this.shot("icloud_link_linked_dark");
     }
 
     private void shot(final String name) {
