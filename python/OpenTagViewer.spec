@@ -11,7 +11,7 @@
 # The release workflow passes flags rather than using this file, because it needs three different
 # invocations for three platforms. The two must agree, and the flags there carry the same comment.
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 # unicorn loads its native library through ctypes at runtime, so PyInstaller's analysis never sees
 # it. Without this the build succeeds and the binary dies at startup with "Failed to load the
@@ -19,6 +19,11 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files
 # publishing it. unicorn is here because local Anisette emulates Apple's ADI library, which is what
 # lets signing in work without a third-party Anisette server.
 unicorn_datas, unicorn_binaries, unicorn_hiddenimports = collect_all('unicorn')
+
+# The emulated Mac's engine (exporter/macadi.py). Nothing imports it at build time - the frozen
+# exporter runs it as a child of itself with --run-emulated-mac - so analysis never finds it, and
+# a build without this signs in as nothing. The release workflow passes --collect-submodules.
+machoadi_hiddenimports = collect_submodules('machoadi')
 
 # FindMy.py keeps Apple's pinned root certificates as `.crt` files beside its code, and anisette
 # keeps `apple-root.pem` beside its own. PyInstaller bundles code, not the files next to it - so
@@ -35,7 +40,7 @@ a = Analysis(
     pathex=['.'],
     binaries=unicorn_binaries,
     datas=unicorn_datas + findmy_datas + anisette_datas,
-    hiddenimports=unicorn_hiddenimports,
+    hiddenimports=unicorn_hiddenimports + machoadi_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

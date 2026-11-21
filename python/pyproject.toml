@@ -43,6 +43,11 @@ dependencies = [
     # on Windows - which rules out curses. See main/prompts.py for what happens without a
     # terminal, which is not "it falls back": prompt_toolkit waits for keystrokes that never come.
     "questionary>=2.1.1",
+    # The machine the iCloud route signs in as: Apple's macOS CoreADI under Unicorn
+    # (exporter/macadi.py). sacca97/os-findmy-e's engine, from parawanderer's fork, which spells
+    # the OS "Mac OS X", verifies TLS and installs with pip. **GPL-2.0, and never imported**: the
+    # exporter runs it as `python -m machoadi.mac_anisette` in its own process.
+    "machoadi",
 ]
 
 [tool.uv]
@@ -69,7 +74,8 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
-FindMy = { git = "https://github.com/parawanderer/FindMy.py", rev = "00fd962a0e8ec9f5601fe0b9db3f16ccea252a3c" }
+FindMy = { git = "https://github.com/parawanderer/FindMy.py", rev = "37d5ca0b4ab0143e53ca158d61cf6d5e18bd6ba8" }
+machoadi = { git = "https://github.com/parawanderer/os-findmy-e", rev = "595d39810639d750715babc30b063d4ac8f2c437", subdirectory = "tools/machoadi" }
 
 [dependency-groups]
 # Only the release build installs this, with `uv sync --no-default-groups --group build`. It is

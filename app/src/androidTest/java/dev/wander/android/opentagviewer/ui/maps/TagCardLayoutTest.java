@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.wander.android.opentagviewer.R;
+import dev.wander.android.opentagviewer.ble.FindMyAdvertisement;
 
 /**
  * Layout tests for the tag cards along the bottom of the map.
@@ -273,8 +274,8 @@ public class TagCardLayoutTest {
     }
 
     /**
-     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal and the
-     * longest battery word - must not wrap to a second line and grow the row. Built directly
+     * {@code MapsActivity.showNearbyStatusOn}'s longest realistic line - full signal, with the
+     * battery icon showing - must not wrap to a second line and grow the row. Built directly
      * rather than through {@link #measureHeights}, which always writes a fixed string to this
      * field.
      */
@@ -299,11 +300,12 @@ public class TagCardLayoutTest {
 
             ((TextView) baseline.findViewById(R.id.device_last_update))
                     .setText("Last Updated: 2 minutes ago");
-            // "critical" (English) / "kritisch" (German) is the longest battery word; five
-            // filled dots is the longest signal reading; three digits covers up to the 30
-            // second freshness window in NearbyTagSightings with room to spare.
+            // Five filled dots is the longest signal reading. The battery is an icon now
+            // (NearbyBatteryIcon), so the icon has to fit on the line beside it, not a word.
             ((TextView) withNearbyStatus.findViewById(R.id.device_last_update))
-                    .setText("Nearby (●●●●●) · Battery critical");
+                    .setText("Nearby (●●●●●)");
+            NearbyBatteryIcon.show(withNearbyStatus.findViewById(R.id.device_nearby_battery),
+                    FindMyAdvertisement.BatteryLevel.VERY_LOW);
 
             for (final FrameLayout card : new FrameLayout[]{baseline, withNearbyStatus}) {
                 card.measure(

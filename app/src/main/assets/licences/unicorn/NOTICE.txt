@@ -1,0 +1,35 @@
+Unicorn 2.1.4, in lib/<abi>/libmacadi.so
+=========================================
+
+This APK contains libmacadi.so, the emulated Mac that signs in to Find My. It links
+Unicorn (https://github.com/unicorn-engine/unicorn), a CPU emulator built on QEMU,
+which is licensed under the GNU General Public License, version 2. The licence is in
+COPYING beside this file. Parts of Unicorn's QEMU code carry their own GPL-2.0
+compatible licences; see qemu-LICENSE, COPYING.LGPL2 and COPYING_GLIB, which are
+Unicorn's own files at the 2.1.4 tag.
+
+libmacadi.so runs in its own process (":macadi") and talks to the rest of the app
+over Android's binder. It is the only part of this APK that contains Unicorn.
+
+Corresponding source
+--------------------
+
+  * Unicorn 2.1.4, exactly as built:
+      https://github.com/unicorn-engine/unicorn/archive/refs/tags/2.1.4.tar.gz
+      SHA-256 ea8863f095a0136388694e5a6063afd9bb7650e30243dd6251af59c5ce5601f4
+    The same file is attached to every OpenTagViewer release on GitHub that ships
+    libmacadi.so, beside the APK.
+
+  * The rest of libmacadi.so, and how it is built: app/src/main/cpp/macadi/ and
+    app/src/main/cpp/CMakeLists.txt in https://github.com/parawanderer/OpenTagViewer,
+    at the release's tag.
+
+Other code in libmacadi.so
+--------------------------
+
+macho.cpp, vm.cpp and core_adi.cpp are a C++ port of sacca97/os-findmy-e's
+native/adi-core (https://github.com/sacca97/os-findmy-e), MIT License,
+Copyright (c) 2026 sacca. Its full notice is in app/src/main/cpp/macadi/NOTICE.md
+in the repository above.
+
+Apple's CoreADI is not in this APK. The app downloads it from Apple at runtime.
