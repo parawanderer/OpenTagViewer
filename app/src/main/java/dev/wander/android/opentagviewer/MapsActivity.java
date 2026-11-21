@@ -1134,6 +1134,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             final UserMapCameraPosition pos = saved.get();
             this.mapProvider.moveCamera(pos.getLat(), pos.getLon(), pos.getZoom());
             this.openingCameraRestored = true;
+            // Then glide to where the phone is now, keeping the zoom the user left it at:
+            // the remembered view is where they were, not necessarily where they are. No
+            // permission or no fix leaves the restored view alone.
+            this.animateCameraToMyLocation(pos.getZoom());
             return;
         }
 
@@ -1199,6 +1203,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private void animateCameraToMyLocation() {
         if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
+            this.animateCameraToMyLocation(this.initialZoom());
+        } else {
+            Log.e(TAG, "Clicked on 'My Location' button while not having Location permissions. This shouldn't happen as this button should have been hidden in this case!");
+        }
+    }
+
+    /** Animates to the phone's last known fix at {@code zoom}; does nothing without permission or a fix. */
+    private void animateCameraToMyLocation(final float zoom) {
+        if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED) {
 
             this.fusedLocationClient.getLastLocation()
                     .addOnSuccessListener(this, location -> {
@@ -1213,14 +1227,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                             this.mapProvider.animateCamera(
                                     location.getLatitude(),
                                     location.getLongitude(),
-                                    this.initialZoom(),
+                                    zoom,
                                     null
                             );
                         }
                     });
-
-        } else {
-            Log.e(TAG, "Clicked on 'My Location' button while not having Location permissions. This shouldn't happen as this button should have been hidden in this case!");
         }
     }
 
