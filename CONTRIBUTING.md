@@ -13,14 +13,15 @@ contributors.
 
 | | Why |
 | --- | --- |
-| **JDK 17+** | The Android Gradle Plugin refuses to run on anything older, with an error that reads like a plugin bug. Android Studio's bundled runtime works: `export JAVA_HOME="/path/to/Android Studio/jbr"` |
+| **JDK 17 or 21** | The Android Gradle Plugin refuses to run on anything older, with an error that reads like a plugin bug. **Newer is not fine either:** Gradle 8.10 cannot run on Java 25, and fails with nothing but the version number (`25.0.4`) as its error. Recent Android Studio releases bundle Java 25, so set Settings → Build Tools → Gradle → **Gradle JDK** to a 17 or 21, and point `JAVA_HOME` at the same one for the CLI |
 | **Android SDK** | Either `local.properties` with `sdk.dir=...`, or `ANDROID_HOME` set |
 | **Python 3** on `PATH` | The build shells out to it to generate the stub `unicorn` wheel (`scripts/build_unicorn_stub_wheel.py`). If your interpreter has an unusual name, pass `-PpythonExecutable=...` |
+| **`sh`, `strings` and `pkg-config` on `PATH`** (Windows) | The emulated Mac's native build (`app/src/main/cpp/macadi/`) compiles Unicorn, whose CMake runs `sh qemu/configure` to generate `config-host.h`, and that script calls the other two. Linux and macOS have all three. On Windows: `sh` is in Git for Windows — add `C:\Program Files\Git\usr\bin` to your **user** `PATH`, which Git's installer does not do. Git does not ship `strings` or `pkg-config`; [Strawberry Perl](https://strawberryperl.com/) puts both on `PATH` and is what this was verified with. Then restart Android Studio and delete `app/.cxx`, which caches the failed configure. `MacAdi.cmake` names whichever is missing; before it did, the build failed minutes later on `'config-host.h' file not found` |
 | **Android Studio** (optional) | Everything works from the CLI, but the IDE is easier for running the app on a device |
 | **[`gh`](https://cli.github.com/)** (optional) | Strongly recommended if you work with a coding agent — see below |
 
-Easiest route to the first three is Android Studio, which ships a JDK and can install the
-SDK for you. Otherwise: [Temurin 17](https://adoptium.net/temurin/releases/?version=17),
+Easiest route to the SDK is Android Studio, which can install it for you, and can download a
+JDK 17 or 21 from the Gradle JDK dropdown. Otherwise: [Temurin 17](https://adoptium.net/temurin/releases/?version=17),
 the [command line tools](https://developer.android.com/studio#command-tools), and
 [python.org](https://www.python.org/downloads/).
 
@@ -661,6 +662,57 @@ static constructor running. No provisioning and nothing sent to Apple beyond dow
 libraries. See [`app/src/test/adi-on-bionic/README.md`](app/src/test/adi-on-bionic/README.md) for how
 it works and what it measured.
 
+### The emulated Mac, on the host
+
+```bash
+python scripts/locate_mac_coreadi.py --remote --out /tmp/CoreADI.x86_64
+cmake -S app/src/test/macadi-host -B build/macadi && cmake --build build/macadi --parallel
+build/macadi/macadi_cli /tmp/CoreADI.x86_64 979a0 /nonexistent 00112233445566778899aabbccddeeff -1 --load-only
+```
+
+Since 2026-10-12 Apple gives the Find My token only to a sign-in whose Anisette machine was
+minted by a Mac or an iPhone, so the app runs Apple's **macOS** CoreADI under an x86_64 emulator
+(`app/src/main/cpp/macadi/`, see `EmulatedMacAnisette`). This builds the same native core for the
+machine you are on, through the same `MacAdi.cmake`, and loads Apple's library into it. The first
+line downloads 3.5 MB from Apple with exactly the range request the app makes and checks it
+against the pinned hashes; `--dmg iTunes12.8.3.dmg` does the same against a full copy of the
+installer and shows which of its chunks the range spans.
+
+`macadi_selftest` checks what a comparison cannot: that a guest call which never returns is
+stopped by the call timeout (`macadi-host.yml` runs this part), and, given a copy of a provisioned
+store, its host UUID and a count, that one engine serves that many header sets in a row with the
+same machine id and without its resident memory growing past the first fifty calls:
+
+```bash
+build/macadi/macadi_selftest /tmp/CoreADI.x86_64 979a0 [store-copy <host uuid, 32 hex> 1000]
+```
+
+Unicorn's default translation cache is 1 GiB and only flushes when full, which grew `:macadi` by
+about 20 KB a call without the cap `Vm` now sets; QEMU's TLB also doubles to about 60 MB over the
+first dozen calls and then stops, which is expected.
+
+Given a provisioned store directory and its host UUID instead of `--load-only`, `macadi_cli`
+prints one header set. Pass a fixed Unix time as the fifth argument to compare its output byte
+for byte against another implementation; never use a fixed clock for anything sent to Apple.
+
+#### Against os-findmy-e's Rust, byte for byte
+
+```bash
+scripts/adi-emulator-diff/compare-libmacadi.sh /tmp/CoreADI.x86_64 [provisioned store dir]
+```
+
+Builds os-findmy-e's `adi-core` (pinned commit) and this port's `macadi_diff`, has both make the same
+offline CoreADI calls with a frozen clock and a fixed host UUID, and diffs the output; it exits
+non-zero on any difference. Needs git, cargo, cmake and libclang (`unicorn-engine-sys` runs bindgen).
+`macadi-host.yml` runs it on every change to the port. Without a store, the calls stop short of the
+OTP path; a **copy** of a provisioned store (`files/anisette/mac/store/` from an install, through
+`adb shell run-as`, or an exporter's `emulated-mac/machine/store/`) takes both drivers through one
+header session on that machine as well, still offline. Set `ADI_DIFF_HOST_UUID` to that machine's
+host UUID (`identity.json`): the machine id is derived from it, and without it both drivers just
+report "not provisioned", which matches and proves nothing. The script refuses that case when the
+variable is set. Run this way on 2026-11-20 against a store the exporter's Python engine had
+provisioned with Apple: identical machine id, OTP and routing.
+
 ### Which Python each tree targets
 
 There are three, and they are not the same:
@@ -878,7 +930,8 @@ scripts/adi-emulator-diff/run.sh /tmp/CoreADI.x86_64
 ```
 
 Runs Apple's macOS CoreADI under Unicorn and under icicle with the same inputs and diffs the
-output; it exits non-zero on any difference. Unlike the scripts above it does need the network,
+output; it exits non-zero on any difference. (`compare-libmacadi.sh`, above, uses the same driver
+to compare this repository's C++ port with the Rust it came from.) Unlike the scripts above it does need the network,
 to clone three repositories at pinned commits, but it sends nothing to Apple. Nobody needs to run
 it routinely; it exists for whoever wants to replace Unicorn. Why, what it showed and what it
 does not cover: [docs/emulated-mac-emulator-choice.md](docs/emulated-mac-emulator-choice.md).
@@ -913,6 +966,7 @@ run regardless: each AES entry carries a fresh random salt.
 | `native-stubs.yml` | `app/src/main/cpp/**`, `app/src/test/cpp/**` changes | Builds the stand-ins for Apple's two stubbed libraries on x86_64 and arm64 Linux and checks what they export and return. Seconds, no Android |
 | `adi-on-bionic.yml` | `app/src/main/cpp/**`, `adi-libraries.json`, `AdiFunction.java`, its own directory | Loads and initialises Apple's real ADI libraries on x86_64 and arm64 Linux under Android 9 and Android 14 bionic, with no emulator, and checks the pre-#232 stub still fails. About a minute cold, seconds warm |
 | `check-gsa-edge.yml` | daily, and every PR to `main` | Asks Apple's edge whether it still lets the app's and the exporter's sign-in and provisioning requests through, with their exact headers and no account. A scheduled failure opens an issue. Seconds |
+| `macadi-host.yml` | `app/src/main/cpp/macadi/**`, `app/src/test/macadi-host/**`, `MacCoreAdi*.java`, `scripts/locate_mac_coreadi.py`, `scripts/adi-emulator-diff/**` | Fetches Apple's macOS CoreADI with the app's own range request, checks both pinned hashes, builds the emulated Mac's native core for the host and has it load the library; a second job runs `compare-libmacadi.sh`, the port against os-findmy-e's `adi-core` byte for byte. Nothing sent to Apple beyond the download. A few minutes each, mostly building Unicorn |
 | `waiting-on-reporter.yml` | a comment on an issue, daily | Removes the `waiting on reporter` label when the issue's author replies. Daily, comments once on any labelled issue quiet for 14 days, and again only after somebody else has commented. Never closes anything. Both triggers run the copy on `main`, so a PR cannot exercise it; `workflow_dispatch` defaults to a dry run that prints what it would post |
 
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
