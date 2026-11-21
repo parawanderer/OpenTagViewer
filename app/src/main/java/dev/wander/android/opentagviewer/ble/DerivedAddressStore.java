@@ -4,6 +4,8 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import dev.wander.android.opentagviewer.util.FileReplace;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -178,7 +180,7 @@ public final class DerivedAddressStore {
             return;
         }
 
-        if (!temporary.renameTo(target) && (!target.delete() || !temporary.renameTo(target))) {
+        if (!FileReplace.moveOver(temporary, target)) {
             Log.w(TAG, "Could not replace the derived addresses for beaconId=" + beaconId);
             temporary.delete();
         }
