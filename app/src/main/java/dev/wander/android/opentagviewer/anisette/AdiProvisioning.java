@@ -72,12 +72,28 @@ public final class AdiProvisioning {
 
     /** Thrown when Apple or ADI refuses, with enough context to tell which. */
     public static final class ProvisioningException extends Exception {
+        /** HTTP 433: Apple has already provisioned this device id, and will not again. */
+        public static final int ALREADY_PROVISIONED = 433;
+
+        private final int httpStatus;
+
         public ProvisioningException(String message) {
+            this(message, 0);
+        }
+
+        public ProvisioningException(String message, int httpStatus) {
             super(message);
+            this.httpStatus = httpStatus;
         }
 
         public ProvisioningException(String message, Throwable cause) {
             super(message, cause);
+            this.httpStatus = 0;
+        }
+
+        /** The status Apple answered with, or 0 when the failure was not an HTTP refusal. */
+        public int httpStatus() {
+            return this.httpStatus;
         }
     }
 

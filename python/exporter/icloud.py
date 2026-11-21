@@ -296,6 +296,12 @@ def make_account(
         identity = ClientIdentity(
             serial=serial_from(stored), device_name=identity.device_name)
 
+    # **The emulated Mac unless something else was asked for.** Apple stopped serving the Android
+    # ADI machine `anisette` provisions (#248), so it is reached only by naming its library cache.
+    # See `exporter.macadi`.
+    if provider is None and anisette_url is None and libs_path is None:
+        return _emulated_mac_account(stored, identity, identity_path)
+
     # After the substitution above, never before: the provider is what actually sends
     # `X-Apple-I-SRL-NO`, so building it from the placeholder identity would present the constant
     # this change exists to stop presenting.
@@ -325,6 +331,48 @@ def make_account(
         device_name=identity.device_name,
         timeout=LOGIN_TIMEOUT_SECONDS,
     )
+
+
+def _emulated_mac_account(
+    stored: dict[str, Any] | None,
+    identity: ClientIdentity,
+    identity_path: Path | None,
+) -> AsyncAppleAccount:
+    """
+    An account on the emulated Mac kept beside the device identity, provisioning it if needed.
+
+    **The ids are the machine's.** Provisioning registered one device id and one local user id
+    with Apple, and `X-Apple-I-MD-M` is derived from that registration; an account sending other
+    ids alongside it is a shape no real Mac produces. So they come from the machine, not from
+    `device-identity.json` - which only confirms the stored session is this machine's.
+    """
+    from exporter import macadi  # noqa: PLC0415 - the app imports this module and never needs it
+
+    root = (identity_path or device.identity_path()).parent / macadi.DIRNAME
+    provider = macadi.EmulatedMacAnisetteProvider(macadi.EmulatedMac.open(root, identity.serial))
+
+    if stored is not None and (stored["uid"], stored["devid"]) == (provider.uid, provider.devid):
+        logger.info("Reusing the stored emulated Mac, so this is not a new device to Apple")
+        state: Any = {
+            "type": "account",
+            "ids": {"uid": stored["uid"], "devid": stored["devid"]},
+            "account": {"username": None, "password": None, "info": None},
+            "login": {"state": LoginState.LOGGED_OUT.value, "data": None},
+            "anisette": provider.to_json(),
+        }
+        return AsyncAppleAccount(
+            provider, state_info=state, device_name=identity.device_name,
+            timeout=LOGIN_TIMEOUT_SECONDS)
+
+    if stored is not None:
+        # Unavoidable once: the stored ids are the Android ADI machine Apple stopped serving.
+        logger.warning(
+            "This install signed in before as a different machine; signing in as the emulated Mac"
+            " adds one entry to the account's device list. The serial stays %s.", provider.serial)
+
+    return AsyncAppleAccount(
+        provider, uid=provider.uid, devid=provider.devid, device_name=identity.device_name,
+        timeout=LOGIN_TIMEOUT_SECONDS)
 
 
 def _make_provider(
@@ -751,6 +799,50 @@ def _describe_factor(method: object) -> str:
     return type(method).__name__
 
 
+class _CloudKitDeviceView:
+    """
+    The account, except that `device_uuid` is a UUID - for the keychain and CloudKit clients only.
+
+    FindMy.py's CloudKit client sends `uuid.UUID(account.device_uuid)`, and a Mac's device id is a
+    provisioning UDID - `00006000-` and sixteen hex - so opening the client failed with "badly
+    formed hexadecimal UUID string" before anything was sent. CloudKit's identifier is a separate
+    field from `X-Mme-Device-Id`, so it is answered with another stable value, and everything else -
+    Grand Slam, tokens, PET renewal - reaches the real account. After #274's `_forCloudKit`, and
+    sacca97/os-findmy-e's `tag_keys.CloudKitIdentity` before it.
+    """
+
+    def __init__(self, account: AsyncAppleAccount, device_uuid: str) -> None:
+        self._account = account
+        self._device_uuid = device_uuid
+
+    @property
+    def device_uuid(self) -> str:
+        return self._device_uuid
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._account, name)
+
+
+def _with_a_uuid_for_cloudkit(account: Any) -> Any:
+    """`account`, or a view of it whose device id CloudKit can parse."""
+    device_id = getattr(account, "device_uuid", None)
+    if not isinstance(device_id, str):
+        return account
+    try:
+        uuid.UUID(device_id)
+        return account
+    except ValueError:
+        pass
+
+    # The emulated Mac's host UUID when the provider can say; otherwise one derived from the
+    # device id, which is as stable as the device id is.
+    stable = getattr(getattr(account, "_anisette", None), "cloudkit_device_uuid", None)
+    if not isinstance(stable, str):
+        stable = str(uuid.uuid5(uuid.NAMESPACE_URL, f"opentagviewer:device:{device_id}")).upper()
+    logger.info("The device id is not a UUID; CloudKit is told %s instead", stable)
+    return _CloudKitDeviceView(account, stable)
+
+
 async def open_client(
     account: AsyncAppleAccount, identity: ClientIdentity = EXPORTER_IDENTITY,
 ) -> AsyncFindMyClient:
@@ -761,6 +853,7 @@ async def open_client(
     client with the library's own device name. Rule 11: every path has to send the same identity,
     and a second name here would be a second device in the user's list.
     """
+    account = _with_a_uuid_for_cloudkit(account)
     session = await AsyncKeychainSession.open(account)
     try:
         store = AsyncBeaconStore(

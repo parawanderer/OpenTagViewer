@@ -42,3 +42,20 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/stubs/AppleStubs.cmake")
 
 add_apple_stub(CoreFoundation)
 add_apple_stub(mediaplatform)
+
+# --------------------------------------------------------------------------------------------
+# The emulated Mac.
+#
+# Since 2026-10-12 Apple gives the Find My token only to a Mac or iPhone identity, and a machine
+# provisioned by the Android libraries above cannot present as one. So this runs Apple's *macOS*
+# CoreADI instead, under an x86_64 emulator - see macadi/MacAdi.cmake and MacCoreAdi.java.
+#
+# Its own library, not part of libopentagviewer.so: the emulator is GPL-2.0 and several MB, and
+# keeping it separate means it is only loaded when the emulated Mac is actually used.
+# --------------------------------------------------------------------------------------------
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/macadi/MacAdi.cmake")
+
+add_library(macadi SHARED macadi/jni.cpp)
+target_compile_options(macadi PRIVATE -fexceptions)
+target_link_libraries(macadi PRIVATE macadi_core log)

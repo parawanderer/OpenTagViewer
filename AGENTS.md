@@ -89,6 +89,15 @@ python -m venv .venv && .venv/bin/pip install "FindMy==<pinned version>"
   emulator Chaquopy cannot build for Android. `app/stubs/unicorn/` is a stand-in that makes
   the dependency tree resolve; every method raises. The stub is not a step toward enabling
   `aniLocal`, and never will be.
+- **Unicorn ships as native code, GPL-2.0 and all, and that was decided rather than missed.**
+  The emulated Mac (rule 21) runs it in `libmacadi.so`. Before replacing it with a permissive
+  emulator for licence reasons, read
+  [docs/emulated-mac-emulator-choice.md](./docs/emulated-mac-emulator-choice.md): a replacement
+  is invisible to users **only if it produces the same bytes**, because the emulator is not part
+  of the machine identity but its output is. `scripts/adi-emulator-diff/` is the check. CI runs it offline only; the OTP path was compared
+  by hand on 2026-11-20, identical, and needs `ADI_DIFF_HOST_UUID` set to the store's host UUID or
+  both sides just say "not provisioned" (CONTRIBUTING.md). The same doc says what the GPL obliges: a notice, and the
+  library kept in its own process.
 - **The app does run ADI locally, by a different route.** `app/src/main/java/.../anisette/`
   loads Apple's real Android ADI libraries in-process and produces Anisette here, falling
   back to a remote server when it cannot. That is unrelated to `aniLocal` and needs no
@@ -610,6 +619,18 @@ curl -so /dev/null -w '%{http_code}\n' -X POST --data-binary t \
 app and the exporter send, and opens an issue when one is refused. It would have caught this before
 the first report. `python scripts/check_gsa_edge.py` asks from your own connection.
 
+**It did, on 2026-11-20 ([#289](https://github.com/parawanderer/OpenTagViewer/issues/289)), and
+the rule was a different one.** The edge began refusing any sign-in whose client info spells the OS
+`<macOS;…>`, while the identical request saying `<Mac OS X;…>` — what macOS's own `akd` sends —
+got through. The legacy Mac profile said `macOS`. Model, version, build and bundle made no
+difference; provisioning and the report fetch accept both. Finding it took a dozen requests with
+one field changed at a time (the script's `Probe` shape does this), not a day. Two lessons: **any
+field in that header can become the one Apple keys on**, so copy Apple's own spelling of each and
+not a plausible one; and **a stored session carries its identity and its password**, so it
+re-authenticates under the old value on its own. Fixing the profile alone would have left every
+existing user to break at their next PET renewal — `identity.respellRefusedOsName` corrects it on
+restore.
+
 **So check the neighbours first.** This project shares an authentication path with AltStore,
 SideStore, Macless Haystack, OpenBubbles and every Anisette server, because they all copied it
 from the same place. When something that worked yesterday fails for everybody, half an hour
@@ -694,7 +715,93 @@ already sent you, and then reasoning from a guess while you wait.
   had a phone number blacked out by hand, and the pixels either side of it were not. Quote the
   error text, never the surrounding screen, and never re-upload the image.
 
-### 21. The account takes turns. It is never used by two things at once
+### 21. Anisette comes from an emulated Mac, and it is one machine for the life of the install
+
+Since 2026-10-12 Apple issues the Find My token (`searchPartyToken`) only to a sign-in whose
+Anisette machine was minted by a Mac or an iPhone; an Android-minted one gets `mmeAuthToken` alone
+and every report fetch answers 401 ([malmeloo/FindMy.py#278](https://github.com/malmeloo/FindMy.py/issues/278)).
+From about 2026-10-20 the edge also answers 503 to any `X-MMe-Client-Info` whose OS token is
+`Android`, whatever else is sent ([#261](https://github.com/parawanderer/OpenTagViewer/pull/261)).
+So `LocalAnisette`'s Android libraries can no longer reach Find My by any combination of headers.
+
+`EmulatedMacAnisette` runs Apple's **macOS** CoreADI - the x86_64 build in iTunes 12.8.3 - under
+Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-findmy-e; see its
+`NOTICE.md`). **A fresh sign-in gets it; a restored session keeps the machine that signed it in.**
+
+- **Never move an existing session onto the emulated Mac.** A session `LocalAnisette` signed in
+  before 2026-10-12 still fetches reports, and its token only works with Anisette from the Android
+  machine that obtained it (#248). Handing it the emulated Mac at restore downloads CoreADI,
+  provisions a new Mac at app start, and sends that Mac's `X-Apple-I-MD-M` beside the account's
+  Android `X-Mme-Device-Id` - a working session made to answer 401. `AnisetteForSession` decides,
+  from `SessionProvenance`: `LocalAnisette` for every session but the emulated Mac's own, and
+  `EmulatedMacAnisette.Purpose.RESTORE` for those, which **never provisions** - a Mac that lost its
+  store is not the machine that holds the token. `RestoringASessionOnTheMachineThatSignedItInTest`
+  pins it.
+- **Provenance has one home**: `sessionEstablishedLocally` in `LocalAnisette.PREFERENCES`, the key
+  every older install already has, plus `sessionMachine = emulatedMac` beside it for the Mac's
+  sessions. A new preferences file reads "nothing recorded" for every upgrader, which silently
+  turned off the machine-change warning in `_preferLocalAnisette`.
+- **`libmacadi.so` is loaded only in `:macadi`.** `MacAdiService` hosts the emulator and the app
+  reaches it over binder through `RemoteMacAdi`; nothing in the app process may touch `MacCoreAdi`,
+  whose static initialiser loads the library. Two reasons: a SIGSEGV from Unicorn or Apple's code
+  is a native crash no `catch` sees (rule 4, #232), and the GPL-2.0 emulator must stay a separate
+  program from the Apache-2.0 libraries and the map SDKs. A death during a call arrives as
+  `MacAdi.EmulatorDiedException`, is recorded per app version and library build, and the Mac is not
+  tried again until one of those changes. `OpenAirTagApplication` returns early in that process,
+  as it does in `:adiprobe`. `TheEmulatedMacInItsOwnProcessTest` checks the boundary for real.
+
+- **The library is fetched from Apple, never shipped.** One HTTP range request: in that exact disk
+  image the package payload is stored uncompressed and contiguous, so its offset is a constant.
+  `scripts/locate_mac_coreadi.py` re-derives and checks every constant, reading them from the Java
+  sources. Both the payload and the library are pinned by SHA-256, and the dispatcher offset
+  (`0x979A0`) is only valid for that one build.
+- **One identity, kept forever** - rule 11, with more at stake. `files/anisette/mac/identity.json`
+  and `store/` belong together: the library hashes the host UUID into the machine id, Apple binds
+  the provisioning to the device id, and the Find My token only works alongside Anisette from the
+  machine that obtained it. Apple will provision a device id **once** (a second attempt answers
+  HTTP 433 / -29002), so a lost store means a new machine and a new device-list entry. The same
+  holds for a process that died after Apple answered `midFinishProvisioning` and before the store
+  was saved: a sign-in that gets 433 for a never-provisioned identity draws a new one and tries
+  once more, or it would fall back to a server on every sign-in after.
+- **Never leave `adi.pb` in the store.** Provisioning writes the legacy whole-machine blob beside
+  the per-user one, and while it exists the library says "not provisioned". A process that
+  provisioned and then asked for headers sent Apple an empty machine id, which surfaces as
+  **`ec -80009`, "MID is invalid"** - and looked like an emulation fault until a restart, which
+  never reloads the file, made it go away. `CoreAdi::beginSession` drops it before every session.
+- **A Mac's device id is not a UUID**, and FindMy.py's CloudKit client parses it as one. The
+  keychain and CloudKit clients get `icloud_bridge._forCloudKit`'s view of the account instead,
+  which answers `device_uuid` with a UUID derived from the device id and forwards everything
+  else. Not the Mac's host UUID: a session that falls back to a remote server has no Mac to ask,
+  and it would tell CloudKit a second device. Anything new that
+  hands the account to CloudKit has to go through it.
+- **Never freeze the emulated clock outside a byte-for-byte comparison.** A constant OTP is
+  accepted for about a minute and then refused.
+- **Grand Slam now asks for a second factor with `hsc` 409 and no `au`**, which FindMy.py before
+  parawanderer/FindMy.py#9 read as "no 2FA needed". The pinned FindMy.py handles it in
+  `_gsa_authenticate` (`_normalize_2fa_status`, as malmeloo/FindMy.py#279 has it), so the app no
+  longer wraps `_gsa_request`. `test_emulated_mac.TestHsc409` fails if a pin move loses it.
+- **The APK carries GPL-2.0 code** (Unicorn). Keep it in `libmacadi.so`, not in
+  `libopentagviewer.so`, and keep its obligations met: `assets/licences/unicorn/` carries the
+  licence files and a notice naming the exact source (`UnicornNoticeTest` keeps it in step with
+  `MacAdi.cmake`), and `build-release.yml` attaches that source tarball to every release.
+- **The C++ port is checked against os-findmy-e's Rust byte for byte**, offline:
+  `scripts/adi-emulator-diff/compare-libmacadi.sh`, in `macadi-host.yml`. Change `vm.cpp`,
+  `core_adi.cpp` or `macho.cpp` and that job is what says whether the port still matches.
+- **`:macadi` is long-lived, so the emulator must not grow or hang.** One engine serves every
+  header set for the process's life. Unicorn's default 1 GiB translation cache, flushed only when
+  full, grew it ~20 KB a call without end; `Vm` caps it at 8 MiB. A guest call has a 30 s timeout,
+  because a loop under emulation would otherwise hold a core and the app's binder call forever.
+  The process is let go after five idle minutes (`EmulatedMacAnisette.IDLE_CLOSE_MS`) and reopened
+  from the store. `macadi_selftest` checks the timeout in CI and memory over many calls by hand.
+
+The emulator suite's sign-in tests cannot cover any of this - they swap the Anisette source for a
+fake. What does: the JVM tests (`EmulatedMacAnisetteTest`, `MacIdentityTest`,
+`MacProvisioningTest` against `FakeGrandSlam`, `RestoringASessionOnTheMachineThatSignedItInTest`,
+the fetcher's), `macadi-host.yml` (the library loads in the ported emulator, and matches adi-core),
+`TheEmulatedMacInItsOwnProcessTest` on the device, the Python tests in `test_emulated_mac.py`, and a
+real sign-in on a phone.
+
+### 22. The account takes turns. It is never used by two things at once
 
 The signed-in account's asyncio loop runs on a thread of its own (`app/src/main/python/account_loop.py`),
 so the iCloud screen no longer waits behind a location fetch. Before
@@ -1091,7 +1198,14 @@ Each of these has already produced a hang that looked like something else:
   wrap one in a `grep` or a `timeout` that can swallow the error message — that turns a fast,
   legible failure into an apparent hang. `JAVA_HOME` pointing below 17 is the usual culprit,
   and it fails deep inside the Android Gradle Plugin with a message that reads like a plugin
-  bug.
+  bug. Above 21 fails too: Android Studio's bundled Java 25 makes Gradle 8.10 fail with only
+  `25.0.4` as its message.
+- **The native build needs `sh`, `strings` and `pkg-config`.** Unicorn's CMake runs
+  `sh qemu/configure` without checking the result, so from PowerShell or Android Studio it used
+  to "succeed" and the compile then died on `'config-host.h' file not found`. `MacAdi.cmake` now
+  names the missing tool up front. A Git Bash shell can still pass where the IDE fails, because
+  it puts more on `PATH`: test with the PATH the IDE gets, not your shell's. See CONTRIBUTING's
+  setup table, and delete `app/.cxx` after fixing it.
 
 ## Conventions
 
