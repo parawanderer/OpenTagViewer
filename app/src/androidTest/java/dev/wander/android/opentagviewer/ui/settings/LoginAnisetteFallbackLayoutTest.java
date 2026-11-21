@@ -21,7 +21,9 @@ import org.junit.runner.RunWith;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
 import dev.wander.android.opentagviewer.anisette.AppleLibraryCrashReport;
+import dev.wander.android.opentagviewer.anisette.EmulatedMacAnisette;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
+import dev.wander.android.opentagviewer.anisette.MacCoreAdiFetcher;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 
 /**
@@ -184,6 +186,70 @@ public class LoginAnisetteFallbackLayoutTest {
                 ((TextView) view(R.id.anisetteLoginFallbackReason)).getText().toString());
         assertEquals("a network failure is not worth a bug report",
                 View.GONE, view(R.id.anisetteReportCrashButton).getVisibility());
+    }
+
+    private static AnisetteStatus noCoreAdi() {
+        return AnisetteStatus.of(FakeAnisetteSource.unavailable(
+                EmulatedMacAnisette.NO_COREADI_REASON + ": Apple answered HTTP 403"));
+    }
+
+    /**
+     * Without CoreADI, the file is offered first: the link to Apple's image, choose and retry.
+     * The server stays reachable, but the sentence says locations will not load through it.
+     */
+    @Test
+    public void noCoreAdiOffersTheFileAndWarnsAboutTheServer() {
+        apply(noCoreAdi());
+
+        assertEquals(View.VISIBLE, view(R.id.anisetteCoreAdiContainer).getVisibility());
+        assertEquals(MacCoreAdiFetcher.DMG_URL,
+                ((TextView) view(R.id.anisetteCoreAdiLink)).getText().toString());
+        assertEquals(this.screen.getContext().getString(R.string.anisette_login_needs_coreadi),
+                ((TextView) view(R.id.anisetteLoginFallbackReason)).getText().toString());
+        assertEquals(View.VISIBLE, view(R.id.anisetteChooseCoreAdiButton).getVisibility());
+        assertEquals(View.VISIBLE, view(R.id.anisetteRetryCoreAdiButton).getVisibility());
+        assertEquals("the server is still a way to sign in",
+                View.VISIBLE, view(R.id.anisetteRemoteSection).getVisibility());
+        assertEquals(View.GONE, view(R.id.anisetteReportCrashButton).getVisibility());
+        assertEquals("nothing was refused yet",
+                View.GONE, view(R.id.anisetteCoreAdiRejection).getVisibility());
+    }
+
+    /** Any other failure, or recovering, takes the offer away again. */
+    @Test
+    public void theFileIsOfferedOnlyWhileItIsMissing() {
+        apply(noCoreAdi());
+        apply(AnisetteStatus.of(FakeAnisetteSource.unavailable("Unable to resolve host")));
+        assertEquals(View.GONE, view(R.id.anisetteCoreAdiContainer).getVisibility());
+
+        apply(noCoreAdi());
+        apply(AnisetteStatus.of(FakeAnisetteSource.ready()));
+        assertEquals(View.GONE, view(R.id.anisetteCoreAdiContainer).getVisibility());
+    }
+
+    /** Somebody who chose a server is not offered a file for a machine they are not using. */
+    @Test
+    public void choosingAServerIsNotAnsweredWithTheFile() {
+        apply(noCoreAdi(), true);
+
+        assertEquals(View.GONE, view(R.id.anisetteCoreAdiContainer).getVisibility());
+    }
+
+    /** A refused file says why, and a fresh attempt clears it. */
+    @Test
+    public void aRefusedFileSaysWhyUntilTheNextTry() {
+        apply(noCoreAdi());
+        getInstrumentation().runOnMainSync(() -> SharedMainSettingsManager.applyCoreAdiRejection(
+                this.screen, "the library is not the expected build"));
+
+        final TextView rejection = (TextView) view(R.id.anisetteCoreAdiRejection);
+        assertEquals(View.VISIBLE, rejection.getVisibility());
+        assertTrue(rejection.getText().toString(),
+                rejection.getText().toString().contains("not the expected build"));
+
+        getInstrumentation().runOnMainSync(
+                () -> SharedMainSettingsManager.applyCoreAdiRejection(this.screen, null));
+        assertEquals(View.GONE, rejection.getVisibility());
     }
 
     /** The report is only worth sending if it names the phone. */

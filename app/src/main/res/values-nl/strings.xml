@@ -422,4 +422,7 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="server_url_not_https">Geen https: het API-token wordt onversleuteld verstuurd.</string>
     <string name="google_find_hub_setup_guide">Zo stel je dit in</string>
     <string name="battery_icon_description">Batterij %1$s</string>
+    <string name="anisette_login_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie via de link hieronder, op een computer of in je browser, zet hem op deze telefoon en kies hem hier. Een server kan je nog steeds aanmelden, maar de locaties van je tags laden daar niet mee.</string>
+    <string name="anisette_local_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie op een computer of in je browser, zet hem op deze telefoon en kies hem hier.</string>
+    <string name="anisette_coreadi_copy_link">Downloadlink kopiëren</string>
 </resources>

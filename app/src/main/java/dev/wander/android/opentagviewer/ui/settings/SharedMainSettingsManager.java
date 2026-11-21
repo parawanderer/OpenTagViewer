@@ -40,6 +40,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
 import dev.wander.android.opentagviewer.anisette.AppleLibraryCrashReport;
+import dev.wander.android.opentagviewer.anisette.MacCoreAdiFetcher;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService;
@@ -349,14 +350,30 @@ public class SharedMainSettingsManager {
         // again - and there is nothing to try. What helps is knowing which phone it is.
         final boolean crashes = explain && state == AnisetteStatus.State.CRASHES_HERE;
 
+        // **Without CoreADI, the server is the trap, not the way out.** It signs in, and then
+        // every location fetch answers 401 (no Find My token since 2026-10-12). So the screen
+        // offers the file first and says what the server will not do.
+        final boolean needsCoreAdi = explain && status.needsCoreAdi();
+
         final View reason = root.findViewById(R.id.anisetteLoginFallbackReason);
         if (reason != null) {
             reason.setVisibility(explain ? VISIBLE : GONE);
             if (reason instanceof TextView) {
                 ((TextView) reason).setText(crashes
                         ? R.string.anisette_login_crashes_here
+                        : needsCoreAdi
+                        ? R.string.anisette_login_needs_coreadi
                         : R.string.anisette_login_needs_server);
             }
+        }
+
+        final View coreAdi = root.findViewById(R.id.anisetteCoreAdiContainer);
+        if (coreAdi != null) {
+            coreAdi.setVisibility(needsCoreAdi ? VISIBLE : GONE);
+        }
+        final TextView coreAdiLink = root.findViewById(R.id.anisetteCoreAdiLink);
+        if (coreAdiLink != null) {
+            coreAdiLink.setText(MacCoreAdiFetcher.DMG_URL);
         }
 
         final View report = root.findViewById(R.id.anisetteReportCrashButton);
@@ -365,6 +382,27 @@ public class SharedMainSettingsManager {
             report.setOnClickListener(crashes ? v -> openTheCrashReport(v.getContext(), status)
                     : null);
         }
+    }
+
+    /**
+     * Say why a file chosen as CoreADI was refused, or clear it with {@code null}.
+     *
+     * @param problem the importer's reason, shown inside the existing "not the version" sentence
+     */
+    public static void applyCoreAdiRejection(final View root, final String problem) {
+        if (root == null) {
+            return;
+        }
+        final TextView rejection = root.findViewById(R.id.anisetteCoreAdiRejection);
+        if (rejection == null) {
+            return;
+        }
+        if (problem == null) {
+            rejection.setVisibility(GONE);
+            return;
+        }
+        rejection.setText(root.getContext().getString(R.string.anisette_apk_rejected, problem));
+        rejection.setVisibility(VISIBLE);
     }
 
     private static void openTheCrashReport(final Context context, final AnisetteStatus status) {
@@ -490,12 +528,24 @@ public class SharedMainSettingsManager {
         if (ownApk == null) {
             return;
         }
-        ownApk.setVisibility(status.needsOwnApk() ? VISIBLE : GONE);
+        // The same block serves both files: the Apple Music APK for the Android libraries, and
+        // CoreADI for the emulated Mac. Only one of them can be what is missing.
+        ownApk.setVisibility(status.needsOwnApk() || status.needsCoreAdi() ? VISIBLE : GONE);
 
         final TextView explanation = root.findViewById(R.id.anisetteOwnApkExplanation);
-        if (status.needsOwnApk() && explanation != null) {
-            explanation.setText(root.getContext().getString(
-                    R.string.anisette_local_needs_own_file, apkVersion));
+        if (explanation != null) {
+            if (status.needsCoreAdi()) {
+                explanation.setText(R.string.anisette_local_needs_coreadi);
+            } else if (status.needsOwnApk()) {
+                explanation.setText(root.getContext().getString(
+                        R.string.anisette_local_needs_own_file, apkVersion));
+            }
+        }
+
+        final TextView whereToGet = root.findViewById(R.id.anisetteWhereToGetApkButton);
+        if (whereToGet != null) {
+            whereToGet.setText(status.needsCoreAdi()
+                    ? R.string.anisette_coreadi_copy_link : R.string.anisette_where_to_get_apk);
         }
 
         final View clear = root.findViewById(R.id.anisetteClearApkButton);

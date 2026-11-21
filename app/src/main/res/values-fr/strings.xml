@@ -422,4 +422,7 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="server_url_not_https">Pas en https : le jeton d\'API sera envoyé sans chiffrement.</string>
     <string name="google_find_hub_setup_guide">Comment le configurer</string>
     <string name="battery_icon_description">Batterie %1$s</string>
+    <string name="anisette_login_needs_coreadi">Ce téléphone n\'a pas pu télécharger un fichier nécessaire depuis Apple (macOS CoreADI). Téléchargez l\'image disque d\'iTunes 12.8.3 via le lien ci-dessous, sur un ordinateur ou dans votre navigateur, placez-la sur ce téléphone et choisissez-la ici. Un serveur peut toujours vous connecter, mais la position de vos balises ne se chargera pas par son intermédiaire.</string>
+    <string name="anisette_local_needs_coreadi">Ce téléphone n\'a pas pu télécharger un fichier nécessaire depuis Apple (macOS CoreADI). Téléchargez l\'image disque d\'iTunes 12.8.3 sur un ordinateur ou dans votre navigateur, placez-la sur ce téléphone et choisissez-la ici.</string>
+    <string name="anisette_coreadi_copy_link">Copier le lien de téléchargement</string>
 </resources>

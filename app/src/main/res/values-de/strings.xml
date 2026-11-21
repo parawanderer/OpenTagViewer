@@ -422,4 +422,7 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="server_url_not_https">Kein https: Das API-Token wird unverschlüsselt gesendet.</string>
     <string name="google_find_hub_setup_guide">So richtest du das ein</string>
     <string name="battery_icon_description">Akku %1$s</string>
+    <string name="anisette_login_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image über den Link unten herunter, am Computer oder im Browser, lege es auf dieses Telefon und wähle es hier aus. Ein Server kann dich zwar anmelden, aber die Standorte deiner Tags werden darüber nicht geladen.</string>
+    <string name="anisette_local_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image am Computer oder im Browser herunter, lege es auf dieses Telefon und wähle es hier aus.</string>
+    <string name="anisette_coreadi_copy_link">Download-Link kopieren</string>
 </resources>
