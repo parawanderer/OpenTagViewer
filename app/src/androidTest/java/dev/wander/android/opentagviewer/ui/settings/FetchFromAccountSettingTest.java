@@ -34,6 +34,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
+import dev.wander.android.opentagviewer.ICloudLinkActivity;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.SettingsActivity;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
@@ -117,7 +118,7 @@ public class FetchFromAccountSettingTest {
     public void settingsOffersToReadTheAppleAccount() {
         this.openSettings();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.settings_icloud_link))
                 .check(matches(isDisplayed())));
     }
 
@@ -136,8 +137,8 @@ public class FetchFromAccountSettingTest {
         this.openSettings();
 
         Eventually.check(() -> onView(allOf(
-                withText(R.string.icloud_fetch_from_settings_linked),
-                isDescendantOfA(withId(R.id.settings_fetch_from_account))))
+                withText(R.string.icloud_link_subtitle_linked),
+                isDescendantOfA(withId(R.id.settings_icloud_link))))
                 .check(matches(isDisplayed())));
     }
 
@@ -152,8 +153,8 @@ public class FetchFromAccountSettingTest {
         this.openSettings();
 
         Eventually.check(() -> onView(allOf(
-                withText(R.string.icloud_fetch_from_settings_subtitle),
-                isDescendantOfA(withId(R.id.settings_fetch_from_account))))
+                withText(R.string.icloud_link_subtitle_unlinked),
+                isDescendantOfA(withId(R.id.settings_icloud_link))))
                 .check(matches(isDisplayed())));
     }
 
@@ -162,10 +163,10 @@ public class FetchFromAccountSettingTest {
     public void tappingItReachesTheAccountScreen() {
         this.openSettings();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.settings_icloud_link))
                 .check(matches(isDisplayed())));
 
-        onView(withId(R.id.settings_fetch_from_account)).perform(click());
+        onView(withId(R.id.settings_icloud_link)).perform(click());
 
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
     }
@@ -194,9 +195,9 @@ public class FetchFromAccountSettingTest {
 
         this.openSettingsExpectingAResult();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.settings_icloud_link))
                 .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_fetch_from_account)).perform(click());
+        onView(withId(R.id.settings_icloud_link)).perform(click());
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
 
         // **Backed out, not finished.** Calling finish() directly skips handleEndActivity(),
@@ -220,6 +221,36 @@ public class FetchFromAccountSettingTest {
     }
 
     /**
+     * <b>Once linked, the row opens the Apple iCloud link page instead</b>, and an import made
+     * from there still reaches whoever opened Settings: the fetch is one screen further away now,
+     * and the map only rebuilds if the result makes it all the way back.
+     */
+    @Test
+    public void onceLinkedItOpensTheLinkPageAndItsImportIsPassedOn() {
+        this.givenTheAccountIsAlreadyLinked();
+        final Intent imported = new Intent();
+        imported.putExtra(FetchFromICloudActivity.RESULT_IMPORTED, true);
+        intending(hasComponent(ICloudLinkActivity.class.getName()))
+                .respondWith(new ActivityResult(Activity.RESULT_OK, imported));
+
+        this.openSettingsExpectingAResult();
+
+        // Wait for the lookup to answer "linked", or the tap would start the link instead.
+        Eventually.check(() -> onView(allOf(
+                withText(R.string.icloud_link_subtitle_linked),
+                isDescendantOfA(withId(R.id.settings_icloud_link))))
+                .check(matches(isDisplayed())));
+        onView(withId(R.id.settings_icloud_link)).perform(click());
+        Eventually.check(() -> intended(hasComponent(ICloudLinkActivity.class.getName())));
+
+        Espresso.pressBackUnconditionally();
+
+        final Intent data = this.scenario.getResult().getResultData();
+        assertNotNull(data);
+        assertTrue(data.getBooleanExtra(FetchFromICloudActivity.RESULT_IMPORTED, false));
+    }
+
+    /**
      * And it is not claimed when nothing was imported.
      *
      * <p>A result that always says "imported" costs a full rebuild of the map every time
@@ -231,9 +262,9 @@ public class FetchFromAccountSettingTest {
     public void backingOutOfItDoesNotClaimAnImport() {
         this.openSettingsExpectingAResult();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.settings_icloud_link))
                 .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_fetch_from_account)).perform(click());
+        onView(withId(R.id.settings_icloud_link)).perform(click());
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
 
         Espresso.pressBackUnconditionally();

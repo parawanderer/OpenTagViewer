@@ -211,8 +211,6 @@
     <string name="vendor_lookup_hint">%1$s — идентификатор компании Bluetooth SIG. Нажмите, чтобы найти его и узнать, кто это сделал.</string>
     <string name="rename_failed_title">Имя не изменено</string>
     <string name="rename_failed_message">Имя этой метки хранится в вашей учётной записи Apple, поэтому переименование должно дойти до Apple — сейчас этого не произошло. Ничего не изменилось. Проверьте подключение и повторите попытку.</string>
-    <string name="icloud_fetch_from_settings_subtitle">Добавить метки из вашей учётной записи или обновить уже добавленные</string>
-    <string name="icloud_fetch_from_settings_linked">Связано с вашей учётной записью Apple. Нажмите, чтобы проверить новые или изменённые метки.</string>
     <string name="icloud_link_account_action">Связать метки через учётную запись Apple</string>
     <string name="tag_ignored_summary">Нет обновлений уже несколько месяцев — поиск приостановлен</string>
     <string name="tag_ignored_retry">Проверить сейчас</string>
@@ -233,7 +231,6 @@
     <string name="battery_level_very_low">Критически низкий (~5-10%) — почти разряжен</string>
     <string name="battery_level_icloud_only">Это значение обновляется только у меток, прочитанных из iCloud. Метка, импортированная из файла, сохраняет значение на момент экспорта.</string>
     <string name="icloud_unlink_title">Отвязать мою учётную запись Apple</string>
-    <string name="icloud_unlink_subtitle">Приложение перестанет читать метки из вашей учётной записи</string>
     <string name="icloud_unlink_confirm_title">Отвязать учётную запись Apple?</string>
     <string name="icloud_unlink_confirm_message">Приложение перестанет читать ваши метки из Apple. Уже импортированные метки останутся на этом устройстве вместе с историей местоположений, но больше не будут обновляться из вашей учётной записи.
 
@@ -391,7 +388,6 @@
     <string name="anisette_crash_report_body">На этом телефоне библиотека входа Apple падает сразу после загрузки. На большинстве телефонов она работает, и мы пока не знаем, что общего у затронутых устройств.\n\nТеперь OpenTagViewer использует для этого шага сервер, так что вы можете войти и пользоваться приложением как обычно. Отчёт с данными ниже поможет нам найти причину.</string>
     <string name="login_failed_refused_before_password">Apple отказалась начинать вход с этим Apple ID ещё до проверки пароля, поэтому вводить его заново бесполезно. Проверьте, можете ли вы войти на account.apple.com и не требует ли Apple там чего-либо. Удалённый сервер представляется Apple другим устройством — это стоит попробовать. Ответ Apple: %1$s</string>
     <string name="extra_sources">Дополнительные источники местоположения (экспериментально)</string>
-    <string name="extra_sources_subtitle">Трекеры Google Find Hub</string>
     <string name="extra_sources_explainer">Экспериментальная функция. Определяйте местоположение трекеров вашего аккаунта Google через собственный сервис googlefind. Их можно добавить как устройства или связать с устройством, чтобы отчёты обеих сетей были на одной метке.</string>
     <string name="google_find_hub_explainer">Отчёты трекеров вашего аккаунта Google через сервис googlefind. Новые местоположения запрашиваются только при обновлении метки.</string>
     <string name="server_url">Адрес сервера</string>
@@ -430,4 +426,15 @@
     <string name="import_choice_exporter_subtitle">Файл .zip, созданный экспортёром OpenTagViewer</string>
     <string name="import_choice_openhaystack_subtitle">Файл .keys из OpenHaystack</string>
     <string name="import_choice_google_subtitle">Трекеры в вашем аккаунте Google</string>
+    <string name="icloud_link_title">Связь с Apple iCloud</string>
+    <string name="icloud_link_subtitle_linked">Связано. Нажмите, чтобы проверить новые метки или отменить связь.</string>
+    <string name="icloud_link_subtitle_unlinked">Не связано. Нажмите, чтобы загрузить метки из аккаунта Apple.</string>
+    <string name="settings_google_find_hub">Google Find Hub (экспериментально)</string>
+    <string name="settings_google_find_hub_subtitle">Трекеры в вашем аккаунте Google</string>
+    <string name="icloud_link_status_linked">Связано с вашим аккаунтом Apple</string>
+    <string name="icloud_link_status_linked_detail">Этот телефон может снова читать метки из iCloud без код-пароля устройства.</string>
+    <string name="icloud_link_status_unlinked">Не связано</string>
+    <string name="icloud_link_status_unlinked_detail">Подключитесь один раз с код-паролем одного из ваших устройств Apple. После этого проверка новых меток — одно касание.</string>
+    <string name="icloud_link_connect_button">Подключить метки из iCloud</string>
+    <string name="icloud_link_check_button">Проверить новые метки</string>
 </resources>

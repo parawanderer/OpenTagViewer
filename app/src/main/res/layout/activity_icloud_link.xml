@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings -> Apple iCloud link. A status card, then the one thing to do about it: connect when
+    not linked, check for new tags when linked, and a quieter Unlink under that. Two list rows on
+    a page of their own read as a stub, and a list row is not how a main action looks.
+    See ICloudLinkActivity.
+-->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <variable name="handleClickBack" type="Runnable" />
+    </data>
+
+    <LinearLayout
+        android:id="@+id/icloud_link_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/icloud_link_toolbar"
+            layout="@layout/inline_top_toolbar"
+            app:onClickBack="@{handleClickBack}"
+            app:pageTitle="@{@string/icloud_link_title}" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="16dp"
+                android:paddingTop="16dp"
+                android:paddingRight="16dp"
+                android:paddingBottom="20dp">
+
+                <LinearLayout
+                    android:id="@+id/icloud_link_status_card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/layout_rounded"
+                    android:backgroundTint="?attr/colorSurfaceContainerLow"
+                    android:orientation="horizontal"
+                    android:padding="20dp">
+
+                    <ImageView
+                        android:id="@+id/icloud_link_status_icon"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/link_off_24px"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="18dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/icloud_link_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/nunito_semi_bold"
+                            android:text="@string/icloud_link_status_unlinked"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:id="@+id/icloud_link_status_detail"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/icloud_link_status_unlinked_detail"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Connect when not linked, "Check for new tags" when linked. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/icloud_link_primary_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/icloud_link_connect_button" />
+
+                <!-- Gone until the membership lookup says there is something to unlink. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/icloud_link_unlink_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/icloud_unlink_title"
+                    android:textColor="?attr/colorError"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</layout>
