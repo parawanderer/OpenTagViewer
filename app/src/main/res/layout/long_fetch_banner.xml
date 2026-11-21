@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The "finding your tags" banner on the map. Its own file so it can be inflated in a test:
+    activity_maps cannot be, without Play Services. Positioned by the include in activity_maps.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/layout_rounded"
+    android:backgroundTint="?android:attr/colorBackground"
+    android:elevation="8dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="12dp"
+    android:paddingTop="10dp"
+    android:paddingRight="14dp"
+    android:paddingBottom="10dp">
+
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/long_fetch_banner_spinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="10dp"
+        android:indeterminate="true"
+        app:hideAnimationBehavior="inward"
+        app:indicatorSize="16dp"
+        app:showAnimationBehavior="inward"
+        app:trackColor="?attr/colorSurfaceVariant"
+        app:trackCornerRadius="2dp"
+        app:trackThickness="2dp" />
+
+    <TextView
+        android:id="@+id/long_fetch_banner_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/nunito_medium"
+        android:text="@string/finding_tags_banner"
+        android:textColor="?attr/colorOnBackground"
+        android:textSize="12sp" />
+</LinearLayout>

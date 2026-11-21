@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google 지도 API 키가 없습니다</string>
     <string name="maps_api_key_missing_message">이 빌드에는 Google 지도 API 키가 없어 지도를 불러올 수 없습니다. secrets.properties에 MAPS_API_KEY를 추가한 후 다시 빌드하거나, 설정에서 다른 지도 제공자를 선택하세요.</string>
-    <string name="resolving_tags_banner">태그의 위치를 처음으로 확인하는 중입니다. 찾는 대로 최근에 확인된 것부터 표시됩니다. 앱을 열어 두세요.</string>
-    <string name="resolving_tags_banner_progress">태그 위치를 확인하는 중입니다(%2$d개 중 %1$d개). 찾는 대로 최근에 확인된 것부터 표시됩니다. 앱을 열어 두세요.</string>
     <string name="anisette_mode_title">로그인 데이터</string>
     <string name="anisette_mode_local">이 기기에서 생성</string>
     <string name="anisette_mode_remote">원격 서버</string>
@@ -425,4 +423,5 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="anisette_login_needs_coreadi">이 휴대폰에서 Apple로부터 필요한 파일(macOS CoreADI)을 다운로드하지 못했습니다. 아래 링크에서 iTunes 12.8.3 디스크 이미지를 컴퓨터나 브라우저로 다운로드해 이 휴대폰에 넣은 뒤 여기서 선택하세요. 서버로도 로그인은 할 수 있지만 태그 위치는 불러오지 못합니다.</string>
     <string name="anisette_local_needs_coreadi">이 휴대폰에서 Apple로부터 필요한 파일(macOS CoreADI)을 다운로드하지 못했습니다. iTunes 12.8.3 디스크 이미지를 컴퓨터나 브라우저로 다운로드해 이 휴대폰에 넣은 뒤 여기서 선택하세요.</string>
     <string name="anisette_coreadi_copy_link">다운로드 링크 복사</string>
+    <string name="finding_tags_banner">태그를 찾는 중… %1$d개 남음. 앱을 열어 두세요.</string>
 </resources>

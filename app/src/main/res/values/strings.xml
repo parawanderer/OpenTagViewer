@@ -136,8 +136,6 @@
     <string name="amap_key_saved">AMap API key saved.</string>
     <string name="amap_key_cleared">AMap API key removed.</string>
     <string name="amap_how_to_get_a_key">How to get a key</string>
-    <string name="resolving_tags_banner">Locating your tags for the first time. They appear as they are found, most recently seen first — please keep the app open.</string>
-    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). They appear as they are found, most recently seen first — please keep the app open.</string>
     <string name="maps_api_key_missing_title">Google Maps API key missing</string>
     <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
     <string name="no_devices_imported_yet">No devices yet</string>
@@ -460,4 +458,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="anisette_login_needs_coreadi">This phone couldn\'t download a file it needs from Apple (macOS CoreADI). Download the iTunes 12.8.3 disk image from the link below, on a computer or in your browser, put it on this phone and choose it here. A server can still sign you in, but your tags\' locations won\'t load through one.</string>
     <string name="anisette_local_needs_coreadi">This phone couldn\'t download a file it needs from Apple (macOS CoreADI). Download the iTunes 12.8.3 disk image on a computer or in your browser, put it on this phone and choose it here.</string>
     <string name="anisette_coreadi_copy_link">Copy download link</string>
+    <string name="finding_tags_banner">Finding your tags… %1$d left. Keep the app open.</string>
 </resources>

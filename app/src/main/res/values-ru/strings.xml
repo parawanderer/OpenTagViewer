@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Отсутствует ключ API Google Карт</string>
     <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
-    <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
-    <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
     <string name="anisette_mode_title">Данные для входа</string>
     <string name="anisette_mode_local">На этом устройстве</string>
     <string name="anisette_mode_remote">Удалённый сервер</string>
@@ -425,4 +423,5 @@
     <string name="anisette_login_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 по ссылке ниже — на компьютере или в браузере, — перенесите его на этот телефон и выберите здесь. Сервер по-прежнему может выполнить вход, но местоположения ваших меток через него не загрузятся.</string>
     <string name="anisette_local_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 на компьютере или в браузере, перенесите его на этот телефон и выберите здесь.</string>
     <string name="anisette_coreadi_copy_link">Скопировать ссылку для загрузки</string>
+    <string name="finding_tags_banner">Ищем ваши метки… осталось %1$d. Не закрывайте приложение.</string>
 </resources>

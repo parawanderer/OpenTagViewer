@@ -7,6 +7,10 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+
 /**
  * Tests for the "still locating your tags" banner's bookkeeping.
  * <br>
@@ -83,68 +87,84 @@ public class LongFetchBannerStateTest {
         assertTrue(this.state.fetchStarted());
     }
 
-    // --- the count ------------------------------------------------------------------------
+    // --- only for tags with nothing to show ------------------------------------------------
+
+    /** Three tags fetching; which of them already have a position or a Bluetooth sighting. */
+    private static Predicate<String> found(final String... ids) {
+        final Set<String> located = Set.of(ids);
+        return located::contains;
+    }
+
+    private void aSlowBatchOf(final String... ids) {
+        this.state.fetchStarted();
+        this.state.lookingFor(List.of(ids));
+        this.state.becameDue();
+    }
 
     @Test
-    public void aNewBatchClearsThePreviousBatchesCount() {
+    public void allTagsNearbyMeansNoBanner() {
+        aSlowBatchOf("a", "b", "c");
+
+        // @parawanderer's case: every tag heard over Bluetooth, so there is nothing to wait for.
+        assertFalse(this.state.shouldShow(found("a", "b", "c")));
+    }
+
+    @Test
+    public void aTagWithNothingToShowPutsItUpAndIsCounted() {
+        aSlowBatchOf("a", "b", "c");
+
+        assertTrue(this.state.shouldShow(found("a")));
+        assertEquals("only the tags still missing", 2, this.state.stillMissing(found("a")));
+    }
+
+    @Test
+    public void itComesDownOnceTheLastMissingTagIsFound() {
+        aSlowBatchOf("a", "b");
+        assertTrue(this.state.shouldShow(found()));
+
+        assertFalse("the batch may still be running", this.state.shouldShow(found("a", "b")));
+        assertTrue(this.state.isFetching());
+    }
+
+    @Test
+    public void nothingShowsBeforeTheDelayHasPassed() {
         this.state.fetchStarted();
-        this.state.setProgress(3, 5);
+        this.state.lookingFor(List.of("a"));
+
+        assertFalse("a quick fetch should never put it up", this.state.shouldShow(found()));
+    }
+
+    @Test
+    public void aNewBatchForgetsThePreviousBatchesTags() {
+        aSlowBatchOf("a", "b", "c");
         this.state.fetchFinished();
 
         this.state.fetchStarted();
 
-        // Otherwise "3 of 5" flashes up before the new batch reports its own total.
-        assertFalse(this.state.hasCount());
-        assertEquals(0, this.state.total());
+        // Otherwise a stale count flashes up before the new batch says what it fetches.
+        assertEquals(0, this.state.stillMissing(found()));
+        assertFalse(this.state.shouldShow(found()));
     }
 
     @Test
-    public void anOverlappingFetchDoesNotClearTheCountInProgress() {
-        this.state.fetchStarted();
-        this.state.setProgress(2, 6);
+    public void anOverlappingFetchAddsItsTagsRatherThanReplacing() {
+        aSlowBatchOf("a");
 
         this.state.fetchStarted();
+        this.state.lookingFor(List.of("b"));
 
-        assertTrue(this.state.hasCount());
-        assertEquals(3, this.state.displayedPosition());
+        assertEquals(2, this.state.stillMissing(found()));
     }
 
     @Test
-    public void showsNoCountForASingleTag() {
+    public void becomingDueAfterTheBatchEndedShowsNothing() {
         this.state.fetchStarted();
-        this.state.setProgress(0, 1);
+        this.state.lookingFor(List.of("a"));
+        this.state.fetchFinished();
 
-        // "1 of 1" tells the user nothing they cannot already see.
-        assertFalse(this.state.hasCount());
-    }
+        // The delayed show can fire just after a quick batch finished.
+        this.state.becameDue();
 
-    @Test
-    public void showsNoCountBeforeTheTotalIsKnown() {
-        this.state.fetchStarted();
-
-        assertFalse(this.state.hasCount());
-    }
-
-    @Test
-    public void countsTheTagBeingWorkedOnRatherThanTheOnesFinished() {
-        this.state.fetchStarted();
-        this.state.setProgress(0, 3);
-
-        // Zero done means the first one is in progress, so it reads "1 of 3", not "0 of 3".
-        assertEquals(1, this.state.displayedPosition());
-        assertEquals(3, this.state.total());
-
-        this.state.setProgress(1, 3);
-        assertEquals(2, this.state.displayedPosition());
-    }
-
-    @Test
-    public void theCountCannotOvershootTheTotal() {
-        this.state.fetchStarted();
-        this.state.setProgress(3, 3);
-
-        // The final completion reports 3 of 3 done, which would otherwise read "4 of 3" in
-        // the moment between the last accessory finishing and the banner being hidden.
-        assertEquals(3, this.state.displayedPosition());
+        assertFalse(this.state.shouldShow(found()));
     }
 }
