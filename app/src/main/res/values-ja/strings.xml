@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google マップ API キーがありません</string>
     <string name="maps_api_key_missing_message">このビルドには Google マップ API キーがないため、地図を読み込めません。secrets.properties に MAPS_API_KEY を追加してビルドし直すか、設定で別の地図プロバイダを選択してください。</string>
-    <string name="resolving_tags_banner">タグの位置を初めて特定しています。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
-    <string name="resolving_tags_banner_progress">タグの位置を特定しています（%2$d 件中 %1$d 件）。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
     <string name="anisette_mode_title">サインインデータ</string>
     <string name="anisette_mode_local">この端末で生成</string>
     <string name="anisette_mode_remote">リモートサーバー</string>
@@ -425,6 +423,7 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="anisette_login_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。下のリンクから iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。サーバーでもサインインはできますが、タグの位置情報は読み込まれません。</string>
     <string name="anisette_local_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。</string>
     <string name="anisette_coreadi_copy_link">ダウンロードリンクをコピー</string>
+    <string name="finding_tags_banner">タグを探しています… 残り %1$d 個。アプリを開いたままにしてください。</string>
     <string name="import_choice_exporter">OpenTagViewer エクスポーターのタグ</string>
     <string name="import_choice_openhaystack">OpenHaystack キー</string>
     <string name="import_choice_google">Google Find Hub（試験運用）</string>

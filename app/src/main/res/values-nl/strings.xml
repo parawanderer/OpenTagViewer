@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API-sleutel ontbreekt</string>
     <string name="maps_api_key_missing_message">Deze build heeft geen Google Maps API-sleutel, dus de kaart wordt niet geladen. Voeg MAPS_API_KEY toe aan secrets.properties en bouw opnieuw, of kies een andere kaartaanbieder in de instellingen.</string>
-    <string name="resolving_tags_banner">Je tags worden voor het eerst gelokaliseerd. Ze verschijnen zodra ze gevonden zijn, meest recent gezien eerst — houd de app open.</string>
-    <string name="resolving_tags_banner_progress">Je tags worden gelokaliseerd (%1$d van %2$d). Ze verschijnen zodra ze gevonden zijn, meest recent gezien eerst — houd de app open.</string>
     <string name="anisette_mode_title">Aanmeldgegevens</string>
     <string name="anisette_mode_local">Op dit apparaat</string>
     <string name="anisette_mode_remote">Externe server</string>
@@ -425,6 +423,7 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_login_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie via de link hieronder, op een computer of in je browser, zet hem op deze telefoon en kies hem hier. Een server kan je nog steeds aanmelden, maar de locaties van je tags laden daar niet mee.</string>
     <string name="anisette_local_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie op een computer of in je browser, zet hem op deze telefoon en kies hem hier.</string>
     <string name="anisette_coreadi_copy_link">Downloadlink kopiëren</string>
+    <string name="finding_tags_banner">Je tags worden gezocht… nog %1$d. Laat de app open.</string>
     <string name="import_choice_exporter">Tags uit de OpenTagViewer-exporter</string>
     <string name="import_choice_openhaystack">OpenHaystack-sleutel</string>
     <string name="import_choice_google">Google Find Hub (experimenteel)</string>

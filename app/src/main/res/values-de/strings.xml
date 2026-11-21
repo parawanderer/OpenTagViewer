@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API-Schlüssel fehlt</string>
     <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
-    <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
-    <string name="resolving_tags_banner_progress">Tags werden geortet (%1$d von %2$d). Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
     <string name="anisette_mode_title">Anmeldedaten</string>
     <string name="anisette_mode_local">Auf diesem Gerät</string>
     <string name="anisette_mode_remote">Externer Server</string>
@@ -425,6 +423,7 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="anisette_login_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image über den Link unten herunter, am Computer oder im Browser, lege es auf dieses Telefon und wähle es hier aus. Ein Server kann dich zwar anmelden, aber die Standorte deiner Tags werden darüber nicht geladen.</string>
     <string name="anisette_local_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image am Computer oder im Browser herunter, lege es auf dieses Telefon und wähle es hier aus.</string>
     <string name="anisette_coreadi_copy_link">Download-Link kopieren</string>
+    <string name="finding_tags_banner">Deine Tags werden gesucht… noch %1$d. Lass die App geöffnet.</string>
     <string name="import_choice_exporter">Tags aus dem OpenTagViewer-Exporter</string>
     <string name="import_choice_openhaystack">OpenHaystack-Schlüssel</string>
     <string name="import_choice_google">Google Find Hub (experimentell)</string>

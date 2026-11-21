@@ -110,8 +110,6 @@
     <string name="how_do_i_get_the_zip"><u>如何取得 zip 檔案？</u></string>
     <string name="maps_api_key_missing_title">缺少 Google 地圖 API Key</string>
     <string name="maps_api_key_missing_message">此版本未包含 Google 地圖 API Key，因此無法載入地圖。請在 secrets.properties 中新增 MAPS_API_KEY 後重新建置，或在設定中選擇其他地圖提供商。</string>
-    <string name="resolving_tags_banner">正在首次定位你的標籤。找到一個顯示一個，最近出現過的優先，請保持應用程式開啟。</string>
-    <string name="resolving_tags_banner_progress">正在定位你的標籤（第 %1$d 個，共 %2$d 個）。找到一個顯示一個，最近出現過的優先，請保持應用程式開啟。</string>
     <string name="anisette_mode_title">登入資料</string>
     <string name="anisette_mode_local">在本裝置產生</string>
     <string name="anisette_mode_remote">遠端伺服器</string>
@@ -425,6 +423,7 @@
     <string name="anisette_login_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請透過下方連結在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。伺服器仍可讓你登入，但無法透過它載入標籤的位置。</string>
     <string name="anisette_local_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。</string>
     <string name="anisette_coreadi_copy_link">複製下載連結</string>
+    <string name="finding_tags_banner">正在尋找你的標籤… 還剩 %1$d 個。請保持應用程式開啟。</string>
     <string name="import_choice_exporter">OpenTagViewer 匯出工具的標籤</string>
     <string name="import_choice_openhaystack">OpenHaystack 金鑰</string>
     <string name="import_choice_google">Google Find Hub（實驗性）</string>
