@@ -425,7 +425,10 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_login_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie via de link hieronder, op een computer of in je browser, zet hem op deze telefoon en kies hem hier. Een server kan je nog steeds aanmelden, maar de locaties van je tags laden daar niet mee.</string>
     <string name="anisette_local_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie op een computer of in je browser, zet hem op deze telefoon en kies hem hier.</string>
     <string name="anisette_coreadi_copy_link">Downloadlink kopiëren</string>
-    <string name="import_choice_exporter">Tags uit de OpenTagViewer-exporter (.zip)</string>
-    <string name="import_choice_openhaystack">OpenHaystack-sleutel (.keys)</string>
+    <string name="import_choice_exporter">Tags uit de OpenTagViewer-exporter</string>
+    <string name="import_choice_openhaystack">OpenHaystack-sleutel</string>
     <string name="import_choice_google">Google Find Hub (experimenteel)</string>
+    <string name="import_choice_exporter_subtitle">De .zip die de OpenTagViewer-exporter maakte</string>
+    <string name="import_choice_openhaystack_subtitle">Een .keys-bestand uit OpenHaystack</string>
+    <string name="import_choice_google_subtitle">Trackers in je Google-account</string>
 </resources>

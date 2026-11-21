@@ -425,7 +425,10 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="anisette_login_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image über den Link unten herunter, am Computer oder im Browser, lege es auf dieses Telefon und wähle es hier aus. Ein Server kann dich zwar anmelden, aber die Standorte deiner Tags werden darüber nicht geladen.</string>
     <string name="anisette_local_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image am Computer oder im Browser herunter, lege es auf dieses Telefon und wähle es hier aus.</string>
     <string name="anisette_coreadi_copy_link">Download-Link kopieren</string>
-    <string name="import_choice_exporter">Tags aus dem OpenTagViewer-Exporter (.zip)</string>
-    <string name="import_choice_openhaystack">OpenHaystack-Schlüssel (.keys)</string>
+    <string name="import_choice_exporter">Tags aus dem OpenTagViewer-Exporter</string>
+    <string name="import_choice_openhaystack">OpenHaystack-Schlüssel</string>
     <string name="import_choice_google">Google Find Hub (experimentell)</string>
+    <string name="import_choice_exporter_subtitle">Die .zip-Datei des OpenTagViewer-Exporters</string>
+    <string name="import_choice_openhaystack_subtitle">Eine .keys-Datei aus OpenHaystack</string>
+    <string name="import_choice_google_subtitle">Tracker in deinem Google-Konto</string>
 </resources>
