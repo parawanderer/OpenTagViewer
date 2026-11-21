@@ -13,14 +13,15 @@ contributors.
 
 | | Why |
 | --- | --- |
-| **JDK 17+** | The Android Gradle Plugin refuses to run on anything older, with an error that reads like a plugin bug. Android Studio's bundled runtime works: `export JAVA_HOME="/path/to/Android Studio/jbr"` |
+| **JDK 17 or 21** | The Android Gradle Plugin refuses to run on anything older, with an error that reads like a plugin bug. **Newer is not fine either:** Gradle 8.10 cannot run on Java 25, and fails with nothing but the version number (`25.0.4`) as its error. Recent Android Studio releases bundle Java 25, so set Settings → Build Tools → Gradle → **Gradle JDK** to a 17 or 21, and point `JAVA_HOME` at the same one for the CLI |
 | **Android SDK** | Either `local.properties` with `sdk.dir=...`, or `ANDROID_HOME` set |
 | **Python 3** on `PATH` | The build shells out to it to generate the stub `unicorn` wheel (`scripts/build_unicorn_stub_wheel.py`). If your interpreter has an unusual name, pass `-PpythonExecutable=...` |
+| **`sh`, `strings` and `pkg-config` on `PATH`** (Windows) | The emulated Mac's native build (`app/src/main/cpp/macadi/`) compiles Unicorn, whose CMake runs `sh qemu/configure` to generate `config-host.h`, and that script calls the other two. Linux and macOS have all three. On Windows: `sh` is in Git for Windows — add `C:\Program Files\Git\usr\bin` to your **user** `PATH`, which Git's installer does not do. Git does not ship `strings` or `pkg-config`; [Strawberry Perl](https://strawberryperl.com/) puts both on `PATH` and is what this was verified with. Then restart Android Studio and delete `app/.cxx`, which caches the failed configure. `MacAdi.cmake` names whichever is missing; before it did, the build failed minutes later on `'config-host.h' file not found` |
 | **Android Studio** (optional) | Everything works from the CLI, but the IDE is easier for running the app on a device |
 | **[`gh`](https://cli.github.com/)** (optional) | Strongly recommended if you work with a coding agent — see below |
 
-Easiest route to the first three is Android Studio, which ships a JDK and can install the
-SDK for you. Otherwise: [Temurin 17](https://adoptium.net/temurin/releases/?version=17),
+Easiest route to the SDK is Android Studio, which can install it for you, and can download a
+JDK 17 or 21 from the Gradle JDK dropdown. Otherwise: [Temurin 17](https://adoptium.net/temurin/releases/?version=17),
 the [command line tools](https://developer.android.com/studio#command-tools), and
 [python.org](https://www.python.org/downloads/).
 

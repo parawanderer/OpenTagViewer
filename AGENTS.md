@@ -1166,7 +1166,14 @@ Each of these has already produced a hang that looked like something else:
   wrap one in a `grep` or a `timeout` that can swallow the error message — that turns a fast,
   legible failure into an apparent hang. `JAVA_HOME` pointing below 17 is the usual culprit,
   and it fails deep inside the Android Gradle Plugin with a message that reads like a plugin
-  bug.
+  bug. Above 21 fails too: Android Studio's bundled Java 25 makes Gradle 8.10 fail with only
+  `25.0.4` as its message.
+- **The native build needs `sh`, `strings` and `pkg-config`.** Unicorn's CMake runs
+  `sh qemu/configure` without checking the result, so from PowerShell or Android Studio it used
+  to "succeed" and the compile then died on `'config-host.h' file not found`. `MacAdi.cmake` now
+  names the missing tool up front. A Git Bash shell can still pass where the IDE fails, because
+  it puts more on `PATH`: test with the PATH the IDE gets, not your shell's. See CONTRIBUTING's
+  setup table, and delete `app/.cxx` after fixing it.
 
 ## Conventions
 
