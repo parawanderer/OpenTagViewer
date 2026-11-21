@@ -937,6 +937,23 @@ class TestReadingAsTheMemberItAlreadyIs:
         assert answer["reason"] == icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
         assert answer["message"].strip()
 
+    def test_a_closed_account_is_not_a_membership_that_stopped_working(self, session, loop):
+        """
+        The membership is fine; the account under the session was replaced. MapsActivity
+        restores a fresh account whenever it is rebuilt and closes the old one, and the
+        background account read could be resuming on the old one at that moment. Calling that
+        "unusable" made both callers forget the stored membership, so the next fetch asked
+        for a device passcode again - seen on a device, 2026-11-21.
+        """
+        made = session(FakeClient())
+        loop.shutDown()
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert not answer["ok"]
+        assert answer["reason"] != icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
+
     def test_rubbish_in_storage_does_not_crash(self, session):
         made = session(FakeClient())
 

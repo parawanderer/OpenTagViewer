@@ -665,6 +665,11 @@ class ICloudSession:
             print(f"iCloud bridge: reading as {peer.peer_id}, with no passcode")
 
             return json.dumps({"ok": True})
+        except account_loop.AccountClosedError:
+            # Not the membership: the account under this session was replaced and closed. Both
+            # Java callers forget the membership on MEMBERSHIP_UNUSABLE, which here cost a device
+            # passcode for nothing. The ordinary classification lets the background read retry.
+            return _unexpected("resuming the keychain session")
         except Exception:
             # Worth its own reason. A membership that no longer works is not a broken app - the
             # peer may have been removed from the account - and the answer is to unlock with a

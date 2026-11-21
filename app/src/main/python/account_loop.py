@@ -75,6 +75,18 @@ def interleaving() -> Iterator[None]:
         _interleaving.on = previous
 
 
+class AccountClosedError(RuntimeError):
+    """
+    A call reached an account that has been closed, or was closed while it waited.
+
+    **Its own type so callers can tell it from Apple refusing something.** The app closes the
+    old account whenever it restores a new one, and a background step can still be holding the
+    old one. `icloud_bridge.resume` once read this as "the stored membership no longer works"
+    and the app forgot the membership. A `RuntimeError` subclass, so existing handlers still
+    catch it.
+    """
+
+
 class AccountLoop:
     """
     Stands in for an account's `_evt_loop`, which FindMy.py uses for nothing but
@@ -160,7 +172,7 @@ class AccountLoop:
         with self._state:
             if self._closed:
                 coro.close()
-                raise RuntimeError("This account has been closed")
+                raise AccountClosedError("This account has been closed")
 
             future = asyncio.run_coroutine_threadsafe(coro, self._loop)
 
@@ -169,7 +181,7 @@ class AccountLoop:
         except concurrent.futures.CancelledError:
             # Only `close` cancels anything here, so this is the account going away under a call
             # that was waiting for it - a reason worth more than a bare CancelledError.
-            raise RuntimeError(
+            raise AccountClosedError(
                 "The account was closed while this call was waiting for it") from None
 
     def stopOnceIdle(self) -> None:
