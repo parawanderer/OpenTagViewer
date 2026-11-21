@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.anisette;
 
 import android.util.Log;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -50,6 +51,33 @@ public final class MacCoreAdiFetcher {
             "System/Library/PrivateFrameworks/CoreADI.framework/Versions/A/CoreADI";
 
     private static final int CPU_TYPE_X86_64 = 0x01000007;
+
+    private static final int FAT_MAGIC = 0xCAFEBABE;
+    /** A thin 64-bit Mach-O, as its first four bytes read big-endian. */
+    private static final int MH_CIGAM_64 = 0xCFFAEDFE;
+
+    /**
+     * What a file has to hash to, and where the payload sits in the disk image.
+     *
+     * <p>A value rather than constants used directly, so a test can build a small disk image and
+     * library of its own: Apple's bytes cannot be checked into this repository.
+     */
+    static final class Pins {
+        final long payloadOffset;
+        final int payloadLength;
+        final String payloadSha256;
+        final String librarySha256;
+
+        Pins(long payloadOffset, int payloadLength, String payloadSha256, String librarySha256) {
+            this.payloadOffset = payloadOffset;
+            this.payloadLength = payloadLength;
+            this.payloadSha256 = payloadSha256;
+            this.librarySha256 = librarySha256;
+        }
+    }
+
+    static final Pins APPLES = new Pins(PAYLOAD_OFFSET, PAYLOAD_LENGTH, PAYLOAD_SHA256,
+            MacCoreAdi.BUILD_SHA256);
 
     private MacCoreAdiFetcher() {
     }
@@ -135,8 +163,12 @@ public final class MacCoreAdiFetcher {
      * @throws FetchException if either the payload or the library is not the pinned one
      */
     static byte[] extract(byte[] payload) throws FetchException {
+        return extract(payload, APPLES);
+    }
+
+    static byte[] extract(byte[] payload, Pins pins) throws FetchException {
         final String payloadHash = sha256(payload);
-        if (!PAYLOAD_SHA256.equals(payloadHash)) {
+        if (!pins.payloadSha256.equals(payloadHash)) {
             throw new FetchException("the installer bytes are not the expected ones (sha256 "
                     + payloadHash + ")");
         }
@@ -149,14 +181,100 @@ public final class MacCoreAdiFetcher {
         }
 
         final byte[] framework = fileFromCpio(cpio, FRAMEWORK_PATH);
-        final byte[] library = slice(framework, CPU_TYPE_X86_64);
+        return checkedLibrary(slice(framework, CPU_TYPE_X86_64), pins);
+    }
 
+    private static byte[] checkedLibrary(byte[] library, Pins pins) throws FetchException {
         final String libraryHash = sha256(library);
-        if (!MacCoreAdi.BUILD_SHA256.equals(libraryHash)) {
+        if (!pins.librarySha256.equals(libraryHash)) {
             throw new FetchException("the library is not the expected build (sha256 "
                     + libraryHash + ")");
         }
         return library;
+    }
+
+    /**
+     * Store a library the user supplied, for a phone that cannot download it from Apple.
+     *
+     * <p>Takes either of two files, told apart by their first four bytes:
+     * <ul>
+     *     <li><b>The iTunes 12.8.3 disk image</b>, {@link #DMG_URL}, downloaded on a computer and
+     *     copied over. Only the same byte range the download asks for is read; the rest is
+     *     skipped, which on a local file is a seek rather than 291 MB of reading.</li>
+     *     <li><b>The CoreADI library itself</b>, universal or already sliced to x86_64.</li>
+     * </ul>
+     * Both are checked against exactly the pins the download is, so a file supplied by hand can
+     * never run code the download would have refused.
+     *
+     * @return the library's bytes, once stored at {@code target}
+     * @throws FetchException with a reason worth showing, for any other file
+     */
+    public static byte[] importFrom(InputStream in, File target) throws FetchException {
+        return importFrom(in, target, APPLES);
+    }
+
+    static byte[] importFrom(InputStream in, File target, Pins pins) throws FetchException {
+        final byte[] library;
+        try (BufferedInputStream buffered = new BufferedInputStream(in)) {
+            buffered.mark(4);
+            final byte[] head = new byte[4];
+            final int got = readUpTo(buffered, head);
+            buffered.reset();
+
+            final int magic = got == 4 ? be32(head, 0) : 0;
+            if (magic == FAT_MAGIC || magic == MH_CIGAM_64) {
+                final byte[] file = readAtMost(buffered, 64 << 20);
+                library = checkedLibrary(
+                        magic == FAT_MAGIC ? slice(file, CPU_TYPE_X86_64) : file, pins);
+            } else {
+                if (!skipExactly(buffered, pins.payloadOffset)) {
+                    throw new FetchException("the file is too small to be the iTunes 12.8.3"
+                            + " disk image, and is not a CoreADI library either");
+                }
+                final byte[] payload = new byte[pins.payloadLength];
+                if (readUpTo(buffered, payload) != payload.length) {
+                    throw new FetchException("the file is too small to be the iTunes 12.8.3"
+                            + " disk image, and is not a CoreADI library either");
+                }
+                library = extract(payload, pins);
+            }
+        } catch (final IOException e) {
+            throw new FetchException("could not read the file: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+        }
+
+        write(target, library);
+        Log.i(TAG, "stored a CoreADI library supplied by hand");
+        return library;
+    }
+
+    /** Fills as much of {@code into} as the stream has; returns how much that was. */
+    private static int readUpTo(InputStream in, byte[] into) throws IOException {
+        int total = 0;
+        while (total < into.length) {
+            final int read = in.read(into, total, into.length - total);
+            if (read == -1) {
+                break;
+            }
+            total += read;
+        }
+        return total;
+    }
+
+    /** False when the stream ends first. {@code skip} may stop short without being at the end. */
+    private static boolean skipExactly(InputStream in, long count) throws IOException {
+        long left = count;
+        while (left > 0) {
+            final long skipped = in.skip(left);
+            if (skipped > 0) {
+                left -= skipped;
+            } else if (in.read() == -1) {
+                return false;
+            } else {
+                left--;
+            }
+        }
+        return true;
     }
 
     /**

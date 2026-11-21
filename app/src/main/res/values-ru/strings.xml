@@ -422,4 +422,7 @@
     <string name="server_url_not_https">Не https: токен API будет передан без шифрования.</string>
     <string name="google_find_hub_setup_guide">Как это настроить</string>
     <string name="battery_icon_description">Батарея %1$s</string>
+    <string name="anisette_login_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 по ссылке ниже — на компьютере или в браузере, — перенесите его на этот телефон и выберите здесь. Сервер по-прежнему может выполнить вход, но местоположения ваших меток через него не загрузятся.</string>
+    <string name="anisette_local_needs_coreadi">Телефону не удалось скачать у Apple нужный файл (macOS CoreADI). Скачайте образ диска iTunes 12.8.3 на компьютере или в браузере, перенесите его на этот телефон и выберите здесь.</string>
+    <string name="anisette_coreadi_copy_link">Скопировать ссылку для загрузки</string>
 </resources>

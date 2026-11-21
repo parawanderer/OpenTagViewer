@@ -86,6 +86,40 @@ public class AnisetteStatusTest {
         assertFalse("a copy of the same library crashes the same way", status.needsOwnApk());
     }
 
+    /** The emulated Mac crashing is a crash too. Its sentence differs, and it used to read as UNAVAILABLE. */
+    @Test
+    public void theEmulatedMacCrashingIsACrashToo() {
+        final AnisetteStatus status = AnisetteStatus.of(
+                FakeAnisetteSource.unavailable(EmulatedMacAnisette.CRASHES_HERE_REASON));
+
+        assertEquals(AnisetteStatus.State.CRASHES_HERE, status.state());
+    }
+
+    /**
+     * No CoreADI is its own state, offering the file and never the APK. A server would sign in and
+     * then fail every fetch, so it is not an answer here.
+     */
+    @Test
+    public void noCoreAdiAsksForCoreAdiAndNotTheApk() {
+        final AnisetteStatus status = AnisetteStatus.of(FakeAnisetteSource.unavailable(
+                EmulatedMacAnisette.NO_COREADI_REASON
+                        + ": could not download the library from Apple: UnknownHostException"));
+
+        assertEquals(AnisetteStatus.State.NEEDS_COREADI, status.state());
+        assertTrue(status.failed());
+        assertTrue(status.needsCoreAdi());
+        assertFalse(status.needsOwnApk());
+    }
+
+    /** An ordinary network failure elsewhere does not ask for CoreADI. */
+    @Test
+    public void anOrdinaryFailureDoesNotAskForCoreAdi() {
+        final AnisetteStatus status = AnisetteStatus.of(
+                FakeAnisetteSource.unavailable("Unable to resolve host gsa.apple.com"));
+
+        assertFalse(status.needsCoreAdi());
+    }
+
     /** No source at all is "nothing has happened yet", not "something went wrong". */
     @Test
     public void noSourceIsPendingRatherThanBroken() {

@@ -1,6 +1,7 @@
 package dev.wander.android.opentagviewer.anisette;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -8,11 +9,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Getting Apple's macOS CoreADI out of the iTunes installer, without Apple's bytes.
@@ -170,5 +173,107 @@ public class MacCoreAdiFetcherTest {
             assertTrue(thrown.getMessage(), thrown.getMessage().contains("expected 206"));
             assertArrayEquals(bytes("some other build"), MacCoreAdiFetcher.readFile(target));
         }
+    }
+
+    // --- Supplied by hand, for a phone that cannot download it ---
+
+    /** A thin x86_64 Mach-O, as far as the first four bytes go. */
+    private static final byte[] LIBRARY = concat(
+            new byte[]{(byte) 0xCF, (byte) 0xFA, (byte) 0xED, (byte) 0xFE},
+            bytes("the x86_64 CoreADI"));
+
+    private static final int OFFSET = 1000;
+
+    private static byte[] concat(byte[]... parts) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (final byte[] part : parts) {
+            out.write(part, 0, part.length);
+        }
+        return out.toByteArray();
+    }
+
+    private static byte[] gzip(byte[] data) throws Exception {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (GZIPOutputStream zipped = new GZIPOutputStream(out)) {
+            zipped.write(data);
+        }
+        return out.toByteArray();
+    }
+
+    /** The installer payload: a gzipped cpio holding the universal framework binary. */
+    private static byte[] payload() throws Exception {
+        return gzip(cpio("./" + MacCoreAdiFetcher.FRAMEWORK_PATH,
+                fat(bytes("thirty-two bit"), LIBRARY)));
+    }
+
+    /** A disk image in miniature: the payload at a fixed offset, with other bytes either side. */
+    private static byte[] diskImage() throws Exception {
+        final byte[] before = new byte[OFFSET];
+        Arrays.fill(before, (byte) 'x');
+        return concat(before, payload(), bytes("the rest of the image"));
+    }
+
+    private static MacCoreAdiFetcher.Pins pins() throws Exception {
+        final byte[] payload = payload();
+        return new MacCoreAdiFetcher.Pins(OFFSET, payload.length,
+                MacCoreAdiFetcher.sha256(payload), MacCoreAdiFetcher.sha256(LIBRARY));
+    }
+
+    private File target() {
+        return new File(this.folder.getRoot(), "CoreADI-4.19-x86_64");
+    }
+
+    private byte[] importing(byte[] file) throws Exception {
+        return MacCoreAdiFetcher.importFrom(new ByteArrayInputStream(file), target(), pins());
+    }
+
+    @Test
+    public void theDiskImageGivesTheSameLibraryTheDownloadWould() throws Exception {
+        assertArrayEquals(LIBRARY, importing(diskImage()));
+        assertArrayEquals(LIBRARY, MacCoreAdiFetcher.readFile(target()));
+    }
+
+    @Test
+    public void theUniversalLibraryIsSlicedToX8664() throws Exception {
+        assertArrayEquals(LIBRARY, importing(fat(bytes("thirty-two bit"), LIBRARY)));
+    }
+
+    @Test
+    public void theAlreadySlicedLibraryIsTakenAsItIs() throws Exception {
+        assertArrayEquals(LIBRARY, importing(LIBRARY));
+        assertArrayEquals(LIBRARY, MacCoreAdiFetcher.readFile(target()));
+    }
+
+    @Test
+    public void aLibraryOfAnotherBuildIsRefusedAndNothingIsStored() {
+        final byte[] other = concat(Arrays.copyOf(LIBRARY, 4), bytes("a newer CoreADI"));
+
+        final MacCoreAdiFetcher.FetchException thrown = assertThrows(
+                MacCoreAdiFetcher.FetchException.class, () -> importing(other));
+
+        assertTrue(thrown.getMessage(), thrown.getMessage().contains("not the expected build"));
+        assertFalse(target().exists());
+    }
+
+    @Test
+    public void aDiskImageOfAnotherVersionIsRefused() throws Exception {
+        final byte[] image = diskImage();
+        image[OFFSET + 20] ^= 1;
+
+        final MacCoreAdiFetcher.FetchException thrown = assertThrows(
+                MacCoreAdiFetcher.FetchException.class, () -> importing(image));
+
+        assertTrue(thrown.getMessage(), thrown.getMessage().contains("not the expected ones"));
+        assertFalse(target().exists());
+    }
+
+    @Test
+    public void aFileThatIsNeitherSaysSo() {
+        final MacCoreAdiFetcher.FetchException thrown = assertThrows(
+                MacCoreAdiFetcher.FetchException.class,
+                () -> importing(bytes("a holiday photo")));
+
+        assertTrue(thrown.getMessage(), thrown.getMessage().contains("too small"));
+        assertFalse(target().exists());
     }
 }

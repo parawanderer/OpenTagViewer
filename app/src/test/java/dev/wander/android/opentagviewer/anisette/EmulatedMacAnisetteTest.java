@@ -51,6 +51,8 @@ public class EmulatedMacAnisetteTest {
     /** Device ids Apple has provisioned already, and answers HTTP 433 for. */
     private Set<String> appleHasProvisioned;
     private int libraryFetches;
+    /** When set, getting CoreADI fails with this, as a blocked download would. */
+    private Exception libraryFails;
 
     /** {@link NativeLoadGuard.Store} in memory. */
     private static final class MemoryDeaths implements NativeLoadGuard.Store {
@@ -99,6 +101,9 @@ public class EmulatedMacAnisetteTest {
         return new EmulatedMacAnisette(this.directory, settings, purpose,
                 this.provenanceFile.provenance(), this.opener, () -> {
                     this.libraryFetches++;
+                    if (this.libraryFails != null) {
+                        throw this.libraryFails;
+                    }
                     return this.library;
                 },
                 (identity, adi) -> {
@@ -311,6 +316,32 @@ public class EmulatedMacAnisetteTest {
         assertTrue(mac.unavailableReason().contains("remote"));
         assertTrue(this.opener.opened.isEmpty());
         assertEquals("", mac.otp());
+    }
+
+    /**
+     * A CoreADI that never arrived is marked as such, which is what makes the sign-in screen
+     * offer the file instead of a server that would fail every fetch.
+     */
+    @Test
+    public void aCoreAdiThatCouldNotBeFetchedSaysSo() {
+        this.libraryFails = new MacCoreAdiFetcher.FetchException(
+                "Apple answered HTTP 403 to a range request for the library; expected 206");
+        final EmulatedMacAnisette mac = inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN);
+
+        assertFalse(mac.ensureReady());
+        assertTrue(mac.unavailableReason(),
+                mac.unavailableReason().startsWith(EmulatedMacAnisette.NO_COREADI_REASON));
+        assertTrue("the cause is kept for the log", mac.unavailableReason().contains("HTTP 403"));
+    }
+
+    /** Any other failure is not mistaken for a missing CoreADI. */
+    @Test
+    public void otherFailuresAreNotCalledAMissingCoreAdi() {
+        this.opener.failWith = new IOException("could not start the emulated Mac's process");
+        final EmulatedMacAnisette mac = inANewProcess(EmulatedMacAnisette.Purpose.SIGN_IN);
+
+        assertFalse(mac.ensureReady());
+        assertFalse(mac.unavailableReason().contains(EmulatedMacAnisette.NO_COREADI_REASON));
     }
 
     @Test

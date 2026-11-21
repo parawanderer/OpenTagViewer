@@ -96,6 +96,66 @@
             android:text="@string/anisette_report_crash"
             android:visibility="gone" />
 
+        <!--
+            Only when the emulated Mac could not get Apple's macOS CoreADI. The server below
+            would sign in and then fail every location fetch, so what is offered first is the
+            file itself: Apple's link to copy, and a way to choose the download once it is on
+            the phone. See AnisetteStatus.State.NEEDS_COREADI.
+        -->
+        <LinearLayout
+            android:id="@+id/anisetteCoreAdiContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/anisetteCoreAdiLink"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textIsSelectable="true"
+                android:textSize="11sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/anisetteCopyCoreAdiLinkButton"
+                style="?attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/anisette_coreadi_copy_link" />
+
+            <TextView
+                android:id="@+id/anisetteCoreAdiRejection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:textColor="?attr/colorError"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/anisetteChooseCoreAdiButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/anisette_choose_apk" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/anisetteRetryCoreAdiButton"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/retry" />
+            </LinearLayout>
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
