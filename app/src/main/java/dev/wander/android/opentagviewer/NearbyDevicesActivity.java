@@ -31,6 +31,7 @@ import dev.wander.android.opentagviewer.ble.BlePermissions;
 import dev.wander.android.opentagviewer.ble.ForeignTagNames;
 import dev.wander.android.opentagviewer.ble.NearbyDeviceBook;
 import dev.wander.android.opentagviewer.ble.NearbyDeviceScanner;
+import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.ble.NearbyDeviceSighting;
 import dev.wander.android.opentagviewer.databinding.ActivityNearbyDevicesBinding;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
@@ -68,7 +69,7 @@ public class NearbyDevicesActivity extends AppCompatActivity {
     /** Resubscribe interval after the scan ended mid-session; mirrors MapsActivity's choice. */
     private static final long SCAN_RETRY_DELAY_MS = TimeUnit.SECONDS.toMillis(30);
 
-    private final NearbyDeviceScanner scanner = new NearbyDeviceScanner();
+    private final NearbyDeviceScanner scanner = AppDependencies.nearbyDeviceScanner();
     private final NearbyDeviceBook book = new NearbyDeviceBook();
     private ForeignTagNames names;
 
