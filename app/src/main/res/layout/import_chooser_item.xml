@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One choice in ImportChooser. Shaped like Settings' clickable rows (settings_item_clickable):
+    an icon, a title and a line saying what it is, with the touch ripple. Bare text items read
+    as a paragraph rather than as something to tap.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:paddingLeft="24dp"
+    android:paddingTop="10dp"
+    android:paddingRight="24dp"
+    android:paddingBottom="10dp">
+
+    <ImageView
+        android:id="@+id/import_choice_icon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:importantForAccessibility="no"
+        tools:src="@drawable/key_24px" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="20dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/import_choice_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nunito_semi_bold"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            tools:text="OpenHaystack key (.keys)" />
+
+        <TextView
+            android:id="@+id/import_choice_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="A key file from OpenHaystack or Macless Haystack" />
+    </LinearLayout>
+</LinearLayout>

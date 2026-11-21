@@ -459,4 +459,10 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="anisette_local_needs_coreadi">This phone couldn\'t download a file it needs from Apple (macOS CoreADI). Download the iTunes 12.8.3 disk image on a computer or in your browser, put it on this phone and choose it here.</string>
     <string name="anisette_coreadi_copy_link">Copy download link</string>
     <string name="finding_tags_banner">Finding your tags… %1$d left. Keep the app open.</string>
+    <string name="import_choice_exporter">OpenTagViewer exporter tags</string>
+    <string name="import_choice_openhaystack">OpenHaystack key</string>
+    <string name="import_choice_google">Google Find Hub (experimental)</string>
+    <string name="import_choice_exporter_subtitle">The .zip made by the OpenTagViewer exporter</string>
+    <string name="import_choice_openhaystack_subtitle">A .keys file from OpenHaystack</string>
+    <string name="import_choice_google_subtitle">Trackers on your Google account</string>
 </resources>

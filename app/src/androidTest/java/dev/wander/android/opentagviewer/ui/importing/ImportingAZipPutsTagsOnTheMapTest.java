@@ -5,6 +5,7 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -222,6 +223,12 @@ public class ImportingAZipPutsTagsOnTheMapTest {
         // one.
         onView(ViewMatchers.withText(R.string.do_import))
                 .inRoot(isPlatformPopup()).perform(click());
+
+        // Import opens the chooser; the exporter's zip is the first choice.
+        Eventually.check(() -> onView(ViewMatchers.withText(R.string.import_choice_exporter))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(ViewMatchers.withText(R.string.import_choice_exporter))
+                .inRoot(isDialog()).perform(click());
     }
 
     // ------------------------------------------------------------------ the bundle
