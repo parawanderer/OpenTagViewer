@@ -247,7 +247,6 @@ You can link again later. That needs your Apple device passcode.</string>
     <string name="icloud_unlink_failed">Could not unlink your Apple account. Please try again.</string>
     <string name="no_app_to_open_a_map_with">No app on this phone can open a map</string>
     <string name="icloud_loading_opening_account">Opening your Apple account…</string>
-    <string name="icloud_loading_waiting_for_location_check">Waiting for the location check to finish…</string>
     <string name="export_logs">Export Logs</string>
     <string name="log_file_has_been_exported_successfully">Log file has been exported successfully</string>
     <string name="failed_to_export_log_file">Could not export the log file</string>

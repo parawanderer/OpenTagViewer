@@ -49,7 +49,6 @@ import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFetch;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
-import dev.wander.android.opentagviewer.python.PythonLock;
 import dev.wander.android.opentagviewer.python.icloud.RecoverableDevice;
 import dev.wander.android.opentagviewer.ui.CodeChipSpan;
 import dev.wander.android.opentagviewer.ui.RecoverableDeviceIcon;
@@ -230,9 +229,9 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         if (this.isShowing(R.id.icloud_loading_container)) {
             // **Only an unlock is worth trapping somebody for.** Swallowing every back press
             // while the loading step was up meant that a screen waiting on PythonLock - which a
-            // first import holds for minutes, walking key indices for tags with no alignment -
-            // could not be left at all. Neither the in-app arrow nor the device's own back
-            // button did anything, and the wait looked like a hang.
+            // first import held for minutes, walking key indices for tags with no alignment,
+            // until issue #126 - could not be left at all. Neither the in-app arrow nor the
+            // device's own back button did anything, and the wait looked like a hang.
             //
             // An unlock attempt is different: it is already talking to Apple, and attempts are
             // probably a limited resource on their end, so abandoning one mid-flight risks
@@ -282,12 +281,14 @@ public class FetchFromICloudActivity extends AppCompatActivity {
         // by the membership check further down: an app that has already joined resumes as the
         // member it is and never sees the device list. Saying otherwise up front tells somebody
         // who just linked their account that the app is hunting for hardware to unlock with,
-        // when the thing it is actually waiting for is its turn to talk to Python.
+        // when what it is actually doing is opening the account.
+        //
+        // That is also all it is doing while a location check runs. This used to say it was
+        // waiting for one, because it was - for minutes, on a first import - until the two
+        // started taking turns between requests to Apple (issue #126).
         //
         // askForADevice() sets that message, at the point it becomes true.
-        this.showWaiting(PythonLock.isBusy()
-                ? R.string.icloud_loading_waiting_for_location_check
-                : R.string.icloud_loading_opening_account);
+        this.showWaiting(R.string.icloud_loading_opening_account);
 
         if (this.icloud != null) {
             this.icloud.close();

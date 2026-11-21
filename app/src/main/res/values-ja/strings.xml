@@ -247,7 +247,6 @@
     <string name="icloud_unlink_failed">Apple アカウントの連携を解除できませんでした。もう一度お試しください。</string>
     <string name="no_app_to_open_a_map_with">この端末には地図を開けるアプリがありません</string>
     <string name="icloud_loading_opening_account">Apple アカウントを開いています…</string>
-    <string name="icloud_loading_waiting_for_location_check">位置情報の確認が終わるのを待っています…</string>
     <string name="export_logs">ログを書き出す</string>
     <string name="log_file_has_been_exported_successfully">ログファイルを書き出しました</string>
     <string name="failed_to_export_log_file">ログファイルを書き出せませんでした</string>

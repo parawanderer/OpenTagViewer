@@ -92,10 +92,9 @@ public class PythonAppleService {
     }
 
     /**
-     * Whether a call into Python is currently in progress.
+     * Whether a fetch or an account change is currently in progress.
      *
-     * <p>Delegates to {@link PythonLock}, which is where the lock moved when the iCloud flow
-     * started driving the same event loop. Kept here because the periodic refresh asks this
+     * <p>Delegates to {@link PythonLock}. Kept here because the periodic refresh asks this
      * service, and where the lock lives is not its business.
      */
     public static boolean isBusy() {

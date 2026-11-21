@@ -247,7 +247,6 @@
     <string name="icloud_unlink_failed">Apple 계정 연결을 해제하지 못했습니다. 다시 시도해 주세요.</string>
     <string name="no_app_to_open_a_map_with">이 휴대전화에는 지도를 열 수 있는 앱이 없습니다</string>
     <string name="icloud_loading_opening_account">Apple 계정을 여는 중…</string>
-    <string name="icloud_loading_waiting_for_location_check">위치 확인이 끝나기를 기다리는 중…</string>
     <string name="export_logs">로그 내보내기</string>
     <string name="log_file_has_been_exported_successfully">로그 파일을 내보냈습니다</string>
     <string name="failed_to_export_log_file">로그 파일을 내보내지 못했습니다</string>

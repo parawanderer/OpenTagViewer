@@ -26,6 +26,7 @@ import pytest
 
 from findmy.errors import InvalidCredentialsError, UnauthorizedError
 
+import account_loop
 import icloud_bridge
 import identity as app_identity
 from exporter import icloud
@@ -194,8 +195,15 @@ class FakeAsyncAccount:
 
 @pytest.fixture
 def loop():
+    """
+    The loop as the app's account has it: running on a thread of its own.
+
+    Not a bare loop, because `openSession` refuses one - see `account_loop.attach`.
+    """
     made = asyncio.new_event_loop()
-    yield made
+    attached = account_loop.AccountLoop(made)
+    yield attached
+    attached.shutDown()
     made.close()
 
 
@@ -240,6 +248,18 @@ class TestStartingASession:
             _evt_loop = None
 
         assert icloud_bridge.openSession(Moved()) is None
+
+    def test_it_refuses_an_account_whose_loop_is_not_on_its_own_thread(self):
+        """
+        Java lets these steps run beside a location fetch now, which is only safe once
+        `account_loop.attach` has given the loop a thread. Without it, both would drive one loop
+        with `run_until_complete` at once.
+        """
+        bare = asyncio.new_event_loop()
+        try:
+            assert icloud_bridge.openSession(FakeAccount(bare)) is None
+        finally:
+            bare.close()
 
     def test_nothing_can_be_done_before_the_client_is_open(self, loop):
         made = icloud_bridge.openSession(FakeAccount(loop))
@@ -916,6 +936,23 @@ class TestReadingAsTheMemberItAlreadyIs:
 
         assert answer["reason"] == icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
         assert answer["message"].strip()
+
+    def test_a_closed_account_is_not_a_membership_that_stopped_working(self, session, loop):
+        """
+        The membership is fine; the account under the session was replaced. MapsActivity
+        restores a fresh account whenever it is rebuilt and closes the old one, and the
+        background account read could be resuming on the old one at that moment. Calling that
+        "unusable" made both callers forget the stored membership, so the next fetch asked
+        for a device passcode again - seen on a device, 2026-11-21.
+        """
+        made = session(FakeClient())
+        loop.shutDown()
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert not answer["ok"]
+        assert answer["reason"] != icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
+        assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
 
     def test_rubbish_in_storage_does_not_crash(self, session):
         made = session(FakeClient())

@@ -247,7 +247,6 @@
     <string name="icloud_unlink_failed">无法取消关联你的 Apple 账户，请重试。</string>
     <string name="no_app_to_open_a_map_with">此手机上没有可以打开地图的应用</string>
     <string name="icloud_loading_opening_account">正在打开您的 Apple 账户…</string>
-    <string name="icloud_loading_waiting_for_location_check">正在等待位置检查完成…</string>
     <string name="export_logs">导出日志</string>
     <string name="log_file_has_been_exported_successfully">日志文件已导出</string>
     <string name="failed_to_export_log_file">无法导出日志文件</string>
