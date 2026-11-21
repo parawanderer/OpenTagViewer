@@ -198,6 +198,10 @@
             android:exported="false"
             android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
         <activity
+            android:name=".ICloudLinkActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenTagViewer.GenericGreyishActivity" />
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings"

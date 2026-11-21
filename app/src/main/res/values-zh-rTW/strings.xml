@@ -211,8 +211,6 @@
     <string name="vendor_lookup_hint">%1$s 是藍牙技術聯盟（SIG）的廠商識別碼。點一下即可查詢它出自哪家廠商。</string>
     <string name="rename_failed_title">名稱未變更</string>
     <string name="rename_failed_message">此標籤的名稱儲存在你的 Apple 帳戶中，因此重新命名需要送達 Apple，而剛才沒有成功。沒有任何變更。請檢查網路連線後再試一次。</string>
-    <string name="icloud_fetch_from_settings_subtitle">加入你帳戶中的標籤，或更新已匯入的標籤</string>
-    <string name="icloud_fetch_from_settings_linked">已連結你的 Apple 帳戶。點一下可檢查是否有新增或變更的標籤。</string>
     <string name="icloud_link_account_action">透過 Apple 帳戶連結標籤</string>
     <string name="tag_ignored_summary">數月無更新 — 已暫停尋找</string>
     <string name="tag_ignored_retry">立即檢查</string>
@@ -233,7 +231,6 @@
     <string name="battery_level_very_low">極低（約 5-10%）— 幾乎耗盡</string>
     <string name="battery_level_icloud_only">只有從 iCloud 讀取的標籤才會更新此值。從檔案匯入的標籤會保留匯出時的數值。</string>
     <string name="icloud_unlink_title">取消連結我的 Apple 帳戶</string>
-    <string name="icloud_unlink_subtitle">讓此 App 不再從你的帳戶讀取標籤</string>
     <string name="icloud_unlink_confirm_title">要取消連結你的 Apple 帳戶嗎？</string>
     <string name="icloud_unlink_confirm_message">此 App 將不再從 Apple 讀取你的標籤。已匯入的標籤及其位置紀錄會保留在本裝置上，但不會再從你的帳戶更新。
 
@@ -391,7 +388,6 @@
     <string name="anisette_crash_report_body">Apple 的登入函式庫在這支手機上一載入就會當機。它在大多數手機上都能正常運作，我們還不知道受影響的手機有什麼共通點。\n\nOpenTagViewer 現在改用伺服器完成這一步，因此你可以正常登入和使用 App。附上下方資訊的回報能幫助我們找到原因。</string>
     <string name="login_failed_refused_before_password">Apple 在檢查你的密碼之前就拒絕開始登入此 Apple ID，所以重新輸入密碼沒有用。請確認你能否在 account.apple.com 登入，以及 Apple 是否在那裡要求你做什麼。遠端伺服器會以另一台裝置的身分出現在 Apple 面前，值得一試。Apple 的回覆：%1$s</string>
     <string name="extra_sources">其他位置來源（實驗性）</string>
-    <string name="extra_sources_subtitle">Google Find Hub 追蹤器</string>
     <string name="extra_sources_explainer">實驗性功能。透過你自己的 googlefind 服務定位 Google 帳戶中的追蹤器。可將其新增為裝置，或連結到某個裝置，讓兩個網路的報告顯示在同一個標記上。</string>
     <string name="google_find_hub_explainer">透過 googlefind 服務取得你 Google 帳戶中追蹤器的報告。只在重新整理標籤時要求新位置。</string>
     <string name="server_url">伺服器位址</string>
@@ -430,4 +426,15 @@
     <string name="import_choice_exporter_subtitle">由 OpenTagViewer 匯出工具產生的 .zip 檔案</string>
     <string name="import_choice_openhaystack_subtitle">來自 OpenHaystack 的 .keys 檔案</string>
     <string name="import_choice_google_subtitle">你的 Google 帳戶中的追蹤器</string>
+    <string name="icloud_link_title">Apple iCloud 連結</string>
+    <string name="icloud_link_subtitle_linked">已連結。輕觸以檢查新標籤或取消連結。</string>
+    <string name="icloud_link_subtitle_unlinked">未連結。輕觸以從你的 Apple 帳戶取得標籤。</string>
+    <string name="settings_google_find_hub">Google Find Hub（實驗性）</string>
+    <string name="settings_google_find_hub_subtitle">你的 Google 帳戶中的追蹤器</string>
+    <string name="icloud_link_status_linked">已連結你的 Apple 帳戶</string>
+    <string name="icloud_link_status_linked_detail">此手機無需裝置密碼即可再次從 iCloud 讀取你的標籤。</string>
+    <string name="icloud_link_status_unlinked">未連結</string>
+    <string name="icloud_link_status_unlinked_detail">使用你的一台 Apple 裝置的密碼連接一次。之後檢查新標籤只需輕觸一下。</string>
+    <string name="icloud_link_connect_button">連接 iCloud 中的標籤</string>
+    <string name="icloud_link_check_button">檢查新標籤</string>
 </resources>

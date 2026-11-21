@@ -27,7 +27,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.R;
-import dev.wander.android.opentagviewer.SettingsActivity;
+import dev.wander.android.opentagviewer.ICloudLinkActivity;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
@@ -51,7 +51,8 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 @RunWith(AndroidJUnit4.class)
 public class UnlinkTheAccountSettingTest {
 
-    private ActivityScenario<SettingsActivity> scenario;
+    /** Settings -> Apple iCloud link, where the unlink row moved to. It kept its id. */
+    private ActivityScenario<ICloudLinkActivity> scenario;
     private KeychainMembershipRepository memberships;
 
     @Before
@@ -78,7 +79,7 @@ public class UnlinkTheAccountSettingTest {
     }
 
     private void openSettings() {
-        this.scenario = ActivityScenario.launch(SettingsActivity.class);
+        this.scenario = ActivityScenario.launch(ICloudLinkActivity.class);
     }
 
     private void givenTheAccountIsAlreadyLinked() {
@@ -105,10 +106,10 @@ public class UnlinkTheAccountSettingTest {
     public void thereIsNothingToUnlinkBeforeLinking() {
         this.openSettings();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_primary_button))
                 .check(matches(isDisplayed())));
 
-        onView(withId(R.id.settings_unlink_account)).check(matches(not(isDisplayed())));
+        onView(withId(R.id.icloud_link_unlink_button)).check(matches(not(isDisplayed())));
     }
 
     /** Once linked, the row appears. */
@@ -118,10 +119,12 @@ public class UnlinkTheAccountSettingTest {
 
         this.openSettings();
 
-        Eventually.check(() -> onView(allOf(
-                withText(R.string.icloud_unlink_title),
-                isDescendantOfA(withId(R.id.settings_unlink_account))))
-                .check(matches(isDisplayed())));
+        Eventually.check(() -> onView(withId(R.id.icloud_link_unlink_button))
+                .check(matches(allOf(isDisplayed(), withText(R.string.icloud_unlink_title)))));
+        onView(withId(R.id.icloud_link_status))
+                .check(matches(withText(R.string.icloud_link_status_linked)));
+        onView(withId(R.id.icloud_link_primary_button))
+                .check(matches(withText(R.string.icloud_link_check_button)));
     }
 
     /**
@@ -176,7 +179,7 @@ public class UnlinkTheAccountSettingTest {
         onView(withText(R.string.cancel)).inRoot(isDialog()).perform(click());
 
         assertTrue("cancelling unlinked the account anyway", this.stillLinked());
-        onView(withId(R.id.settings_unlink_account)).check(matches(isDisplayed()));
+        onView(withId(R.id.icloud_link_unlink_button)).check(matches(isDisplayed()));
     }
 
     /**
@@ -199,13 +202,14 @@ public class UnlinkTheAccountSettingTest {
 
         assertFalse("the membership was not forgotten", this.stillLinked());
 
-        Eventually.check(() -> onView(withId(R.id.settings_unlink_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_unlink_button))
                 .check(matches(not(isDisplayed()))));
 
-        Eventually.check(() -> onView(allOf(
-                withText(R.string.icloud_fetch_from_settings_subtitle),
-                isDescendantOfA(withId(R.id.settings_fetch_from_account))))
-                .check(matches(isDisplayed())));
+        // The card and the button follow: not linked, and offering to connect again.
+        Eventually.check(() -> onView(withId(R.id.icloud_link_status))
+                .check(matches(withText(R.string.icloud_link_status_unlinked))));
+        onView(withId(R.id.icloud_link_primary_button))
+                .check(matches(withText(R.string.icloud_link_connect_button)));
     }
 
     /**
@@ -228,9 +232,9 @@ public class UnlinkTheAccountSettingTest {
         this.scenario.close();
         this.openSettings();
 
-        Eventually.check(() -> onView(withId(R.id.settings_fetch_from_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_primary_button))
                 .check(matches(isDisplayed())));
-        onView(withId(R.id.settings_unlink_account)).check(matches(not(isDisplayed())));
+        onView(withId(R.id.icloud_link_unlink_button)).check(matches(not(isDisplayed())));
     }
 
     /**
@@ -245,10 +249,10 @@ public class UnlinkTheAccountSettingTest {
      * correct and roughly instant.
      */
     private void openTheUnlinkDialog() {
-        Eventually.check(() -> onView(withId(R.id.settings_unlink_account))
+        Eventually.check(() -> onView(withId(R.id.icloud_link_unlink_button))
                 .check(matches(isDisplayed())));
 
-        onView(withId(R.id.settings_unlink_account)).perform(click());
+        onView(withId(R.id.icloud_link_unlink_button)).perform(click());
 
         Eventually.check(() -> onView(withText(R.string.icloud_unlink_confirm_title))
                 .inRoot(isDialog())

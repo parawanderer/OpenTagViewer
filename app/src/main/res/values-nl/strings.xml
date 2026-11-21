@@ -211,8 +211,6 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="vendor_lookup_hint">%1$s is een bedrijfs-id van de Bluetooth SIG. Tik erop om op te zoeken wie dit heeft gemaakt.</string>
     <string name="rename_failed_title">De naam is niet gewijzigd</string>
     <string name="rename_failed_message">Deze tag krijgt zijn naam uit je Apple-account, dus hernoemen moet Apple bereiken — en dat lukte zojuist niet. Er is niets gewijzigd. Controleer je verbinding en probeer het opnieuw.</string>
-    <string name="icloud_fetch_from_settings_subtitle">Voeg de tags uit je account toe, of werk de tags hier bij</string>
-    <string name="icloud_fetch_from_settings_linked">Gekoppeld aan je Apple-account. Tik om te zoeken naar nieuwe of gewijzigde tags.</string>
     <string name="icloud_link_account_action">Tags koppelen via Apple-account</string>
     <string name="tag_ignored_summary">Al maanden geen updates — zoeken gepauzeerd</string>
     <string name="tag_ignored_retry">Nu controleren</string>
@@ -233,7 +231,6 @@ Je tags en hun locatiegeschiedenis blijven op deze telefoon staan — er is niet
     <string name="battery_level_very_low">Kritiek laag (~5-10%) — bijna leeg</string>
     <string name="battery_level_icloud_only">Alleen tags die uit iCloud worden gelezen werken dit bij. Een tag die uit een bestand is geïmporteerd houdt de waarde van het moment van exporteren.</string>
     <string name="icloud_unlink_title">Koppeling met mijn Apple-account opheffen</string>
-    <string name="icloud_unlink_subtitle">Deze app leest dan geen tags meer uit je account</string>
     <string name="icloud_unlink_confirm_title">Koppeling met je Apple-account opheffen?</string>
     <string name="icloud_unlink_confirm_message">Deze app leest je tags dan niet meer bij Apple. Tags die je al hebt geïmporteerd blijven op dit apparaat staan, samen met hun locatiegeschiedenis — maar ze worden niet meer bijgewerkt vanuit je account.
 
@@ -391,7 +388,6 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_crash_report_body">Apples aanmeldbibliotheek crasht op deze telefoon zodra ze geladen wordt. Op de meeste telefoons werkt ze, en we weten nog niet wat de getroffen toestellen gemeen hebben.\n\nOpenTagViewer gebruikt voor die stap nu een server, dus je kunt gewoon aanmelden en de app normaal gebruiken. Een melding met de gegevens hieronder helpt ons de oorzaak te vinden.</string>
     <string name="login_failed_refused_before_password">Apple weigerde het inloggen met deze Apple ID te starten voordat je wachtwoord werd gecontroleerd, dus opnieuw intypen helpt niet. Controleer of je kunt inloggen op account.apple.com en of Apple daar iets van je vraagt. Een externe server stelt zich bij Apple voor als een ander apparaat, dat is het proberen waard. Apple meldde: %1$s</string>
     <string name="extra_sources">Extra locatiebronnen (experimenteel)</string>
-    <string name="extra_sources_subtitle">Google Find Hub-trackers</string>
     <string name="extra_sources_explainer">Experimenteel. Vind de trackers in je Google-account via je eigen googlefind-service. Voeg ze toe als apparaat, of koppel ze aan een apparaat zodat de meldingen van beide netwerken op één markering staan.</string>
     <string name="google_find_hub_explainer">Meldingen van de trackers in je Google-account, via een googlefind-service. Nieuwe locaties worden alleen opgevraagd als je een tag vernieuwt.</string>
     <string name="server_url">Serveradres</string>
@@ -430,4 +426,15 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="import_choice_exporter_subtitle">De .zip die de OpenTagViewer-exporter maakte</string>
     <string name="import_choice_openhaystack_subtitle">Een .keys-bestand uit OpenHaystack</string>
     <string name="import_choice_google_subtitle">Trackers in je Google-account</string>
+    <string name="icloud_link_title">Apple iCloud-koppeling</string>
+    <string name="icloud_link_subtitle_linked">Gekoppeld. Tik om op nieuwe tags te controleren of te ontkoppelen.</string>
+    <string name="icloud_link_subtitle_unlinked">Niet gekoppeld. Tik om je tags uit je Apple-account op te halen.</string>
+    <string name="settings_google_find_hub">Google Find Hub (experimenteel)</string>
+    <string name="settings_google_find_hub_subtitle">Trackers in je Google-account</string>
+    <string name="icloud_link_status_linked">Gekoppeld aan je Apple-account</string>
+    <string name="icloud_link_status_linked_detail">Deze telefoon kan je tags opnieuw uit iCloud lezen zonder toegangscode.</string>
+    <string name="icloud_link_status_unlinked">Niet gekoppeld</string>
+    <string name="icloud_link_status_unlinked_detail">Maak één keer verbinding met de toegangscode van een van je Apple-apparaten. Daarna controleer je met één tik op nieuwe tags.</string>
+    <string name="icloud_link_connect_button">Tags uit iCloud koppelen</string>
+    <string name="icloud_link_check_button">Controleren op nieuwe tags</string>
 </resources>

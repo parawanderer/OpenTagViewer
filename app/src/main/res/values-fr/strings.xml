@@ -212,8 +212,6 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="vendor_lookup_hint">%1$s est un identifiant d’entreprise Bluetooth SIG. Touchez pour le rechercher et découvrir qui a fabriqué cet accessoire.</string>
     <string name="rename_failed_title">Le nom n’a pas été modifié</string>
     <string name="rename_failed_message">Cette balise est nommée dans votre compte Apple : la renommer doit donc atteindre Apple, ce qui vient d’échouer. Rien n’a été modifié. Vérifiez votre connexion et réessayez.</string>
-    <string name="icloud_fetch_from_settings_subtitle">Ajouter les balises de votre compte, ou mettre à jour celles déjà présentes</string>
-    <string name="icloud_fetch_from_settings_linked">Associé à votre compte Apple. Touchez pour rechercher des balises nouvelles ou modifiées.</string>
     <string name="icloud_link_account_action">Associer des balises via le compte Apple</string>
     <string name="tag_ignored_summary">Aucune mise à jour depuis des mois – recherche en pause</string>
     <string name="tag_ignored_retry">Vérifier maintenant</string>
@@ -234,7 +232,6 @@ Vos balises et leur historique de position restent sur ce téléphone — rien n
     <string name="battery_level_very_low">Critique (~5-10%) – presque épuisée</string>
     <string name="battery_level_icloud_only">Seules les balises lues depuis iCloud mettent cette valeur à jour. Une balise importée depuis un fichier conserve la valeur qu’elle avait lors de l’export.</string>
     <string name="icloud_unlink_title">Dissocier mon compte Apple</string>
-    <string name="icloud_unlink_subtitle">Empêcher cette application de lire les balises de votre compte</string>
     <string name="icloud_unlink_confirm_title">Dissocier votre compte Apple ?</string>
     <string name="icloud_unlink_confirm_message">Cette application cessera de lire vos balises depuis Apple. Les balises déjà importées restent sur cet appareil, avec leur historique de localisation — mais elles ne seront plus mises à jour depuis votre compte.
 
@@ -391,7 +388,6 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="anisette_crash_report_body">La bibliothèque de connexion d\'Apple plante dès son chargement sur ce téléphone. Elle fonctionne sur la plupart des téléphones, et nous ne savons pas encore ce que les appareils concernés ont en commun.\n\nOpenTagViewer utilise désormais un serveur pour cette étape : vous pouvez vous connecter et utiliser l\'app normalement. Un rapport avec les informations ci-dessous nous aide à trouver la cause.</string>
     <string name="login_failed_refused_before_password">Apple a refusé de commencer la connexion à cet identifiant Apple avant même de vérifier votre mot de passe : le saisir à nouveau ne changera rien. Vérifiez que vous pouvez vous connecter sur account.apple.com et si Apple vous y demande quelque chose. Un serveur distant présente un autre appareil à Apple, cela vaut la peine d\'essayer. Apple a répondu : %1$s</string>
     <string name="extra_sources">Sources de localisation supplémentaires (expérimental)</string>
-    <string name="extra_sources_subtitle">Traceurs Google Find Hub</string>
     <string name="extra_sources_explainer">Expérimental. Localisez les traceurs de votre compte Google via votre propre service googlefind. Ajoutez-les comme appareils, ou associez-les à un appareil pour afficher les rapports des deux réseaux sur un seul repère.</string>
     <string name="google_find_hub_explainer">Rapports des traceurs de votre compte Google, via un service googlefind. Les nouvelles positions ne sont demandées que lorsque vous actualisez une balise.</string>
     <string name="server_url">Adresse du serveur</string>
@@ -430,4 +426,15 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="import_choice_exporter_subtitle">Le fichier .zip créé par l\'exportateur OpenTagViewer</string>
     <string name="import_choice_openhaystack_subtitle">Un fichier .keys d\'OpenHaystack</string>
     <string name="import_choice_google_subtitle">Les traceurs de votre compte Google</string>
+    <string name="icloud_link_title">Lien Apple iCloud</string>
+    <string name="icloud_link_subtitle_linked">Associé. Touchez pour chercher de nouvelles balises ou dissocier.</string>
+    <string name="icloud_link_subtitle_unlinked">Non associé. Touchez pour récupérer vos balises depuis votre compte Apple.</string>
+    <string name="settings_google_find_hub">Google Find Hub (expérimental)</string>
+    <string name="settings_google_find_hub_subtitle">Les traceurs de votre compte Google</string>
+    <string name="icloud_link_status_linked">Associé à votre compte Apple</string>
+    <string name="icloud_link_status_linked_detail">Ce téléphone peut relire vos balises depuis iCloud sans code d\'appareil.</string>
+    <string name="icloud_link_status_unlinked">Non associé</string>
+    <string name="icloud_link_status_unlinked_detail">Connectez-vous une fois avec le code d\'un de vos appareils Apple. Ensuite, chercher de nouvelles balises ne prend qu\'une touche.</string>
+    <string name="icloud_link_connect_button">Connecter les balises depuis iCloud</string>
+    <string name="icloud_link_check_button">Chercher de nouvelles balises</string>
 </resources>
