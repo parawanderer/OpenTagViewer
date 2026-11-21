@@ -11,8 +11,11 @@ import static dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsMan
 import static dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager.ANISETTE_TEST_STATUS.OK;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +31,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
@@ -43,6 +48,7 @@ import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,6 +70,8 @@ import dev.wander.android.opentagviewer.python.PythonAuthService.PythonAuthRespo
 import dev.wander.android.opentagviewer.python.TermsDocument;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.EmulatedMacAnisette;
+import dev.wander.android.opentagviewer.anisette.MacCoreAdiFetcher;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.service.web.CronetProvider;
 import dev.wander.android.opentagviewer.service.web.GitHubService;
@@ -281,6 +289,16 @@ public class AppleLoginActivity extends AppCompatActivity {
                 .setOnClickListener(v -> this.openTheReportPageForTheLoginFailure());
         this.findViewById(R.id.login_error_try_remote_anisette)
                 .setOnClickListener(v -> this.onClickTryRemoteAnisette());
+
+        // Supplying CoreADI by hand, offered only in AnisetteStatus.State.NEEDS_COREADI.
+        // Not the DMG's mime type: a download arrives as octet-stream, x-apple-diskimage or
+        // nothing at all, and filtering would hide the very file the user was sent to fetch.
+        this.findViewById(R.id.anisetteChooseCoreAdiButton)
+                .setOnClickListener(v -> this.pickCoreAdiLauncher.launch(new String[] {"*/*"}));
+        this.findViewById(R.id.anisetteRetryCoreAdiButton)
+                .setOnClickListener(v -> this.checkAnisetteAgain());
+        this.findViewById(R.id.anisetteCopyCoreAdiLinkButton)
+                .setOnClickListener(v -> this.copyCoreAdiLink());
 
         this.findViewById(R.id.login_terms_agree_button)
                 .setOnClickListener(v -> this.onAgreeToTerms());
@@ -1002,7 +1020,8 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.testAndSaveAnisetteUrl(currentAnisetteServerSelection);
 
-        if (setupStatus == SETUP_STATUS.NO_SERVER_CONFIGURED) {
+        if (setupStatus == SETUP_STATUS.NO_SERVER_CONFIGURED
+                || setupStatus == SETUP_STATUS.NEEDS_COREADI) {
             this.setCurrentStepText(R.string.welcome, direction);
         } else {
             this.setCurrentStepText(R.string.choose_your_server, direction);
@@ -1366,6 +1385,12 @@ public class AppleLoginActivity extends AppCompatActivity {
                     if (status.state() == AnisetteStatus.State.READY) {
                         return Observable.just(SETUP_STATUS.OK);
                     }
+                    // Not OK even when a stored server answers. That server would sign in
+                    // and then fail every fetch, and OK skips this step, so nobody would ever
+                    // see the offer of the file that would actually fix it.
+                    if (status.needsCoreAdi()) {
+                        return Observable.just(SETUP_STATUS.NEEDS_COREADI);
+                    }
                     return this.getAnisetteServerSetupStatus();
                 });
     }
@@ -1518,9 +1543,84 @@ public class AppleLoginActivity extends AppCompatActivity {
         return Objects.requireNonNull(this.model.getUiState().getValue());
     }
 
+    /**
+     * Picks the iTunes 12.8.3 disk image, or CoreADI itself, for a phone that could not download
+     * it. {@code OpenDocument}, so a 291 MB file is read where it lies rather than copied first.
+     */
+    private final ActivityResultLauncher<String[]> pickCoreAdiLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) {
+                    this.importCoreAdi(uri);
+                }
+            });
+
+    /**
+     * Store a CoreADI the user chose, then check Anisette again.
+     *
+     * <p>Off the main thread: a disk image is skipped through to its payload, then unpacked and
+     * hashed. Checked against the same pins as the download, so nothing chosen here can run code
+     * the download would have refused.
+     */
+    private void importCoreAdi(final Uri chosen) {
+        final View root = this.findViewById(android.R.id.content);
+        SharedMainSettingsManager.applyCoreAdiRejection(root, null);
+        this.showLoading(null);
+
+        var async = Observable.fromCallable(() -> {
+                    try (InputStream in = this.getContentResolver().openInputStream(chosen)) {
+                        if (in == null) {
+                            return Optional.of("the file could not be opened");
+                        }
+                        MacCoreAdiFetcher.importFrom(in, EmulatedMacAnisette.libraryFile(this));
+                        return Optional.<String>empty();
+                    } catch (final MacCoreAdiFetcher.FetchException e) {
+                        Log.w(TAG, "the chosen file is not CoreADI", e);
+                        return Optional.of(String.valueOf(e.getMessage()));
+                    }
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(problem -> {
+                    this.hideLoading();
+                    if (problem.isPresent()) {
+                        SharedMainSettingsManager.applyCoreAdiRejection(root, problem.get());
+                        return;
+                    }
+                    this.checkAnisetteAgain();
+                }, error -> {
+                    this.hideLoading();
+                    Log.e(TAG, "could not import the chosen CoreADI", error);
+                    SharedMainSettingsManager.applyCoreAdiRejection(root,
+                            String.valueOf(error.getMessage()));
+                });
+    }
+
+    /** Ask local Anisette again from scratch: after a supplied file, or a network that recovered. */
+    private void checkAnisetteAgain() {
+        // A fresh source, so nothing it remembered about the failure carries over.
+        this.localAnisette = AppDependencies.anisette(this, this.getUserSettings(), false);
+        // Aimed at the account form, as a phone that worked from the start would be. handleAuth
+        // only goes there for LOGIN or no page, and this screen's page is still the welcome
+        // step; when the answer is still no, it comes back here anyway.
+        this.getUiState().setCurrentPage(PAGE.LOGIN);
+        this.handleAuth(this.getUiState());
+    }
+
+    private void copyCoreAdiLink() {
+        final ClipboardManager clipboard =
+                (ClipboardManager) this.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("iTunes 12.8.3",
+                    MacCoreAdiFetcher.DMG_URL));
+            Toast.makeText(this, R.string.exported_tags_code_copied, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     enum SETUP_STATUS {
         NO_SERVER_CONFIGURED,
         SERVER_UNAVAILABLE,
+        /** The emulated Mac has no CoreADI. Stops on this step, with the file offered. */
+        NEEDS_COREADI,
         OK;
     }
 }

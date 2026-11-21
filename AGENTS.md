@@ -755,6 +755,14 @@ Unicorn, in `libmacadi.so` (`app/src/main/cpp/macadi/`, ported from sacca97/os-f
   `scripts/locate_mac_coreadi.py` re-derives and checks every constant, reading them from the Java
   sources. Both the payload and the library are pinned by SHA-256, and the dispatcher offset
   (`0x979A0`) is only valid for that one build.
+- **A CoreADI that cannot be downloaded must not fall back to a server quietly.** Since the
+  2026-10-12 change a server signs in and then every fetch answers 401, so the fallback is a trap.
+  A failed fetch marks `unavailableReason` with `EmulatedMacAnisette.NO_COREADI_REASON`,
+  `AnisetteStatus` makes that `NEEDS_COREADI`, and the sign-in screen stops on the Anisette step,
+  **even when a stored server answers** (that used to skip straight to the account form), offering
+  Apple's link, **Choose a file** and **Retry**. `MacCoreAdiFetcher.importFrom` takes the iTunes
+  disk image or the library and checks both against the download's own pins.
+  `SuppliedCoreAdiFlowTest` fails if the screen skips the offer again.
 - **One identity, kept forever** - rule 11, with more at stake. `files/anisette/mac/identity.json`
   and `store/` belong together: the library hashes the host UUID into the machine id, Apple binds
   the provisioning to the device id, and the Find My token only works alongside Anisette from the

@@ -171,6 +171,7 @@ wizard).
 | Anisette tests | `app/src/androidTest/java/.../anisette/` | as above, **opt-in** except `ApplesRealLibraryOnThisDeviceTest` | yes, and network |
 | UI tests | `AppleLoginFlowTest`, `app/src/androidTest/java/.../ui/` | Espresso, on the managed device | provisioned for you |
 | Wiki screenshots | `app/src/androidTest/java/.../ui/WikiScreenshots*Test` | as above, **opt-in** | a windowed emulator |
+| CoreADI from the real disk image | `MacCoreAdiRealImageTest` (JVM) | Gradle / JUnit, **opt-in**: set `COREADI_DMG` | no, but the 291 MB image |
 | Chaquopy bridge tests | `app/src/test/python/` | pytest | no |
 | Desktop exporter tests | `python/test/` | pytest | no |
 | Shared export package | `python/opentagviewer_export/tests/` | pytest | no |
@@ -663,6 +664,16 @@ libraries. See [`app/src/test/adi-on-bionic/README.md`](app/src/test/adi-on-bion
 it works and what it measured.
 
 ### The emulated Mac, on the host
+
+**A CoreADI supplied by hand** (the sign-in screen offers this when the download fails) goes
+through `MacCoreAdiFetcher.importFrom`. Its JVM tests use miniature fakes; to put Apple's real
+image through it against the real pins, download `MacCoreAdiFetcher.DMG_URL` and run:
+
+```bash
+COREADI_DMG=/path/to/iTunes12.8.3.dmg ./gradlew :app:testDebugUnitTest --tests '*MacCoreAdiRealImageTest'
+```
+
+Passed on 2026-11-21 in 0.3 s (it seeks to the payload instead of reading 291 MB).
 
 ```bash
 python scripts/locate_mac_coreadi.py --remote --out /tmp/CoreADI.x86_64

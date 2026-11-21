@@ -420,5 +420,8 @@
     <string name="server_url_not_https">不是 https：API 令牌将以未加密方式发送。</string>
     <string name="google_find_hub_setup_guide">如何设置</string>
     <string name="battery_icon_description">电量%1$s</string>
+    <string name="anisette_login_needs_coreadi">此手机无法从 Apple 下载所需的文件（macOS CoreADI）。请通过下方链接在电脑或浏览器中下载 iTunes 12.8.3 磁盘映像，放到此手机上并在此处选择。服务器仍可让你登录，但无法通过它加载标签的位置。</string>
+    <string name="anisette_local_needs_coreadi">此手机无法从 Apple 下载所需的文件（macOS CoreADI）。请在电脑或浏览器中下载 iTunes 12.8.3 磁盘映像，放到此手机上并在此处选择。</string>
+    <string name="anisette_coreadi_copy_link">复制下载链接</string>
     <string name="finding_tags_banner">正在查找你的标签… 还剩 %1$d 个。请保持应用打开。</string>
 </resources>

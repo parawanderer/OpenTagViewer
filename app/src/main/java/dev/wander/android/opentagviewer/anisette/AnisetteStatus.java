@@ -34,6 +34,16 @@ public final class AnisetteStatus {
          */
         APPLE_CHANGED,
         /**
+         * The emulated Mac could not get Apple's macOS CoreADI: the download was blocked, failed,
+         * or came back as something other than the pinned build.
+         *
+         * <p>Its own state because the usual way out is a trap. A remote server signs in fine but,
+         * since Apple's 2026-10-12 change, gets no Find My token, so every report fetch afterwards
+         * answers 401. What does help is the file itself, downloaded on a computer and chosen
+         * here, which is what the sign-in screen offers in this state.
+         */
+        NEEDS_COREADI,
+        /**
          * Apple's library kills the process that loads it, on this device (issue #232).
          *
          * <p>The only state that asks for a report. Nothing the user can change fixes it, and the
@@ -74,8 +84,14 @@ public final class AnisetteStatus {
         }
 
         final String reason = source.unavailableReason();
-        if (reason != null && reason.contains(LocalAnisette.CRASHES_HERE_REASON)) {
+        // Either source's sentence. The emulated Mac's used to fall through to UNAVAILABLE, so a
+        // phone it crashed on was told to try a server rather than asked for a report.
+        if (reason != null && (reason.contains(LocalAnisette.CRASHES_HERE_REASON)
+                || reason.contains(EmulatedMacAnisette.CRASHES_HERE_REASON))) {
             return new AnisetteStatus(State.CRASHES_HERE, reason);
+        }
+        if (reason != null && reason.contains(EmulatedMacAnisette.NO_COREADI_REASON)) {
+            return new AnisetteStatus(State.NEEDS_COREADI, reason);
         }
         return new AnisetteStatus(
                 looksLikeAppleChangedTheLibraries(reason)
@@ -109,7 +125,13 @@ public final class AnisetteStatus {
     public boolean failed() {
         return this.state == State.UNAVAILABLE
                 || this.state == State.APPLE_CHANGED
+                || this.state == State.NEEDS_COREADI
                 || this.state == State.CRASHES_HERE;
+    }
+
+    /** Whether supplying Apple's macOS CoreADI (or the iTunes disk image) by hand would help. */
+    public boolean needsCoreAdi() {
+        return this.state == State.NEEDS_COREADI;
     }
 
     /** Whether supplying an Apple Music APK by hand would help. */

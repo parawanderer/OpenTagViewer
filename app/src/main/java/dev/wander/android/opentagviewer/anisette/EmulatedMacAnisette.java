@@ -74,6 +74,20 @@ public final class EmulatedMacAnisette implements AnisetteSource {
             "The emulated Mac crashed its process on this device, so a remote Anisette server is"
                     + " used instead";
 
+    /**
+     * Starts {@link #unavailableReason()} when CoreADI could not be got onto the phone: the
+     * download failed, or what came back was not the pinned build. {@link AnisetteStatus} matches
+     * on it to offer supplying the file by hand, which is the one thing that helps then.
+     */
+    public static final String NO_COREADI_REASON = "Apple's macOS CoreADI could not be fetched";
+
+    private static final String LIBRARY_NAME = "CoreADI-4.19-x86_64";
+
+    /** Where CoreADI is kept, for {@link MacCoreAdiFetcher#importFrom} to put one supplied by hand. */
+    public static File libraryFile(Context context) {
+        return new File(directoryFor(context), LIBRARY_NAME);
+    }
+
     /** How long one generated set is reused. See {@code LocalAnisette.CACHE_FOR_MS}. */
     private static final long CACHE_FOR_MS = 5_000;
 
@@ -197,7 +211,7 @@ public final class EmulatedMacAnisette implements AnisetteSource {
 
     private static Library libraryIn(File directory) {
         return () -> {
-            final File target = new File(directory, "CoreADI-4.19-x86_64");
+            final File target = new File(directory, LIBRARY_NAME);
             MacCoreAdiFetcher.ensure(target);
             return target;
         };
@@ -328,7 +342,10 @@ public final class EmulatedMacAnisette implements AnisetteSource {
                 if (opened != null) {
                     opened.close();
                 }
-                this.unavailableReason = e.getMessage() == null ? e.toString() : e.getMessage();
+                final String message = e.getMessage() == null ? e.toString() : e.getMessage();
+                // Only the library step throws this, so it is a CoreADI that never arrived.
+                this.unavailableReason = e instanceof MacCoreAdiFetcher.FetchException
+                        ? NO_COREADI_REASON + ": " + message : message;
                 Log.w(TAG, "the emulated Mac is unavailable, falling back to a remote server: "
                         + this.unavailableReason, e);
                 return false;

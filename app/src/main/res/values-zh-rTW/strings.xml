@@ -420,5 +420,8 @@
     <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
     <string name="google_find_hub_setup_guide">如何設定</string>
     <string name="battery_icon_description">電量%1$s</string>
+    <string name="anisette_login_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請透過下方連結在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。伺服器仍可讓你登入，但無法透過它載入標籤的位置。</string>
+    <string name="anisette_local_needs_coreadi">此手機無法從 Apple 下載所需的檔案（macOS CoreADI）。請在電腦或瀏覽器中下載 iTunes 12.8.3 磁碟映像，放到此手機上並在此處選擇。</string>
+    <string name="anisette_coreadi_copy_link">複製下載連結</string>
     <string name="finding_tags_banner">正在尋找你的標籤… 還剩 %1$d 個。請保持應用程式開啟。</string>
 </resources>

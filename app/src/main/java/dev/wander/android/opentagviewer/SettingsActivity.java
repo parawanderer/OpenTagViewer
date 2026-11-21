@@ -9,6 +9,9 @@ import static android.view.View.VISIBLE;
 import static android.view.View.inflate;
 import static dev.wander.android.opentagviewer.util.android.TextChangedWatcherFactory.justWatchOnChanged;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -50,6 +53,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -65,7 +69,9 @@ import dev.wander.android.opentagviewer.anisette.AdiLibraryImporter;
 import dev.wander.android.opentagviewer.anisette.AdiLibraryManifest;
 import dev.wander.android.opentagviewer.anisette.AnisetteSource;
 import dev.wander.android.opentagviewer.anisette.AnisetteStatus;
+import dev.wander.android.opentagviewer.anisette.EmulatedMacAnisette;
 import dev.wander.android.opentagviewer.anisette.LocalAnisette;
+import dev.wander.android.opentagviewer.anisette.MacCoreAdiFetcher;
 import dev.wander.android.opentagviewer.databinding.ActivitySettingsBinding;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
@@ -806,9 +812,17 @@ public class SettingsActivity extends AppCompatActivity {
             learnMore.setOnClickListener(v -> this.openConfiguredLink("anisetteWikiPage"));
         }
 
+        // Both buttons serve whichever file is missing: CoreADI for the emulated Mac, or the
+        // Apple Music APK for the Android libraries. See applyLocalAnisetteStatus.
         final View whereToGetApk = view.findViewById(R.id.anisetteWhereToGetApkButton);
         if (whereToGetApk != null) {
-            whereToGetApk.setOnClickListener(v -> this.openConfiguredLink("anisetteApkWikiPage"));
+            whereToGetApk.setOnClickListener(v -> {
+                if (this.lastLocalAnisetteStatus.needsCoreAdi()) {
+                    this.copyCoreAdiLink();
+                } else {
+                    this.openConfiguredLink("anisetteApkWikiPage");
+                }
+            });
         }
 
         final View chooseApk = view.findViewById(R.id.anisetteChooseApkButton);
@@ -819,7 +833,11 @@ public class SettingsActivity extends AppCompatActivity {
                 // Not the APK mime type: files downloaded from a browser or a file host
                 // routinely arrive as octet-stream or with no type at all, and filtering them
                 // out would hide the very file people were told to go and find.
-                this.pickAnisetteApkLauncher.launch(new String[] {"*/*"});
+                if (this.lastLocalAnisetteStatus.needsCoreAdi()) {
+                    this.pickCoreAdiLauncher.launch(new String[] {"*/*"});
+                } else {
+                    this.pickAnisetteApkLauncher.launch(new String[] {"*/*"});
+                }
             });
         }
 
@@ -831,6 +849,59 @@ public class SettingsActivity extends AppCompatActivity {
 
     /** The Anisette dialog currently on screen, so a file-picker result can update it. */
     private View anisetteDialogView;
+
+    /** What local Anisette said last, which decides which file the dialog's buttons ask for. */
+    private AnisetteStatus lastLocalAnisetteStatus = AnisetteStatus.pending();
+
+    /** Picks the iTunes 12.8.3 disk image, or CoreADI itself. See AppleLoginActivity's twin. */
+    private final ActivityResultLauncher<String[]> pickCoreAdiLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) {
+                    this.importCoreAdi(uri);
+                }
+            });
+
+    /** Store a CoreADI chosen by hand, checked against the download's own pins, then re-check. */
+    private void importCoreAdi(final Uri chosen) {
+        final View view = this.anisetteDialogView;
+        if (view != null) {
+            SharedMainSettingsManager.applyApkRejection(view, null);
+            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                    view, AnisetteStatus.checking(), "", this.currentSettings.hasOwnAnisetteApk());
+        }
+
+        var async = Observable.fromCallable(() -> {
+                    try (InputStream in = this.getContentResolver().openInputStream(chosen)) {
+                        if (in == null) {
+                            return Optional.of("the file could not be opened");
+                        }
+                        MacCoreAdiFetcher.importFrom(in, EmulatedMacAnisette.libraryFile(this));
+                        return Optional.<String>empty();
+                    } catch (final MacCoreAdiFetcher.FetchException e) {
+                        Log.w(TAG, "the chosen file is not CoreADI", e);
+                        return Optional.of(String.valueOf(e.getMessage()));
+                    }
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(problem -> {
+                    if (view == null) {
+                        return;
+                    }
+                    problem.ifPresent(p -> SharedMainSettingsManager.applyApkRejection(view, p));
+                    this.loadLocalAnisetteStatus(view);
+                }, error -> Log.e(TAG, "failed to import the chosen CoreADI", error));
+    }
+
+    private void copyCoreAdiLink() {
+        final ClipboardManager clipboard =
+                (ClipboardManager) this.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("iTunes 12.8.3",
+                    MacCoreAdiFetcher.DMG_URL));
+            Toast.makeText(this, R.string.exported_tags_code_copied, Toast.LENGTH_SHORT).show();
+        }
+    }
 
     /**
      * Picks an Apple Music APK to take the ADI libraries from.
@@ -972,9 +1043,12 @@ public class SettingsActivity extends AppCompatActivity {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        result -> SharedMainSettingsManager.applyLocalAnisetteStatus(
-                                view, result.first, result.second,
-                                this.currentSettings.hasOwnAnisetteApk()),
+                        result -> {
+                            this.lastLocalAnisetteStatus = result.first;
+                            SharedMainSettingsManager.applyLocalAnisetteStatus(
+                                    view, result.first, result.second,
+                                    this.currentSettings.hasOwnAnisetteApk());
+                        },
                         error -> Log.w(TAG, "could not determine the local Anisette status",
                                 error));
     }

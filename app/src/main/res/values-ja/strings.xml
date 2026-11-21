@@ -420,5 +420,8 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
     <string name="google_find_hub_setup_guide">設定方法</string>
     <string name="battery_icon_description">電池 %1$s</string>
+    <string name="anisette_login_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。下のリンクから iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。サーバーでもサインインはできますが、タグの位置情報は読み込まれません。</string>
+    <string name="anisette_local_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。</string>
+    <string name="anisette_coreadi_copy_link">ダウンロードリンクをコピー</string>
     <string name="finding_tags_banner">タグを探しています… 残り %1$d 個。アプリを開いたままにしてください。</string>
 </resources>
