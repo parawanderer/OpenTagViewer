@@ -22,3 +22,8 @@ python/test/resources/** -text
 # The locked bundle the Android importer's tests open. A zip is binary regardless; declared
 # so no future setting can decide otherwise.
 *.zip binary
+
+# Licence texts shipped in the APK. A Windows checkout gave Unicorn's COPYING CRLF endings, so
+# an APK built there shipped a different file from the one MacAdi.cmake's notice names, and
+# UnicornNoticeTest failed. LF everywhere, whatever core.autocrlf says.
+app/src/main/assets/licences/** text eol=lf
