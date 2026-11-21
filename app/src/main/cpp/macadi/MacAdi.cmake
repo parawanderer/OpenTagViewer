@@ -20,11 +20,43 @@ set(UNICORN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(UNICORN_INSTALL OFF CACHE BOOL "" FORCE)
 set(UNICORN_LEGACY_STATIC_ARCHIVE OFF CACHE BOOL "" FORCE)
 
+# Unicorn generates config-host.h by running `sh qemu/configure` at configure time, and does not
+# check that it worked. That script also calls `strings` and `pkg-config`. Missing any of them -
+# the usual state of Android Studio or PowerShell on Windows - configure appears to succeed and
+# the compile dies minutes later on `'config-host.h' file not found`, which reads as a broken
+# checkout. So ask first, and check the result after. Unicorn uses a checked-in header under
+# MSVC and needs none of this.
+if(NOT MSVC)
+    set(_macadi_missing "")
+    foreach(_tool sh strings pkg-config)
+        string(MAKE_C_IDENTIFIER "MACADI_TOOL_${_tool}" _var)
+        find_program(${_var} ${_tool})
+        if(NOT ${_var})
+            list(APPEND _macadi_missing ${_tool})
+        endif()
+    endforeach()
+    if(_macadi_missing)
+        list(JOIN _macadi_missing ", " _macadi_missing)
+        message(FATAL_ERROR
+                "Building the emulated Mac needs these on PATH, for Unicorn's configure script: "
+                "${_macadi_missing}. On Windows see the setup table in CONTRIBUTING.md, then "
+                "restart Android Studio and delete app/.cxx.")
+    endif()
+endif()
+
 FetchContent_Declare(
         unicorn
         URL https://github.com/unicorn-engine/unicorn/archive/refs/tags/2.1.4.tar.gz
         URL_HASH SHA256=ea8863f095a0136388694e5a6063afd9bb7650e30243dd6251af59c5ce5601f4)
 FetchContent_MakeAvailable(unicorn)
+
+# Unicorn writes it to the top-level binary directory, not its own.
+if(NOT MSVC AND NOT EXISTS ${CMAKE_BINARY_DIR}/config-host.h)
+    message(FATAL_ERROR
+            "Unicorn's configure step did not produce ${CMAKE_BINARY_DIR}/config-host.h, so the "
+            "build would fail later on a missing header. Its output above says why. Delete app/.cxx "
+            "after fixing it: CMake caches the failed configure.")
+endif()
 
 add_library(macadi_core STATIC
         ${CMAKE_CURRENT_LIST_DIR}/macho.cpp
