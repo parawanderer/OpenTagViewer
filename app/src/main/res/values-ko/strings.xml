@@ -420,6 +420,12 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="anisette_local_needs_coreadi">이 휴대폰에서 Apple로부터 필요한 파일(macOS CoreADI)을 다운로드하지 못했습니다. iTunes 12.8.3 디스크 이미지를 컴퓨터나 브라우저로 다운로드해 이 휴대폰에 넣은 뒤 여기서 선택하세요.</string>
     <string name="anisette_coreadi_copy_link">다운로드 링크 복사</string>
     <string name="finding_tags_banner">태그를 찾는 중… %1$d개 남음. 앱을 열어 두세요.</string>
+    <string name="import_choice_exporter">OpenTagViewer 내보내기 도구의 태그</string>
+    <string name="import_choice_openhaystack">OpenHaystack 키</string>
+    <string name="import_choice_google">Google Find Hub (실험적)</string>
+    <string name="import_choice_exporter_subtitle">OpenTagViewer 내보내기 도구로 만든 .zip 파일</string>
+    <string name="import_choice_openhaystack_subtitle">OpenHaystack의 .keys 파일</string>
+    <string name="import_choice_google_subtitle">Google 계정의 트래커</string>
     <string name="icloud_link_title">Apple iCloud 연결</string>
     <string name="icloud_link_subtitle_linked">연결됨. 탭하여 새 태그를 확인하거나 연결을 해제하세요.</string>
     <string name="icloud_link_subtitle_unlinked">연결되지 않음. 탭하여 Apple 계정에서 태그를 가져오세요.</string>

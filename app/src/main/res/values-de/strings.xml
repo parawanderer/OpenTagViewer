@@ -420,6 +420,12 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="anisette_local_needs_coreadi">Dieses Telefon konnte eine benötigte Datei nicht von Apple herunterladen (macOS CoreADI). Lade das iTunes-12.8.3-Image am Computer oder im Browser herunter, lege es auf dieses Telefon und wähle es hier aus.</string>
     <string name="anisette_coreadi_copy_link">Download-Link kopieren</string>
     <string name="finding_tags_banner">Deine Tags werden gesucht… noch %1$d. Lass die App geöffnet.</string>
+    <string name="import_choice_exporter">Tags aus dem OpenTagViewer-Exporter</string>
+    <string name="import_choice_openhaystack">OpenHaystack-Schlüssel</string>
+    <string name="import_choice_google">Google Find Hub (experimentell)</string>
+    <string name="import_choice_exporter_subtitle">Die .zip-Datei des OpenTagViewer-Exporters</string>
+    <string name="import_choice_openhaystack_subtitle">Eine .keys-Datei aus OpenHaystack</string>
+    <string name="import_choice_google_subtitle">Tracker in deinem Google-Konto</string>
     <string name="icloud_link_title">Apple-iCloud-Verknüpfung</string>
     <string name="icloud_link_subtitle_linked">Verknüpft. Tippe, um nach neuen Tags zu suchen oder die Verknüpfung aufzuheben.</string>
     <string name="icloud_link_subtitle_unlinked">Nicht verknüpft. Tippe, um deine Tags aus deinem Apple-Konto zu holen.</string>

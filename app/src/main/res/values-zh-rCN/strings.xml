@@ -420,6 +420,12 @@
     <string name="anisette_local_needs_coreadi">此手机无法从 Apple 下载所需的文件（macOS CoreADI）。请在电脑或浏览器中下载 iTunes 12.8.3 磁盘映像，放到此手机上并在此处选择。</string>
     <string name="anisette_coreadi_copy_link">复制下载链接</string>
     <string name="finding_tags_banner">正在查找你的标签… 还剩 %1$d 个。请保持应用打开。</string>
+    <string name="import_choice_exporter">OpenTagViewer 导出工具的标签</string>
+    <string name="import_choice_openhaystack">OpenHaystack 密钥</string>
+    <string name="import_choice_google">Google Find Hub（实验性）</string>
+    <string name="import_choice_exporter_subtitle">由 OpenTagViewer 导出工具生成的 .zip 文件</string>
+    <string name="import_choice_openhaystack_subtitle">来自 OpenHaystack 的 .keys 文件</string>
+    <string name="import_choice_google_subtitle">你的 Google 账号中的追踪器</string>
     <string name="icloud_link_title">Apple iCloud 关联</string>
     <string name="icloud_link_subtitle_linked">已关联。点按以检查新标签或取消关联。</string>
     <string name="icloud_link_subtitle_unlinked">未关联。点按以从你的 Apple 账号获取标签。</string>

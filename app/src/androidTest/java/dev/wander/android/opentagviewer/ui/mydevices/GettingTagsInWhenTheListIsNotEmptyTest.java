@@ -9,6 +9,7 @@ import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -173,10 +174,29 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
 
         Eventually.check(() -> onView(withText(R.string.icloud_link_account_action))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
-        onView(withText(R.string.icloud_import_from_file))
+        onView(withText(R.string.do_import))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed()));
         onView(withText(R.string.import_history))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed()));
+    }
+
+    /** The same chooser as the map's: one Import entry, three kinds, and no separate items. */
+    @Test
+    public void importOpensTheSameChooserAsTheMap() {
+        this.openTheListWithATagInIt();
+
+        onView(withId(R.id.page_menu_button)).perform(click());
+        Eventually.check(() -> onView(withText(R.string.do_import))
+                .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
+        onView(withText(R.string.add_openhaystack_key)).check(doesNotExist());
+        onView(withText(R.string.do_import)).inRoot(isPlatformPopup()).perform(click());
+
+        Eventually.check(() -> onView(withText(R.string.import_choice_exporter))
+                .inRoot(isDialog()).check(matches(isDisplayed())));
+        onView(withText(R.string.import_choice_openhaystack)).inRoot(isDialog())
+                .check(matches(isDisplayed()));
+        onView(withText(R.string.import_choice_google)).inRoot(isDialog())
+                .check(matches(isDisplayed()));
     }
 
     @Test
@@ -212,7 +232,7 @@ public class GettingTagsInWhenTheListIsNotEmptyTest {
                 .check(matches(isDisplayed())));
         onView(withId(R.id.page_menu_button)).perform(click());
 
-        Eventually.check(() -> onView(withText(R.string.icloud_import_from_file))
+        Eventually.check(() -> onView(withText(R.string.do_import))
                 .inRoot(isPlatformPopup()).check(matches(isDisplayed())));
         onView(withText(R.string.icloud_link_account_action)).check(doesNotExist());
     }

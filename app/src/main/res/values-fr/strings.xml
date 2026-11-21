@@ -420,6 +420,12 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="anisette_local_needs_coreadi">Ce téléphone n\'a pas pu télécharger un fichier nécessaire depuis Apple (macOS CoreADI). Téléchargez l\'image disque d\'iTunes 12.8.3 sur un ordinateur ou dans votre navigateur, placez-la sur ce téléphone et choisissez-la ici.</string>
     <string name="anisette_coreadi_copy_link">Copier le lien de téléchargement</string>
     <string name="finding_tags_banner">Recherche de vos balises… encore %1$d. Laissez l\'application ouverte.</string>
+    <string name="import_choice_exporter">Balises de l\'exportateur OpenTagViewer</string>
+    <string name="import_choice_openhaystack">Clé OpenHaystack</string>
+    <string name="import_choice_google">Google Find Hub (expérimental)</string>
+    <string name="import_choice_exporter_subtitle">Le fichier .zip créé par l\'exportateur OpenTagViewer</string>
+    <string name="import_choice_openhaystack_subtitle">Un fichier .keys d\'OpenHaystack</string>
+    <string name="import_choice_google_subtitle">Les traceurs de votre compte Google</string>
     <string name="icloud_link_title">Lien Apple iCloud</string>
     <string name="icloud_link_subtitle_linked">Associé. Touchez pour chercher de nouvelles balises ou dissocier.</string>
     <string name="icloud_link_subtitle_unlinked">Non associé. Touchez pour récupérer vos balises depuis votre compte Apple.</string>

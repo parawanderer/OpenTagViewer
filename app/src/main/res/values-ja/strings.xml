@@ -420,6 +420,12 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="anisette_local_needs_coreadi">この端末は Apple から必要なファイル（macOS CoreADI）をダウンロードできませんでした。iTunes 12.8.3 のディスクイメージをパソコンまたはブラウザでダウンロードし、この端末に置いてここで選択してください。</string>
     <string name="anisette_coreadi_copy_link">ダウンロードリンクをコピー</string>
     <string name="finding_tags_banner">タグを探しています… 残り %1$d 個。アプリを開いたままにしてください。</string>
+    <string name="import_choice_exporter">OpenTagViewer エクスポーターのタグ</string>
+    <string name="import_choice_openhaystack">OpenHaystack キー</string>
+    <string name="import_choice_google">Google Find Hub（試験運用）</string>
+    <string name="import_choice_exporter_subtitle">OpenTagViewer エクスポーターで作成した .zip</string>
+    <string name="import_choice_openhaystack_subtitle">OpenHaystack の .keys ファイル</string>
+    <string name="import_choice_google_subtitle">Google アカウントのトラッカー</string>
     <string name="icloud_link_title">Apple iCloud 連携</string>
     <string name="icloud_link_subtitle_linked">連携済み。タップして新しいタグを確認するか、連携を解除します。</string>
     <string name="icloud_link_subtitle_unlinked">未連携。タップして Apple アカウントからタグを取得します。</string>

@@ -48,6 +48,7 @@ import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
 import dev.wander.android.opentagviewer.db.repo.BeaconRepository;
 import dev.wander.android.opentagviewer.ui.importing.ExternalDeviceImporter;
+import dev.wander.android.opentagviewer.ui.importing.ImportChooser;
 import dev.wander.android.opentagviewer.ui.login.SignInAgain;
 import dev.wander.android.opentagviewer.python.icloud.ICloudFailures;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
@@ -657,16 +658,24 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 this.refreshFromTheAccount();
                 return true;
             }
-            if (id == R.id.action_import_from_file) {
-                this.handleStartImport();
-                return true;
-            }
-            if (id == R.id.action_add_openhaystack) {
-                this.openKeysFileLauncher.launch(new String[]{"*/*"});
-                return true;
-            }
-            if (id == R.id.action_add_google) {
-                this.externalImporter.importFromGoogle();
+            if (id == R.id.action_import) {
+                ImportChooser.show(this, new ImportChooser.Choices() {
+                    @Override
+                    public void exporterZip() {
+                        MyDevicesListActivity.this.handleStartImport();
+                    }
+
+                    @Override
+                    public void openHaystackKeys() {
+                        MyDevicesListActivity.this.openKeysFileLauncher
+                                .launch(new String[]{"*/*"});
+                    }
+
+                    @Override
+                    public void googleFindHub() {
+                        MyDevicesListActivity.this.externalImporter.importFromGoogle();
+                    }
+                });
                 return true;
             }
             if (id == R.id.action_import_history) {
