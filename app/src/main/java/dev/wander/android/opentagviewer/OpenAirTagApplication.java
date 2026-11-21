@@ -18,6 +18,8 @@ import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.service.NearbyScanService;
+import dev.wander.android.opentagviewer.util.rx.UndeliverableErrors;
+import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import java.io.FileInputStream;
@@ -40,6 +42,9 @@ public class OpenAirTagApplication extends Application {
         if (isTheAppleLibraryProbe() || isTheEmulatedMac()) {
             return;
         }
+
+        // A fetch that fails after its screen was rebuilt must not take the app down with it.
+        RxJavaPlugins.setErrorHandler(UndeliverableErrors.handler());
 
         // What PyApplication did, which this used to extend. Done by hand so the line above can
         // come first.

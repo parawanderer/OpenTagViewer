@@ -117,6 +117,28 @@ public class PythonAppleService {
         return this.account;
     }
 
+    /**
+     * The account to fetch with, read once the caller holds {@link PythonLock}.
+     *
+     * <p><b>Not necessarily this service's own.</b> A theme or language change rebuilds
+     * {@code MapsActivity}, which restores a fresh account and closes this one in {@link #setup},
+     * under the lock. A fetch queued on the lock behind that swap then ran against the closed
+     * account and failed. The fetch is still worth making, so it goes to whichever account is
+     * signed in now. Null after a sign-out.
+     */
+    private PythonAppleAccount accountToFetchWith() {
+        final PythonAppleService now = INSTANCE;
+        if (now == this) {
+            return this.account;
+        }
+        if (now == null) {
+            Log.i(TAG, "Signed out while this fetch was waiting; skipping it");
+            return null;
+        }
+        Log.i(TAG, "The account was replaced while this fetch was waiting; using the new one");
+        return now.account;
+    }
+
     public Observable<FetchResult> getLastReports(final List<AccessoryRequest> requests, final int hoursToGoBack) {
         return Observable.fromCallable(() -> {
             if (requests.isEmpty()) {
@@ -124,12 +146,17 @@ public class PythonAppleService {
             }
 
             return PythonLock.holding(() -> {
+                final PythonAppleAccount fetchWith = this.accountToFetchWith();
+                if (fetchWith == null) {
+                    return emptyResult();
+                }
+
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
                 var returned = module.callAttr(
                         "getLastReports",
-                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("account", fetchWith.getAccountObj()),
                         new Kwarg("idToAccessoryData", requests),
                         new Kwarg("hoursBack", hoursToGoBack)
                 );
@@ -151,12 +178,17 @@ public class PythonAppleService {
             }
 
             return PythonLock.holding(() -> {
+                final PythonAppleAccount fetchWith = this.accountToFetchWith();
+                if (fetchWith == null) {
+                    return emptyResult();
+                }
+
                 var py = Python.getInstance();
                 var module = py.getModule(MODULE_MAIN);
 
                 var returned = module.callAttr(
                         "getReports",
-                        new Kwarg("account", this.account.getAccountObj()),
+                        new Kwarg("account", fetchWith.getAccountObj()),
                         new Kwarg("idToAccessoryData", requests),
                         new Kwarg("unixStartMs", startTimeUnixMS),
                         new Kwarg("unixEndMs", endTimeUnixMS)
