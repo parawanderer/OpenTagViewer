@@ -206,11 +206,33 @@ class LocalAnisetteProvider(BaseAnisetteProvider):
 
     @property
     def otp(self) -> str:
-        return str(self._bridge.otp())
+        return self._said("one-time password", str(self._bridge.otp()))
 
     @property
     def machine(self) -> str:
-        return str(self._bridge.machine())
+        return self._said("machine id", str(self._bridge.machine()))
+
+    def _said(self, what: str, value: str) -> str:
+        """Pass the value on, saying why when Java had none.
+
+        Empty is still what goes to Apple - the contract is not to throw into a login - but
+        Apple's answer to it is only `ec -80009`, which names no cause. The reason is in Java.
+        """
+        if not value:
+            print(f"Local Anisette produced no {what}: {self._bridge.unavailableReason()}")
+        return value
+
+    @property
+    def router(self) -> str:
+        """`X-Apple-I-MD-RINFO`, from Java rather than FindMy.py's Android constant.
+
+        The emulated Mac is provisioned under a routing number Apple assigns, and has to present
+        that one. A bridge without the method - an older fake in a test - keeps the library's.
+        """
+        router = getattr(self._bridge, "router", None)
+        if router is None:
+            return super().router
+        return str(router())
 
     def to_json(self, dst=None, /):
         """Deliberately the remote mapping - see the class docstring.
@@ -318,7 +340,6 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
             timeout=LOGIN_TIMEOUT_SECONDS,
             **app_identity.deviceIdsForNewSession(localAnisette),
         )
-
         state = acc.login(email, password)
 
         # Which Anisette established this session decides whether continuing it against the
@@ -836,6 +857,7 @@ def getAccount(
             return None
 
         data = json.loads(serializedAccountData)
+        app_identity.respellRefusedOsName(data)
 
         acc = AppleAccount.from_json(data)
         _preferLocalAnisette(acc, localAnisette)

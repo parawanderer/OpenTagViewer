@@ -40,6 +40,7 @@ import plistlib
 import sys
 import time
 import traceback
+import uuid
 from typing import Any
 
 import identity as app_identity
@@ -423,7 +424,7 @@ class ICloudSession:
 
         try:
             client = self._awaiting(
-                lambda: icloud.open_client(self._async, self._identity),
+                lambda: icloud.open_client(_forCloudKit(self._async), self._identity),
                 "opening the Find My client")
             self._awaiting(client.__aenter__, "starting the keychain session")
             self._client = client
@@ -888,6 +889,51 @@ def _plist(mapping: Any) -> str | None:
         return None
 
     return plistlib.dumps(dict(mapping), fmt=plistlib.FMT_XML).decode("utf-8")
+
+
+class _CloudKitDeviceView:
+    """
+    The account, except that `device_uuid` is a UUID - for the keychain and CloudKit clients only.
+
+    FindMy.py's CloudKit client does `uuid.UUID(account.device_uuid)` for the device identifier it
+    sends. An emulated Mac's device id is a Mac provisioning UDID, `00006000-` and sixteen hex,
+    which is not a UUID, so opening the client failed with "badly formed hexadecimal UUID string"
+    before anything was sent. CloudKit's identifier is a different field from `X-Mme-Device-Id`,
+    so this answers it with another stable value and forwards everything else to the real
+    account - Grand Slam, tokens and PET renewals keep the real device id. After
+    sacca97/os-findmy-e `tag_keys.CloudKitIdentity`, which read tags this way.
+    """
+
+    def __init__(self, account: Any, deviceUuid: str) -> None:
+        self._account = account
+        self._deviceUuid = deviceUuid
+
+    @property
+    def device_uuid(self) -> str:
+        return self._deviceUuid
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._account, name)
+
+
+def _forCloudKit(asyncAccount: Any) -> Any:
+    """`asyncAccount`, or a view of it whose device id CloudKit can parse."""
+    deviceId = getattr(asyncAccount, "device_uuid", None)
+    if not isinstance(deviceId, str):
+        return asyncAccount
+    try:
+        uuid.UUID(deviceId)
+        return asyncAccount
+    except ValueError:
+        pass
+
+    # Derived from the device id, which travels with the session. It used to be the emulated
+    # Mac's host UUID when Java was reachable and this otherwise, so one session told CloudKit two
+    # different devices depending on whether it was restored onto the Mac or a remote server - and
+    # on the second the Mac's store, and its host UUID with it, may no longer exist.
+    stable = str(uuid.uuid5(uuid.NAMESPACE_URL, f"opentagviewer:device:{deviceId}")).upper()
+    print(f"The device id is not a UUID; CloudKit is told {stable} instead")
+    return _CloudKitDeviceView(asyncAccount, stable)
 
 
 def openSession(account: Any) -> ICloudSession | None:

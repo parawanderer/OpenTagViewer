@@ -333,7 +333,6 @@
     <string name="battery_short_low">偏低</string>
     <string name="battery_short_very_low">極低</string>
     <string name="battery">電量</string>
-    <string name="nearby_now_with_battery_and_signal">在附近（%2$s）· 電量%1$s</string>
     <string name="heard_over_bluetooth">透過藍牙</string>
     <string name="last_seen">最後收到</string>
     <string name="signal">訊號強度</string>
@@ -423,6 +422,7 @@
     <string name="ring_failed_reason">響鈴失敗：%1$s</string>
     <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
     <string name="google_find_hub_setup_guide">如何設定</string>
+    <string name="battery_icon_description">電量%1$s</string>
     <string name="nearby_devices_title">附近的裝置</string>
     <string name="nearby_devices_menu_open">掃描附近的裝置</string>
     <string name="nearby_devices_empty">附近沒有「尋找」裝置。AirTag 和其他 Apple「尋找」裝置會在此畫面開啟期間顯示在這裡。</string>

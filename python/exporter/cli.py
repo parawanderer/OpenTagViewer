@@ -207,13 +207,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--anisette-url",
         help=(
             "Use a remote Anisette server instead of running it locally. Local is the default and"
-            " keeps the sign-in between this machine and Apple."
+            " keeps the sign-in between this machine and Apple: an emulated Mac, running Apple's"
+            " own macOS CoreADI, which is fetched from Apple on first use."
         ),
     )
     parser.add_argument(
         "--anisette-libs",
         type=Path,
-        help="Where to cache Apple's ADI libraries, so a later run does not download them again.",
+        help=(
+            "Sign in as the Android ADI machine instead of the emulated Mac, caching its libraries"
+            " here. Apple has served that machine differently since October 2026 (#248), so this"
+            " is for comparison, not for use."
+        ),
     )
     parser.add_argument(
         "-v",
