@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Отсутствует ключ API Google Карт</string>
     <string name="maps_api_key_missing_message">В этой сборке нет ключа API Google Карт, поэтому карта не загрузится. Добавьте MAPS_API_KEY в secrets.properties и пересоберите приложение или выберите другого поставщика карт в настройках.</string>
-    <string name="resolving_tags_banner">Первое определение местоположения ваших меток. Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
-    <string name="resolving_tags_banner_progress">Определение местоположения меток (%1$d из %2$d). Они появляются по мере обнаружения, недавно замеченные — первыми. Не закрывайте приложение.</string>
     <string name="anisette_mode_title">Данные для входа</string>
     <string name="anisette_mode_local">На этом устройстве</string>
     <string name="anisette_mode_remote">Удалённый сервер</string>
@@ -422,4 +420,5 @@
     <string name="server_url_not_https">Не https: токен API будет передан без шифрования.</string>
     <string name="google_find_hub_setup_guide">Как это настроить</string>
     <string name="battery_icon_description">Батарея %1$s</string>
+    <string name="finding_tags_banner">Ищем ваши метки… осталось %1$d. Не закрывайте приложение.</string>
 </resources>

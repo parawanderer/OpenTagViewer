@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API key missing</string>
     <string name="maps_api_key_missing_message">This build has no Google Maps API key, so the map will not load. Add MAPS_API_KEY to secrets.properties and rebuild, or pick a different map provider in Settings.</string>
-    <string name="resolving_tags_banner">Locating your tags for the first time. They appear as they are found, most recently seen first — please keep the app open.</string>
-    <string name="resolving_tags_banner_progress">Locating your tags (%1$d of %2$d). They appear as they are found, most recently seen first — please keep the app open.</string>
     <string name="anisette_mode_title">Sign-in data</string>
     <string name="anisette_mode_local">On this device</string>
     <string name="anisette_mode_remote">Remote server</string>
@@ -422,4 +420,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="server_url_not_https">Not https: the API token will be sent unencrypted.</string>
     <string name="google_find_hub_setup_guide">How to set this up</string>
     <string name="battery_icon_description">Battery %1$s</string>
+    <string name="finding_tags_banner">Finding your tags… %1$d left. Keep the app open.</string>
 </resources>

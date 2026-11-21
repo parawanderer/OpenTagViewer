@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google マップ API キーがありません</string>
     <string name="maps_api_key_missing_message">このビルドには Google マップ API キーがないため、地図を読み込めません。secrets.properties に MAPS_API_KEY を追加してビルドし直すか、設定で別の地図プロバイダを選択してください。</string>
-    <string name="resolving_tags_banner">タグの位置を初めて特定しています。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
-    <string name="resolving_tags_banner_progress">タグの位置を特定しています（%2$d 件中 %1$d 件）。見つかったものから順に、最近確認されたものから表示されます。アプリを開いたままにしてください。</string>
     <string name="anisette_mode_title">サインインデータ</string>
     <string name="anisette_mode_local">この端末で生成</string>
     <string name="anisette_mode_remote">リモートサーバー</string>
@@ -422,4 +420,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="server_url_not_https">https ではありません。API トークンは暗号化されずに送信されます。</string>
     <string name="google_find_hub_setup_guide">設定方法</string>
     <string name="battery_icon_description">電池 %1$s</string>
+    <string name="finding_tags_banner">タグを探しています… 残り %1$d 個。アプリを開いたままにしてください。</string>
 </resources>

@@ -394,7 +394,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final long SHOW_LONG_FETCH_BANNER_AFTER_MS = 6000L;
 
     private final Handler longFetchBannerHandler = new Handler(Looper.getMainLooper());
-    private final Runnable showLongFetchBanner = () -> this.setLongFetchBannerVisible(true);
+    private final Runnable showLongFetchBanner = () -> {
+        this.bannerState.becameDue();
+        this.updateLongFetchBanner();
+    };
 
     /** All three are only ever touched on the main looper, so they need no synchronisation. */
     /** Banner bookkeeping. Touched only from the banner handler. See LongFetchBannerStateTest. */
@@ -867,6 +870,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      */
     private void onTagHeardNearby(final NearbyTagSighting sighting) {
         this.nearbySightings.record(sighting);
+        // A tag heard nearby has something to show, so it no longer counts as missing.
+        if (this.bannerState.isFetching()) {
+            this.updateLongFetchBanner();
+        }
 
         final FrameLayout card = this.dynamicCardsForTag.get(sighting.getBeaconId());
         if (card != null) {
@@ -3071,6 +3078,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * while the question is being answered.
      */
     private void armLongFetchBannerIfSlow(final List<AccessoryRequest> requests) {
+        // Which tags this batch is fetching, so the banner can count only those with nothing on
+        // screen. Recorded whether or not the batch turns out slow: an overlapping slow one
+        // shows the banner, and these must be counted in it too.
+        final List<String> beaconIds = new ArrayList<>();
+        for (final AccessoryRequest request : requests) {
+            beaconIds.add(request.getBeaconId());
+        }
+        this.longFetchBannerHandler.post(() -> this.bannerState.lookingFor(beaconIds));
+
         var async = this.beaconRepo.aFetchOfTheseWouldBeSlow(requests)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -3103,41 +3119,40 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 return;
             }
             this.longFetchBannerHandler.removeCallbacks(this.showLongFetchBanner);
-            this.setLongFetchBannerVisible(false);
+            this.updateLongFetchBanner();
         });
     }
 
-    /** Records how far through the batch we are, so the banner can say so. */
+    /** One accessory finished: one fewer may be missing. The position itself is not shown. */
     private void setLongFetchProgress(int done, int total) {
-        this.longFetchBannerHandler.post(() -> {
-            this.bannerState.setProgress(done, total);
-
-            TextView banner = this.findViewById(R.id.long_fetch_banner);
-            if (banner != null && banner.getVisibility() == VISIBLE) {
-                banner.setText(this.longFetchBannerText());
-            }
-        });
+        this.longFetchBannerHandler.post(this::updateLongFetchBanner);
     }
 
-    private String longFetchBannerText() {
-        if (!this.bannerState.hasCount()) {
-            return this.getString(R.string.resolving_tags_banner);
-        }
-        return this.getString(
-                R.string.resolving_tags_banner_progress,
-                this.bannerState.displayedPosition(),
-                this.bannerState.total());
+    /**
+     * Whether a tag already has something on screen: a position from a report, or a Bluetooth
+     * sighting fresh enough to show as Nearby. Either way the wait gains it nothing.
+     */
+    private boolean hasSomethingToShow(final String beaconId) {
+        return this.currentMarkers.containsKey(beaconId)
+                || this.nearbySightings.freshFor(beaconId, System.currentTimeMillis()) != null;
     }
 
-    private void setLongFetchBannerVisible(boolean visible) {
-        TextView banner = this.findViewById(R.id.long_fetch_banner);
+    /**
+     * Show, update or hide the banner from the current state. Called whenever the answer can
+     * change: the delay passing, a tag fetched, a tag heard, the batch ending.
+     */
+    private void updateLongFetchBanner() {
+        final View banner = this.findViewById(R.id.long_fetch_banner);
         if (banner == null) {
             return;
         }
-        if (visible) {
-            banner.setText(this.longFetchBannerText());
+        final boolean show = this.bannerState.shouldShow(this::hasSomethingToShow);
+        if (show) {
+            final TextView text = this.findViewById(R.id.long_fetch_banner_text);
+            text.setText(this.getString(R.string.finding_tags_banner,
+                    this.bannerState.stillMissing(this::hasSomethingToShow)));
         }
-        banner.setVisibility(visible ? VISIBLE : GONE);
+        banner.setVisibility(show ? VISIBLE : GONE);
     }
 
     private boolean isAppleServiceInitialised() {

@@ -111,8 +111,6 @@
     <string name="map_provider_osm">OpenStreetMap</string>
     <string name="maps_api_key_missing_title">Clé API Google Maps manquante</string>
     <string name="maps_api_key_missing_message">Cette version ne contient pas de clé API Google Maps, la carte ne se chargera donc pas. Ajoutez MAPS_API_KEY à secrets.properties et recompilez, ou choisissez un autre fournisseur de cartes dans les paramètres.</string>
-    <string name="resolving_tags_banner">Localisation de vos balises pour la première fois. Elles apparaissent au fur et à mesure, les plus récemment vues d’abord : veuillez laisser l’application ouverte.</string>
-    <string name="resolving_tags_banner_progress">Localisation de vos balises (%1$d sur %2$d). Elles apparaissent au fur et à mesure, les plus récemment vues d’abord : veuillez laisser l’application ouverte.</string>
     <string name="anisette_mode_title">Données de connexion</string>
     <string name="anisette_mode_local">Sur cet appareil</string>
     <string name="anisette_mode_remote">Serveur distant</string>
@@ -422,4 +420,5 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="server_url_not_https">Pas en https : le jeton d\'API sera envoyé sans chiffrement.</string>
     <string name="google_find_hub_setup_guide">Comment le configurer</string>
     <string name="battery_icon_description">Batterie %1$s</string>
+    <string name="finding_tags_banner">Recherche de vos balises… encore %1$d. Laissez l\'application ouverte.</string>
 </resources>

@@ -110,8 +110,6 @@
     <string name="map_provider_amap">AMap (高德地图)</string>
     <string name="maps_api_key_missing_title">Google Maps API-Schlüssel fehlt</string>
     <string name="maps_api_key_missing_message">Dieser Build enthält keinen Google Maps API-Schlüssel, daher wird die Karte nicht geladen. Fügen Sie MAPS_API_KEY zu secrets.properties hinzu und erstellen Sie den Build neu, oder wählen Sie in den Einstellungen einen anderen Kartenanbieter.</string>
-    <string name="resolving_tags_banner">Ihre Tags werden zum ersten Mal geortet. Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
-    <string name="resolving_tags_banner_progress">Tags werden geortet (%1$d von %2$d). Sie erscheinen nach und nach, zuletzt gesehene zuerst – bitte lassen Sie die App geöffnet.</string>
     <string name="anisette_mode_title">Anmeldedaten</string>
     <string name="anisette_mode_local">Auf diesem Gerät</string>
     <string name="anisette_mode_remote">Externer Server</string>
@@ -422,4 +420,5 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="server_url_not_https">Kein https: Das API-Token wird unverschlüsselt gesendet.</string>
     <string name="google_find_hub_setup_guide">So richtest du das ein</string>
     <string name="battery_icon_description">Akku %1$s</string>
+    <string name="finding_tags_banner">Deine Tags werden gesucht… noch %1$d. Lass die App geöffnet.</string>
 </resources>

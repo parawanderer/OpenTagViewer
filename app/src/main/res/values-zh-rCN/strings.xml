@@ -110,8 +110,6 @@
     <string name="how_do_i_get_the_zip"><u>如何获取 zip 文件？</u></string>
     <string name="maps_api_key_missing_title">缺少 Google 地图 API Key</string>
     <string name="maps_api_key_missing_message">此版本未包含 Google 地图 API Key，因此无法加载地图。请在 secrets.properties 中添加 MAPS_API_KEY 后重新构建，或在设置中选择其他地图提供商。</string>
-    <string name="resolving_tags_banner">正在首次定位你的标签。找到一个显示一个，最近出现过的优先，请保持应用开启。</string>
-    <string name="resolving_tags_banner_progress">正在定位你的标签（第 %1$d 个，共 %2$d 个）。找到一个显示一个，最近出现过的优先，请保持应用开启。</string>
     <string name="anisette_mode_title">登录数据</string>
     <string name="anisette_mode_local">在本设备生成</string>
     <string name="anisette_mode_remote">远程服务器</string>
@@ -422,4 +420,5 @@
     <string name="server_url_not_https">不是 https：API 令牌将以未加密方式发送。</string>
     <string name="google_find_hub_setup_guide">如何设置</string>
     <string name="battery_icon_description">电量%1$s</string>
+    <string name="finding_tags_banner">正在查找你的标签… 还剩 %1$d 个。请保持应用打开。</string>
 </resources>

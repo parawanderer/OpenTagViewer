@@ -110,8 +110,6 @@
     <string name="how_do_i_get_the_zip"><u>如何取得 zip 檔案？</u></string>
     <string name="maps_api_key_missing_title">缺少 Google 地圖 API Key</string>
     <string name="maps_api_key_missing_message">此版本未包含 Google 地圖 API Key，因此無法載入地圖。請在 secrets.properties 中新增 MAPS_API_KEY 後重新建置，或在設定中選擇其他地圖提供商。</string>
-    <string name="resolving_tags_banner">正在首次定位你的標籤。找到一個顯示一個，最近出現過的優先，請保持應用程式開啟。</string>
-    <string name="resolving_tags_banner_progress">正在定位你的標籤（第 %1$d 個，共 %2$d 個）。找到一個顯示一個，最近出現過的優先，請保持應用程式開啟。</string>
     <string name="anisette_mode_title">登入資料</string>
     <string name="anisette_mode_local">在本裝置產生</string>
     <string name="anisette_mode_remote">遠端伺服器</string>
@@ -422,4 +420,5 @@
     <string name="server_url_not_https">不是 https：API 權杖將以未加密方式傳送。</string>
     <string name="google_find_hub_setup_guide">如何設定</string>
     <string name="battery_icon_description">電量%1$s</string>
+    <string name="finding_tags_banner">正在尋找你的標籤… 還剩 %1$d 個。請保持應用程式開啟。</string>
 </resources>
