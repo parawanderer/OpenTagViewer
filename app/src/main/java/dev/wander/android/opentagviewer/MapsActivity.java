@@ -1489,7 +1489,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         // Self-handling and asynchronous: it asks Apple whether this session actually wants a
         // code, and does nothing if it does not. Harmless to call alongside the dialog.
-        this.askForACodeIfTheSessionNeedsOne();
+        this.askForACodeAfterAFailedFetch();
 
         ImportedButNotLocatedDialog.show(
                 this, describe(error), this::showSettingsPage);
@@ -1996,7 +1996,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 // factor rather than discarding it (see main.py, and issue #43), so a restore
                 // can land here already unusable. Asked on the main thread because it puts a
                 // view up; harmless when the session is fine, which is almost always.
-                this.runOnUiThread(this::askForACodeIfTheSessionNeedsOne);
+                this.runOnUiThread(
+                        () -> this.askForACodeIfTheSessionNeedsOne(SessionCheck.AFTER_RESTORE));
 
                 return this.appleService;
             });
@@ -2077,7 +2078,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             // and completely wrong about one: once Apple moves the session to REQUIRE_2FA every
             // fetch fails its state check before a request leaves the phone, and no amount of
             // retrying fixes it. That was permanent and silent - stale pins, nothing on screen.
-            this.askForACodeIfTheSessionNeedsOne();
+            this.askForACodeAfterAFailedFetch();
             //Toast.makeText(this.getApplicationContext(), "Error while trying to fetch data for beacons", LENGTH_SHORT).show();
             // this error just happens every now and then. It's no big deal, we will retry automatically eventually...
         });
@@ -2144,7 +2145,22 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * <p>Does nothing if the overlay is already up, so a periodic refresh ticking behind it
      * cannot ask Apple for a second code while somebody is typing the first.
      */
-    private void askForACodeIfTheSessionNeedsOne() {
+    /** Why the session is being checked, for the log line that says it is healthy. */
+    private enum SessionCheck {
+        /**
+         * Every restore checks, because a restore can land on a session that already wants a
+         * code. Nothing failed; the log must not suggest a fetch did.
+         */
+        AFTER_RESTORE,
+        /** A fetch was refused, so whether the session is the reason is worth knowing. */
+        AFTER_FAILED_FETCH
+    }
+
+    private void askForACodeAfterAFailedFetch() {
+        this.askForACodeIfTheSessionNeedsOne(SessionCheck.AFTER_FAILED_FETCH);
+    }
+
+    private void askForACodeIfTheSessionNeedsOne(final SessionCheck why) {
         // **Once, however many accessories failed.** Every tag in the batch fails for the same
         // reason when a session goes stale, and each failure calls this - so without the latch a
         // six-tag account would ask Apple for six codes, or sign out six times over. The check
@@ -2174,8 +2190,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                         // flagging), and no re-login fixes that. Without the line, this
                         // outcome and a check suppressed by the latch above produce the same
                         // empty log.
-                        Log.i(TAG, "The session answers as healthy after a failed fetch, so the"
-                                + " refusal is specific to fetching rather than a dead session");
+                        //
+                        // Said per reason: after a restore nothing failed, and the fetch wording
+                        // made every launch's log read as a fetch problem.
+                        if (why == SessionCheck.AFTER_RESTORE) {
+                            Log.i(TAG, "The restored session answers as healthy; no code needed");
+                        } else {
+                            Log.i(TAG, "The session answers as healthy after a failed fetch, so"
+                                    + " the refusal is specific to fetching rather than a dead"
+                                    + " session");
+                        }
                         return;
                     }
 
@@ -3001,7 +3025,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     // every accessory in turn and the stream completes as though it merely found
                     // nothing. Carrying on is right for one tag that would not answer; it is not
                     // right when the reason is the same for all of them and no retry will fix it.
-                    this.runOnUiThread(this::askForACodeIfTheSessionNeedsOne);
+                    this.runOnUiThread(this::askForACodeAfterAFailedFetch);
                 }));
     }
 
