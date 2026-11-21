@@ -391,7 +391,6 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_crash_report_body">Apples aanmeldbibliotheek crasht op deze telefoon zodra ze geladen wordt. Op de meeste telefoons werkt ze, en we weten nog niet wat de getroffen toestellen gemeen hebben.\n\nOpenTagViewer gebruikt voor die stap nu een server, dus je kunt gewoon aanmelden en de app normaal gebruiken. Een melding met de gegevens hieronder helpt ons de oorzaak te vinden.</string>
     <string name="login_failed_refused_before_password">Apple weigerde het inloggen met deze Apple ID te starten voordat je wachtwoord werd gecontroleerd, dus opnieuw intypen helpt niet. Controleer of je kunt inloggen op account.apple.com en of Apple daar iets van je vraagt. Een externe server stelt zich bij Apple voor als een ander apparaat, dat is het proberen waard. Apple meldde: %1$s</string>
     <string name="extra_sources">Extra locatiebronnen (experimenteel)</string>
-    <string name="extra_sources_subtitle">Google Find Hub-trackers</string>
     <string name="extra_sources_explainer">Experimenteel. Vind de trackers in je Google-account via je eigen googlefind-service. Voeg ze toe als apparaat, of koppel ze aan een apparaat zodat de meldingen van beide netwerken op één markering staan.</string>
     <string name="google_find_hub_explainer">Meldingen van de trackers in je Google-account, via een googlefind-service. Nieuwe locaties worden alleen opgevraagd als je een tag vernieuwt.</string>
     <string name="server_url">Serveradres</string>
@@ -424,4 +423,9 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="anisette_local_needs_coreadi">Deze telefoon kon een benodigd bestand niet van Apple downloaden (macOS CoreADI). Download de iTunes 12.8.3-schijfkopie op een computer of in je browser, zet hem op deze telefoon en kies hem hier.</string>
     <string name="anisette_coreadi_copy_link">Downloadlink kopiëren</string>
     <string name="finding_tags_banner">Je tags worden gezocht… nog %1$d. Laat de app open.</string>
+    <string name="icloud_link_title">Apple iCloud-koppeling</string>
+    <string name="icloud_link_subtitle_linked">Gekoppeld. Tik om op nieuwe tags te controleren of te ontkoppelen.</string>
+    <string name="icloud_link_subtitle_unlinked">Niet gekoppeld. Tik om je tags uit je Apple-account op te halen.</string>
+    <string name="settings_google_find_hub">Google Find Hub (experimenteel)</string>
+    <string name="settings_google_find_hub_subtitle">Trackers in je Google-account</string>
 </resources>

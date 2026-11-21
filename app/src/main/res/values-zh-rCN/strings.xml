@@ -391,7 +391,6 @@
     <string name="anisette_crash_report_body">Apple 的登录库在这部手机上一加载就会崩溃。它在大多数手机上都能正常运行，我们还不知道受影响的手机有什么共同点。\n\nOpenTagViewer 现在改用服务器完成这一步，因此你可以正常登录和使用应用。附上下方信息的报告能帮助我们找到原因。</string>
     <string name="login_failed_refused_before_password">Apple 在检查你的密码之前就拒绝开始登录此 Apple ID，所以重新输入密码没有用。请确认你能否在 account.apple.com 登录，以及 Apple 是否在那里要求你做什么。远程服务器会以另一台设备的身份出现在 Apple 面前，值得一试。Apple 的回复：%1$s</string>
     <string name="extra_sources">其他位置来源（实验性）</string>
-    <string name="extra_sources_subtitle">Google Find Hub 追踪器</string>
     <string name="extra_sources_explainer">实验性功能。通过你自己的 googlefind 服务定位 Google 帐号中的追踪器。可将其添加为设备，或关联到某个设备，让两个网络的报告显示在同一个标记上。</string>
     <string name="google_find_hub_explainer">通过 googlefind 服务获取你 Google 帐号中追踪器的报告。仅在刷新标签时请求新位置。</string>
     <string name="server_url">服务器地址</string>
@@ -424,4 +423,9 @@
     <string name="anisette_local_needs_coreadi">此手机无法从 Apple 下载所需的文件（macOS CoreADI）。请在电脑或浏览器中下载 iTunes 12.8.3 磁盘映像，放到此手机上并在此处选择。</string>
     <string name="anisette_coreadi_copy_link">复制下载链接</string>
     <string name="finding_tags_banner">正在查找你的标签… 还剩 %1$d 个。请保持应用打开。</string>
+    <string name="icloud_link_title">Apple iCloud 关联</string>
+    <string name="icloud_link_subtitle_linked">已关联。点按以检查新标签或取消关联。</string>
+    <string name="icloud_link_subtitle_unlinked">未关联。点按以从你的 Apple 账号获取标签。</string>
+    <string name="settings_google_find_hub">Google Find Hub（实验性）</string>
+    <string name="settings_google_find_hub_subtitle">你的 Google 账号中的追踪器</string>
 </resources>

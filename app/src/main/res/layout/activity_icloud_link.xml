@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings -> Apple iCloud link, once the account is linked. Holds what used to be two loose
+    rows under the account card in Settings. Their ids are kept, so the tests and anything
+    looking them up follow them here. See ICloudLinkActivity.
+-->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <variable name="handleClickBack" type="Runnable" />
+        <variable name="onClickFetchFromAccount" type="Runnable" />
+        <variable name="onClickUnlinkAccount" type="Runnable" />
+        <variable name="fetchFromAccountSubtitle" type="String" />
+    </data>
+
+    <LinearLayout
+        android:id="@+id/icloud_link_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/icloud_link_toolbar"
+            layout="@layout/inline_top_toolbar"
+            app:onClickBack="@{handleClickBack}"
+            app:pageTitle="@{@string/icloud_link_title}" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="20dp">
+
+                <include
+                    android:id="@+id/settings_fetch_from_account"
+                    layout="@layout/settings_item_clickable"
+                    app:icon="@{@drawable/devices_24px}"
+                    app:onClick="@{onClickFetchFromAccount}"
+                    app:sectionSubtitle="@{fetchFromAccountSubtitle}"
+                    app:title="@{@string/icloud_fetch_my_tags}" />
+
+                <!-- Gone until the membership lookup says there is something to unlink. -->
+                <include
+                    android:id="@+id/settings_unlink_account"
+                    layout="@layout/settings_item_clickable"
+                    android:visibility="gone"
+                    app:icon="@{@drawable/link_off_24px}"
+                    app:onClick="@{onClickUnlinkAccount}"
+                    app:sectionSubtitle="@{@string/icloud_unlink_subtitle}"
+                    app:title="@{@string/icloud_unlink_title}" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</layout>

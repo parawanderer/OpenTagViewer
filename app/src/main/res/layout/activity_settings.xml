@@ -6,10 +6,9 @@
     <data>
         <import type="android.view.View" />
         <variable name="handleClickBack" type="Runnable" />
-        <variable name="onClickFetchFromAccount" type="Runnable" />
-        <variable name="onClickUnlinkAccount" type="Runnable" />
+        <variable name="onClickICloudLink" type="Runnable" />
         <variable name="onClickExtraSources" type="Runnable" />
-        <variable name="fetchFromAccountSubtitle" type="String" />
+        <variable name="iCloudLinkSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
         <variable name="onClickLanguage" type="Runnable" />
@@ -78,59 +77,54 @@
             android:orientation="vertical"
             android:paddingBottom="20dp">
 
+        <!--
+            The account card, then one row per account source. The 8dp side padding is the
+            card's alone: it used to be on this whole section, so the rows under the card sat
+            8dp to the right of every row below the divider.
+        -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingLeft="8dp"
-            android:paddingTop="20dp"
-            android:paddingRight="8dp">
+            android:paddingTop="20dp">
 
             <include
                 android:id="@+id/login_info_container"
-                layout="@layout/login_information_settings" />
+                layout="@layout/login_information_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp" />
 
             <!--
-                The third door to the same screen, and the one people go looking for.
-
-                The empty state's button vanishes once anything is imported, and the device
-                list's overflow menu is only obvious to somebody who already knows it is there -
-                so "how do I get my tags again" is a Settings question, and this is where they
-                come to ask it. Placed under the account card because that is what it acts on.
+                Apple iCloud link: "how do I get my tags again" is a Settings question, and this
+                is where people come to ask it. Not linked yet, it starts the link; linked, it
+                opens ICloudLinkActivity for fetching again and unlinking.
             -->
             <include
-                android:id="@+id/settings_fetch_from_account"
+                android:id="@+id/settings_icloud_link"
                 layout="@layout/settings_item_clickable"
                 app:icon="@{@drawable/devices_24px}"
-                app:onClick="@{onClickFetchFromAccount}"
-                app:sectionSubtitle="@{fetchFromAccountSubtitle}"
-                app:title="@{@string/icloud_fetch_my_tags}" />
+                app:onClick="@{onClickICloudLink}"
+                app:sectionSubtitle="@{iCloudLinkSubtitle}"
+                app:title="@{@string/icloud_link_title}" />
 
-            <!--
-                Only shown once there is something to unlink.
-
-                Gone by default rather than shown-and-disabled: this row does not apply at all
-                until the account has been linked, and a permanently greyed row in Settings
-                reads as a broken feature. Its visibility is set from SettingsActivity when the
-                membership lookup answers - see sayWhetherTheAccountIsLinked.
-            -->
-            <include
-                android:id="@+id/settings_unlink_account"
-                layout="@layout/settings_item_clickable"
-                android:visibility="gone"
-                app:icon="@{@drawable/link_off_24px}"
-                app:onClick="@{onClickUnlinkAccount}"
-                app:sectionSubtitle="@{@string/icloud_unlink_subtitle}"
-                app:title="@{@string/icloud_unlink_title}" />
-
-            <!-- Google Find Hub trackers, beside the Apple account -->
+            <!-- Google Find Hub, beside the Apple account: the extra location sources page -->
             <include
                 android:id="@+id/settings_extra_sources"
                 layout="@layout/settings_item_clickable"
                 app:icon="@{@drawable/host_24px}"
                 app:onClick="@{onClickExtraSources}"
-                app:sectionSubtitle="@{@string/extra_sources_subtitle}"
-                app:title="@{@string/extra_sources}" />
+                app:sectionSubtitle="@{@string/settings_google_find_hub_subtitle}"
+                app:title="@{@string/settings_google_find_hub}" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:id="@+id/settings_accounts_divider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp" />
 
         </LinearLayout>
 

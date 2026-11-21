@@ -391,7 +391,6 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="anisette_crash_report_body">La bibliothèque de connexion d\'Apple plante dès son chargement sur ce téléphone. Elle fonctionne sur la plupart des téléphones, et nous ne savons pas encore ce que les appareils concernés ont en commun.\n\nOpenTagViewer utilise désormais un serveur pour cette étape : vous pouvez vous connecter et utiliser l\'app normalement. Un rapport avec les informations ci-dessous nous aide à trouver la cause.</string>
     <string name="login_failed_refused_before_password">Apple a refusé de commencer la connexion à cet identifiant Apple avant même de vérifier votre mot de passe : le saisir à nouveau ne changera rien. Vérifiez que vous pouvez vous connecter sur account.apple.com et si Apple vous y demande quelque chose. Un serveur distant présente un autre appareil à Apple, cela vaut la peine d\'essayer. Apple a répondu : %1$s</string>
     <string name="extra_sources">Sources de localisation supplémentaires (expérimental)</string>
-    <string name="extra_sources_subtitle">Traceurs Google Find Hub</string>
     <string name="extra_sources_explainer">Expérimental. Localisez les traceurs de votre compte Google via votre propre service googlefind. Ajoutez-les comme appareils, ou associez-les à un appareil pour afficher les rapports des deux réseaux sur un seul repère.</string>
     <string name="google_find_hub_explainer">Rapports des traceurs de votre compte Google, via un service googlefind. Les nouvelles positions ne sont demandées que lorsque vous actualisez une balise.</string>
     <string name="server_url">Adresse du serveur</string>
@@ -424,4 +423,9 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="anisette_local_needs_coreadi">Ce téléphone n\'a pas pu télécharger un fichier nécessaire depuis Apple (macOS CoreADI). Téléchargez l\'image disque d\'iTunes 12.8.3 sur un ordinateur ou dans votre navigateur, placez-la sur ce téléphone et choisissez-la ici.</string>
     <string name="anisette_coreadi_copy_link">Copier le lien de téléchargement</string>
     <string name="finding_tags_banner">Recherche de vos balises… encore %1$d. Laissez l\'application ouverte.</string>
+    <string name="icloud_link_title">Lien Apple iCloud</string>
+    <string name="icloud_link_subtitle_linked">Associé. Touchez pour chercher de nouvelles balises ou dissocier.</string>
+    <string name="icloud_link_subtitle_unlinked">Non associé. Touchez pour récupérer vos balises depuis votre compte Apple.</string>
+    <string name="settings_google_find_hub">Google Find Hub (expérimental)</string>
+    <string name="settings_google_find_hub_subtitle">Les traceurs de votre compte Google</string>
 </resources>

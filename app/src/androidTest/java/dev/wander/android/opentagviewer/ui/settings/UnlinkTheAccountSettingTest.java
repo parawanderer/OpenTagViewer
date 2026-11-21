@@ -27,7 +27,7 @@ import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
 import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.R;
-import dev.wander.android.opentagviewer.SettingsActivity;
+import dev.wander.android.opentagviewer.ICloudLinkActivity;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
@@ -51,7 +51,8 @@ import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 @RunWith(AndroidJUnit4.class)
 public class UnlinkTheAccountSettingTest {
 
-    private ActivityScenario<SettingsActivity> scenario;
+    /** Settings -> Apple iCloud link, where the unlink row moved to. It kept its id. */
+    private ActivityScenario<ICloudLinkActivity> scenario;
     private KeychainMembershipRepository memberships;
 
     @Before
@@ -78,7 +79,7 @@ public class UnlinkTheAccountSettingTest {
     }
 
     private void openSettings() {
-        this.scenario = ActivityScenario.launch(SettingsActivity.class);
+        this.scenario = ActivityScenario.launch(ICloudLinkActivity.class);
     }
 
     private void givenTheAccountIsAlreadyLinked() {
