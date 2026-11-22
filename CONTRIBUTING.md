@@ -441,8 +441,11 @@ involved. See AGENTS.md rule 18 for why this exists.
 
 ### Wiki screenshots (skipped by default)
 
-`WikiScreenshotsTest`, `WikiScreenshotsFromTheMapTest` and `WikiScreenshotsOfSigningInTest`
-photograph the app's screens for the wiki. They are a documentation tool rather than tests —
+`WikiScreenshotsTest`, `WikiScreenshotsFromTheMapTest`, `WikiScreenshotsOfSigningInTest` and
+`WikiScreenshotsOfCoreAdiTest` photograph the app's screens for the wiki.
+`WikiScreenshotsOfCoreAdiTest` (the "couldn't download CoreADI" screens) draws windows rather
+than the screen, so it also runs on the headless managed device
+(`:app:testEmulatorDebugAndroidTest` with the same two arguments). They are a documentation tool rather than tests —
 each one ends in a `Shot` and asserts almost nothing — so they are skipped unless asked for:
 
 ```bash
