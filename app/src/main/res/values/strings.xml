@@ -500,4 +500,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">Couldn\'t download a file from Apple</string>
+    <string name="login_failed_no_find_my_token">The Anisette server signed in, but Apple did not grant Find My access to this sign-in. Apple only issues the Find My token to a sign-in from a Mac or an iPhone, so this sign-in cannot fetch any locations. Sign in with Anisette from this phone instead.</string>
 </resources>
