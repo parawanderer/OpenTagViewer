@@ -971,7 +971,7 @@ run regardless: each AES entry carries a fresh random salt.
 | --- | --- | --- |
 | `static-checks.yml` | `app/**`, `scripts/**` changes | Translation check, pyright, tooling tests, Java import check. Seconds, no Android |
 | `build-debug.yml` | Android build inputs change | Instrumented tests on an emulator, JVM tests, Chaquopy bridge tests, debug APK. Also publishes the generated Room schemas as `room-schemas`, so a version bump made without an Android toolchain can still commit the JSON rule 1 requires |
-| `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests, release APK |
+| `build-release.yml` | on release | Translation check, JVM tests, Chaquopy bridge tests and an unsigned release APK in one job; signing in a second job that alone holds the key; attaching it to the release in a third |
 | `macos-scripts-python.yml` | `python/**` or its own changes, or by hand | Exporter and shared-package tests across Python 3.10–3.13 on macOS 15, and 3.13 on Ubuntu under Xvfb |
 | `macos-exporter-python.yml` | on release | Tag/version check, exporter tests, and the PyInstaller build for macOS (both architectures), Windows and Linux |
 | `exporter-build-check.yml` | PR and push to `main`, `python/**` | Builds the Windows binary, starts it, and runs the emulated Mac's engine from inside it (`--run-emulated-mac … info`, which sends Apple nothing but the library download). The release workflow above only runs on `release: published`, so without this a broken bundle is first run by whoever downloads it |
@@ -1122,13 +1122,23 @@ anything:
 python scripts/release_version.py --kind android --tag android-app-v1.0.6
 ```
 
-then runs the tests, builds and signs the APK, and attaches it to the release. The tag must be
+then runs the tests, builds the APK, signs it, and attaches it to the release. The tag must be
 `android-app-v` followed by exactly what `versionName` says; the check fails the release, with
 instructions, if they disagree.
 
-Signing needs `SIGNING_KEY`, `KEY_STORE_PASSWORD`, `KEY_PASSWORD` and the `ALIAS` in the
-**Android Build Release** environment. Those are separate from the exporter's token, and a
-release is a bad time to discover one has expired.
+**Building and signing are separate jobs, and the key only ever reaches the second.** The build
+runs Gradle plugins, Maven artifacts and pip packages nobody here reviewed, so it produces an
+*unsigned* APK (`app/build.gradle.kts` leaves a release unsigned when no keystore is present). The
+`sign` job checks nothing out: it downloads that APK, signs it with the runner's own `apksigner`,
+and refuses to continue unless the signer is the certificate every earlier release carries
+(`EXPECTED_SIGNER_SHA256` in the workflow). Only then does `publish` attach it, with the run's own
+token. Both `build` and `sign` use the environment, so a release asks for approval twice: once to
+build, once to sign.
+
+Signing needs `SIGNING_KEY`, `KEY_STORE_PASSWORD` and `KEY_PASSWORD` in the
+**Android Build Release** environment, and the alias in the workflow's `ALIAS`. `MAPS_API_KEY`
+lives there too, for the build. Those are separate from the exporter's token, and a release is a
+bad time to discover one has expired.
 
 ## Opening a pull request
 

@@ -232,7 +232,22 @@ android {
         release {
             // Keeps the launcher name as-is for real installs.
             manifestPlaceholders["appLabel"] = "@string/app_name"
-            signingConfig = signingConfigs.getByName("release")
+
+            // **Unsigned unless a keystore is actually there.** The release workflow builds with
+            // no key on the machine at all and signs the APK in a separate job, so that nothing
+            // the build runs (plugins, Maven artifacts, pip) ever shares a disk with the release
+            // key - see build-release.yml. AGP names the result app-release-unsigned.apk, which
+            // is hard to mistake for something to ship. A maintainer with the keystore locally
+            // still gets a signed build exactly as before.
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile?.exists() == true) {
+                signingConfig = releaseSigning
+            } else {
+                logger.info(
+                    "No release keystore at ${releaseSigning.storeFile?.path}; release builds " +
+                        "will be unsigned."
+                )
+            }
             isDebuggable = false
             isMinifyEnabled = false
             proguardFiles(
