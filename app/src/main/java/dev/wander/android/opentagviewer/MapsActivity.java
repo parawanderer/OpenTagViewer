@@ -57,6 +57,7 @@ import dev.wander.android.opentagviewer.ui.importing.ImportedButNotLocatedDialog
 import dev.wander.android.opentagviewer.ui.login.TwoFactorAgainOverlay;
 import dev.wander.android.opentagviewer.ui.settings.AnisetteUpgradeDialog;
 import dev.wander.android.opentagviewer.ui.settings.ICloudSetupOfferDialog;
+import dev.wander.android.opentagviewer.ui.maps.CardSlots;
 import dev.wander.android.opentagviewer.ui.maps.IMapProvider;
 import dev.wander.android.opentagviewer.ui.maps.MapContainer;
 import dev.wander.android.opentagviewer.ui.maps.MapProviderFactory;
@@ -2580,6 +2581,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private synchronized void showLastDeviceLocations() {
+        // **A fetch outlives the screen that started it**, on purpose: each tag's result is
+        // stored as it lands, and cutting the walk short would throw that away. So a rebuilt
+        // map's old instance still hears every answer, and must not draw it on views and a
+        // map provider that have been torn down.
+        if (this.isDestroyed()) {
+            Log.d(TAG, "Not redrawing: this map screen has been destroyed");
+            return;
+        }
         for (BeaconData beaconData : this.beacons.values()) {
             BeaconInformation beacon = beaconData.getInfo();
             final String beaconId = beacon.getBeaconId();
@@ -2721,7 +2730,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             if (!this.beacons.containsKey(beaconId) || !this.beaconLocations.isDrawable(beaconId)) {
                 Log.i(TAG, "Cleaning up view for beaconId=" + beaconId + " which did not have any locations associated with itself anymore");
                 View view = this.dynamicCardsForTag.get(beaconId);
-                cardsContainer.removeView(view);
+                CardSlots.detach(view);
                 this.dynamicCardsForTag.remove(beaconId);
             }
         }
@@ -2764,7 +2773,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             if (!this.dynamicCardsForTag.containsKey(beaconId)) {
                 // MAKE A NEW CARD
                 v = (FrameLayout) this.getLayoutInflater().inflate(R.layout.maps_tag_card, null);
-                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
+                CardSlots.placeAt(cardsContainer, v, index);
                 this.dynamicCardsForTag.put(beaconId, v);
             } else {
                 // UPDATE EXISTING CARD
@@ -2854,11 +2863,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
             // otherwise - the model would be in the new order and the screen in the old one.
             // Only moved when it is actually in the wrong place: removeView/addView on every
             // pass would detach and reattach every card on every refresh tick, which loses the
-            // scroll position and interrupts anything mid-animation.
-            if (cardsContainer.indexOfChild(v) != index) {
-                cardsContainer.removeView(v);
-                cardsContainer.addView(v, Math.min(index, cardsContainer.getChildCount()));
-            }
+            // scroll position and interrupts anything mid-animation. See CardSlots for why a plain
+            // removeView/addView pair is not enough.
+            CardSlots.placeAt(cardsContainer, v, index);
 
             index++;
         }
@@ -2942,7 +2949,15 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnNext(reports -> {
                     this.addBeaconLocationsToCurrent(reports);
-                    this.showLastDeviceLocations();
+                    // **A failed redraw must not end the fetch.** An exception here is an
+                    // onError for the whole walk, so the tags after this one were not fetched
+                    // and their key alignment work was not stored (rule 6). Seen 2026-11-21.
+                    try {
+                        this.showLastDeviceLocations();
+                    } catch (final RuntimeException e) {
+                        Log.e(TAG, "Could not redraw after a tag's reports arrived;"
+                                + " fetching the rest anyway", e);
+                    }
                 })
                 .flatMapCompletable((__) -> this.updateBeaconGeocodings())
                 .observeOn(AndroidSchedulers.mainThread())
