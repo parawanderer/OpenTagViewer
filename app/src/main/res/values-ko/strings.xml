@@ -465,4 +465,5 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="settings_section_tags">태그</string>
     <string name="settings_section_app">앱</string>
     <string name="anisette_coreadi_card_title">Apple에서 파일을 다운로드하지 못했습니다</string>
+    <string name="login_failed_no_find_my_token">Anisette 서버로 로그인했지만, Apple이 이 로그인에 나의 찾기 접근 권한을 부여하지 않았습니다. Apple은 Mac 또는 iPhone에서의 로그인에만 나의 찾기 토큰을 발급하므로, 이 로그인으로는 위치를 가져올 수 없습니다. 대신 이 전화의 Anisette로 로그인하세요.</string>
 </resources>
