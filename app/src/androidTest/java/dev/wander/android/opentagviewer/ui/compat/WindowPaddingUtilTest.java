@@ -263,6 +263,65 @@ public class WindowPaddingUtilTest {
         });
     }
 
+    /** A view with a top margin of its own, inside a parent that gives it margins. */
+    private View topAnchoredWithMargin(final int ownTop) {
+        final View control = new FrameLayout(this.context);
+        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = ownTop;
+        new FrameLayout(this.context).addView(control, params);
+        return control;
+    }
+
+    private static int topMarginOf(final View view) {
+        return ((ViewGroup.MarginLayoutParams) view.getLayoutParams()).topMargin;
+    }
+
+    /**
+     * <b>A control along the top of the map goes below the status bar, however tall it is.</b>
+     *
+     * <p>The map's menu button sat a fixed 35dp from the top, and on a phone with a taller status
+     * bar a tap on it opened the notification shade (#286). Its layout margin is now the gap it
+     * wants below the bar.
+     */
+    @Test
+    public void jatopControlGoesBelowTheStatusBarAndKeepsItsOwnGap() {
+        final View control = this.topAnchoredWithMargin(11);
+
+        WindowPaddingUtil.insertUITopMargin(control);
+        deliverInsetsTo(control);
+
+        assertEquals("the control would be under the status bar", STATUS_BAR + 11,
+                topMarginOf(control));
+    }
+
+    /** Delivered twice, the control does not move further down. */
+    @Test
+    public void ktheTopMarginDoesNotStack() {
+        final View control = this.topAnchoredWithMargin(11);
+
+        WindowPaddingUtil.insertUITopMargin(control);
+        deliverInsetsTo(control);
+        deliverInsetsTo(control);
+
+        assertEquals(STATUS_BAR + 11, topMarginOf(control));
+    }
+
+    /** A camera cutout taller than the status bar beside it is cleared too. */
+    @Test
+    public void latallerCutoutIsClearedToo() {
+        final View control = this.topAnchoredWithMargin(11);
+        final int cutout = STATUS_BAR + 40;
+
+        WindowPaddingUtil.insertUITopMargin(control);
+        ViewCompat.dispatchApplyWindowInsets(control, new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(0, STATUS_BAR, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.displayCutout(), Insets.of(0, cutout, 0, 0))
+                .build());
+
+        assertEquals(cutout + 11, topMarginOf(control));
+    }
+
     private static void layOut(final View window) {
         window.measure(
                 View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),

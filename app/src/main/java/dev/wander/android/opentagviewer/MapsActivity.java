@@ -587,6 +587,11 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.setupTagScrollArea();
 
+        // The map draws under the status bar, so the controls along the top take its real
+        // height rather than a fixed guess at it (#286).
+        WindowPaddingUtil.insertUITopMargin(this.findViewById(R.id.more_dropdown_top_right));
+        WindowPaddingUtil.insertUITopMargin(this.findViewById(R.id.long_fetch_banner));
+
         var async = this.getLastCameraPosition()
             .subscribe(pos -> {
                 Log.d(TAG, "Got previous camera position to reset us to: " + pos);

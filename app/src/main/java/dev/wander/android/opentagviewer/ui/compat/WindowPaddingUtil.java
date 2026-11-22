@@ -161,6 +161,44 @@ public final class WindowPaddingUtil {
     }
 
     /**
+     * Keeps a top-anchored view below the status bar, on a screen that draws under it.
+     *
+     * <p><b>The map is the screen this exists for.</b> It draws tiles under a transparent status
+     * bar, and its menu button and long-fetch banner used to sit a fixed 35dp and 45dp from the
+     * top - a guess at the bar's height. A phone with a taller bar, such as a foldable's inner
+     * screen or one with a large camera cutout, put the button under the bar, where a tap opened
+     * the notification shade instead (#286).
+     *
+     * <p>The view's own top margin in the layout is kept as the gap it wants below the bar, and
+     * read once here rather than inside the listener: insets arrive more than once, and adding to
+     * the current margin each time would push the view further down on every delivery.
+     *
+     * <p>The display cutout counts too. In landscape, or on a phone whose status bar is hidden,
+     * a cutout can be taller than the status bar inset reported beside it.
+     *
+     * @param view a view whose parent gives it margins
+     */
+    public static void insertUITopMargin(final View view) {
+        final ViewGroup.MarginLayoutParams initial =
+                (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+        final int ownTop = initial.topMargin;
+
+        ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+            final int bar = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout()).top;
+
+            final ViewGroup.MarginLayoutParams params =
+                    (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+            if (params.topMargin != ownTop + bar) {
+                params.topMargin = ownTop + bar;
+                v.setLayoutParams(params);
+            }
+            return insets;
+        });
+    }
+
+    /**
      * Keeps a bottom-anchored view clear of the navigation bar.
      *
      * <p>Activities that go edge to edge with
