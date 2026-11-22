@@ -173,6 +173,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final int RING_PERMISSION_REQUEST_CODE = 2;
     private static final int NEARBY_PERMISSION_REQUEST_CODE = 3;
 
+    /** Start the iCloud flow once the account is restored. Sent by Setup's last step. */
+    public static final String EXTRA_CONNECT_ICLOUD = "connectICloud";
+
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
     private static final int HOURS_TO_GO_BACK_24H = 24;
@@ -2024,6 +2027,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     AppDependencies.anisette(this, this.userSettings, true))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
+
+                // Setup's "Connect tags from iCloud" lands here: the iCloud flow needs the
+                // account this has just restored, which nothing before the map has. Once only,
+                // so a rebuilt map does not start it again.
+                if (this.getIntent().getBooleanExtra(EXTRA_CONNECT_ICLOUD, false)) {
+                    this.getIntent().removeExtra(EXTRA_CONNECT_ICLOUD);
+                    this.runOnUiThread(() -> this.actOnTheICloudOffer(true));
+                }
 
                 // **The other door.** getAccount now hands back an account that needs a second
                 // factor rather than discarding it (see main.py, and issue #43), so a restore

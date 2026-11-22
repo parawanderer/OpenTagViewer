@@ -14,7 +14,12 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.app.Activity;
 import android.content.Intent;
+import android.os.SystemClock;
+
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
@@ -42,6 +47,8 @@ import dev.wander.android.opentagviewer.Eventually;
 import dev.wander.android.opentagviewer.FetchFromICloudActivity;
 import dev.wander.android.opentagviewer.ui.error.ErrorReportActivity;
 import dev.wander.android.opentagviewer.MapsActivity;
+import dev.wander.android.opentagviewer.python.PythonAppleService;
+import dev.wander.android.opentagviewer.python.icloud.FakeICloudService;
 import dev.wander.android.opentagviewer.R;
 import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
@@ -427,6 +434,56 @@ public class TheICloudOfferAppearsOnceTest {
         onView(withText(R.string.icloud_offer_set_up_now)).inRoot(isDialog()).perform(click());
 
         Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
+    }
+
+    /**
+     * <b>Setup's "Connect tags from iCloud" starts the flow from the map.</b>
+     *
+     * <p>Setup marks the offer as made and opens the map with
+     * {@link MapsActivity#EXTRA_CONNECT_ICLOUD}. The map starts the iCloud flow once it has
+     * restored the account, which is why it is the map's job: the iCloud screen opened from
+     * Setup found no account and closed at once (2026-11-22). No popup either way.
+     */
+    @Test
+    public void setupsConnectStartsTheAccountFetchFromTheMap() {
+        this.settingsWhere(settings -> {
+            settings.setAnisetteMode(UserSettings.ANISETTE_LOCAL);
+            settings.setIcloudOfferMade(true);
+        });
+
+        // **Like the real service where it matters:** nothing until the map has restored the
+        // account into Python, a working session after that. Opened before then - as Setup
+        // used to - this returns null and the iCloud screen closes, which was the bug. (The
+        // real service cannot be used here: apple_test_double's account restores, but cannot
+        // open a keychain session, so the screen would close for an unrelated reason.)
+        final FakeICloudService fake = FakeICloudService.withTags();
+        AppDependencies.replaceICloud(() -> {
+            final PythonAppleService signedIn = PythonAppleService.getInstance();
+            return signedIn == null || signedIn.getAccount() == null ? null : fake;
+        });
+
+        this.scenario = ActivityScenario.launch(new Intent(this.context, MapsActivity.class)
+                .putExtra(MapsActivity.EXTRA_CONNECT_ICLOUD, true));
+
+        Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
+        // **And it stays open.** The bug was not that it never launched: it launched, found no
+        // account and closed again at once. So ask for it resumed, a second later.
+        SystemClock.sleep(1000);
+        Eventually.check(() -> assertTrue("the iCloud screen closed again straight away",
+                this.theICloudScreenIsOpen()));
+    }
+
+    private boolean theICloudScreenIsOpen() {
+        final boolean[] open = {false};
+        getInstrumentation().runOnMainSync(() -> {
+            for (final Activity resumed : ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)) {
+                if (resumed instanceof FetchFromICloudActivity && !resumed.isFinishing()) {
+                    open[0] = true;
+                }
+            }
+        });
+        return open[0];
     }
 
     // --- helpers ------------------------------------------------------------------------------

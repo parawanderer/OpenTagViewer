@@ -6,12 +6,15 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.intent.VerificationModes.times;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -136,7 +139,7 @@ public class OnboardingStepsTest {
     public void aFreshInstallIsDueAndOnlyOnce() {
         assertTrue(OnboardingActivity.isDue(this.context));
         this.open();
-        this.seeTitle(R.string.onboarding_tags_title);
+        this.seeTitle(R.string.onboarding_updates_title);
         assertFalse("shown once means shown once, even if never finished",
                 OnboardingActivity.isDue(this.context));
     }
@@ -145,15 +148,17 @@ public class OnboardingStepsTest {
     public void skippingEverythingEndsOnTheMapWithUpdatesOff() {
         this.open();
 
-        this.seeTitle(R.string.onboarding_tags_title);
+        // The runner granted every permission, so the nearby step is left out: updates, then tags.
+        this.seeTitle(R.string.onboarding_updates_title);
         this.seeTheStepper(1, 2, "1", "2");
         this.tap(R.id.onboarding_skip_button);
 
-        this.seeTitle(R.string.onboarding_updates_title);
+        this.seeTitle(R.string.onboarding_tags_title);
         this.seeTheStepper(2, 2, "✓", "2");
         this.tap(R.id.onboarding_skip_button);
 
-        Eventually.check(() -> intended(hasComponent(MapsActivity.class.getName())));
+        Eventually.check(() -> intended(allOf(hasComponent(MapsActivity.class.getName()),
+                hasExtra(MapsActivity.EXTRA_CONNECT_ICLOUD, false))));
         assertEquals(Boolean.FALSE, new UpdateSettings(this.context).enabled());
         assertEquals("the map must not make the iCloud offer again",
                 Boolean.TRUE, this.settings().getUserSettings().getIcloudOfferMade());
@@ -171,15 +176,23 @@ public class OnboardingStepsTest {
         assertEquals(Boolean.TRUE, new UpdateSettings(this.context).enabled());
     }
 
+    /**
+     * <b>Connecting hands over to the map, not to the iCloud screen.</b> That screen needs the
+     * signed-in account restored, which only the map does: opened from here it found none and
+     * closed at once, which looked like the button skipping a step (2026-11-22, on the emulator).
+     * The map starts the flow itself; TheICloudOfferAppearsOnceTest covers that half.
+     */
     @Test
-    public void connectingOpensTheICloudScreenAndThenCarriesOn() {
+    public void connectingOpensTheMapAskingItToStartTheICloudFlow() {
+        OnboardingActivity.forcedSteps = List.of(OnboardingActivity.Step.TAGS);
         this.open();
 
         this.seeTitle(R.string.onboarding_tags_title);
         this.tap(R.id.onboarding_primary_button);
 
-        Eventually.check(() -> intended(hasComponent(FetchFromICloudActivity.class.getName())));
-        this.seeTitle(R.string.onboarding_updates_title);
+        Eventually.check(() -> intended(allOf(hasComponent(MapsActivity.class.getName()),
+                hasExtra(MapsActivity.EXTRA_CONNECT_ICLOUD, true))));
+        intended(hasComponent(FetchFromICloudActivity.class.getName()), times(0));
     }
 
     @Test
@@ -189,7 +202,9 @@ public class OnboardingStepsTest {
                 "a-label", 2)).blockingAwait();
         this.open();
 
+        // Updates is then the only step.
         this.seeTitle(R.string.onboarding_updates_title);
+        this.seeTheStepper(1, 1, "1");
     }
 
     @Test
@@ -232,7 +247,7 @@ public class OnboardingStepsTest {
         getInstrumentation().setInTouchMode(false);
         try {
             this.open();
-            this.seeTitle(R.string.onboarding_tags_title);
+            this.seeTitle(R.string.onboarding_updates_title);
             getInstrumentation().waitForIdleSync();
 
             this.scenario.onActivity(a -> {
@@ -269,7 +284,7 @@ public class OnboardingStepsTest {
     @Test
     public void backSkipsTheRestToTheMap() {
         this.open();
-        this.seeTitle(R.string.onboarding_tags_title);
+        this.seeTitle(R.string.onboarding_updates_title);
 
         // Unconditionally: it finishes this screen, and the map it opens is stubbed.
         pressBackUnconditionally();

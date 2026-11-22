@@ -16,8 +16,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
@@ -77,11 +75,6 @@ public class OnboardingActivity extends AppCompatActivity {
     private final List<Step> steps = new ArrayList<>();
     private int current = -1;
 
-    private final ActivityResultLauncher<Intent> connectICloud = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            // Whatever happened there, the map will show it; carry on with the steps.
-            result -> this.next());
-
     /** Whether to open this rather than the map after a sign-in. */
     public static boolean isDue(final Context context) {
         return !new OnboardingRecord(context).done();
@@ -100,7 +93,7 @@ public class OnboardingActivity extends AppCompatActivity {
         this.getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                OnboardingActivity.this.toTheMap();
+                OnboardingActivity.this.toTheMap(false);
             }
         });
         this.decideTheSteps();
@@ -120,14 +113,18 @@ public class OnboardingActivity extends AppCompatActivity {
                         this.next();
                         return;
                     }
-                    if (!linked) {
-                        this.steps.add(Step.TAGS);
-                    }
                     if (!this.hasEverything(this.permissionsToAsk())) {
                         this.steps.add(Step.NEARBY);
                     }
                     if (new UpdateSettings(this).enabled() == null) {
                         this.steps.add(Step.UPDATES);
+                    }
+                    // **Last, because connecting ends Setup.** The iCloud flow needs the signed-in
+                    // account restored, and only the map does that: started from here it found
+                    // no account and closed at once. So "Connect" opens the map and asks it to
+                    // start the flow (MapsActivity.EXTRA_CONNECT_ICLOUD).
+                    if (!linked) {
+                        this.steps.add(Step.TAGS);
                     }
                     this.next();
                 }));
@@ -136,7 +133,7 @@ public class OnboardingActivity extends AppCompatActivity {
     private void next() {
         this.current++;
         if (this.current >= this.steps.size()) {
-            this.toTheMap();
+            this.toTheMap(false);
             return;
         }
         this.show(this.steps.get(this.current));
@@ -157,8 +154,7 @@ public class OnboardingActivity extends AppCompatActivity {
                 title.setText(R.string.onboarding_tags_title);
                 body.setText(R.string.onboarding_tags_body);
                 primary.setText(R.string.icloud_link_connect_button);
-                primary.setOnClickListener(v -> this.connectICloud.launch(
-                        new Intent(this, FetchFromICloudActivity.class)));
+                primary.setOnClickListener(v -> this.toTheMap(true));
                 skip.setText(R.string.onboarding_later);
                 break;
             case NEARBY:
@@ -279,10 +275,12 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     /**
-     * Off to the map, with its iCloud popup marked as made: the first step was that offer.
+     * Off to the map, with its iCloud popup marked as made: the tags step was that offer.
      * Written before the map starts, or it reads the old value and offers again.
+     *
+     * @param connectICloud whether the map should start the iCloud flow once it has the account
      */
-    private void toTheMap() {
+    private void toTheMap(final boolean connectICloud) {
         final UserSettingsRepository settings =
                 new UserSettingsRepository(UserSettingsDataStore.getInstance(this.getApplicationContext()));
         this.inFlight.add(Completable.defer(() -> {
@@ -292,14 +290,15 @@ public class OnboardingActivity extends AppCompatActivity {
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::openTheMap, error -> {
+                .subscribe(() -> this.openTheMap(connectICloud), error -> {
                     Log.w(TAG, "Could not mark the iCloud offer as made; the map may offer it", error);
-                    this.openTheMap();
+                    this.openTheMap(connectICloud);
                 }));
     }
 
-    private void openTheMap() {
-        this.startActivity(new Intent(this, MapsActivity.class));
+    private void openTheMap(final boolean connectICloud) {
+        this.startActivity(new Intent(this, MapsActivity.class)
+                .putExtra(MapsActivity.EXTRA_CONNECT_ICLOUD, connectICloud));
         this.finish();
     }
 

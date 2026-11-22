@@ -8,11 +8,13 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra;
 import static androidx.test.espresso.intent.VerificationModes.times;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+import static org.hamcrest.Matchers.allOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
@@ -99,17 +101,18 @@ public class SignInThenSetupJourneyTest {
     public void aFirstSignInGoesThroughSetupToTheMap() {
         this.signIn();
 
-        // Setup, step 1: get your tags. The runner granted every permission, so the nearby
+        // Setup, step 1: update checks. The runner granted every permission, so the nearby
         // step has nothing to ask and is left out: two steps.
-        this.seeTitle(R.string.onboarding_tags_title);
-        intended(hasComponent(OnboardingActivity.class.getName()));
-        this.tap(R.id.onboarding_skip_button);
-
-        // Step 2: update checks.
         this.seeTitle(R.string.onboarding_updates_title);
+        intended(hasComponent(OnboardingActivity.class.getName()));
         this.tap(R.id.onboarding_primary_button);
 
-        Eventually.check(() -> intended(hasComponent(MapsActivity.class.getName())));
+        // Step 2, last: get your tags. "Connect" hands the map the job of starting iCloud.
+        this.seeTitle(R.string.onboarding_tags_title);
+        this.tap(R.id.onboarding_primary_button);
+
+        Eventually.check(() -> intended(allOf(hasComponent(MapsActivity.class.getName()),
+                hasExtra(MapsActivity.EXTRA_CONNECT_ICLOUD, true))));
         assertEquals(Boolean.TRUE, new UpdateSettings(this.context).enabled());
         assertFalse(OnboardingActivity.isDue(this.context));
     }
