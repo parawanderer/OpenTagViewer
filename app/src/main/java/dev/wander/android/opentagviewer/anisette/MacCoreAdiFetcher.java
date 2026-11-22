@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.anisette;
 
 import android.util.Log;
 
+import dev.wander.android.opentagviewer.util.FileReplace;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -359,7 +361,7 @@ public final class MacCoreAdiFetcher {
         } catch (final IOException e) {
             throw new FetchException("could not store the library", e);
         }
-        if (!partial.renameTo(target)) {
+        if (!FileReplace.moveOver(partial, target)) {
             throw new FetchException("could not store the library at " + target);
         }
     }

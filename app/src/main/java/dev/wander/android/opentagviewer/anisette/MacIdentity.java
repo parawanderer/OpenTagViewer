@@ -3,6 +3,8 @@ package dev.wander.android.opentagviewer.anisette;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import dev.wander.android.opentagviewer.util.FileReplace;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -141,7 +143,7 @@ public final class MacIdentity {
             out.write(text.getBytes(StandardCharsets.UTF_8));
             out.getFD().sync();
         }
-        if (!partial.renameTo(new File(directory, FILE))) {
+        if (!FileReplace.moveOver(partial, new File(directory, FILE))) {
             throw new IOException("could not store the emulated Mac's identity");
         }
     }

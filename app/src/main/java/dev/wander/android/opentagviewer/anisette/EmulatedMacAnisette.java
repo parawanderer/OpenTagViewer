@@ -6,6 +6,7 @@ import android.util.Log;
 
 import dev.wander.android.opentagviewer.BuildConfig;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
+import dev.wander.android.opentagviewer.util.FileReplace;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -440,7 +441,7 @@ public final class EmulatedMacAnisette implements AnisetteSource {
                 out.write(file.getValue());
                 out.getFD().sync();
             }
-            if (!partial.renameTo(target)) {
+            if (!FileReplace.moveOver(partial, target)) {
                 throw new IOException("could not store " + target);
             }
         }
