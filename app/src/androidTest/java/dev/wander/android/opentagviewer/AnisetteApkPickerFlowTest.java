@@ -231,8 +231,10 @@ public class AnisetteApkPickerFlowTest {
         this.scenario = ActivityScenario.launch(SettingsActivity.class);
         TestPace.afterAStep();
 
+        // Scrolled to, because Settings is now taller than the screen and this row is near the
+        // bottom. Espresso refuses a click that is less than 90% on screen.
         Eventually.check(() -> onView(withId(R.id.setting_app_anisette_server))
-                .perform(click()));
+                .perform(scrollTo(), click()));
         TestPace.afterAStep();
     }
 
