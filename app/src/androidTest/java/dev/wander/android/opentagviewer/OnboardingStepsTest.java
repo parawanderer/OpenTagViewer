@@ -19,6 +19,9 @@ import static org.junit.Assert.assertTrue;
 import android.app.Activity;
 import android.app.Instrumentation.ActivityResult;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
@@ -213,6 +216,54 @@ public class OnboardingStepsTest {
         this.tap(R.id.onboarding_primary_button);
 
         this.seeTitle(R.string.onboarding_updates_title);
+    }
+
+    /**
+     * <b>No grey over the middle when the user typed the sign-in on a keyboard.</b>
+     *
+     * <p>Typing on a hardware keyboard (or the emulator's host keyboard) leaves touch mode, and
+     * then the first focusable view gets focus when Setup opens: the scroll area. Android draws
+     * its default focus highlight, a grey wash, over any focused view without a background of
+     * its own. Seen on the emulator on 2026-11-22; every touch-mode test and screenshot missed
+     * it. Drawn to a bitmap and sampled in the empty space above the icon.
+     */
+    @Test
+    public void theMiddleIsNotGreyedOutAfterKeyboardInput() {
+        getInstrumentation().setInTouchMode(false);
+        try {
+            this.open();
+            this.seeTitle(R.string.onboarding_tags_title);
+            getInstrumentation().waitForIdleSync();
+
+            this.scenario.onActivity(a -> {
+                final View root = a.findViewById(R.id.onboarding_root);
+                final View step = a.findViewById(R.id.onboarding_step);
+                final View icon = a.findViewById(R.id.onboarding_icon);
+                final Bitmap drawn = Bitmap.createBitmap(
+                        root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
+                final Canvas canvas = new Canvas(drawn);
+                a.getWindow().getDecorView().getBackground().draw(canvas);
+                root.draw(canvas);
+
+                final int[] stepAt = new int[2];
+                step.getLocationInWindow(stepAt);
+                final int[] rootAt = new int[2];
+                root.getLocationInWindow(rootAt);
+                final int[] iconAt = new int[2];
+                icon.getLocationInWindow(iconAt);
+                // Halfway between the top of the scroll area and the icon: nothing drawn there.
+                final int x = 10;
+                final int y = (stepAt[1] + iconAt[1]) / 2 - rootAt[1];
+                final int heading = a.findViewById(R.id.onboarding_heading).getTop() - 4;
+
+                assertEquals("the empty middle is a different colour from the top of the screen:"
+                                + " a focus highlight is drawn over it",
+                        Integer.toHexString(drawn.getPixel(x, Math.max(1, heading))),
+                        Integer.toHexString(drawn.getPixel(x, y)));
+            });
+        } finally {
+            getInstrumentation().setInTouchMode(true);
+        }
     }
 
     @Test

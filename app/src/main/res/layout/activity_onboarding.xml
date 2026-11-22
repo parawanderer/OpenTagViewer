@@ -7,6 +7,7 @@
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/onboarding_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -33,11 +34,17 @@
         android:gravity="center_vertical"
         android:orientation="horizontal" />
 
+    <!--
+        No default focus highlight: after typing the sign-in on a keyboard the app is out of
+        touch mode, this gets focus, and Android washes it grey. See OnboardingStepsTest.
+    -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:defaultFocusHighlightEnabled="false"
+        android:fillViewport="true"
+        tools:targetApi="o">
 
         <LinearLayout
             android:id="@+id/onboarding_step"
