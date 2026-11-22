@@ -41,6 +41,8 @@ import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import androidx.core.graphics.ColorUtils;
+import com.google.android.material.color.MaterialColors;
 
 /**
  * The account rows under the card in Settings: one per account source, lined up with the rows
@@ -236,6 +238,37 @@ public class SettingsAccountRowsTest {
     public void theLinkedPageInDarkMode() {
         this.openTheLinkPageLinked(true);
         this.shot("icloud_link_linked_dark");
+    }
+
+    /**
+     * The card's title is in the account name's colour (colorOnPrimaryContainer), on the card's
+     * own background. Both resolved from the theme, so checked as a number, in both modes.
+     */
+    private void titleIsReadableOnTheCard() {
+        this.scenario.onActivity(a -> {
+            final TextView title = a.findViewById(R.id.icloud_link_status);
+            final int background = MaterialColors.getColor(
+                    title, com.google.android.material.R.attr.colorSurfaceContainerLow);
+            final double ratio = ColorUtils.calculateContrast(
+                    title.getCurrentTextColor(), background);
+            assertTrue("title contrast on the card is " + ratio, ratio >= 4.5);
+            assertEquals("the same blue as the account name",
+                    MaterialColors.getColor(title,
+                            com.google.android.material.R.attr.colorOnPrimaryContainer),
+                    title.getCurrentTextColor());
+        });
+    }
+
+    @Test
+    public void theLinkCardTitleIsReadableInLightMode() {
+        this.openTheLinkPageLinked(false);
+        this.titleIsReadableOnTheCard();
+    }
+
+    @Test
+    public void theLinkCardTitleIsReadableInDarkMode() {
+        this.openTheLinkPageLinked(true);
+        this.titleIsReadableOnTheCard();
     }
 
     private void shot(final String name) {

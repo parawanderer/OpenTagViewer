@@ -387,7 +387,6 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="anisette_report_crash">この端末を報告</string>
     <string name="anisette_crash_report_body">この端末では、Apple のサインイン用ライブラリが読み込み直後にクラッシュします。ほとんどの端末では問題なく動作しており、影響を受ける端末の共通点はまだ分かっていません。\n\nOpenTagViewer はこの手順にサーバーを使うようになったため、サインインもアプリの利用も通常どおりできます。下の情報を添えて報告していただくと、原因の特定に役立ちます。</string>
     <string name="login_failed_refused_before_password">Apple はパスワードを確認する前に、この Apple ID へのサインインの開始を拒否しました。パスワードを入力し直しても解決しません。account.apple.com にサインインできるか、そこで Apple から何か求められていないかを確認してください。リモートサーバーを使うと Apple には別のデバイスとして見えるので、試す価値があります。Apple の応答: %1$s</string>
-    <string name="extra_sources">追加の位置情報ソース（試験運用）</string>
     <string name="extra_sources_explainer">試験運用中の機能です。自分の googlefind サービス経由で Google アカウントのトラッカーを探します。デバイスとして追加するか、デバイスにリンクして両方のネットワークのレポートを 1 つのマーカーに表示できます。</string>
     <string name="google_find_hub_explainer">googlefind サービス経由の、Google アカウントのトラッカーのレポート。新しい位置はタグを更新したときだけ要求します。</string>
     <string name="server_url">サーバーのアドレス</string>
