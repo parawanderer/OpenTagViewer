@@ -867,6 +867,14 @@ public class AppleLoginActivity extends AppCompatActivity {
             return this.getString(R.string.login_failed_terms);
         }
 
+        // Apple signed the user in but issued no Find My token (#311), so the session looks
+        // signed in and every location fetch fails. The remote server is the cause here, not
+        // the remedy, so this reason does not offer it - see showLoginFailure, which only
+        // offers the server route for a refused sign-in.
+        if (PythonAccountLoginException.REASON_NO_FIND_MY_TOKEN.equals(reason)) {
+            return this.getString(R.string.login_failed_no_find_my_token);
+        }
+
         final String detail = error.getLocalizedMessage();
         return detail == null || detail.isBlank()
                 ? this.getString(R.string.login_failed_x, error.getClass().getSimpleName())
