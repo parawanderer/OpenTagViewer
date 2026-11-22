@@ -45,13 +45,18 @@
             android:paddingRight="16dp" />
     </HorizontalScrollView>
 
+    <!-- The top margins here and on long_fetch_banner are the gap below the status bar, not the
+         distance from the top of the screen: MapsActivity adds the bar's real height through
+         WindowPaddingUtil.insertUITopMargin. They used to be fixed at 35dp and 45dp, which put the
+         button under a taller status bar, where a tap opened the notification shade (#286). The
+         values give the same position as before on a 24dp status bar. -->
     <LinearLayout
         android:id="@+id/more_dropdown_top_right"
         android:layout_width="wrap_content"
         android:layout_height="60dp"
         android:layout_alignParentTop="true"
         android:layout_alignParentRight="true"
-        android:layout_marginTop="35dp"
+        android:layout_marginTop="11dp"
         android:layout_marginRight="10dp"
         android:clipToPadding="false"
         android:orientation="horizontal"
@@ -89,7 +94,7 @@
         android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
         android:layout_marginLeft="16dp"
-        android:layout_marginTop="45dp"
+        android:layout_marginTop="21dp"
         android:layout_toLeftOf="@id/more_dropdown_top_right"
         android:visibility="gone"
         tools:visibility="visible" />
