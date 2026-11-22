@@ -465,4 +465,5 @@
     <string name="settings_section_tags">Метки</string>
     <string name="settings_section_app">Приложение</string>
     <string name="anisette_coreadi_card_title">Не удалось скачать файл от Apple</string>
+    <string name="login_failed_no_find_my_token">Сервер Anisette вошёл в систему, но Apple не предоставила этому входу доступ к «Локатору». Apple выдаёт токен «Локатора» только при входе с Mac или iPhone, поэтому этот вход не сможет получать местоположения. Вместо этого войдите с помощью Anisette с этого телефона.</string>
 </resources>
