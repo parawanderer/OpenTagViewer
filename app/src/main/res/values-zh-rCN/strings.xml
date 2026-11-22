@@ -465,4 +465,5 @@
     <string name="settings_section_tags">标签</string>
     <string name="settings_section_app">应用</string>
     <string name="anisette_coreadi_card_title">无法从 Apple 下载文件</string>
+    <string name="login_failed_no_find_my_token">Anisette 服务器已登录，但 Apple 未向此次登录授予“查找”访问权限。Apple 仅向来自 Mac 或 iPhone 的登录发放“查找”令牌，因此此次登录无法获取任何位置。请改用此手机上的 Anisette 登录。</string>
 </resources>
