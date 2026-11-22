@@ -242,6 +242,26 @@ def _unexpected(what: str) -> str:
     )
 
 
+def _saysNothingAboutTheMembership(error: BaseException) -> bool:
+    """
+    Whether a failed `resume` happened around the stored membership rather than to it.
+
+    Matched by type, like `main.classifyLoginFailure`'s network check, and aiohttp by module so
+    this needs no import of it. Anything else stays MEMBERSHIP_UNUSABLE, because a removed peer
+    arrives as a `KeychainSessionError` or a decryption failure and nothing narrower.
+    """
+    import asyncio
+
+    if isinstance(error, (account_loop.AccountClosedError, AppleServiceUnavailableError)):
+        return True
+    if _needsAFreshSignIn(error):
+        return True
+    if isinstance(error, (TimeoutError, asyncio.TimeoutError, OSError)):
+        return True
+    module = type(error).__module__ or ""
+    return module.startswith("aiohttp") or module.startswith("aiohappyeyeballs")
+
+
 def _lastLineOf(detail: str) -> str:
     return detail.strip().splitlines()[-1] if detail.strip() else ""
 
@@ -665,12 +685,15 @@ class ICloudSession:
             print(f"iCloud bridge: reading as {peer.peer_id}, with no passcode")
 
             return json.dumps({"ok": True})
-        except account_loop.AccountClosedError:
-            # Not the membership: the account under this session was replaced and closed. Both
-            # Java callers forget the membership on MEMBERSHIP_UNUSABLE, which here cost a device
-            # passcode for nothing. The ordinary classification lets the background read retry.
-            return _unexpected("resuming the keychain session")
-        except Exception:
+        except Exception as e:
+            # **Both Java callers forget the membership on MEMBERSHIP_UNUSABLE**, and joining
+            # again costs a device passcode. So only a failure of the membership itself gets it.
+            # A closed account, a refused sign-in, Apple declining and the network going away
+            # say nothing about the peer, and go through the ordinary classification: sign in
+            # again, wait, or retry. The closed account was seen on a device on 2026-11-21.
+            if _saysNothingAboutTheMembership(e):
+                return _unexpected("resuming the keychain session")
+
             # Worth its own reason. A membership that no longer works is not a broken app - the
             # peer may have been removed from the account - and the answer is to unlock with a
             # passcode again, not to retry this.

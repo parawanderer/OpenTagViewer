@@ -954,6 +954,44 @@ class TestReadingAsTheMemberItAlreadyIs:
         assert answer["reason"] != icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
         assert answer["reason"] == icloud_bridge.REASON_UNKNOWN
 
+    @pytest.mark.parametrize(
+        ("error", "reason"),
+        [
+            (InvalidCredentialsError("refused"), icloud_bridge.REASON_CREDENTIALS_REJECTED),
+            (None, icloud_bridge.REASON_APPLE_DECLINED),
+            (TimeoutError(), icloud_bridge.REASON_UNKNOWN),
+            (ConnectionResetError("reset by peer"), icloud_bridge.REASON_UNKNOWN),
+        ],
+        ids=["credentials rejected", "apple 429", "timeout", "connection reset"],
+    )
+    def test_a_failure_around_the_membership_does_not_forget_it(self, session, error, reason):
+        """
+        Both Java callers forget the stored membership on MEMBERSHIP_UNUSABLE, and joining again
+        costs a device passcode. A refused sign-in means signing in again (rule 15), and Apple
+        declining or the network dropping means waiting. None of them says the peer is gone.
+        """
+        from findmy.errors import AppleServiceUnavailableError  # noqa: PLC0415
+
+        made = session(FakeClient())
+        made.client._resumeError = (
+            error if error is not None
+            else AppleServiceUnavailableError(429, "pcs_keys", None))
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert not answer["ok"]
+        assert answer["reason"] == reason
+
+    def test_a_refused_keychain_read_still_means_the_membership_is_unusable(self, session):
+        """The other half: the shape a removed peer arrives in keeps its own reason."""
+        made = session(FakeClient())
+        made.client._resumeError = icloud_bridge.KeychainSessionError(
+            "No keys were recovered for the 'Manatee' view")
+
+        answer = json.loads(made.resume(json.dumps(aStoredMembership())))
+
+        assert answer["reason"] == icloud_bridge.REASON_MEMBERSHIP_UNUSABLE
+
     def test_rubbish_in_storage_does_not_crash(self, session):
         made = session(FakeClient())
 
