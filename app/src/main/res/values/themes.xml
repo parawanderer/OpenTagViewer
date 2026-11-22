@@ -120,4 +120,22 @@
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
+
+    <!--
+        A section heading in Settings. Starts at 72dp, where the rows' titles start (22dp padding,
+        a 28dp icon, 22dp gap), so it reads as naming the rows under it. Theme attributes only,
+        so it follows dark mode and wallpaper colours with no night variant.
+    -->
+    <style name="SettingsSectionHeading">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">72dp</item>
+        <item name="android:layout_marginEnd">22dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:fontFamily">@font/nunito_semi_bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:accessibilityHeading">true</item>
+    </style>
 </resources>

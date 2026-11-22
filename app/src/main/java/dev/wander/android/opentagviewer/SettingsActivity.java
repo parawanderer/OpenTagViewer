@@ -92,6 +92,7 @@ import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
+import dev.wander.android.opentagviewer.update.UpdateSettingsRow;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
@@ -235,6 +236,10 @@ public class SettingsActivity extends AppCompatActivity {
                 startActivity(new Intent(this, ExtraSourcesSettingsActivity.class)));
 
         this.sayWhetherTheAccountIsLinked();
+
+        this.appUpdatesRow = new UpdateSettingsRow(this, this.binding::setAppUpdatesSubtitle);
+        this.binding.setOnClickAppUpdates(this.appUpdatesRow::onClick);
+        this.appUpdatesRow.refresh();
 
         this.binding.setOnClickTheme(this::onClickEditTheme);
         this.binding.setCurrentTheme(this.getCurrentThemeUiString());
@@ -476,6 +481,9 @@ public class SettingsActivity extends AppCompatActivity {
     /** What the membership lookup last said. Decides where the Apple iCloud link row goes. */
     private boolean accountIsLinked = false;
 
+    /** Settings -> App updates. */
+    private UpdateSettingsRow appUpdatesRow;
+
     /**
      * Say whether this app has already joined the account's keychain.
      *
@@ -514,6 +522,9 @@ public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (this.appUpdatesRow != null) {
+            this.appUpdatesRow.dispose();
+        }
         // The lookup hops back to the main thread to set a subtitle. If the screen has gone by
         // then that is a binding update on detached views, so it is stopped rather than left to
         // land wherever it lands.

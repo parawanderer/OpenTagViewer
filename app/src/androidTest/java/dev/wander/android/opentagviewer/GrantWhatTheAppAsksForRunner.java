@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dev.wander.android.opentagviewer.ble.BlePermissions;
+import dev.wander.android.opentagviewer.onboarding.OnboardingRecord;
 
 /**
  * Grants the runtime permissions the app asks for on startup, before any test runs.
@@ -57,6 +58,11 @@ public final class GrantWhatTheAppAsksForRunner extends AndroidJUnitRunner {
                 // the point is only that no dialog appears once the tests start.
             }
         }
+
+        // Every sign-in test expects the map after signing in, and a fresh install would show
+        // the onboarding steps first. Marked here so only OnboardingStepsTest, which forgets
+        // it and puts it back, ever sees them.
+        new OnboardingRecord(this.getTargetContext()).markShown();
 
         super.onStart();
     }

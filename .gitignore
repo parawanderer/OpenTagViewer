@@ -35,6 +35,10 @@ tmp/
 # in - none of which belongs to anybody else working on this.
 /.idea/androidTestResultsUserPreferences.xml
 /.idea/deploymentTargetSelector.xml
+# The Device Manager table's sort order, and boilerplate newer Studio versions write naming
+# the Gradle project system. Neither carries anything another checkout needs.
+/.idea/deviceManager.xml
+/.idea/AndroidProjectSystem.xml
 
 # Fixture-investigation notebook. Its whole job is decoding real exports, so its saved cell
 # outputs contain the very things the fixtures under app/src/test/resources/ exist to have

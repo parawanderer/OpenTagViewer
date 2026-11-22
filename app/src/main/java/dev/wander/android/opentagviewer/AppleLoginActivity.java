@@ -1500,7 +1500,10 @@ public class AppleLoginActivity extends AppCompatActivity {
 
         this.model.resetUiState();
         this.finish();
-        Intent intent = new Intent(this, MapsActivity.class);
+        // The first sign-in on this install goes through the onboarding steps, which open the
+        // map when they are done. Only here: opening the app signed in skips this screen.
+        Intent intent = new Intent(this, OnboardingActivity.isDue(this)
+                ? OnboardingActivity.class : MapsActivity.class);
         startActivity(intent);
     }
 
