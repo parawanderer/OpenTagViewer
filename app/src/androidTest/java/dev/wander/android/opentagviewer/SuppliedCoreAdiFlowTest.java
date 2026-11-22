@@ -7,6 +7,7 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
+import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
@@ -14,6 +15,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 import android.app.Activity;
@@ -131,8 +133,26 @@ public class SuppliedCoreAdiFlowTest {
         Eventually.check(() -> onView(withId(R.id.anisetteCoreAdiContainer))
                 .perform(scrollTo()).check(matches(isDisplayed())));
         onView(withId(R.id.email_or_phone_input_field)).check(matches(not(isDisplayed())));
-        onView(withId(R.id.anisetteLoginFallbackReason))
+        // The explanation and every button are inside the card, and the loose line that
+        // explains the other fallbacks stays hidden, so it is not said twice.
+        onView(withId(R.id.anisetteCoreAdiExplanation))
                 .check(matches(withText(R.string.anisette_login_needs_coreadi)));
+        onView(withId(R.id.anisetteLoginFallbackReason)).check(matches(not(isDisplayed())));
+        for (final int inside : new int[]{R.id.anisetteCoreAdiExplanation,
+                R.id.anisetteCoreAdiLink, R.id.anisetteCopyCoreAdiLinkButton,
+                R.id.anisetteChooseCoreAdiButton, R.id.anisetteRetryCoreAdiButton}) {
+            onView(withId(inside)).check(matches(
+                    isDescendantOfA(withId(R.id.anisetteCoreAdiContainer))));
+        }
+
+        // The icon sits beside the title only: the explanation starts where the icon does.
+        this.scenario.onActivity(a -> {
+            final int[] icon = new int[2];
+            final int[] text = new int[2];
+            a.findViewById(R.id.anisetteCoreAdiIcon).getLocationOnScreen(icon);
+            a.findViewById(R.id.anisetteCoreAdiExplanation).getLocationOnScreen(text);
+            assertEquals("explanation left edge", icon[0], text[0]);
+        });
 
         this.shot("coreadi_1_offer_light");
     }

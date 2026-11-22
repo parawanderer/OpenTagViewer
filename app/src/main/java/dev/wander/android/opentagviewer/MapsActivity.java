@@ -128,6 +128,8 @@ import dev.wander.android.opentagviewer.util.android.FusedPhoneLocation;
 import dev.wander.android.opentagviewer.util.LogCollectorUtil;
 import dev.wander.android.opentagviewer.util.MapUtils;
 import dev.wander.android.opentagviewer.util.TagOrder;
+import dev.wander.android.opentagviewer.onboarding.OnboardingRecord;
+import dev.wander.android.opentagviewer.update.UpdateOffer;
 import dev.wander.android.opentagviewer.util.TagVisibility;
 import dev.wander.android.opentagviewer.python.icloud.AccountRefresher;
 import dev.wander.android.opentagviewer.util.android.AddressLookup;
@@ -170,6 +172,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final int RING_PERMISSION_REQUEST_CODE = 2;
     private static final int NEARBY_PERMISSION_REQUEST_CODE = 3;
+
+    /** Start the iCloud flow once the account is restored. Sent by Setup's last step. */
+    public static final String EXTRA_CONNECT_ICLOUD = "connectICloud";
 
     private static final int GOOGLE_LOGO_PADDING_BOTTOM_PX = 40;
 
@@ -387,6 +392,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     private final Handler refreshSchedulerHandler = new Handler();
     private Runnable nextLocationRefreshTask = null;
 
+    /** The opt-in daily check for a newer release, and its bar. */
+    private UpdateOffer updateOffer;
+
     /**
      * How long a fetch may run before we tell the user it is still working.
      * <br>
@@ -544,6 +552,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         this.binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(this.binding.getRoot());
+        this.updateOffer = new UpdateOffer(this, this.binding.getRoot());
 
         this.userSettingsRepo = new UserSettingsRepository(
                 UserSettingsDataStore.getInstance(this.getApplicationContext()));
@@ -691,6 +700,8 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         super.onResume();
 
         this.userSettings = this.userSettingsRepo.getUserSettings();
+        // Opt-in, and at most once a day; see UpdateOffer.
+        this.updateOffer.onResume();
         if (this.mapProvider != null) {
             this.mapProvider.setMapStyle(this.getPreferredMapStyle());
         }
@@ -765,7 +776,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
         // activity, so a request fired from every onResume re-prompted the instant the user
         // denied, a loop with no way out on Android 10 and below.
         if (!BlePermissions.granted(this)) {
-            if (!this.nearbyBlePermissionRequested) {
+            // Not when onboarding already asked on this install: its "Later" was an answer,
+            // and the ring button still asks when somebody taps it.
+            if (!this.nearbyBlePermissionRequested && !new OnboardingRecord(this).done()) {
                 this.nearbyBlePermissionRequested = true;
                 Log.d(TAG, "Requesting BLE permission(s) to watch for nearby tags");
                 ActivityCompat.requestPermissions(
@@ -934,6 +947,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (this.updateOffer != null) {
+            this.updateOffer.onDestroy();
+        }
 
         // Whichever provider this is, and this screen does not ask which: the callback is on
         // IMapProvider with a default no-op, so a provider that needs it overrides and one that
@@ -2011,6 +2027,14 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
                     AppDependencies.anisette(this, this.userSettings, true))
             .map(appleAccount -> {
                 this.appleService = PythonAppleService.setup(appleAccount);
+
+                // Setup's "Connect tags from iCloud" lands here: the iCloud flow needs the
+                // account this has just restored, which nothing before the map has. Once only,
+                // so a rebuilt map does not start it again.
+                if (this.getIntent().getBooleanExtra(EXTRA_CONNECT_ICLOUD, false)) {
+                    this.getIntent().removeExtra(EXTRA_CONNECT_ICLOUD);
+                    this.runOnUiThread(() -> this.actOnTheICloudOffer(true));
+                }
 
                 // **The other door.** getAccount now hands back an account that needs a second
                 // factor rather than discarding it (see main.py, and issue #43), so a restore

@@ -90,6 +90,15 @@ public final class Shot {
      * dialog should be - they are different windows, and on a device with no compositor there is
      * nothing to put them back together.
      */
+    /**
+     * The whole window {@code anyViewInIt} belongs to. For a dialog the test cannot reach as a
+     * {@link Dialog} object, such as one an activity builds for itself: find any view in it with
+     * Espresso's {@code inRoot(isDialog())} and pass that.
+     */
+    public static void ofTheWindowOf(final View anyViewInIt, final String name) {
+        draw(anyViewInIt.getRootView(), name);
+    }
+
     public static void of(final Dialog dialog, final String name) {
         if (dialog.getWindow() == null) {
             Log.w(TAG, "the dialog has no window yet, so nothing was drawn for " + name);

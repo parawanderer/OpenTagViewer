@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The steps after a first sign-in: get your tags, nearby tags and location, update checks.
+    "Setup" and a stepper at the top (circles joined by lines, drawn by OnboardingActivity), the
+    step itself centred, and its two buttons at the bottom. Every step is skippable. The step
+    slides in with StepTransition as the sign-in steps do.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/onboarding_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/onboarding_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:fontFamily="@font/nunito_semi_bold"
+        android:gravity="center"
+        android:text="@string/onboarding_setup"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp" />
+
+    <!-- Filled in per step; its content description reads "Step 1 of 3". -->
+    <LinearLayout
+        android:id="@+id/onboarding_stepper"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal" />
+
+    <!--
+        No default focus highlight: after typing the sign-in on a keyboard the app is out of
+        touch mode, this gets focus, and Android washes it grey. See OnboardingStepsTest.
+    -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:defaultFocusHighlightEnabled="false"
+        android:fillViewport="true"
+        tools:targetApi="o">
+
+        <LinearLayout
+            android:id="@+id/onboarding_step"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingLeft="32dp"
+            android:paddingTop="24dp"
+            android:paddingRight="32dp"
+            android:paddingBottom="24dp">
+
+            <ImageView
+                android:id="@+id/onboarding_icon"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:importantForAccessibility="no"
+                app:srcCompat="@drawable/devices_24px"
+                app:tint="?attr/colorPrimary" />
+
+            <TextView
+                android:id="@+id/onboarding_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="@font/nunito_semi_bold"
+                android:gravity="center"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="26sp" />
+
+            <TextView
+                android:id="@+id/onboarding_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.15"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
+        android:paddingBottom="24dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/onboarding_primary_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/onboarding_skip_button"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+</LinearLayout>

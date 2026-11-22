@@ -9,6 +9,8 @@
         <variable name="onClickICloudLink" type="Runnable" />
         <variable name="onClickExtraSources" type="Runnable" />
         <variable name="iCloudLinkSubtitle" type="String" />
+        <variable name="onClickAppUpdates" type="Runnable" />
+        <variable name="appUpdatesSubtitle" type="String" />
         <variable name="onClickTheme" type="Runnable" />
         <variable name="currentTheme" type="String" />
         <variable name="onClickLanguage" type="Runnable" />
@@ -133,7 +135,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="20dp">
+            android:paddingTop="12dp">
+
+            <!--
+                Section headings: Appearance, Tags, App. Settings had grown to a dozen rows told
+                apart only by spacing. Lined up with the rows' titles, Material-style.
+            -->
+            <TextView
+                android:id="@+id/settings_section_appearance"
+                style="@style/SettingsSectionHeading"
+                android:text="@string/settings_section_appearance" />
 
             <include
                 android:id="@+id/setting_app_theme"
@@ -212,21 +223,6 @@
                 app:onClick="@{onClickLanguage}"
                 />
 
-            <!--
-                Titled for what it now controls rather than for the server it used to be:
-                signing in normally involves no server at all. The subtitle carries whichever
-                is in use, so the common case reads "On this device" instead of a URL that no
-                longer means anything.
-            -->
-            <include
-                android:id="@+id/setting_app_anisette_server"
-                layout="@layout/settings_item_clickable"
-                app:icon="@{@drawable/host_24px}"
-                app:sectionSubtitle="@{currentAnisetteServerUrl}"
-                app:title="@{@string/anisette_provider}"
-                app:onClick="@{onClickAnisetteServerUrl}"
-                />
-
             <include
                 android:id="@+id/setting_app_map_provider"
                 layout="@layout/settings_item_clickable"
@@ -241,6 +237,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:id="@+id/settings_section_tags"
+                style="@style/SettingsSectionHeading"
+                android:text="@string/settings_section_tags" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -428,6 +429,35 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:id="@+id/settings_section_app"
+                style="@style/SettingsSectionHeading"
+                android:text="@string/settings_section_app" />
+
+            <!-- The version, and the opt-in GitHub check for a newer one. See UpdateOffer. -->
+            <include
+                android:id="@+id/settings_app_updates"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/system_update_24px}"
+                app:onClick="@{onClickAppUpdates}"
+                app:sectionSubtitle="@{appUpdatesSubtitle}"
+                app:title="@{@string/updates_title}" />
+
+            <!--
+                Titled for what it now controls rather than for the server it used to be:
+                signing in normally involves no server at all. The subtitle carries whichever
+                is in use, so the common case reads "On this device" instead of a URL that no
+                longer means anything.
+            -->
+            <include
+                android:id="@+id/setting_app_anisette_server"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/host_24px}"
+                app:sectionSubtitle="@{currentAnisetteServerUrl}"
+                app:title="@{@string/anisette_provider}"
+                app:onClick="@{onClickAnisetteServerUrl}"
+                />
 
             <LinearLayout
                 android:layout_width="match_parent"

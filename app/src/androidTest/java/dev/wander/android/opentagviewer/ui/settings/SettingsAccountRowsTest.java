@@ -2,6 +2,7 @@ package dev.wander.android.opentagviewer.ui.settings;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
@@ -40,6 +41,8 @@ import dev.wander.android.opentagviewer.db.repo.KeychainMembershipRepository;
 import dev.wander.android.opentagviewer.python.icloud.KeychainMembership;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import androidx.core.graphics.ColorUtils;
+import com.google.android.material.color.MaterialColors;
 
 /**
  * The account rows under the card in Settings: one per account source, lined up with the rows
@@ -100,6 +103,49 @@ public class SettingsAccountRowsTest {
         final int theme = this.titleXOf(R.id.setting_app_theme);
         assertEquals("Apple iCloud link", theme, this.titleXOf(R.id.settings_icloud_link));
         assertEquals("Google Find Hub", theme, this.titleXOf(R.id.settings_extra_sources));
+    }
+
+    /** A view's top or left edge on screen. */
+    private int[] at(final int viewId) {
+        final int[] xy = new int[2];
+        this.scenario.onActivity(a -> a.findViewById(viewId).getLocationOnScreen(xy));
+        return xy;
+    }
+
+    /**
+     * Each heading starts where the rows' titles start, and sits above the first row it names.
+     * Fails if a heading is indented to the icon, or if a row is moved out from under it.
+     */
+    @Test
+    public void theSectionHeadingsLineUpAndNameTheRowsBelowThem() {
+        this.openSettings();
+        final int titles = this.titleXOf(R.id.setting_app_theme);
+
+        final int[][] headingAndFirstRow = {
+                {R.id.settings_section_appearance, R.id.setting_app_theme},
+                {R.id.settings_section_tags, R.id.settings_show_apple_devices},
+                {R.id.settings_section_app, R.id.settings_app_updates},
+        };
+        int previousY = Integer.MIN_VALUE;
+        for (final int[] pair : headingAndFirstRow) {
+            final int[] heading = this.at(pair[0]);
+            // Within a pixel: the rows reach their titles through 22dp + 28dp + 22dp, each
+            // rounded to pixels on its own, and the heading through one 72dp margin.
+            assertTrue("heading lines up with the row titles: " + heading[0] + " vs " + titles,
+                    Math.abs(titles - heading[0]) <= 1);
+            assertTrue("heading above its first row", heading[1] < this.at(pair[1])[1]);
+            assertTrue("headings in order", heading[1] > previousY);
+            previousY = heading[1];
+        }
+        assertTrue("the Anisette row moved to App",
+                this.at(R.id.setting_app_anisette_server)[1] > previousY);
+    }
+
+    @Test
+    public void theBottomOfSettingsInLightMode() {
+        this.openSettings();
+        onView(withId(R.id.settings_app_debug_data_enabled)).perform(scrollTo());
+        this.shot("settings_sections_bottom_light");
     }
 
     @Test
@@ -192,6 +238,37 @@ public class SettingsAccountRowsTest {
     public void theLinkedPageInDarkMode() {
         this.openTheLinkPageLinked(true);
         this.shot("icloud_link_linked_dark");
+    }
+
+    /**
+     * The card's title is in the account name's colour (colorOnPrimaryContainer), on the card's
+     * own background. Both resolved from the theme, so checked as a number, in both modes.
+     */
+    private void titleIsReadableOnTheCard() {
+        this.scenario.onActivity(a -> {
+            final TextView title = a.findViewById(R.id.icloud_link_status);
+            final int background = MaterialColors.getColor(
+                    title, com.google.android.material.R.attr.colorSurfaceContainerLow);
+            final double ratio = ColorUtils.calculateContrast(
+                    title.getCurrentTextColor(), background);
+            assertTrue("title contrast on the card is " + ratio, ratio >= 4.5);
+            assertEquals("the same blue as the account name",
+                    MaterialColors.getColor(title,
+                            com.google.android.material.R.attr.colorOnPrimaryContainer),
+                    title.getCurrentTextColor());
+        });
+    }
+
+    @Test
+    public void theLinkCardTitleIsReadableInLightMode() {
+        this.openTheLinkPageLinked(false);
+        this.titleIsReadableOnTheCard();
+    }
+
+    @Test
+    public void theLinkCardTitleIsReadableInDarkMode() {
+        this.openTheLinkPageLinked(true);
+        this.titleIsReadableOnTheCard();
     }
 
     private void shot(final String name) {

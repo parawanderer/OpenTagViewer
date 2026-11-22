@@ -420,7 +420,6 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="anisette_report_crash">Report this phone</string>
     <string name="anisette_crash_report_body">Apple\'s sign-in library crashes as soon as it loads on this phone. It works on most phones, and we do not know yet what the affected ones have in common.\n\nOpenTagViewer now uses a server for that step, so you can sign in and use the app normally. A report with the details below is what helps us find the cause.</string>
     <string name="login_failed_refused_before_password">Apple refused to start signing in to this Apple ID before your password was checked, so retyping it will not help. Check that you can sign in at account.apple.com and whether Apple asks anything of you there. Trying a remote server presents Apple with a different device, which is worth a try. Apple said: %1$s</string>
-    <string name="extra_sources">Extra location sources (experimental)</string>
     <string name="extra_sources_explainer">Experimental. Locate the trackers in your Google account through your own googlefind service. They can be added as devices, or linked to a device so both networks\' reports show on one marker.</string>
     <string name="google_find_hub" translatable="false">Google Find Hub</string>
     <string name="google_find_hub_explainer">Reports of the trackers in your Google account, from a googlefind service. Fresh locations are requested only when you refresh a tag.</string>
@@ -472,4 +471,33 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="icloud_link_status_unlinked_detail">Connect once with the passcode of one of your Apple devices. After that, checking for new tags takes one tap.</string>
     <string name="icloud_link_connect_button">Connect tags from iCloud</string>
     <string name="icloud_link_check_button">Check for new tags</string>
+    <string name="onboarding_step">Step %1$d of %2$d</string>
+    <string name="onboarding_tags_title">Get your tags</string>
+    <string name="onboarding_tags_body">Read your tags from your iCloud account. You can also import a file from the exporter later, from the map\'s menu.</string>
+    <string name="onboarding_later">Later</string>
+    <string name="onboarding_nearby_title">Tags near you</string>
+    <string name="onboarding_nearby_body">Bluetooth shows when a tag is close by and lets you ring it. Location shows where you are on the map.</string>
+    <string name="onboarding_allow">Allow</string>
+    <string name="onboarding_updates_title">New versions</string>
+    <string name="onboarding_updates_yes">Check daily</string>
+    <string name="onboarding_updates_no">No thanks</string>
+    <string name="updates_explained">Check GitHub once a day for a new version of the app? GitHub sees your IP address when it is asked.</string>
+    <string name="updates_title">App updates</string>
+    <string name="updates_subtitle_off">Version %1$s · Checking is off</string>
+    <string name="updates_subtitle_unchecked">Version %1$s · Not checked yet</string>
+    <string name="updates_subtitle_current">Version %1$s · Up to date</string>
+    <string name="updates_subtitle_available">Version %1$s · %2$s available</string>
+    <string name="updates_checking">Checking GitHub…</string>
+    <string name="updates_check_failed">Could not reach GitHub. Try again later.</string>
+    <string name="updates_turn_on">Turn on</string>
+    <string name="updates_turn_off">Turn off</string>
+    <string name="updates_check_now">Check now</string>
+    <string name="updates_open_release">Open release page</string>
+    <string name="updates_available">Version %1$s is out</string>
+    <string name="updates_update">Update</string>
+    <string name="onboarding_setup">Setup</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_tags">Tags</string>
+    <string name="settings_section_app">App</string>
+    <string name="anisette_coreadi_card_title">Couldn\'t download a file from Apple</string>
 </resources>

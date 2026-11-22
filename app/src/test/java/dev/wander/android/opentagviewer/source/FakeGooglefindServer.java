@@ -23,13 +23,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>A plain {@link ServerSocket} rather than the JDK's HTTP server, which is not on the unit test
  * compile classpath here - the same choice as {@code FakeApkServer}.
  */
-final class FakeGooglefindServer implements Closeable {
+public final class FakeGooglefindServer implements Closeable {
 
     /** One request as it arrived. Header names are lowercased. */
-    static final class Request {
-        final String method;
-        final String target;
-        final Map<String, String> headers;
+    public static final class Request {
+        public final String method;
+        public final String target;
+        public final Map<String, String> headers;
         final String body;
 
         Request(final String method, final String target, final Map<String, String> headers, final String body) {
@@ -55,7 +55,7 @@ final class FakeGooglefindServer implements Closeable {
     private final Map<String, Answer> answers = new HashMap<>();
     private final List<Request> requests = new ArrayList<>();
 
-    FakeGooglefindServer() throws IOException {
+    public FakeGooglefindServer() throws IOException {
         // Port 0: the OS picks a free one, so parallel tests cannot collide on a fixed number.
         this.socket = new ServerSocket(0, 0, InetAddress.getByName("127.0.0.1"));
         final Thread thread = new Thread(this::serveUntilStopped, "FakeGooglefindServer");
@@ -63,12 +63,12 @@ final class FakeGooglefindServer implements Closeable {
         thread.start();
     }
 
-    String url() {
+    public String url() {
         return "http://127.0.0.1:" + this.socket.getLocalPort();
     }
 
     /** Answer any request whose path (query excluded) is {@code path}. Unknown paths get 404. */
-    synchronized FakeGooglefindServer answer(final String path, final int status, final String body) {
+    public synchronized FakeGooglefindServer answer(final String path, final int status, final String body) {
         this.answers.put(path, new Answer(status, body));
         return this;
     }
@@ -77,7 +77,7 @@ final class FakeGooglefindServer implements Closeable {
         return new ArrayList<>(this.requests);
     }
 
-    synchronized Request lastRequest() {
+    public synchronized Request lastRequest() {
         return this.requests.get(this.requests.size() - 1);
     }
 
