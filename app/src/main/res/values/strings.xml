@@ -499,4 +499,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
+    <string name="anisette_coreadi_card_title">Couldn\'t download a file from Apple</string>
 </resources>

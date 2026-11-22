@@ -357,7 +357,8 @@ public class SharedMainSettingsManager {
 
         final View reason = root.findViewById(R.id.anisetteLoginFallbackReason);
         if (reason != null) {
-            reason.setVisibility(explain ? VISIBLE : GONE);
+            // Not for CoreADI: that explanation is inside its own card, with the file's buttons.
+            reason.setVisibility(explain && !needsCoreAdi ? VISIBLE : GONE);
             if (reason instanceof TextView) {
                 ((TextView) reason).setText(crashes
                         ? R.string.anisette_login_crashes_here

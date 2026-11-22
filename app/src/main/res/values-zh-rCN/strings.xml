@@ -464,4 +464,5 @@
     <string name="settings_section_appearance">外观</string>
     <string name="settings_section_tags">标签</string>
     <string name="settings_section_app">应用</string>
+    <string name="anisette_coreadi_card_title">无法从 Apple 下载文件</string>
 </resources>

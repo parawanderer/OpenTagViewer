@@ -464,4 +464,5 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="settings_section_appearance">화면</string>
     <string name="settings_section_tags">태그</string>
     <string name="settings_section_app">앱</string>
+    <string name="anisette_coreadi_card_title">Apple에서 파일을 다운로드하지 못했습니다</string>
 </resources>

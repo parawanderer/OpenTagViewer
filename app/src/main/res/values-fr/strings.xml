@@ -464,4 +464,5 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="settings_section_appearance">Apparence</string>
     <string name="settings_section_tags">Balises</string>
     <string name="settings_section_app">Application</string>
+    <string name="anisette_coreadi_card_title">Impossible de télécharger un fichier d\'Apple</string>
 </resources>

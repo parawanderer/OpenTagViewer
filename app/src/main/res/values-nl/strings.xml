@@ -464,4 +464,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="settings_section_appearance">Weergave</string>
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
+    <string name="anisette_coreadi_card_title">Kon een bestand van Apple niet downloaden</string>
 </resources>

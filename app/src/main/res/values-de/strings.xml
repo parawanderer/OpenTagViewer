@@ -464,4 +464,5 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="settings_section_appearance">Darstellung</string>
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
+    <string name="anisette_coreadi_card_title">Eine Datei von Apple konnte nicht geladen werden</string>
 </resources>

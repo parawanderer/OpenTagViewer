@@ -84,6 +84,19 @@ public class ExtraSourcesSettingsScreenTest {
         });
     }
 
+    /** The icon sits beside the title only: the paragraphs start where the icon does. */
+    @Test
+    public void theCardsParagraphsAreNotIndentedUnderTheIcon() {
+        Eventually.check(() -> onView(withId(R.id.extra_sources_card)).check(matches(isDisplayed())));
+        this.scenario.onActivity(a -> {
+            final int[] icon = new int[2];
+            final int[] text = new int[2];
+            a.findViewById(R.id.extra_sources_card_icon).getLocationOnScreen(icon);
+            a.findViewById(R.id.extra_sources_explainer_text).getLocationOnScreen(text);
+            assertEquals("paragraph left edge", icon[0], text[0]);
+        });
+    }
+
     @Test
     public void shotLight() {
         Eventually.check(() -> onView(withId(R.id.extra_sources_card)).check(matches(isDisplayed())));

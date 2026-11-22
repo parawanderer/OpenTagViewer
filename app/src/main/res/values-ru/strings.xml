@@ -464,4 +464,5 @@
     <string name="settings_section_appearance">Оформление</string>
     <string name="settings_section_tags">Метки</string>
     <string name="settings_section_app">Приложение</string>
+    <string name="anisette_coreadi_card_title">Не удалось скачать файл от Apple</string>
 </resources>

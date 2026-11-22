@@ -50,38 +50,50 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/layout_rounded"
                     android:backgroundTint="?attr/colorSurfaceContainerLow"
-                    android:orientation="horizontal"
+                    android:orientation="vertical"
                     android:paddingLeft="20dp"
                     android:paddingTop="20dp"
                     android:paddingRight="20dp"
                     android:paddingBottom="8dp">
 
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/host_24px"
-                        app:tint="?attr/colorOnPrimaryContainer" />
+                    <!-- The icon beside the title only; the paragraphs below use the full width. -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:importantForAccessibility="no"
+                            android:id="@+id/extra_sources_card_icon"
+                            app:srcCompat="@drawable/host_24px"
+                            app:tint="?attr/colorOnPrimaryContainer" />
+
+                        <TextView
+                            android:id="@+id/extra_sources_card_title"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/nunito_semi_bold"
+                            android:text="@string/google_find_hub"
+                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textSize="17sp" />
+                    </LinearLayout>
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginLeft="18dp"
-                        android:layout_weight="1"
+                        android:layout_marginTop="8dp"
                         android:orientation="vertical">
 
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:fontFamily="@font/nunito_semi_bold"
-                            android:text="@string/google_find_hub"
-                            android:textColor="?attr/colorOnPrimaryContainer"
-                            android:textSize="17sp" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
+                            android:id="@+id/extra_sources_explainer_text"
                             android:text="@string/extra_sources_explainer"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
