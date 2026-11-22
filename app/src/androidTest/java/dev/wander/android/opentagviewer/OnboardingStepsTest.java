@@ -293,22 +293,24 @@ public class OnboardingStepsTest {
     }
 
     private void shotOf(final OnboardingActivity.Step step, final boolean night, final String name) {
+        // The order Setup really shows them in (OnboardingActivity.decideTheSteps), so the
+        // stepper in these pictures - which the wiki uses - numbers them as a user sees them.
         OnboardingActivity.forcedSteps = List.of(
-                OnboardingActivity.Step.TAGS, OnboardingActivity.Step.NEARBY,
-                OnboardingActivity.Step.UPDATES);
+                OnboardingActivity.Step.NEARBY, OnboardingActivity.Step.UPDATES,
+                OnboardingActivity.Step.TAGS);
         if (night) {
             getInstrumentation().runOnMainSync(
                     () -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES));
         }
         this.open();
-        this.seeTitle(R.string.onboarding_tags_title);
-        if (step != OnboardingActivity.Step.TAGS) {
-            this.tap(R.id.onboarding_skip_button);
-            this.seeTitle(R.string.onboarding_nearby_title);
-        }
-        if (step == OnboardingActivity.Step.UPDATES) {
+        this.seeTitle(R.string.onboarding_nearby_title);
+        if (step != OnboardingActivity.Step.NEARBY) {
             this.tap(R.id.onboarding_skip_button);
             this.seeTitle(R.string.onboarding_updates_title);
+        }
+        if (step == OnboardingActivity.Step.TAGS) {
+            this.tap(R.id.onboarding_skip_button);
+            this.seeTitle(R.string.onboarding_tags_title);
         }
         final Activity[] activity = {null};
         this.scenario.onActivity(a -> activity[0] = a);
