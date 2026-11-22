@@ -43,7 +43,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # clang, because the NDK is clang: the stubs should be compiled by the compiler family that
       # builds them for the APK. Both are preinstalled on GitHub's Ubuntu images.

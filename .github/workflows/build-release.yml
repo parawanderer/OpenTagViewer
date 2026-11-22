@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Nothing rewrites versionName from the tag: it is what the app reports about itself in
       # Settings and in bug reports, and it is baked into the APK. So a tag that disagrees
@@ -57,7 +57,7 @@ jobs:
         run: echo "repository_name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
 
       - name: Set Up JDK
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'zulu' # See 'Supported distributions' for available options
           java-version: '17'
@@ -92,7 +92,7 @@ jobs:
 
       # Covers app/src/main/python, the module Chaquopy packages into the APK.
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
@@ -137,14 +137,14 @@ jobs:
       # Upload Artifact Build
       # Noted For Output [main_project_module]/build/outputs/apk/debug/
       - name: Upload APK Debug
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) debug generated
           path: ${{ env.main_project_module }}/build/outputs/apk/debug/
 
       # Noted For Output [main_project_module]/build/outputs/apk/release/
       - name: Upload APK Release
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) release generated
           path: ${{ env.main_project_module }}/build/outputs/apk/release/
@@ -172,7 +172,7 @@ jobs:
           echo "UNICORN_SOURCE=unicorn-$(basename "$url")" >> "$GITHUB_ENV"
 
       - name: Upload APK Release Asset to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         if: github.event_name == 'release'
         with:
           files: |
@@ -183,7 +183,7 @@ jobs:
 
       # Noted For Output [main_project_module]/build/outputs/bundle/release/
       # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
-      #   uses: actions/upload-artifact@v7
+      #   uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       #   with:
       #     name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - App bundle(s) AAB release generated
       #     path: ${{ env.main_project_module }}/build/outputs/bundle/release/

@@ -41,7 +41,7 @@ jobs:
     name: Build the probe and stubs with the NDK
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Both ABIs are cross-compiled here: the arm64 runner image has no Android SDK, and the NDK
       # ships no linux-aarch64 host toolchain.
@@ -72,7 +72,7 @@ jobs:
           done
           file dist/*/*/*
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: probe
           path: dist/
@@ -113,9 +113,9 @@ jobs:
             extract: extract_bionic_apex.sh
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: probe
           path: dist
@@ -127,7 +127,7 @@ jobs:
 
       # The runtime is 46-65 MB once trimmed to what is needed, against a 430-720 MB image, so it is
       # cached. Keyed on the image and the script that extracts it. Saved only by a passing job.
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: runtime-cache
         with:
           path: runtime
