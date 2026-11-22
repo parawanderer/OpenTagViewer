@@ -219,6 +219,25 @@ public final class FakeAppleAuthService implements AppleAuthService {
         return fake;
     }
 
+    /**
+     * Apple signs the user in but issues no Find My token.
+     *
+     * <p><b>Issue #311.</b> Since 2026-10-12 Apple issues {@code searchPartyToken} only to a
+     * sign-in whose Anisette machine was minted by a Mac or an iPhone, so a sign-in through
+     * a remote Anisette server completes and then every location fetch fails. Carries no
+     * account: there is nothing further to do with the session, and handing one over is an
+     * invitation to store it.
+     */
+    public static FakeAppleAuthService signsInWithoutFindMyToken() {
+        final FakeAppleAuthService fake =
+                new FakeAppleAuthService(LOGIN_STATE.LOGGED_OUT, null);
+        fake.loginFailsWith = new PythonAccountLoginException(
+                "Apple signed in but did not issue a Find My token "
+                        + "(searchPartyToken missing from service tokens)",
+                PythonAccountLoginException.REASON_NO_FIND_MY_TOKEN);
+        return fake;
+    }
+
     /** Signing in works, but the code that gets typed is refused. */
     public FakeAppleAuthService thatRejectsTheCode(final String message) {
         this.codeFailsWith = new PythonAccountLoginException(message);
