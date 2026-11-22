@@ -71,6 +71,22 @@ public class PythonAccountLoginException extends RuntimeException {
      */
     public static final String REASON_REFUSED_BEFORE_PASSWORD = "refused_before_password";
 
+    /**
+     * Apple signed the user in but issued no Find My token. Matches
+     * {@code REASON_NO_FIND_MY_TOKEN}.
+     *
+     * <p><b>Issue #311.</b> Since 2026-10-12 Apple issues {@code searchPartyToken} only to a
+     * sign-in whose Anisette machine was minted by a Mac or an iPhone, so a sign-in through
+     * a remote Anisette server completes and then every location fetch fails. The sign-in
+     * worked, so the screen must not blame the password, the network, or a refusal - and
+     * must not offer the remote-server route, because the server is the cause here rather
+     * than the remedy.
+     *
+     * <p>Carries no account, deliberately: unlike terms, there is nothing further to do with
+     * the session from here.
+     */
+    public static final String REASON_NO_FIND_MY_TOKEN = "no_find_my_token";
+
     /** Anything not recognised. The detail is shown as-is rather than guessed at. */
     public static final String REASON_UNKNOWN = "unknown";
 
