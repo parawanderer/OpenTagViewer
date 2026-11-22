@@ -465,4 +465,5 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="settings_section_tags">Balises</string>
     <string name="settings_section_app">Application</string>
     <string name="anisette_coreadi_card_title">Impossible de télécharger un fichier d\'Apple</string>
+    <string name="login_failed_no_find_my_token">Le serveur Anisette t’a connecté, mais Apple n’a pas accordé l’accès à Localiser pour cette connexion. Apple ne délivre le jeton Localiser que pour une connexion depuis un Mac ou un iPhone, donc cette connexion ne peut récupérer aucune position. Connecte-toi plutôt avec Anisette depuis ce téléphone.</string>
 </resources>
