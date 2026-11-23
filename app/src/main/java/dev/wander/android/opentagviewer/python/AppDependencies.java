@@ -22,6 +22,8 @@ import dev.wander.android.opentagviewer.ble.FmdnRingTrigger;
 import dev.wander.android.opentagviewer.ble.RoutingSoundTrigger;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
+import dev.wander.android.opentagviewer.db.repo.LocalDataEraser;
+import dev.wander.android.opentagviewer.db.repo.ThisPhonesTagData;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
@@ -135,6 +137,17 @@ public final class AppDependencies {
      */
     private static BundleBuilder bundleBuilder = new ChaquopyBundleBuilder();
 
+    /**
+     * Erases the user's tags, keys and history from this phone, for Settings.
+     *
+     * <p><b>Here so a test can press the button without it doing the thing.</b> The instrumented
+     * suite runs against the real on-device database, which on somebody's own phone holds their
+     * tags; a test of the erase button that really erased would wipe them. So a test checks the
+     * screen calls this, and {@code ErasingEverythingTest} checks what the real one deletes,
+     * against an in-memory database.
+     */
+    private static Function<Context, LocalDataEraser> dataEraserFactory = ThisPhonesTagData::of;
+
     /** Builds the blocking history importer for the My Devices screen. */
     private static Function<Context, HistoryArchiveImporter> historyImporterFactory =
             context -> new HistoryImporter(OpenTagViewerDatabase.getInstance(
@@ -236,6 +249,15 @@ public final class AppDependencies {
         return bundleBuilder;
     }
 
+    public static LocalDataEraser dataEraser(final Context context) {
+        return dataEraserFactory.apply(context);
+    }
+
+    @VisibleForTesting
+    public static void replaceDataEraser(final LocalDataEraser replacement) {
+        dataEraserFactory = context -> replacement;
+    }
+
     public static HistoryArchiveImporter historyImporter(final Context context) {
         return historyImporterFactory.apply(context);
     }
@@ -308,6 +330,7 @@ public final class AppDependencies {
         accessorySoundTrigger = null;
         logRedactor = new ChaquopyLogRedactor();
         bundleBuilder = new ChaquopyBundleBuilder();
+        dataEraserFactory = ThisPhonesTagData::of;
         historyImporterFactory = context -> new HistoryImporter(
                 OpenTagViewerDatabase.getInstance(context.getApplicationContext()));
         icloudFactory = AppDependencies::openRealICloud;

@@ -465,4 +465,13 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">Eine Datei von Apple konnte nicht geladen werden</string>
+    <string name="remove_tag_also_erase_history">Auch den Standortverlauf löschen. Ein erneuter Import des Tags bringt ihn nicht zurück.</string>
+    <string name="remove_tags_also_erase_history">Auch deren Standortverlauf löschen. Ein erneuter Import der Tags bringt ihn nicht zurück.</string>
+    <string name="logout_also_erase_data">Auch alle Tags auf diesem Telefon samt Schlüsseln und Standortverlauf sowie die iCloud-Verknüpfung löschen</string>
+    <string name="erase_all_data_title">Alle Daten löschen</string>
+    <string name="erase_all_data_subtitle">Alle Tags samt Schlüsseln und Standortverlauf von diesem Telefon löschen und abmelden</string>
+    <string name="erase_all_data_confirm_title">Alle Daten löschen?</string>
+    <string name="erase_all_data_confirm_message">Alle Tags auf diesem Telefon werden gelöscht, samt Schlüsseln und Standortverlauf, ebenso die Importe, aus denen sie stammen, und die iCloud-Verknüpfung. Du wirst von deinem Apple-Konto abgemeldet. Deine Einstellungen bleiben erhalten.\n\nDas lässt sich nicht rückgängig machen. Ein aus einer Datei importierter Tag kommt nur zurück, wenn du diese Datei erneut importierst.\n\nDie App wird dadurch nicht aus deinem Apple-Konto entfernt. Das muss auf einem Apple-Gerät geschehen.</string>
+    <string name="erase_all_data_confirm_button">Löschen</string>
+    <string name="error_erasing_data">Die Daten auf diesem Telefon konnten nicht gelöscht werden, daher bist du weiterhin angemeldet. Versuche es erneut.</string>
 </resources>

@@ -39,4 +39,15 @@ public interface ImportDao {
 
     @Delete
     int delete(Import importDataWithId);
+
+    /**
+     * Delete an import once no tag refers to it any more, removed or not.
+     *
+     * <p>An import row records who exported the bundle ({@code source_user}, an Apple ID) and
+     * when. Once its last tag has been erased it describes nothing, so it goes too. One that a
+     * hidden, removed tag still points at stays, because a re-import may bring that tag back.
+     */
+    @Query("DELETE FROM Import WHERE id = :importId"
+            + " AND NOT EXISTS (SELECT 1 FROM OwnedBeacons WHERE import_id = :importId)")
+    int deleteIfNothingRefersTo(long importId);
 }

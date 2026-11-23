@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 
@@ -1156,13 +1157,21 @@ public class MyDevicesListActivity extends AppCompatActivity {
                         : R.string.are_you_sure_you_want_to_remove_these_devices)
                 : this.getString(R.string.remove_devices_but_keep_account_ones, fromTheAccount);
 
+        // Keys go either way, history only when ticked - see BeaconRepository#removeBeacon.
+        final View alsoErase = this.getLayoutInflater().inflate(R.layout.dialog_also_erase, null);
+        final CheckBox eraseHistory = alsoErase.findViewById(R.id.dialog_also_erase);
+        eraseHistory.setText(removable.size() == 1
+                ? R.string.remove_tag_also_erase_history
+                : R.string.remove_tags_also_erase_history);
+
         new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
                 .setTitle(removable.size() == 1 ? R.string.remove_device : R.string.remove_devices)
                 .setIcon(R.drawable.delete_24px)
                 .setMessage(message)
+                .setView(alsoErase)
                 .setPositiveButton(R.string.confirm, (dialog, which) -> {
                     for (BeaconInformation device : removable) {
-                        this.removeDevice(device);
+                        this.removeDevice(device, eraseHistory.isChecked());
                     }
                     this.endSelection();
                 })
@@ -1184,12 +1193,13 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void removeDevice(final BeaconInformation device) {
+    private void removeDevice(final BeaconInformation device, final boolean alsoErasingHistory) {
         final String beaconId = device.getBeaconId();
 
-        // Same call DeviceInfoActivity makes: rows are hidden rather than deleted, so the
-        // location history survives a re-import.
-        var async = this.beaconRepo.markBeaconAsRemoved(beaconId)
+        // Same call DeviceInfoActivity makes. Unless the history is being erased too, the row is
+        // hidden rather than deleted, so the location history survives a re-import; the keys are
+        // deleted either way.
+        var async = this.beaconRepo.removeBeacon(beaconId, alsoErasingHistory)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         () -> this.refreshListOnItemRemoved(beaconId),

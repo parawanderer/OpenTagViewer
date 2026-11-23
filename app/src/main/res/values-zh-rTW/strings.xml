@@ -465,4 +465,13 @@
     <string name="settings_section_tags">標籤</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">無法從 Apple 下載檔案</string>
+    <string name="remove_tag_also_erase_history">同時刪除其位置記錄。再次匯入該標籤也無法復原。</string>
+    <string name="remove_tags_also_erase_history">同時刪除它們的位置記錄。再次匯入這些標籤也無法復原。</string>
+    <string name="logout_also_erase_data">同時清除此手機上的所有標籤（包括金鑰和位置記錄）以及 iCloud 連結</string>
+    <string name="erase_all_data_title">清除所有資料</string>
+    <string name="erase_all_data_subtitle">從此手機刪除所有標籤及其金鑰和位置記錄，並登出</string>
+    <string name="erase_all_data_confirm_title">清除所有資料？</string>
+    <string name="erase_all_data_confirm_message">此手機上的所有標籤將被刪除，連同其金鑰、位置記錄、匯入來源以及 iCloud 連結。你將登出 Apple 帳戶。你的設定會保留。\n\n此操作無法復原。從檔案匯入的標籤只有再次匯入該檔案才能恢復。\n\n這不會將此 App 從你的 Apple 帳戶中移除。移除需要在 Apple 裝置上進行。</string>
+    <string name="erase_all_data_confirm_button">清除</string>
+    <string name="error_erasing_data">無法清除此手機上的資料，因此你仍處於登入狀態。請再試一次。</string>
 </resources>

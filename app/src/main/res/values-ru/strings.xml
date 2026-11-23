@@ -465,4 +465,13 @@
     <string name="settings_section_tags">Метки</string>
     <string name="settings_section_app">Приложение</string>
     <string name="anisette_coreadi_card_title">Не удалось скачать файл от Apple</string>
+    <string name="remove_tag_also_erase_history">Также удалить её историю местоположений. Повторный импорт метки её не вернёт.</string>
+    <string name="remove_tags_also_erase_history">Также удалить их историю местоположений. Повторный импорт меток её не вернёт.</string>
+    <string name="logout_also_erase_data">Также стереть все метки на этом телефоне вместе с их ключами и историей местоположений, а также привязку iCloud</string>
+    <string name="erase_all_data_title">Стереть все данные</string>
+    <string name="erase_all_data_subtitle">Удалить с этого телефона все метки, их ключи и историю местоположений и выйти</string>
+    <string name="erase_all_data_confirm_title">Стереть все данные?</string>
+    <string name="erase_all_data_confirm_message">Все метки на этом телефоне будут удалены вместе с ключами и историей местоположений, а также импорты, из которых они получены, и привязка iCloud. Вы выйдете из учётной записи Apple. Настройки сохранятся.\n\nЭто нельзя отменить. Метка, импортированная из файла, вернётся только при повторном импорте этого файла.\n\nЭто не удаляет приложение из вашей учётной записи Apple. Это нужно сделать на устройстве Apple.</string>
+    <string name="erase_all_data_confirm_button">Стереть</string>
+    <string name="error_erasing_data">Не удалось стереть данные на этом телефоне, поэтому вы по-прежнему в учётной записи. Попробуйте ещё раз.</string>
 </resources>

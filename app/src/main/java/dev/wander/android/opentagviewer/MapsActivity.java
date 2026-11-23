@@ -261,6 +261,9 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     /** Whether the running ping started a sound that has a stop command (DULT). */
     private boolean continuousPingLeftStoppableSound;
 
+    /** Set when Settings signed out, so leaving does not save the map position again. */
+    private boolean leavingForSignIn;
+
     /**
      * Stops still in flight, by beaconId. A new ping for the same tag cancels its pending stop,
      * which would otherwise land after the new start and silence it.
@@ -666,7 +669,10 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
 
         if (this.mapProvider != null) {
             IMapProvider.CameraPosition pos = this.mapProvider.getCameraPosition();
-            if (pos != null) {
+            // Not when leaving for the sign-in screen: that is a sign-out, possibly one that has
+            // just erased this position along with everything else, and writing it back here
+            // would undo that.
+            if (pos != null && !this.leavingForSignIn) {
                 var async = this.userDataRepository.storeLastCameraPosition(
                         UserMapCameraPosition.builder()
                                 .zoom(pos.getZoom())
@@ -3366,6 +3372,7 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
     }
 
     private void handleSendToLogin() {
+        this.leavingForSignIn = true;
         this.finish(); // finish current activity, send to login.
         // Login will send back to instance of this if it succeeds.
         Intent intent = new Intent(this, AppleLoginActivity.class);

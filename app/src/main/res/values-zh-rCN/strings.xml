@@ -465,4 +465,13 @@
     <string name="settings_section_tags">标签</string>
     <string name="settings_section_app">应用</string>
     <string name="anisette_coreadi_card_title">无法从 Apple 下载文件</string>
+    <string name="remove_tag_also_erase_history">同时删除其位置记录。再次导入该标签也无法恢复。</string>
+    <string name="remove_tags_also_erase_history">同时删除它们的位置记录。再次导入这些标签也无法恢复。</string>
+    <string name="logout_also_erase_data">同时清除此手机上的所有标签（包括密钥和位置记录）以及 iCloud 关联</string>
+    <string name="erase_all_data_title">清除所有数据</string>
+    <string name="erase_all_data_subtitle">从此手机删除所有标签及其密钥和位置记录，并退出登录</string>
+    <string name="erase_all_data_confirm_title">清除所有数据？</string>
+    <string name="erase_all_data_confirm_message">此手机上的所有标签将被删除，连同其密钥、位置记录、导入来源以及 iCloud 关联。你将退出 Apple 账户。你的设置会保留。\n\n此操作无法撤销。从文件导入的标签只有再次导入该文件才能恢复。\n\n这不会将此应用从你的 Apple 账户中移除。移除需要在 Apple 设备上进行。</string>
+    <string name="erase_all_data_confirm_button">清除</string>
+    <string name="error_erasing_data">无法清除此手机上的数据，因此你仍处于登录状态。请重试。</string>
 </resources>

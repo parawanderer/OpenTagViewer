@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 
 import dev.wander.android.opentagviewer.data.model.UserMapCameraPosition;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -53,5 +54,14 @@ public class UserDataRepository {
         .take(1)
         .map(_ignored -> currentPosition)
         .subscribeOn(Schedulers.io());
+    }
+
+    /** Forget where the map was last pointed, which is roughly where the user's tags were. */
+    public Completable forgetLastCameraPosition() {
+        return Completable.fromSingle(this.userCache.updateDataAsync(cache -> {
+            final MutablePreferences mutablePreferences = cache.toMutablePreferences();
+            mutablePreferences.remove(MAP_CAMERA_ORIENTATION);
+            return Single.just(mutablePreferences);
+        })).subscribeOn(Schedulers.io());
     }
 }

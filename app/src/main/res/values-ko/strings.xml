@@ -465,4 +465,13 @@ Apple이 요청을 거부한 것뿐이라면 잠시 기다렸다가 다시 시�
     <string name="settings_section_tags">태그</string>
     <string name="settings_section_app">앱</string>
     <string name="anisette_coreadi_card_title">Apple에서 파일을 다운로드하지 못했습니다</string>
+    <string name="remove_tag_also_erase_history">위치 기록도 삭제합니다. 태그를 다시 가져와도 복구되지 않습니다.</string>
+    <string name="remove_tags_also_erase_history">위치 기록도 삭제합니다. 태그를 다시 가져와도 복구되지 않습니다.</string>
+    <string name="logout_also_erase_data">이 휴대폰의 모든 태그(키와 위치 기록 포함)와 iCloud 연결도 지웁니다</string>
+    <string name="erase_all_data_title">모든 데이터 지우기</string>
+    <string name="erase_all_data_subtitle">이 휴대폰에서 모든 태그, 키, 위치 기록을 삭제하고 로그아웃합니다</string>
+    <string name="erase_all_data_confirm_title">모든 데이터를 지우시겠습니까?</string>
+    <string name="erase_all_data_confirm_message">이 휴대폰의 모든 태그가 키, 위치 기록, 가져온 원본 데이터, iCloud 연결과 함께 삭제됩니다. Apple 계정에서 로그아웃됩니다. 설정은 유지됩니다.\n\n이 작업은 되돌릴 수 없습니다. 파일에서 가져온 태그는 그 파일을 다시 가져와야만 돌아옵니다.\n\n이 작업으로 Apple 계정에서 이 앱이 제거되지는 않습니다. 제거는 Apple 기기에서 해야 합니다.</string>
+    <string name="erase_all_data_confirm_button">지우기</string>
+    <string name="error_erasing_data">이 휴대폰의 데이터를 지우지 못해 로그인 상태가 유지됩니다. 다시 시도하세요.</string>
 </resources>

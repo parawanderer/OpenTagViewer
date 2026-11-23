@@ -24,6 +24,9 @@ public interface BeaconNamingRecordDao {
     @Query("UPDATE BeaconNamingRecord SET is_removed = 1 WHERE id = :beaconId")
     void setRemoved(String beaconId);
 
+    @Query("DELETE FROM BeaconNamingRecord WHERE id = :beaconId")
+    int deleteById(String beaconId);
+
     @Delete
     void delete(BeaconNamingRecord beaconNamingRecWithId);
 }

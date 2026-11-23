@@ -26,6 +26,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -100,6 +101,7 @@ import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -253,6 +255,7 @@ public class SettingsActivity extends AppCompatActivity {
         this.binding.setIsShowAppleDevicesEnabled(this.currentSettings.shouldShowAppleDevices());
         this.binding.setIsScanInBackgroundEnabled(this.currentSettings.shouldScanInBackground());
         this.binding.setOnClickAppleDevicesHelpLink(this::onClickAppleDevicesHelpLink);
+        this.binding.setOnClickEraseAllData(this::onClickEraseAllData);
         this.binding.setIsSystemColorsSupported(DynamicColors.isDynamicColorAvailable());
         this.binding.setIsSystemColorsEnabled(
                 this.currentSettings.getUseSystemColors() == Boolean.TRUE);
@@ -1279,20 +1282,65 @@ public class SettingsActivity extends AppCompatActivity {
     private void onClickLogout(View view) {
         if (this.userAuthData == null) return;
 
+        // Logging out has only ever cleared the session, and still does by default: tags
+        // imported from a file are the only copy anybody has. Erasing them is offered rather
+        // than assumed, unticked.
+        final View alsoErase = this.getLayoutInflater().inflate(R.layout.dialog_also_erase, null);
+        final CheckBox eraseEverything = alsoErase.findViewById(R.id.dialog_also_erase);
+        eraseEverything.setText(R.string.logout_also_erase_data);
+
         var dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.logout)
                 .setMessage(R.string.are_you_sure_you_want_to_logout)
+                .setView(alsoErase)
                 .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.logout, (dialog1, which) -> this.performLogout())
+                .setPositiveButton(R.string.logout, (dialog1, which) ->
+                        this.performLogout(eraseEverything.isChecked()))
+                .show();
+    }
+
+    /**
+     * Settings -> Erase all data. The same as logging out with the box ticked, offered on its
+     * own because somebody looking to wipe the app looks for that, not inside Logout.
+     */
+    private void onClickEraseAllData() {
+        new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
+                .setTitle(R.string.erase_all_data_confirm_title)
+                .setIcon(R.drawable.delete_24px)
+                .setMessage(R.string.erase_all_data_confirm_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.erase_all_data_confirm_button,
+                        (dialog, which) -> this.performLogout(true))
                 .show();
     }
 
     private void performLogout() {
+        this.performLogout(false);
+    }
+
+    /**
+     * Sign out, and first erase the tags, keys and history when asked to.
+     *
+     * <p><b>If the erase fails, the user stays signed in and is told.</b> Signing out anyway
+     * would leave them believing their data was gone when it was not, and back at a sign-in
+     * screen with no way to tell.
+     */
+    private void performLogout(final boolean alsoErasingEverything) {
         // Let go of the Apple session too, closing its HTTP session and sockets rather
         // than leaving them to a finaliser that cannot do it. See issue #133.
         PythonAppleService.forget();
 
-        var async = this.authRepository.clearUser()
+        final Completable erasing = alsoErasingEverything
+                ? AppDependencies.dataEraser(this).eraseEverything()
+                : Completable.complete();
+
+        var async = erasing
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnError(error -> {
+                    Log.e(TAG, "Failed to erase this phone's data, so not signing out", error);
+                    Toast.makeText(this, R.string.error_erasing_data, Toast.LENGTH_LONG).show();
+                })
+                .andThen(this.authRepository.clearUser())
                 .subscribe(() -> {
                     // logout by sending back to login page
                     Intent data = new Intent();
