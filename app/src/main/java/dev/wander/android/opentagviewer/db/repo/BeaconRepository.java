@@ -1066,18 +1066,32 @@ public class BeaconRepository {
      * free pages, which is exactly where somebody reading the file would look.
      */
     public Completable removeBeacon(final String beaconId, final boolean alsoErasingHistory) {
+        return this.removeBeacons(List.of(beaconId), alsoErasingHistory);
+    }
+
+    /**
+     * {@link #removeBeacon} for several tags at once, as the device list's multi-select does.
+     *
+     * <p>One transaction and one compaction, rather than one of each per tag. A compaction
+     * rewrites the whole file, so removing ten tags one by one rewrote it ten times, and the calls
+     * ran concurrently, so each could find another holding the database and fail.
+     */
+    public Completable removeBeacons(
+            final List<String> beaconIds, final boolean alsoErasingHistory) {
         return Completable.fromRunnable(() -> {
             db.runInTransaction(() -> {
-                if (alsoErasingHistory) {
-                    final Long importId = db.ownedBeaconDao().importIdOf(beaconId);
-                    db.ownedBeaconDao().deleteById(beaconId);
-                    db.beaconNamingRecordDao().deleteById(beaconId);
-                    if (importId != null) {
-                        db.importDao().deleteIfNothingRefersTo(importId);
+                for (final String beaconId : beaconIds) {
+                    if (alsoErasingHistory) {
+                        final Long importId = db.ownedBeaconDao().importIdOf(beaconId);
+                        db.ownedBeaconDao().deleteById(beaconId);
+                        db.beaconNamingRecordDao().deleteById(beaconId);
+                        if (importId != null) {
+                            db.importDao().deleteIfNothingRefersTo(importId);
+                        }
+                    } else {
+                        db.beaconNamingRecordDao().setRemoved(beaconId);
+                        db.ownedBeaconDao().removeAndForgetKeys(beaconId);
                     }
-                } else {
-                    db.beaconNamingRecordDao().setRemoved(beaconId);
-                    db.ownedBeaconDao().removeAndForgetKeys(beaconId);
                 }
             });
 

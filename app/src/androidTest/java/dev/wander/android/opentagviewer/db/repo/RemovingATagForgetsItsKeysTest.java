@@ -298,6 +298,44 @@ public class RemovingATagForgetsItsKeysTest {
     }
 
     /**
+     * Multi-select removes several tags in one call, so the file is compacted once. It must do to
+     * each tag exactly what removing it alone does.
+     */
+    @Test
+    public void removingSeveralAtOnceForgetsEveryOnesKeys() {
+        this.importAZipOf(THE_TAG, ITS_SIBLING);
+        this.givenItHasHistory(THE_TAG);
+        this.givenItHasHistory(ITS_SIBLING);
+
+        this.repo.removeBeacons(List.of(THE_TAG, ITS_SIBLING), false).blockingAwait();
+
+        for (final String id : new String[] {THE_TAG, ITS_SIBLING}) {
+            final String[] keys = this.storedKeysOf(id);
+            assertNotNull(id + " should stay, hidden", keys);
+            assertNull(id + "'s plist is still stored", keys[0]);
+            assertNull(id + "'s accessory state is still stored", keys[1]);
+            assertNull(id + "'s alignment record is still stored", keys[2]);
+            assertEquals(id + "'s history should be kept", 1, this.historyRowsFor(id));
+        }
+    }
+
+    /** And with the box ticked, the import goes once the last of its tags has. */
+    @Test
+    public void erasingAWholeZipAtOnceDeletesItsImport() {
+        this.importAZipOf(THE_TAG, ITS_SIBLING);
+        this.givenItHasHistory(THE_TAG);
+        this.givenItHasHistory(ITS_SIBLING);
+
+        this.repo.removeBeacons(List.of(THE_TAG, ITS_SIBLING), true).blockingAwait();
+
+        assertNull(this.storedKeysOf(THE_TAG));
+        assertNull(this.storedKeysOf(ITS_SIBLING));
+        assertEquals(0, this.count("LocationReport"));
+        assertEquals(0, this.count("BeaconNamingRecord"));
+        assertEquals("the import outlived every tag it held", 0, this.count("Import"));
+    }
+
+    /**
      * A tag from a zip that later arrived from the Apple account has its row moved off the import,
      * but keeps the zip's naming record when the account holds none. Erasing the other tag from
      * that zip must not delete the import, which would cascade into that naming record and take

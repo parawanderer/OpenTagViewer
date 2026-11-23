@@ -1170,9 +1170,7 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 .setMessage(message)
                 .setView(alsoErase)
                 .setPositiveButton(R.string.confirm, (dialog, which) -> {
-                    for (BeaconInformation device : removable) {
-                        this.removeDevice(device, eraseHistory.isChecked());
-                    }
+                    this.removeDevices(removable, eraseHistory.isChecked());
                     this.endSelection();
                 })
                 .setNegativeButton(R.string.cancel, null)
@@ -1193,18 +1191,23 @@ public class MyDevicesListActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void removeDevice(final BeaconInformation device, final boolean alsoErasingHistory) {
-        final String beaconId = device.getBeaconId();
+    private void removeDevices(
+            final List<BeaconInformation> devices, final boolean alsoErasingHistory) {
+        final List<String> beaconIds = new ArrayList<>(devices.size());
+        for (final BeaconInformation device : devices) {
+            beaconIds.add(device.getBeaconId());
+        }
 
-        // Same call DeviceInfoActivity makes. Unless the history is being erased too, the row is
-        // hidden rather than deleted, so the location history survives a re-import; the keys are
+        // The batch form of what DeviceInfoActivity calls, so the database is compacted once
+        // rather than once per tag. Unless the history is being erased too, the rows are hidden
+        // rather than deleted, so the location history survives a re-import; the keys are
         // deleted either way.
-        var async = this.beaconRepo.removeBeacon(beaconId, alsoErasingHistory)
+        var async = this.beaconRepo.removeBeacons(beaconIds, alsoErasingHistory)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        () -> this.refreshListOnItemRemoved(beaconId),
+                        () -> beaconIds.forEach(this::refreshListOnItemRemoved),
                         error -> {
-                            Log.e(TAG, "Failure marking beacon as removed!", error);
+                            Log.e(TAG, "Failed to remove " + beaconIds.size() + " tag(s)", error);
                             Toast.makeText(
                                     this.getApplicationContext(),
                                     R.string.error_occurred_while_removing_the_device,
