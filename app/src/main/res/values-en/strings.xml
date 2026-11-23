@@ -473,5 +473,5 @@ If Apple simply refused the request, waiting and trying again is worth doing fir
     <string name="erase_all_data_confirm_title">Erase all data?</string>
     <string name="erase_all_data_confirm_message">Every tag on this phone is deleted, with its keys and location history, along with the imports they came from and the iCloud link. You are logged out of your Apple account. Your settings stay.\n\nThis cannot be undone. A tag imported from a file comes back only by importing that file again.\n\nThis does not remove the app from your Apple account. That has to be done on an Apple device.</string>
     <string name="erase_all_data_confirm_button">Erase</string>
-    <string name="error_erasing_data">Could not erase the data on this phone, so you are still logged in. Try again.</string>
+    <string name="error_erasing_data">Could not erase everything on this phone, so you are still logged in. Your tags are still here, but the iCloud link may already be gone. Try again.</string>
 </resources>

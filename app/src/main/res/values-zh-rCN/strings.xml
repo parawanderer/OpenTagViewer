@@ -473,5 +473,5 @@
     <string name="erase_all_data_confirm_title">清除所有数据？</string>
     <string name="erase_all_data_confirm_message">此手机上的所有标签将被删除，连同其密钥、位置记录、导入来源以及 iCloud 关联。你将退出 Apple 账户。你的设置会保留。\n\n此操作无法撤销。从文件导入的标签只有再次导入该文件才能恢复。\n\n这不会将此应用从你的 Apple 账户中移除。移除需要在 Apple 设备上进行。</string>
     <string name="erase_all_data_confirm_button">清除</string>
-    <string name="error_erasing_data">无法清除此手机上的数据，因此你仍处于登录状态。请重试。</string>
+    <string name="error_erasing_data">无法清除此手机上的全部数据，因此你仍处于登录状态。你的标签仍在，但 iCloud 关联可能已被移除。请重试。</string>
 </resources>

@@ -180,6 +180,17 @@ public class ErasingEverythingFromSettingsTest {
         assertTrue(message, message.contains("cannot be undone"));
     }
 
+    /**
+     * The failure message must not say nothing was erased. The iCloud link is forgotten before the
+     * tags, so a failure after it leaves the tags and not the link.
+     */
+    @Test
+    public void theFailureSaysTheICloudLinkMayBeGone() {
+        final String message = this.context.getString(R.string.error_erasing_data);
+        assertTrue(message, message.contains("iCloud link"));
+        assertTrue(message, message.contains("still logged in"));
+    }
+
     /** Confirming erases, then signs out and sends the map to the sign-in screen. */
     @Test
     public void confirmingErasesAndSignsOut() {

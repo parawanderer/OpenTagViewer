@@ -473,5 +473,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="erase_all_data_confirm_title">Alle gegevens wissen?</string>
     <string name="erase_all_data_confirm_message">Alle tags op deze telefoon worden verwijderd, met hun sleutels en locatiegeschiedenis, samen met de imports waar ze vandaan kwamen en de iCloud-koppeling. Je wordt uitgelogd bij je Apple-account. Je instellingen blijven bewaard.\n\nDit kan niet ongedaan worden gemaakt. Een tag die uit een bestand is geïmporteerd, komt alleen terug door dat bestand opnieuw te importeren.\n\nDe app wordt hiermee niet uit je Apple-account verwijderd. Dat moet op een Apple-apparaat gebeuren.</string>
     <string name="erase_all_data_confirm_button">Wissen</string>
-    <string name="error_erasing_data">De gegevens op deze telefoon konden niet worden gewist, dus je bent nog ingelogd. Probeer het opnieuw.</string>
+    <string name="error_erasing_data">Niet alles op deze telefoon kon worden gewist, dus je bent nog ingelogd. Je tags zijn er nog, maar de iCloud-koppeling is mogelijk al verwijderd. Probeer het opnieuw.</string>
 </resources>

@@ -1324,7 +1324,8 @@ public class SettingsActivity extends AppCompatActivity {
      *
      * <p><b>If the erase fails, the user stays signed in and is told.</b> Signing out anyway
      * would leave them believing their data was gone when it was not, and back at a sign-in
-     * screen with no way to tell.
+     * screen with no way to tell. The message does not claim nothing was erased: the iCloud link
+     * goes first, on purpose (see {@code ThisPhonesTagData}), so it may already be gone.
      */
     private void performLogout(final boolean alsoErasingEverything) {
         // Let go of the Apple session too, closing its HTTP session and sockets rather
