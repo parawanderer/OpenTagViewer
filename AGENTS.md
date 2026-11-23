@@ -841,6 +841,25 @@ whole arrangement leans on two private details of it - `_evt_loop.run_until_comp
 fetcher looking `fetch_raw_reports` up on the instance - and a fake keeps both names after a rename
 (rule 3).
 
+### 23. A DataStore write starts when you call it, not when you subscribe
+
+`RxDataStore.updateDataAsync` runs `scope.async { … }.asSingle()`, and `async` starts at once. So
+every repository method built on it (`UserAuthRepository.clearUser`, `storeUserAuth`,
+`KeychainMembershipRepository.forget`, `UserDataRepository.forgetLastCameraPosition`, settings
+writes) has **already begun writing by the time it returns its Completable**. Subscribing only
+waits for it.
+
+That makes `a.andThen(repo.clearUser())` a trap. It reads as "clear the user once `a` succeeds",
+but `clearUser()` is evaluated while the chain is being built, so the session is cleared whether
+`a` succeeds, fails, or is never subscribed at all. Nothing fails and nothing logs. On the happy
+path it looks right, which is the only path anyone tries by hand.
+
+It was caught by `ErasingEverythingFromSettingsTest.aFailedEraseDoesNotSignOut`: Settings signed
+the user out after telling them the erase had failed and they were still signed in. **Wrap any
+DataStore-backed call that must wait for something before it in `Completable.defer(...)`** (or
+`Single.defer`), and when the order matters, test the failure path, because the success path
+cannot tell the two apart.
+
 ---
 
 ## Building and testing

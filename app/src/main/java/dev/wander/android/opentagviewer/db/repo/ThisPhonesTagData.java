@@ -43,10 +43,16 @@ public final class ThisPhonesTagData implements LocalDataEraser {
                 new UserDataRepository(UserCacheDataStore.getInstance(app)));
     }
 
+    /**
+     * Each step deferred until the one before it has finished. The DataStore writes start the
+     * moment their method is called (RxDataStore.updateDataAsync does not wait for a subscriber),
+     * so chaining the calls directly would start all of them at once, and start them even if
+     * nobody ever subscribed.
+     */
     @Override
     public Completable eraseEverything() {
-        return this.memberships.forget()
-                .andThen(this.userData.forgetLastCameraPosition())
-                .andThen(this.beacons.eraseEverything());
+        return Completable.defer(this.memberships::forget)
+                .andThen(Completable.defer(this.userData::forgetLastCameraPosition))
+                .andThen(Completable.defer(this.beacons::eraseEverything));
     }
 }

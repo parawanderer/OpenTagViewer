@@ -1340,7 +1340,10 @@ public class SettingsActivity extends AppCompatActivity {
                     Log.e(TAG, "Failed to erase this phone's data, so not signing out", error);
                     Toast.makeText(this, R.string.error_erasing_data, Toast.LENGTH_LONG).show();
                 })
-                .andThen(this.authRepository.clearUser())
+                // Deferred, not passed directly: RxDataStore.updateDataAsync starts the write the
+                // moment clearUser() is called, before anything subscribes, so building this chain
+                // with clearUser() in it signed the user out even when the erase above failed.
+                .andThen(Completable.defer(this.authRepository::clearUser))
                 .subscribe(() -> {
                     // logout by sending back to login page
                     Intent data = new Intent();
