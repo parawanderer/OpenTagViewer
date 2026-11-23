@@ -2144,13 +2144,17 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * <p>Accepting saves first and signs out only once the save has landed. The other order
      * looks the same right up until the write loses a race with the activity finishing, at
      * which point they sign in again and arrive back on the server they just left.
+     *
+     * <p>{@link RxFlows#onlyAfter} and not {@code andThen}, because {@code clearUser()} starts
+     * writing when it is called. Passed to {@code andThen} directly it signed the user out at
+     * once, and still did if the save then failed.
      */
     private void offerLocalAnisetteUpgradeIfDue() {
         this.runOnUiThread(() -> AnisetteUpgradeDialog.offerIfDue(this, this.userSettings,
             accepted -> {
                 var saved = this.userSettingsRepo.storeUserSettings(this.userSettings);
 
-                var async = (accepted ? saved.andThen(this.userAuthRepo.clearUser()) : saved)
+                var async = (accepted ? RxFlows.onlyAfter(saved, this.userAuthRepo::clearUser) : saved)
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(() -> {
