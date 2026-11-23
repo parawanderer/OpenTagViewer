@@ -2145,18 +2145,16 @@ public class MapsActivity extends AppCompatActivity implements IMapProvider.OnMa
      * looks the same right up until the write loses a race with the activity finishing, at
      * which point they sign in again and arrive back on the server they just left.
      *
-     * <p>The sign-out is deferred because {@code clearUser()} starts writing when it is called,
-     * not when it is subscribed to: {@code RxDataStore.updateDataAsync} launches its coroutine
-     * straight away. Passed to {@code andThen} directly, it signed the user out at once, and
-     * still did if the save then failed.
+     * <p>{@link RxFlows#onlyAfter} and not {@code andThen}, because {@code clearUser()} starts
+     * writing when it is called. Passed to {@code andThen} directly it signed the user out at
+     * once, and still did if the save then failed.
      */
     private void offerLocalAnisetteUpgradeIfDue() {
         this.runOnUiThread(() -> AnisetteUpgradeDialog.offerIfDue(this, this.userSettings,
             accepted -> {
                 var saved = this.userSettingsRepo.storeUserSettings(this.userSettings);
 
-                var signOut = Completable.defer(this.userAuthRepo::clearUser);
-                var async = (accepted ? saved.andThen(signOut) : saved)
+                var async = (accepted ? RxFlows.onlyAfter(saved, this.userAuthRepo::clearUser) : saved)
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(() -> {

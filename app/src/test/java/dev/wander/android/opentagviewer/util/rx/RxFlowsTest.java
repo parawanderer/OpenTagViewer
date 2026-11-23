@@ -330,4 +330,57 @@ public class RxFlowsTest {
 
         assertEquals(List.of("0/0"), progress);
     }
+
+    // -------------------------------------------------------------------------------------
+    // onlyAfter - a DataStore write that must wait for something before it
+    // -------------------------------------------------------------------------------------
+
+    /**
+     * Stands in for a repository method built on {@code RxDataStore.updateDataAsync}: the write
+     * happens when the method is called, and the Completable it returns only reports on it.
+     */
+    private static Completable eagerWrite(final AtomicInteger writes) {
+        writes.incrementAndGet();
+        return Completable.complete();
+    }
+
+    @Test
+    public void onlyAfter_doesNotStartTheNextStepBeforeTheFirstCompletes() {
+        final AtomicInteger signOuts = new AtomicInteger();
+        final PublishSubject<Object> save = PublishSubject.create();
+
+        final TestObserver<Void> result = RxFlows.onlyAfter(
+                save.ignoreElements(), () -> eagerWrite(signOuts)).test();
+
+        assertEquals("signed out before the save landed", 0, signOuts.get());
+
+        save.onComplete();
+
+        result.assertComplete();
+        assertEquals(1, signOuts.get());
+    }
+
+    /** The bug the helper exists for: a failed save must leave the user signed in. */
+    @Test
+    public void onlyAfter_neverStartsTheNextStepWhenTheFirstFails() {
+        final AtomicInteger signOuts = new AtomicInteger();
+
+        RxFlows.onlyAfter(Completable.error(new RuntimeException("save failed")),
+                        () -> eagerWrite(signOuts))
+                .test()
+                .assertError(RuntimeException.class);
+
+        assertEquals(0, signOuts.get());
+    }
+
+    /** Building the chain without subscribing must not do the second step either. */
+    @Test
+    public void onlyAfter_doesNothingUntilSubscribed() {
+        final AtomicInteger signOuts = new AtomicInteger();
+
+        final Completable unused = RxFlows.onlyAfter(Completable.complete(),
+                () -> eagerWrite(signOuts));
+
+        assertEquals(0, signOuts.get());
+    }
 }

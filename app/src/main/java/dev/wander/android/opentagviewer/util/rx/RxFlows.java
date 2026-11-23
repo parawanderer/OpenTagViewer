@@ -6,11 +6,12 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.functions.BiConsumer;
 import io.reactivex.rxjava3.functions.Function;
+import io.reactivex.rxjava3.functions.Supplier;
 
 /**
  * Stream compositions that the app depends on and that are easy to get subtly wrong.
  * <br>
- * Both methods here exist because the composition, not the work, was the bug. They are kept
+ * Each method here exists because the composition, not the work, was the bug. They are kept
  * free of Android types so they can be tested on the JVM: the originals lived inside
  * {@code MapsActivity}, where nothing could reach them, and the failure they produced was a
  * missing card rather than an exception - no crash, no log, no test.
@@ -43,6 +44,26 @@ public final class RxFlows {
             parts[i] = streams[i].ignoreElements();
         }
         return Completable.mergeArray(parts).andThen(then);
+    }
+
+    /**
+     * Runs {@code first}, and only once it has completed, creates and runs {@code then}.
+     * <br>
+     * {@code then} is taken as a supplier because some Completables here have already started
+     * by the time they are returned. Every DataStore write ({@code UserAuthRepository.clearUser},
+     * {@code UserSettingsRepository.storeUserSettings} and the rest) is built on
+     * {@code RxDataStore.updateDataAsync}, which launches its coroutine when called.
+     * {@code first.andThen(repo.clearUser())} therefore signs the user out while the chain is
+     * being built, and still does if {@code first} fails. Nothing is logged and the success path
+     * looks identical, so it went unnoticed.
+     * <br>
+     * If {@code first} fails, {@code then} is never created.
+     *
+     * @param first run first
+     * @param then  called only after {@code first} completes
+     */
+    public static Completable onlyAfter(final Completable first, final Supplier<Completable> then) {
+        return first.andThen(Completable.defer(then));
     }
 
     /**
