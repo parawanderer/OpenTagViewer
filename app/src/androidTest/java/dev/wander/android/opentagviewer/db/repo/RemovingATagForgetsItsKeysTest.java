@@ -34,6 +34,7 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
 import dev.wander.android.opentagviewer.python.FetchResult;
+import dev.wander.android.opentagviewer.python.icloud.AccessoryRecords;
 
 /**
  * What removing a tag leaves behind on the phone.
@@ -294,6 +295,27 @@ public class RemovingATagForgetsItsKeysTest {
         assertEquals(1, this.count("Import"));
         assertEquals("the hidden tag's history went with an import that should have stayed",
                 1, this.historyRowsFor(ITS_SIBLING));
+    }
+
+    /**
+     * A tag from a zip that later arrived from the Apple account has its row moved off the import,
+     * but keeps the zip's naming record when the account holds none. Erasing the other tag from
+     * that zip must not delete the import, which would cascade into that naming record and take
+     * the account tag's name with it.
+     */
+    @Test
+    public void anImportANamingRecordStillPointsAtIsKept() {
+        this.importAZipOf(THE_TAG, ITS_SIBLING);
+        // (beaconId, ownedBeaconPlist, namingRecordPlist, keyAlignmentPlist): no naming record.
+        this.repo.refreshAccountBeacons(
+                List.of(new AccessoryRecords(ITS_SIBLING, A_PLIST, null, AN_ALIGNMENT)))
+                .blockingFirst();
+
+        this.repo.removeBeacon(THE_TAG, true).blockingAwait();
+
+        assertNotNull("the account tag lost the name it had from the zip",
+                this.db.beaconNamingRecordDao().getByBeaconId(ITS_SIBLING));
+        assertEquals("the import still has a naming record, so it stays", 1, this.count("Import"));
     }
 
     /**
