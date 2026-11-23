@@ -465,4 +465,5 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="settings_section_tags">タグ</string>
     <string name="settings_section_app">アプリ</string>
     <string name="anisette_coreadi_card_title">Apple からファイルをダウンロードできませんでした</string>
+    <string name="login_failed_no_find_my_token">Anisetteサーバーでのサインインは成功しましたが、Appleはこのサインインに「探す」へのアクセスを付与しませんでした。Appleは「探す」トークンをMacまたはiPhoneからのサインインにのみ発行するため、このサインインでは位置情報を取得できません。代わりにこの電話のAnisetteでサインインしてください。</string>
 </resources>

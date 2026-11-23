@@ -465,4 +465,5 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">Kon een bestand van Apple niet downloaden</string>
+    <string name="login_failed_no_find_my_token">De Anisette-server heeft je aangemeld, maar Apple heeft deze aanmelding geen toegang tot Zoek mijn gegeven. Apple geeft het Zoek mijn-token alleen aan een aanmelding vanaf een Mac of iPhone, dus met deze aanmelding kunnen geen locaties worden opgehaald. Meld je in plaats daarvan aan met Anisette vanaf deze telefoon.</string>
 </resources>

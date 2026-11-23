@@ -310,6 +310,26 @@ def _anisetteProvider(anisetteServerUrl: str, localAnisette: Any = None, **ident
         anisetteServerUrl, timeout=LOGIN_TIMEOUT_SECONDS, **identityKwargs)
 
 
+def _hasFindMyToken(account: AppleAccount) -> bool:
+    """
+    Whether Apple issued the Find My token at sign-in.
+
+    `service_tokens` is the iCloud service tokens obtained while logging in, keyed by
+    service name, and `fetch_raw_reports` reads `searchPartyToken` from it for every
+    request. An empty token is no token: nothing Apple issues here is an empty string.
+    Any failure to read the tokens counts as none issued - refusing the sign-in with its
+    own reason is still right then, because a session that cannot prove its token is
+    not one to store.
+    """
+    try:
+        tokens = account.service_tokens
+    except Exception:
+        return False
+    if not tokens:
+        return False
+    return bool(tokens.get("searchPartyToken"))
+
+
 def loginSync(email: str, password: str, anisetteServerUrl: str,
               localAnisette: Any = None) -> dict:
     # Bound before the try so the failure path can tell "no account was ever built" from "the
@@ -369,6 +389,21 @@ def loginSync(email: str, password: str, anisetteServerUrl: str,
                 "account": acc,
                 "loginState": state.value,
                 "loginMethods": named_methods_list
+            }
+
+        # Apple only issues the Find My token (`searchPartyToken`) to a sign-in whose
+        # Anisette machine was minted by a Mac or an iPhone. A remote Anisette server
+        # still completes the sign-in, so without this the app stores a session that
+        # looks signed in and then fails every location fetch - issue #311. Refuse it
+        # here, with a reason of its own, and no account: there is nothing further to
+        # do with the session, and handing it to Java is an invitation to store it.
+        # Only for LOGGED_IN: `service_tokens` requires that state, and a 2FA sign-in
+        # has not completed yet.
+        if state == LoginState.LOGGED_IN and not _hasFindMyToken(acc):
+            return {
+                "error": "Apple signed in but did not issue a Find My token "
+                "(searchPartyToken missing from service tokens)",
+                "reason": REASON_NO_FIND_MY_TOKEN,
             }
 
         # Any of the other cases. I'm not sure if this can even happen...
@@ -553,6 +588,26 @@ code, so a report carries it.
 
 **A wrong password is not this.** That is refused at the second step, `complete`, and stays
 :data:`REASON_UNKNOWN` - a different Anisette identity cannot fix a bad credential.
+"""
+
+REASON_NO_FIND_MY_TOKEN = "no_find_my_token"
+"""
+Apple signed the user in but did not issue the Find My token.
+
+**The sign-in worked and the session is still useless.** Since 2026-10-12 Apple issues
+`searchPartyToken` only to a sign-in whose Anisette machine was minted by a Mac or an iPhone
+(malmeloo/FindMy.py#278, #248). A remote Anisette server still completes the sign-in, so the
+app looks signed in - and then every location fetch fails, because `fetch_raw_reports` reads
+that token for every request. Storing the session is the bad write behind OpenTagViewer#311.
+
+**Carries no account, deliberately.** There is nothing further to do with the session from
+here, and handing it to Java is an invitation to store it - the bad write behind issues #43
+and #119.
+
+**Not :data:`REASON_APPLE_DECLINED`, and not :data:`REASON_REFUSED_BEFORE_PASSWORD`.**
+Neither offers the right remedy: Apple did not refuse anything, and the remote server is the
+cause here rather than the route to try - offering it again would send somebody back to the
+thing that just failed.
 """
 
 REASON_UNKNOWN = "unknown"

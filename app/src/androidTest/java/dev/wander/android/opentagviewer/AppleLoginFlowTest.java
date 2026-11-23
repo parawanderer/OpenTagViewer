@@ -390,6 +390,43 @@ public class AppleLoginFlowTest {
     }
 
     /**
+     * <b>A sign-in through a remote Anisette server that Apple grants no Find My token to is
+     * reported as exactly that.</b>
+     *
+     * <p><b>Issue #311.</b> Since 2026-10-12 Apple issues {@code searchPartyToken} only to a
+     * sign-in whose Anisette machine was minted by a Mac or an iPhone, so a sign-in through
+     * a remote server completes and then every location fetch fails. The screen used to store
+     * that session and look signed in, with nothing ever locating.
+     *
+     * <p>Asserted on the wrong turns: not the terms sentence, not "Apple declined" (which
+     * says to wait, and here waiting does not help), and the remote-server offer stays
+     * hidden - the server is the cause here, not the remedy.
+     */
+    @Test
+    public void aSignInWithNoFindMyTokenSaysSo() {
+        this.apple = FakeAppleAuthService.signsInWithoutFindMyToken();
+        AppDependencies.replaceAuthService(this.apple);
+
+        launch();
+        signIn();
+
+        final Context context = getInstrumentation().getTargetContext();
+
+        Eventually.check(() -> onView(withId(R.id.login_error_message_text)).check(matches(
+                withText(context.getString(R.string.login_failed_no_find_my_token)))));
+
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_terms)))));
+        onView(withId(R.id.login_error_message_text)).check(matches(
+                not(withText(context.getString(R.string.login_failed_apple_declined)))));
+
+        // The server route is for a refused sign-in, and this one was not refused - the
+        // server is what signed in.
+        onView(withId(R.id.login_error_try_remote_anisette))
+                .check(matches(not(isDisplayed())));
+    }
+
+    /**
      * <b>When Apple names a wait, the screen gives it rather than "try again shortly".</b>
      *
      * <p>A {@code Retry-After} on the refusal, carried across the bridge. The test above is the

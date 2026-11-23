@@ -465,4 +465,5 @@ Wenn Apple die Anfrage lediglich abgelehnt hat, lohnt es sich, zu warten und es 
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">Eine Datei von Apple konnte nicht geladen werden</string>
+    <string name="login_failed_no_find_my_token">Der Anisette-Server hat dich angemeldet, aber Apple hat dieser Anmeldung keinen Zugriff auf „Wo ist?“ gewährt. Apple stellt das „Wo ist?“-Token nur für Anmeldungen von einem Mac oder iPhone aus, daher kann diese Anmeldung keine Standorte abrufen. Melde dich stattdessen mit Anisette von diesem Telefon an.</string>
 </resources>

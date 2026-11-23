@@ -465,4 +465,5 @@
     <string name="settings_section_tags">標籤</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">無法從 Apple 下載檔案</string>
+    <string name="login_failed_no_find_my_token">Anisette 伺服器已登入，但 Apple 未向此次登入授予「尋找」存取權限。Apple 僅向來自 Mac 或 iPhone 的登入發放「尋找」權杖，因此此次登入無法取得任何位置。請改用此手機上的 Anisette 登入。</string>
 </resources>
