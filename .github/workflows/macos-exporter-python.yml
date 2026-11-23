@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     # Nothing in this pipeline rewrites VERSION in python/exporter/version.py: the tag names the
     # artifact, and the app keeps whatever was committed. So a tag that disagrees with the
@@ -75,12 +75,12 @@ jobs:
 
     # Do everything strictly for the python version used in the release build...
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }}
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
 
     # --frozen: exactly what uv.lock records, or fail. FindMy.py is pinned there by commit,
     # because it is a branch rather than a release - so a release build cannot silently pick up
@@ -186,15 +186,15 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Python ${{ env.PYINSTALLER_PYTHON_VER }} (${{ matrix.arch }})
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: ${{ env.PYINSTALLER_PYTHON_VER }}
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
 
     # tkinter is not part of a stock Python on macOS or Linux, and the wizard is a tkinter app -
     # without this the build succeeds and the binary dies at import on a user's machine. Windows
@@ -396,7 +396,7 @@ jobs:
         echo "UPLOAD_PATH=${{ github.workspace }}/output/$ASSET" >> $GITHUB_ENV
 
     - name: Upload PyInstaller Artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ env.UPLOAD_ASSET }}
         path: ${{ env.UPLOAD_PATH }}
@@ -408,7 +408,7 @@ jobs:
     # here, and failed with 403 "Resource not accessible by integration" after both binaries
     # had already been built. The v1.0.5 release published with no assets attached.
     - name: Upload Release Asset to GitHub Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
       with:
         files: ${{ env.UPLOAD_PATH }}
         # Explicit because a manual run is not on a tag: github.ref is the branch, and without

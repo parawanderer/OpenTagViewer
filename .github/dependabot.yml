@@ -1,0 +1,19 @@
+# Every `uses:` in .github/workflows is pinned to a full commit SHA, with the release it came from
+# in a trailing comment (`uses: actions/checkout@<sha> # v7.0.1`). A tag can be moved to point at
+# different code after it was reviewed; a commit cannot. Dependabot reads the comment and moves
+# both together, so this is what keeps the pins from going stale.
+#
+# A Dependabot PR touches only .github/, and the build and static checks do not run for that path
+# (AGENTS.md rule 16). Run them by hand against its branch before merging.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: CI

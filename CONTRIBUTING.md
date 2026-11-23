@@ -983,6 +983,14 @@ run regardless: each AES entry carries a fresh random salt.
 | `macadi-host.yml` | `app/src/main/cpp/macadi/**`, `app/src/test/macadi-host/**`, `MacCoreAdi*.java`, `scripts/locate_mac_coreadi.py`, `scripts/adi-emulator-diff/**` | Fetches Apple's macOS CoreADI with the app's own range request, checks both pinned hashes, builds the emulated Mac's native core for the host and has it load the library; a second job runs `compare-libmacadi.sh`, the port against os-findmy-e's `adi-core` byte for byte. Nothing sent to Apple beyond the download. A few minutes each, mostly building Unicorn |
 | `waiting-on-reporter.yml` | a comment on an issue, daily | Removes the `waiting on reporter` label when the issue's author replies. Daily, comments once on any labelled issue quiet for 14 days, and again only after somebody else has commented. Never closes anything. Both triggers run the copy on `main`, so a PR cannot exercise it; `workflow_dispatch` defaults to a dry run that prints what it would post |
 
+**Every action is pinned to a commit, not a tag**: `uses: actions/checkout@<40-char sha> # v7.0.1`.
+A tag can be moved to different code after anyone looked at it, and several of these jobs hold a
+write token or a release key. Pin a new `uses:` the same way, to the commit its release tag points
+at, with the full version in the comment. Dependabot (`.github/dependabot.yml`) opens one grouped
+PR a week moving the SHAs and comments together. That PR touches only `.github/`, so the build
+and static checks do not run on it by themselves (rule 16 in AGENTS.md); dispatch them against its
+branch before merging.
+
 The instrumented job needs KVM on the runner; the workflow enables it first. It runs the same
 `:app:testEmulatorDebugAndroidTest` managed device you run locally, so there is no second
 emulator definition in CI to keep in step with `app/build.gradle.kts`.
