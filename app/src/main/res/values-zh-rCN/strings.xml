@@ -465,4 +465,14 @@
     <string name="settings_section_tags">标签</string>
     <string name="settings_section_app">应用</string>
     <string name="anisette_coreadi_card_title">无法从 Apple 下载文件</string>
+    <string name="nearby_devices_title">附近的设备</string>
+    <string name="nearby_devices_menu_open">扫描附近的设备</string>
+    <string name="nearby_devices_empty">附近没有“查找”设备。AirTag 和其他 Apple“查找”设备会在此屏幕打开期间显示在这里。</string>
+    <string name="nearby_devices_needs_permission">允许蓝牙访问以查看附近的“查找”设备。</string>
+    <string name="nearby_device_unnamed">“查找”设备 · %1$s</string>
+    <string name="nearby_device_distance_format">约 %1$s 米</string>
+    <string name="nearby_device_separated">与物主分离</string>
+    <string name="nearby_device_with_owner">在物主附近</string>
+    <string name="nearby_devices_scan_unavailable">蓝牙已关闭或不可用。打开后可查看附近的 Find My 设备 — 将自动重试。</string>
+    <string name="nearby_device_offline">离线</string>
 </resources>

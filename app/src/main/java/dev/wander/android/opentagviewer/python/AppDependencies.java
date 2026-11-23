@@ -19,6 +19,7 @@ import dev.wander.android.opentagviewer.anisette.LocalAnisette;
 import dev.wander.android.opentagviewer.ble.AccessorySoundTrigger;
 import dev.wander.android.opentagviewer.ble.BleAccessorySoundTrigger;
 import dev.wander.android.opentagviewer.ble.FmdnRingTrigger;
+import dev.wander.android.opentagviewer.ble.NearbyDeviceScanner;
 import dev.wander.android.opentagviewer.ble.RoutingSoundTrigger;
 import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
@@ -141,6 +142,13 @@ public final class AppDependencies {
                     context.getApplicationContext()));
 
     /**
+     * The scan behind the Nearby devices screen. Replaceable because an emulator has no real
+     * Bluetooth: the screen's tests feed it made-up sightings instead.
+     */
+    private static Supplier<NearbyDeviceScanner> nearbyDeviceScannerFactory =
+            NearbyDeviceScanner::new;
+
+    /**
      * Turns coordinates into something a person recognises.
      *
      * <p><b>Here because a screen with no geocoder does not look broken.</b> The card falls back
@@ -240,6 +248,15 @@ public final class AppDependencies {
         return historyImporterFactory.apply(context);
     }
 
+    public static NearbyDeviceScanner nearbyDeviceScanner() {
+        return nearbyDeviceScannerFactory.get();
+    }
+
+    @VisibleForTesting
+    public static void replaceNearbyDeviceScanner(final NearbyDeviceScanner replacement) {
+        nearbyDeviceScannerFactory = () -> replacement;
+    }
+
     public static AnisetteServerTesterService serverTester(final CronetEngine engine) {
         return serverTesterFactory.apply(engine);
     }
@@ -311,6 +328,7 @@ public final class AppDependencies {
         historyImporterFactory = context -> new HistoryImporter(
                 OpenTagViewerDatabase.getInstance(context.getApplicationContext()));
         icloudFactory = AppDependencies::openRealICloud;
+        nearbyDeviceScannerFactory = NearbyDeviceScanner::new;
         geocoderFactory = (context, locale) ->
                 AddressLookup.through(new Geocoder(context, locale));
     }
