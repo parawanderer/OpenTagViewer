@@ -261,8 +261,12 @@ jobs:
           echo "$report" | grep -v '^WARNING'
           echo "$report" | grep -qx 'Verified using v2 scheme (APK Signature Scheme v2): true'
           echo "$report" | grep -qx 'Number of signers: 1'
-          if ! echo "$report" | grep -qx "Signer #1 certificate SHA-256 digest: $EXPECTED_SIGNER_SHA256"; then
-            echo "::error::The APK is not signed by the release certificate ($EXPECTED_SIGNER_SHA256). It would not install over an existing release, so it is not being published."
+          # Every certificate digest the report names, whatever it calls the signer: build-tools 35
+          # and 36 say "Signer #1 certificate SHA-256 digest:", 37 says "V2 Signer: certificate
+          # SHA-256 digest:". Exactly one, and it must be the release certificate.
+          signers=$(echo "$report" | sed -n 's/^.*[Ss]igner.*certificate SHA-256 digest: \([0-9a-f]\{64\}\)$/\1/p' | sort -u)
+          if [ "$signers" != "$EXPECTED_SIGNER_SHA256" ]; then
+            echo "::error::The APK is signed by ${signers:-nothing recognisable}, not the release certificate ($EXPECTED_SIGNER_SHA256). It would not install over an existing release, so it is not being published."
             exit 1
           fi
           "$BUILD_TOOLS/zipalign" -c -P 16 4 "$apk"
