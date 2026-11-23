@@ -854,11 +854,15 @@ but `clearUser()` is evaluated while the chain is being built, so the session is
 `a` succeeds, fails, or is never subscribed at all. Nothing fails and nothing logs. On the happy
 path it looks right, which is the only path anyone tries by hand.
 
-It was caught by `ErasingEverythingFromSettingsTest.aFailedEraseDoesNotSignOut`: Settings signed
-the user out after telling them the erase had failed and they were still signed in. **Wrap any
-DataStore-backed call that must wait for something before it in `Completable.defer(...)`** (or
-`Single.defer`), and when the order matters, test the failure path, because the success path
-cannot tell the two apart.
+It bit twice, independently: `MapsActivity.offerLocalAnisetteUpgradeIfDue` signed the user out
+before the local Anisette choice was saved, and Settings signed the user out after telling them an
+erase had failed and they were still signed in (caught by
+`ErasingEverythingFromSettingsTest.aFailedEraseDoesNotSignOut`). **Use
+`RxFlows.onlyAfter(first, repo::clearUser)`**, which takes the second step as a supplier and only
+calls it once `first` completes, and wrap a chain's own first step in `Completable.defer(...)` if
+the chain is built before anything subscribes. When the order matters, test the failure path,
+because the success path cannot tell the two apart. `RxFlowsTest` shows how, with a stand-in that
+writes when called.
 
 ---
 

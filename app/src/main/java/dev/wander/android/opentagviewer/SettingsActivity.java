@@ -99,6 +99,7 @@ import dev.wander.android.opentagviewer.util.android.LocaleConfigUtil;
 import dev.wander.android.opentagviewer.util.android.PropertiesUtil;
 import dev.wander.android.opentagviewer.util.android.SigningInfoUtil;
 import dev.wander.android.opentagviewer.util.android.WebLink;
+import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import dev.wander.android.opentagviewer.util.validate.AnisetteUrlValidatorUtil;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
@@ -1334,16 +1335,16 @@ public class SettingsActivity extends AppCompatActivity {
                 ? AppDependencies.dataEraser(this).eraseEverything()
                 : Completable.complete();
 
-        var async = erasing
+        final Completable erasedOrToldWhyNot = erasing
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnError(error -> {
                     Log.e(TAG, "Failed to erase this phone's data, so not signing out", error);
                     Toast.makeText(this, R.string.error_erasing_data, Toast.LENGTH_LONG).show();
-                })
-                // Deferred, not passed directly: RxDataStore.updateDataAsync starts the write the
-                // moment clearUser() is called, before anything subscribes, so building this chain
-                // with clearUser() in it signed the user out even when the erase above failed.
-                .andThen(Completable.defer(this.authRepository::clearUser))
+                });
+
+        // RxFlows.onlyAfter and not andThen: clearUser() starts writing when it is called, so
+        // passed to andThen directly it signed the user out even when the erase above failed.
+        var async = RxFlows.onlyAfter(erasedOrToldWhyNot, this.authRepository::clearUser)
                 .subscribe(() -> {
                     // logout by sending back to login page
                     Intent data = new Intent();

@@ -6,6 +6,7 @@ import dev.wander.android.opentagviewer.db.datastore.UserAuthDataStore;
 import dev.wander.android.opentagviewer.db.datastore.UserCacheDataStore;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
+import dev.wander.android.opentagviewer.util.rx.RxFlows;
 import io.reactivex.rxjava3.core.Completable;
 
 /**
@@ -44,15 +45,16 @@ public final class ThisPhonesTagData implements LocalDataEraser {
     }
 
     /**
-     * Each step deferred until the one before it has finished. The DataStore writes start the
-     * moment their method is called (RxDataStore.updateDataAsync does not wait for a subscriber),
-     * so chaining the calls directly would start all of them at once, and start them even if
-     * nobody ever subscribed.
+     * Each step starts only once the one before it has finished, through
+     * {@link RxFlows#onlyAfter}. The DataStore writes start the moment their method is called, so
+     * chaining the calls directly would start all of them at once, and start them even if nobody
+     * ever subscribed. The first is deferred for the same reason.
      */
     @Override
     public Completable eraseEverything() {
-        return Completable.defer(this.memberships::forget)
-                .andThen(Completable.defer(this.userData::forgetLastCameraPosition))
-                .andThen(Completable.defer(this.beacons::eraseEverything));
+        final Completable link = Completable.defer(this.memberships::forget);
+        final Completable mapPosition =
+                RxFlows.onlyAfter(link, this.userData::forgetLastCameraPosition);
+        return RxFlows.onlyAfter(mapPosition, this.beacons::eraseEverything);
     }
 }
