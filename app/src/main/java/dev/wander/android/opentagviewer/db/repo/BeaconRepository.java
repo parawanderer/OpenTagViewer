@@ -949,8 +949,15 @@ public class BeaconRepository {
 
             final long now = System.currentTimeMillis();
 
+            // Only for tags that still have a row. A fetch that was running when the user erased a
+            // tag lands afterwards, and one report for a tag with no row fails the foreign key and
+            // with it the whole insert, every other tag's reports included.
+            final Set<String> held = new HashSet<>(db.ownedBeaconDao()
+                    .whichExist(new ArrayList<>(reportsForBeaconId.keySet())));
+
             // flat map them all:
             LocationReport[] allRecords = reportsForBeaconId.entrySet().stream()
+                            .filter(kvp -> held.contains(kvp.getKey()))
                             .flatMap(kvp -> kvp.getValue().stream().map(locationReport -> LocationReport.builder()
                                     .hashId(BeaconLocationReportHasher.getSha256HashFor(kvp.getKey(), locationReport))
                                     .beaconId(kvp.getKey())

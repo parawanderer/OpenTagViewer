@@ -133,9 +133,24 @@ public interface OwnedBeaconDao {
      * Persist the rolling-key alignment state (FindMy 0.9.x stateful FindMyAccessory)
      * after a successful fetch. Targeted UPDATE so we don't risk clobbering other
      * columns if the in-memory copy is stale.
+     *
+     * <p><b>Never onto a removed tag.</b> A fetch or a Bluetooth sighting that was already running
+     * when the user removed the tag lands afterwards, and without {@code is_removed = 0} it wrote
+     * the keys {@link #removeAndForgetKeys} had just deleted straight back onto the hidden row.
      */
-    @Query("UPDATE OwnedBeacons SET accessory_json = :accessoryJson WHERE id = :beaconId")
+    @Query("UPDATE OwnedBeacons SET accessory_json = :accessoryJson"
+            + " WHERE id = :beaconId AND is_removed = 0")
     void updateAccessoryJson(String beaconId, String accessoryJson);
+
+    /**
+     * Which of these tags still have a row, removed or not.
+     *
+     * <p>For a fetch landing after a tag was erased: its reports have nothing to belong to, and
+     * {@code LocationReport}'s foreign key would fail the whole insert, every other tag's reports
+     * included.
+     */
+    @Query("SELECT id FROM OwnedBeacons WHERE id IN (:beaconIds)")
+    List<String> whichExist(List<String> beaconIds);
 
     @Delete
     void delete(OwnedBeacon ownedBeaconWithId);

@@ -19,6 +19,10 @@ import org.junit.runner.RunWith;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import dev.wander.android.opentagviewer.data.model.BeaconLocationReport;
 
 import dev.wander.android.opentagviewer.db.repo.model.ImportData;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
@@ -29,6 +33,7 @@ import dev.wander.android.opentagviewer.db.room.entity.LastBleSighting;
 import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.db.room.entity.UserBeaconOptions;
+import dev.wander.android.opentagviewer.python.FetchResult;
 
 /**
  * What removing a tag leaves behind on the phone.
@@ -55,6 +60,9 @@ public class RemovingATagForgetsItsKeysTest {
     private static final String AN_ALIGNMENT = "<?xml version=\"1.0\"?><plist><dict>"
             + "<key>lastIndexObserved</key><integer>1234</integer></dict></plist>";
     private static final String ACCESSORY_JSON = "{\"type\":\"accessory\",\"master_key\":\"x\"}";
+    /** What a fetch hands back: the same keys, with the alignment moved on. */
+    private static final String ALIGNED_JSON =
+            "{\"type\":\"accessory\",\"master_key\":\"x\",\"alignment\":5678}";
 
     private OpenTagViewerDatabase db;
     private BeaconRepository repo;
@@ -286,6 +294,64 @@ public class RemovingATagForgetsItsKeysTest {
         assertEquals(1, this.count("Import"));
         assertEquals("the hidden tag's history went with an import that should have stayed",
                 1, this.historyRowsFor(ITS_SIBLING));
+    }
+
+    /**
+     * <b>A fetch already running when the tag was removed.</b> It lands afterwards carrying the
+     * tag's freshly aligned accessory JSON, which is the same keys Remove has just deleted. It must
+     * not write them back onto the hidden row; the tag still listed beside it is updated as usual.
+     */
+    @Test
+    public void aFetchThatLandsAfterRemovalDoesNotWriteTheKeysBack() {
+        this.importAZipOf(THE_TAG, ITS_SIBLING);
+        this.repo.removeBeacon(THE_TAG, false).blockingAwait();
+
+        this.repo.storeFetchResult(new FetchResult(
+                Map.of(THE_TAG, List.of(), ITS_SIBLING, List.of()),
+                Map.of(THE_TAG, ALIGNED_JSON, ITS_SIBLING, ALIGNED_JSON),
+                Set.of(), Set.of())).blockingFirst();
+
+        assertNull("a fetch that was in flight put the removed tag's keys back",
+                this.storedKeysOf(THE_TAG)[1]);
+        assertEquals("the tag that was not removed should still get its new alignment",
+                ALIGNED_JSON, this.storedKeysOf(ITS_SIBLING)[1]);
+    }
+
+    /**
+     * The same for a Bluetooth sighting, which reads the row before deriving and writes after,
+     * so a removal can land in between. {@code recordAccessorySighting} ends in this write.
+     */
+    @Test
+    public void aSightingThatLandsAfterRemovalDoesNotWriteTheKeysBack() {
+        this.importAZipOf(THE_TAG);
+        this.repo.removeBeacon(THE_TAG, false).blockingAwait();
+
+        this.db.ownedBeaconDao().updateAccessoryJson(THE_TAG, ALIGNED_JSON);
+
+        assertNull(this.storedKeysOf(THE_TAG)[1]);
+    }
+
+    /**
+     * A fetch that lands after its tag was erased has reports for a row that no longer exists.
+     * One such report fails {@code LocationReport}'s foreign key and with it the whole insert, so
+     * the other tags fetched alongside lost their reports too.
+     */
+    @Test
+    public void aFetchThatLandsAfterTheTagWasErasedStillStoresTheOthers() {
+        this.importAZipOf(THE_TAG, ITS_SIBLING);
+        this.repo.removeBeacon(THE_TAG, true).blockingAwait();
+
+        final List<BeaconLocationReport> aReport = List.of(BeaconLocationReport.builder()
+                .timestamp(5_000L).publishedAt(5_000L).description("somewhere")
+                .latitude(52.370216).longitude(4.895168).build());
+        this.repo.storeFetchResult(new FetchResult(
+                Map.of(THE_TAG, aReport, ITS_SIBLING, aReport),
+                Map.of(), Set.of(), Set.of())).blockingFirst();
+
+        assertEquals("the erased tag's report should be dropped", 0, this.historyRowsFor(THE_TAG));
+        assertEquals("the other tag's report went down with the erased one's",
+                1, this.historyRowsFor(ITS_SIBLING));
+        assertNull("the erased tag came back", this.storedKeysOf(THE_TAG));
     }
 
     /** Settings -> Erase all data, as far as the database goes. */
