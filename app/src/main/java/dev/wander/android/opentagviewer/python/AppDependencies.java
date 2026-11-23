@@ -143,8 +143,8 @@ public final class AppDependencies {
      * <p><b>Here so a test can press the button without it doing the thing.</b> The instrumented
      * suite runs against the real on-device database, which on somebody's own phone holds their
      * tags; a test of the erase button that really erased would wipe them. So a test checks the
-     * screen calls this, and {@code ErasingEverythingTest} checks what the real one deletes,
-     * against an in-memory database.
+     * screen calls this, {@code RemovingATagForgetsItsKeysTest} checks what the real one deletes,
+     * against an in-memory database, and {@code ThisPhonesTagDataTest} the order it does it in.
      */
     private static Function<Context, LocalDataEraser> dataEraserFactory = ThisPhonesTagData::of;
 

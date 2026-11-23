@@ -12,9 +12,10 @@ import io.reactivex.rxjava3.core.Completable;
 public interface LocalDataEraser {
     /**
      * Every tag and its keys, location history, imports and the records about them; the iCloud
-     * link's keys; and the last map position. Not the settings, not the Apple session (signing
-     * out is the caller's next step) and not the device identity, which would make the next
-     * sign-in register a second device on the account (AGENTS.md rule 11).
+     * link's keys; the last map position; and the tags the background scan is listening for.
+     * Not the settings, not the Apple session (signing out is the caller's next step) and not the
+     * device identity, which would make the next sign-in register a second device on the account
+     * (AGENTS.md rule 11).
      */
     Completable eraseEverything();
 }
