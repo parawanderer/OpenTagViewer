@@ -347,6 +347,18 @@
     <string name="left_behind_seconds_explainer">Сколько метка должна молчать, прежде чем приложение решит, что вы её забыли. С середины этого времени поиск идёт на полной мощности, поэтому меньшее значение предупреждает раньше и расходует больше заряда.</string>
     <string name="left_behind_sound">Звук будильника</string>
     <string name="left_behind_sound_default">Стандартный звук будильника</string>
+    <string name="history_retention_title">Хранить историю местоположений</string>
+    <string name="history_retention_forever">Всегда</string>
+    <string name="history_retention_1_year">1 год</string>
+    <string name="history_retention_6_months">6 месяцев</string>
+    <string name="history_retention_3_months">3 месяца</string>
+    <string name="history_retention_1_month">1 месяц</string>
+    <string name="history_retention_confirm_title">Удалить старую историю?</string>
+    <string name="history_retention_confirm_message">Местоположения старше выбранного срока будут удалены сейчас и затем при каждом запуске приложения. Это касается и импортированной истории. Для каждой метки сохраняется её последнее известное местоположение.
+
+Это действие нельзя отменить. Если нужна копия, сначала экспортируйте историю.</string>
+    <string name="history_retention_confirm_button">Удалить</string>
+    <string name="history_retention_delete_failed">Не удалось удалить старую историю. Приложение попробует снова при следующем запуске.</string>
     <string name="icloud_membership_unreadable_title">Подключите учётную запись Apple заново</string>
     <string name="icloud_membership_unreadable_message">Приложение хранит подключение к вашей учётной записи Apple, но больше не может его прочитать. Нужные ключи находятся в защищённом хранилище этого устройства и не подлежат восстановлению — поэтому подключение придётся выполнить заново.
 

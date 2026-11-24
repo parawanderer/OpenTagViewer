@@ -1,5 +1,7 @@
 package dev.wander.android.opentagviewer.db.repo.model;
 
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -161,6 +163,17 @@ public class UserSettings {
     private String leftBehindSoundUri;
 
     /**
+     * How many days of location history to keep, or null/zero to keep all of it.
+     *
+     * <p><b>Null means keep everything, and that is the default on purpose.</b> Until this
+     * existed the app never deleted a report, and somebody updating should not find their history
+     * shorter for a setting they never saw. Older reports are deleted only once somebody picks a
+     * period. See {@link #resolveHistoryRetentionDays()} and
+     * {@code db.repo.LocationHistoryRetention}, which does the deleting.
+     */
+    private Integer historyRetentionDays;
+
+    /**
      * What a tag's silence has to outlast before it is worth a targeted check.
      *
      * <p>Well above the floor, because this is the value for everybody who never opens the
@@ -199,6 +212,23 @@ public class UserSettings {
     /** Beyond this the tag is somewhere else entirely and the alert has missed its moment. */
     public static final int LEFT_BEHIND_AFTER_SECONDS_MAX = 300;
 
+    /** Keep every report. The default, and what a stored zero or a missing value means. */
+    public static final int HISTORY_RETENTION_FOREVER = 0;
+
+    /**
+     * The periods Settings offers, in days, longest first, after
+     * {@link #HISTORY_RETENTION_FOREVER}: a year, six months, three months and a month.
+     *
+     * <p>Each is the longest the named period can be on a calendar (366, 184, 92 and 31 days), so
+     * "a month" never keeps less than a month.
+     *
+     * <p><b>A month is the shortest on purpose.</b> The History screen asks Apple for a day it
+     * has no record of fetching, and Apple only has the last week or so. Every period here is well
+     * past that, so a day this deletes is never one the History screen would go and fetch again.
+     */
+    public static final List<Integer> HISTORY_RETENTION_CHOICES_DAYS =
+            List.of(HISTORY_RETENTION_FOREVER, 366, 184, 92, 31);
+
     public static final String ANISETTE_LOCAL = "local";
     public static final String ANISETTE_REMOTE = "remote";
 
@@ -210,6 +240,33 @@ public class UserSettings {
 
         return Math.max(LEFT_BEHIND_AFTER_SECONDS_MIN,
                 Math.min(LEFT_BEHIND_AFTER_SECONDS_MAX, this.leftBehindAfterSeconds));
+    }
+
+    /**
+     * The history period in days, or {@link #HISTORY_RETENTION_FOREVER}.
+     *
+     * <p>Always one of {@link #HISTORY_RETENTION_CHOICES_DAYS}. A stored value that is not one
+     * (a later version's choice, say, after a downgrade) rounds up to the next choice that keeps
+     * at least as much, and past the longest it keeps everything. An unexpected value should
+     * never delete more than somebody asked for.
+     */
+    public int resolveHistoryRetentionDays() {
+        if (this.historyRetentionDays == null || this.historyRetentionDays <= 0) {
+            return HISTORY_RETENTION_FOREVER;
+        }
+
+        int resolved = HISTORY_RETENTION_FOREVER;
+        for (final int choice : HISTORY_RETENTION_CHOICES_DAYS) {
+            if (choice != HISTORY_RETENTION_FOREVER && choice >= this.historyRetentionDays) {
+                resolved = choice;
+            }
+        }
+        return resolved;
+    }
+
+    /** Whether location history is kept forever - see {@link #historyRetentionDays}. */
+    public boolean keepsHistoryForever() {
+        return this.resolveHistoryRetentionDays() == HISTORY_RETENTION_FOREVER;
     }
 
     public boolean hasDarkThemeEnabled() {

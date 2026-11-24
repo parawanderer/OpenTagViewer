@@ -24,6 +24,8 @@ import dev.wander.android.opentagviewer.python.icloud.ICloudService;
 import dev.wander.android.opentagviewer.python.icloud.PythonICloudService;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
+import dev.wander.android.opentagviewer.db.repo.HistoryPruner;
+import dev.wander.android.opentagviewer.db.repo.LocationHistoryRetention;
 import dev.wander.android.opentagviewer.service.web.AnisetteServerTesterService;
 import dev.wander.android.opentagviewer.util.android.AddressLookup;
 import dev.wander.android.opentagviewer.util.history.HistoryArchiveImporter;
@@ -170,6 +172,27 @@ public final class AppDependencies {
     }
 
     /**
+     * Deletes location history older than the period chosen in Settings.
+     *
+     * <p><b>Here so a test can choose a period without it deleting anything.</b> The instrumented
+     * suite runs against the real on-device database, and on somebody's own phone that holds
+     * their history. So the Settings test checks the screen asks for the right period, and
+     * {@code PruningOldLocationHistoryTest} checks what the real one deletes, against an
+     * in-memory database.
+     */
+    private static Function<Context, HistoryPruner> historyPrunerFactory =
+            LocationHistoryRetention::of;
+
+    public static HistoryPruner historyPruner(final Context context) {
+        return historyPrunerFactory.apply(context);
+    }
+
+    @VisibleForTesting
+    public static void replaceHistoryPruner(final HistoryPruner replacement) {
+        historyPrunerFactory = context -> replacement;
+    }
+
+    /**
      * Opens a conversation with iCloud on the signed-in account.
      *
      * <p>A supplier rather than an instance because a session is not reusable: it holds a
@@ -313,5 +336,6 @@ public final class AppDependencies {
         icloudFactory = AppDependencies::openRealICloud;
         geocoderFactory = (context, locale) ->
                 AddressLookup.through(new Geocoder(context, locale));
+        historyPrunerFactory = LocationHistoryRetention::of;
     }
 }

@@ -6,6 +6,7 @@ import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStor
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_UPGRADE_OFFERED;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ANISETTE_SERVER_URL;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ENABLE_DEBUG_DATA;
+import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.HISTORY_RETENTION_DAYS;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.ICLOUD_OFFER_MADE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LANGUAGE;
 import static dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore.LEFT_BEHIND_AFTER_SECONDS;
@@ -50,6 +51,7 @@ public class UserSettingsRepository {
                 Boolean icloudOfferMade = settings.get(ICLOUD_OFFER_MADE);
                 Integer leftBehindAfterSeconds = settings.get(LEFT_BEHIND_AFTER_SECONDS);
                 String leftBehindSoundUri = settings.get(LEFT_BEHIND_SOUND_URI);
+                Integer historyRetentionDays = settings.get(HISTORY_RETENTION_DAYS);
 
                 return UserSettings.builder()
                         .anisetteServerUrl(anisetteServerUrl)
@@ -67,6 +69,7 @@ public class UserSettingsRepository {
                         .icloudOfferMade(icloudOfferMade)
                         .leftBehindAfterSeconds(leftBehindAfterSeconds)
                         .leftBehindSoundUri(leftBehindSoundUri)
+                        .historyRetentionDays(historyRetentionDays)
                         .build();
 
             }).subscribeOn(Schedulers.io())
@@ -115,6 +118,12 @@ public class UserSettingsRepository {
             mutablePreferences.set(LEFT_BEHIND_SOUND_URI,
                     userSettings.getLeftBehindSoundUri() == null
                             ? "" : userSettings.getLeftBehindSoundUri());
+            // Zero rather than absent for "keep everything", for the same reason as above: an int
+            // key cannot hold null. resolveHistoryRetentionDays reads zero as keep everything.
+            mutablePreferences.set(HISTORY_RETENTION_DAYS,
+                    userSettings.getHistoryRetentionDays() == null
+                            ? UserSettings.HISTORY_RETENTION_FOREVER
+                            : userSettings.getHistoryRetentionDays());
             // An empty string means "not chosen", which is not the same as either mode - see
             // UserSettings.anisetteMode. Writing "local" here for somebody who never chose
             // would move an existing session onto a different machine identity.

@@ -67,4 +67,22 @@ public interface LocationReportDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(LocationReport... locationReports);
+
+    /**
+     * Deletes every report older than {@code cutoffUnixMS}, except each tag's newest.
+     *
+     * <p><b>The newest one stays however old it is</b>, because it is not history: it is where
+     * the map draws the tag, what "last updated" says and where Navigate goes. A tag that has
+     * not been heard for longer than the retention period would otherwise turn into "No last
+     * location known", which reads as the app having lost it. The comparison is against that
+     * tag's own newest timestamp, so a row tied with it is kept too.
+     *
+     * <p>The subquery is answered from the {@code (beacon_id, timestamp)} index.
+     *
+     * @return how many reports were deleted
+     */
+    @Query("DELETE FROM LocationReport WHERE timestamp < :cutoffUnixMS"
+            + " AND timestamp < (SELECT MAX(newest.timestamp) FROM LocationReport AS newest"
+            + " WHERE newest.beacon_id = LocationReport.beacon_id)")
+    int deleteOlderThanExceptNewest(long cutoffUnixMS);
 }

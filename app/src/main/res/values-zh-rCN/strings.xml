@@ -347,6 +347,18 @@
     <string name="left_behind_seconds_explainer">标签失去信号多久后，应用才判定你把它落下了。超过一半时间后会全力搜索，所以时间越短提醒越早，也越耗电。</string>
     <string name="left_behind_sound">报警声</string>
     <string name="left_behind_sound_default">默认报警声</string>
+    <string name="history_retention_title">位置历史保留时间</string>
+    <string name="history_retention_forever">永久</string>
+    <string name="history_retention_1_year">1 年</string>
+    <string name="history_retention_6_months">6 个月</string>
+    <string name="history_retention_3_months">3 个月</string>
+    <string name="history_retention_1_month">1 个月</string>
+    <string name="history_retention_confirm_title">删除较早的历史记录？</string>
+    <string name="history_retention_confirm_message">早于所选时间的位置会立即删除，之后每次启动应用时也会删除，包括你导入的历史记录。每个标签会保留其最后已知位置。
+
+此操作无法撤销。如需副本，请先导出历史记录。</string>
+    <string name="history_retention_confirm_button">删除</string>
+    <string name="history_retention_delete_failed">无法删除较早的历史记录。应用会在下次启动时重试。</string>
     <string name="icloud_membership_unreadable_title">请重新连接您的 Apple 账户</string>
     <string name="icloud_membership_unreadable_message">本应用保存了与你的 Apple 账户的连接，但已无法读取。所需的密钥保存在本设备的安全存储中，且无法恢复，因此需要重新建立连接。
 

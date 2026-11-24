@@ -347,6 +347,18 @@
     <string name="left_behind_seconds_explainer">標籤失去訊號多久後，應用程式才判定你把它落下了。超過一半時間後會全力搜尋，所以時間越短提醒越早，也越耗電。</string>
     <string name="left_behind_sound">警報聲</string>
     <string name="left_behind_sound_default">預設警報聲</string>
+    <string name="history_retention_title">位置紀錄保留時間</string>
+    <string name="history_retention_forever">永久</string>
+    <string name="history_retention_1_year">1 年</string>
+    <string name="history_retention_6_months">6 個月</string>
+    <string name="history_retention_3_months">3 個月</string>
+    <string name="history_retention_1_month">1 個月</string>
+    <string name="history_retention_confirm_title">刪除較舊的歷史記錄？</string>
+    <string name="history_retention_confirm_message">早於所選時間的位置會立即刪除，之後每次啟動 App 時也會刪除，包括你匯入的歷史記錄。每個標籤會保留其最後已知位置。
+
+此操作無法復原。如需副本，請先匯出歷史記錄。</string>
+    <string name="history_retention_confirm_button">刪除</string>
+    <string name="history_retention_delete_failed">無法刪除較舊的歷史記錄。App 會在下次啟動時重試。</string>
     <string name="icloud_membership_unreadable_title">請重新連接你的 Apple 帳戶</string>
     <string name="icloud_membership_unreadable_message">本應用程式儲存了與你的 Apple 帳戶的連線，但已無法讀取。所需的金鑰保存在本裝置的安全儲存空間中，且無法復原，因此必須重新建立連線。
 

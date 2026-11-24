@@ -22,6 +22,8 @@
         <variable name="isDebugDataEnabled" type="boolean" />
         <variable name="isShowAppleDevicesEnabled" type="boolean" />
         <variable name="isScanInBackgroundEnabled" type="boolean" />
+        <variable name="onClickHistoryRetention" type="Runnable" />
+        <variable name="historyRetentionSubtitle" type="String" />
         <variable name="onClickAppleDevicesHelpLink" type="Runnable" />
         <variable name="isSystemColorsSupported" type="boolean" />
         <variable name="isSystemColorsEnabled" type="boolean" />
@@ -423,6 +425,18 @@
                     android:textSize="13sp"
                     tools:text="Default alarm sound" />
             </LinearLayout>
+
+            <!--
+                How long location history is kept. Forever unless somebody picks a period, so
+                nothing is deleted for anyone who never opens it. See HistoryRetentionRow.
+            -->
+            <include
+                android:id="@+id/settings_history_retention"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/history_24px}"
+                app:onClick="@{onClickHistoryRetention}"
+                app:sectionSubtitle="@{historyRetentionSubtitle}"
+                app:title="@{@string/history_retention_title}" />
 
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"

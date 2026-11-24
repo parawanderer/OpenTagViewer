@@ -14,6 +14,7 @@ import com.google.android.material.color.DynamicColors;
 import dev.wander.android.opentagviewer.anisette.AppleLibraryProbeService;
 import dev.wander.android.opentagviewer.anisette.MacAdiService;
 import dev.wander.android.opentagviewer.db.datastore.UserSettingsDataStore;
+import dev.wander.android.opentagviewer.db.repo.LocationHistoryRetention;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.db.room.OpenTagViewerDatabase;
@@ -57,6 +58,7 @@ public class OpenAirTagApplication extends Application {
         this.setupTheme();
         this.setupSystemColors();
         this.resumeBackgroundScanIfEnabled();
+        this.deleteHistoryOlderThanChosen();
     }
 
     private boolean isTheAppleLibraryProbe() {
@@ -112,6 +114,39 @@ public class OpenAirTagApplication extends Application {
                 }
             } catch (final Exception e) {
                 Log.w(TAG, "Could not read whether to scan in the background", e);
+            }
+        });
+    }
+
+    /**
+     * Deletes location history older than the period chosen in Settings, if one was.
+     *
+     * <p>At start because that is the one moment every process passes through, the background
+     * scan's included. Off the main thread for the same reason as the scan above, and because the
+     * delete can take a while on a large history.
+     *
+     * <p><b>With the default, keep everything, this reads one setting and stops</b>: it never
+     * opens the database, so nothing changes for anyone who has not chosen a period. Nor does it
+     * create a database that does not exist yet, since there is nothing in it to delete.
+     */
+    private void deleteHistoryOlderThanChosen() {
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                final int days = new UserSettingsRepository(UserSettingsDataStore.getInstance(this))
+                        .getUserSettings()
+                        .resolveHistoryRetentionDays();
+
+                if (days == UserSettings.HISTORY_RETENTION_FOREVER || this.isFirstRun()) {
+                    return;
+                }
+
+                final int deleted = LocationHistoryRetention.of(this).prune(days).blockingGet();
+                Log.i(TAG, "Kept " + days + " days of location history; deleted "
+                        + deleted + " older reports");
+            } catch (final Exception e) {
+                // Tried again at the next start. Keeping history a little longer than asked is
+                // not worth interrupting anybody over.
+                Log.w(TAG, "Could not delete location history older than the chosen period", e);
             }
         });
     }
