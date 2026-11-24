@@ -37,6 +37,7 @@ import dev.wander.android.opentagviewer.db.room.entity.LocationReport;
 import dev.wander.android.opentagviewer.db.room.entity.OwnedBeacon;
 import dev.wander.android.opentagviewer.anisette.FakeAnisetteSource;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.util.TimesToday;
 import dev.wander.android.opentagviewer.util.android.AppCryptographyUtil;
 import dev.wander.android.opentagviewer.util.rx.RefreshPolicy;
 
@@ -179,14 +180,13 @@ public final class AMapWithTagsOnIt {
                             + "</dict></plist>")
                     .build());
 
-            // **Reported a couple of hours ago, not on a fixed date in 2023.** The timestamp
-            // decides which day the report belongs to, and the history screen asks for one
-            // local day at a time - so a fixed past date gives every screen built on this
-            // fixture an empty "today", which reads as the history being broken.
-            //
-            // Two hours rather than minutes, so it is comfortably inside today whatever hour
-            // the suite runs at, and inside every window the app asks for.
-            final long reportedAt = System.currentTimeMillis() - (2L * 60 * 60 * 1000);
+            // **On today's local date, not a fixed date in 2023 and not "two hours ago".**
+            // The timestamp decides which day the report belongs to, and the history screen
+            // asks for one local day at a time - so a fixed past date gives every screen built
+            // on this fixture an empty "today", which reads as the history being broken. Two
+            // hours ago did the same thing between 00:00 and 02:00, and this fixture was red on
+            // CI twice that way. See TimesToday.
+            final long reportedAt = TimesToday.at(i);
 
             // Spread apart, so "which card is centred" has a different answer per tag.
             this.db.locationReportDao().insertAll(LocationReport.builder()
