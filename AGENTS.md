@@ -978,6 +978,15 @@ Two more rules that came out of the same failures:
   boxes and the bundle passcode groups both advance when full, and Espresso's per-character
   typing fails the moment the field it started on stops being focused. It is also the case
   people actually hit: a code is pasted far more often than typed.
+- **Never seed a timestamp as an offset from now.** `AMapWithTagsOnIt` seeded every tag at "two
+  hours ago", with a comment saying that was comfortably inside today. It is, between 02:00 and
+  22:00. Outside that it is yesterday, the history screen asks for one local day at a time, and
+  sees nothing: `DebugModeReachesEveryScreenTest` failed at 00:14 UTC with *"no history row was
+  built at all"* while the other 858 tests passed. That is a 22-minute rerun with no fault to
+  find, and it has happened on `main` and on a contributor's PR. **`TimesToday.at(i)`** anchors
+  seeded times to local midnight, and any timestamp a screen filters by wants the same
+  treatment. `TimesTodayTest` pins the midnight, end-of-day, first-minute and foreign-zone
+  cases, and 5 of its 6 go red if the offset comes back.
 
 #### `animationsDisabled` does not disable animations
 

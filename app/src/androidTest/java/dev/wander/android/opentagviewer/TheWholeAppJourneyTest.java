@@ -40,8 +40,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.time.Instant;
-import java.time.ZoneId;
+import dev.wander.android.opentagviewer.util.TimesToday;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -213,7 +212,7 @@ public class TheWholeAppJourneyTest {
      * <p><b>Absolute times, not offsets.</b> The history screen asks for one <i>local</i> day at
      * a time, so "two hours ago" falls on yesterday for anybody running the suite shortly after
      * midnight - a test that is green all day and red at 00:30 for reasons that have nothing to
-     * do with the app. The day boundary is computed here the same way the screen computes it.
+     * do with the app. {@link TimesToday} anchors them to the day boundary the screen uses.
      */
     private void givenTheAccountHasReportedToday() {
         if (!Python.isStarted()) {
@@ -224,7 +223,6 @@ public class TheWholeAppJourneyTest {
         this.appleDouble.callAttr("install");
         this.appleDouble.callAttr("clearReports");
 
-        final long startOfToday = startOfTodayLocal();
         for (int i = 0; i < REPORTS_TODAY; i++) {
             // A minute apart, and only minutes into the day, so every one of them is in the
             // past however early the suite runs.
@@ -235,19 +233,9 @@ public class TheWholeAppJourneyTest {
             // could have been drawn through any of them, or one of them, and looked the same.
             // A few hundred metres apart makes the drawing say what it did.
             this.appleDouble.callAttr("reportAt",
-                    startOfToday + ((i + 1) * 60_000L),
+                    TimesToday.at(i),
                     LATITUDE + (i * STEP_LATITUDE), LONGITUDE + (i * STEP_LONGITUDE));
         }
-    }
-
-    /** Midnight this morning, by the same clock {@code HistoryViewActivity} uses. */
-    private static long startOfTodayLocal() {
-        return Instant.ofEpochMilli(System.currentTimeMillis())
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate()
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli();
     }
 
     @After
