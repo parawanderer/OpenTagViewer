@@ -251,6 +251,35 @@ public class NearbyScanService extends Service {
         context.getApplicationContext().stopService(intent);
     }
 
+    /** Whether an instance is alive in this process: set in onCreate, cleared in onDestroy. */
+    private static volatile boolean running = false;
+
+    /**
+     * Stops the service and starts it again, if it is running. Otherwise does nothing.
+     *
+     * <p><b>For after the tags have been erased.</b> The scan reads the tags once, when it starts,
+     * and keeps their keys for the life of the service. Without a restart it went on listening for
+     * the erased tags, and alerting on them, until the process died. A fresh instance reads the
+     * now empty database, and retires the erased tags' derived addresses on the way.
+     *
+     * <p>A start the system refuses is logged, not thrown. The erase has already succeeded by
+     * then, and failing it would tell the user nothing was erased. The stop has still happened,
+     * so nothing is listening for the erased tags; the setting starts it again with the app.
+     */
+    public static void restartIfRunning(final Context context) {
+        if (!running) {
+            return;
+        }
+        Log.i(TAG, "Restarting, so the scan forgets tags that are no longer stored");
+        stop(context);
+        try {
+            start(context);
+        } catch (IllegalStateException e) {
+            // ForegroundServiceStartNotAllowedException is one, on Android 12 and later.
+            Log.w(TAG, "Stopped the scan but could not start it again", e);
+        }
+    }
+
     @Nullable
     @Override
     public IBinder onBind(final Intent intent) {
@@ -260,6 +289,7 @@ public class NearbyScanService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        running = true;
 
         this.beaconRepo = new BeaconRepository(
                 OpenTagViewerDatabase.getInstance(this.getApplicationContext()));
@@ -310,6 +340,7 @@ public class NearbyScanService extends Service {
             // alarm would outlive the thing that started it.
             this.alarm.stop();
         }
+        running = false;
         super.onDestroy();
     }
 

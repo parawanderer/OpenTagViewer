@@ -2,6 +2,8 @@ package dev.wander.android.opentagviewer.db.repo;
 
 import android.util.Log;
 
+import androidx.sqlite.db.SupportSQLiteDatabase;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -947,8 +949,15 @@ public class BeaconRepository {
 
             final long now = System.currentTimeMillis();
 
+            // Only for tags that still have a row. A fetch that was running when the user erased a
+            // tag lands afterwards, and one report for a tag with no row fails the foreign key and
+            // with it the whole insert, every other tag's reports included.
+            final Set<String> held = new HashSet<>(db.ownedBeaconDao()
+                    .whichExist(new ArrayList<>(reportsForBeaconId.keySet())));
+
             // flat map them all:
             LocationReport[] allRecords = reportsForBeaconId.entrySet().stream()
+                            .filter(kvp -> held.contains(kvp.getKey()))
                             .flatMap(kvp -> kvp.getValue().stream().map(locationReport -> LocationReport.builder()
                                     .hashId(BeaconLocationReportHasher.getSha256HashFor(kvp.getKey(), locationReport))
                                     .beaconId(kvp.getKey())
@@ -1038,13 +1047,86 @@ public class BeaconRepository {
         }).subscribeOn(Schedulers.io());
     }
 
-    public Completable markBeaconAsRemoved(final String beaconId) {
+    /**
+     * Remove a tag the user imported from a file. Never called for an account tag, which the
+     * next account read would only write back - see {@code MyDevicesListActivity}.
+     *
+     * <p><b>Its keys go either way.</b> Removing used to only hide the row, so the private key and
+     * shared secrets of every tag ever removed stayed in the database, readable by anybody who got
+     * at it, and could locate the tag until it was re-paired. Somebody removing a tag they sold or
+     * handed back expects them gone.
+     *
+     * <p><b>Its history goes only when asked.</b> Hiding the row rather than deleting it is what
+     * lets a tag removed by mistake come back with its history by importing it again, and that is
+     * still the default. {@code alsoErasingHistory} deletes the row instead, which cascades to
+     * its location history, the record of which days were fetched, its last Bluetooth sighting
+     * and the user's name for it; and the import it came from, once no other tag refers to it.
+     *
+     * <p>Then the database is compacted, because a deleted row is otherwise still in the file's
+     * free pages, which is exactly where somebody reading the file would look.
+     */
+    public Completable removeBeacon(final String beaconId, final boolean alsoErasingHistory) {
+        return this.removeBeacons(List.of(beaconId), alsoErasingHistory);
+    }
+
+    /**
+     * {@link #removeBeacon} for several tags at once, as the device list's multi-select does.
+     *
+     * <p>One transaction and one compaction, rather than one of each per tag. A compaction
+     * rewrites the whole file, so removing ten tags one by one rewrote it ten times, and the calls
+     * ran concurrently, so each could find another holding the database and fail.
+     */
+    public Completable removeBeacons(
+            final List<String> beaconIds, final boolean alsoErasingHistory) {
         return Completable.fromRunnable(() -> {
+            db.runInTransaction(() -> {
+                for (final String beaconId : beaconIds) {
+                    if (alsoErasingHistory) {
+                        final Long importId = db.ownedBeaconDao().importIdOf(beaconId);
+                        db.ownedBeaconDao().deleteById(beaconId);
+                        db.beaconNamingRecordDao().deleteById(beaconId);
+                        if (importId != null) {
+                            db.importDao().deleteIfNothingRefersTo(importId);
+                        }
+                    } else {
+                        db.beaconNamingRecordDao().setRemoved(beaconId);
+                        db.ownedBeaconDao().removeAndForgetKeys(beaconId);
+                    }
+                }
+            });
 
-            db.beaconNamingRecordDao().setRemoved(beaconId);
-            db.ownedBeaconDao().setRemoved(beaconId);
-
+            this.compactBestEffort();
         }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Delete every tag, its keys and history, every import and every record about them.
+     *
+     * <p>Room's {@code clearAllTables} also checkpoints the write-ahead log and vacuums, so what
+     * was deleted does not linger in the file. It must not run on the main thread or inside a
+     * transaction, hence the scheduler.
+     */
+    public Completable eraseEverything() {
+        return Completable.fromRunnable(db::clearAllTables).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Rewrite the database file without the free pages a delete leaves behind, then fold the
+     * write-ahead log back in and truncate it.
+     *
+     * <p>Best effort: if another connection is busy it fails, and the data is still deleted as far
+     * as the app is concerned - only a forensic reading of the file could find it until the next
+     * compaction. Not worth failing the user's removal over.
+     */
+    private void compactBestEffort() {
+        try {
+            final SupportSQLiteDatabase sqlite = db.getOpenHelper().getWritableDatabase();
+            sqlite.execSQL("VACUUM");
+            sqlite.query("PRAGMA wal_checkpoint(TRUNCATE)").close();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not compact the database after removing a tag; the rows are gone"
+                    + " but their bytes stay in the file until the next compaction", e);
+        }
     }
 
     public Observable<Optional<DailyHistoryFetchRecord>> getInsertionHistoryItem(final String beaconId, final long startOfDayTimestampMS) {

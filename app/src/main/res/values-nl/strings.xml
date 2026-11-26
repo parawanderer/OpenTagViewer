@@ -465,4 +465,13 @@ Als Apple het verzoek simpelweg weigerde, is even wachten en opnieuw proberen he
     <string name="settings_section_tags">Tags</string>
     <string name="settings_section_app">App</string>
     <string name="anisette_coreadi_card_title">Kon een bestand van Apple niet downloaden</string>
+    <string name="remove_tag_also_erase_history">Ook de locatiegeschiedenis verwijderen. Opnieuw importeren van de tag brengt die niet terug.</string>
+    <string name="remove_tags_also_erase_history">Ook hun locatiegeschiedenis verwijderen. Opnieuw importeren van de tags brengt die niet terug.</string>
+    <string name="logout_also_erase_data">Ook alle tags op deze telefoon wissen, met hun sleutels en locatiegeschiedenis, en de iCloud-koppeling</string>
+    <string name="erase_all_data_title">Alle gegevens wissen</string>
+    <string name="erase_all_data_subtitle">Alle tags met hun sleutels en locatiegeschiedenis van deze telefoon verwijderen en uitloggen</string>
+    <string name="erase_all_data_confirm_title">Alle gegevens wissen?</string>
+    <string name="erase_all_data_confirm_message">Alle tags op deze telefoon worden verwijderd, met hun sleutels en locatiegeschiedenis, samen met de imports waar ze vandaan kwamen en de iCloud-koppeling. Je wordt uitgelogd bij je Apple-account. Je instellingen blijven bewaard.\n\nDit kan niet ongedaan worden gemaakt. Een tag die uit een bestand is geïmporteerd, komt alleen terug door dat bestand opnieuw te importeren.\n\nDe app wordt hiermee niet uit je Apple-account verwijderd. Dat moet op een Apple-apparaat gebeuren.</string>
+    <string name="erase_all_data_confirm_button">Wissen</string>
+    <string name="error_erasing_data">Niet alles op deze telefoon kon worden gewist, dus je bent nog ingelogd. Je tags zijn er nog, maar de iCloud-koppeling is mogelijk al verwijderd. Probeer het opnieuw.</string>
 </resources>

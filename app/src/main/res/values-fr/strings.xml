@@ -465,4 +465,13 @@ Si Apple a simplement refusé la requête, il vaut mieux attendre et réessayer.
     <string name="settings_section_tags">Balises</string>
     <string name="settings_section_app">Application</string>
     <string name="anisette_coreadi_card_title">Impossible de télécharger un fichier d\'Apple</string>
+    <string name="remove_tag_also_erase_history">Supprimer aussi son historique de localisation. Importer à nouveau la balise ne le restaurera pas.</string>
+    <string name="remove_tags_also_erase_history">Supprimer aussi leur historique de localisation. Importer à nouveau les balises ne le restaurera pas.</string>
+    <string name="logout_also_erase_data">Effacer aussi toutes les balises de ce téléphone, avec leurs clés et leur historique de localisation, ainsi que l’association iCloud</string>
+    <string name="erase_all_data_title">Effacer toutes les données</string>
+    <string name="erase_all_data_subtitle">Supprimer toutes les balises, leurs clés et leur historique de localisation de ce téléphone, et se déconnecter</string>
+    <string name="erase_all_data_confirm_title">Effacer toutes les données ?</string>
+    <string name="erase_all_data_confirm_message">Toutes les balises de ce téléphone sont supprimées, avec leurs clés et leur historique de localisation, ainsi que les importations dont elles proviennent et l’association iCloud. Vous êtes déconnecté de votre compte Apple. Vos réglages sont conservés.\n\nCette action est irréversible. Une balise importée depuis un fichier ne revient qu’en important à nouveau ce fichier.\n\nCela ne retire pas l’application de votre compte Apple. Cela doit se faire sur un appareil Apple.</string>
+    <string name="erase_all_data_confirm_button">Effacer</string>
+    <string name="error_erasing_data">Impossible de tout effacer sur ce téléphone, vous êtes donc toujours connecté. Vos balises sont toujours là, mais l’association iCloud a peut-être déjà été supprimée. Réessayez.</string>
 </resources>

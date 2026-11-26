@@ -104,12 +104,53 @@ public interface OwnedBeaconDao {
     void setRemoved(String beaconId);
 
     /**
+     * Hide a tag the user removed, and forget its keys.
+     *
+     * <p>The row stays, so its location history stays with it (hidden, like the row) and comes
+     * back if the same tag is imported again. The three columns that hold key material do not:
+     * {@code content} is the exported plist with the private key and shared secrets,
+     * {@code accessory_json} is FindMy.py's state built from the same keys, and
+     * {@code alignment_plist} is where the key schedule had got to. Somebody who removes a tag
+     * they sold or gave back reasonably expects those to be gone. A re-import supplies all three
+     * again, through {@link #refreshFromImport}, whose {@code COALESCE}s fill a null in.
+     */
+    @Query("UPDATE OwnedBeacons SET is_removed = 1, content = NULL, accessory_json = NULL,"
+            + " alignment_plist = NULL WHERE id = :beaconId")
+    void removeAndForgetKeys(String beaconId);
+
+    /**
+     * Delete a tag outright. Its location history, fetch records, last Bluetooth sighting and the
+     * user's name for it are children of this row and go with it ({@code ON DELETE CASCADE}).
+     */
+    @Query("DELETE FROM OwnedBeacons WHERE id = :beaconId")
+    int deleteById(String beaconId);
+
+    /** Which import a row came from, removed or not; null for an account tag or no such row. */
+    @Query("SELECT import_id FROM OwnedBeacons WHERE id = :beaconId")
+    Long importIdOf(String beaconId);
+
+    /**
      * Persist the rolling-key alignment state (FindMy 0.9.x stateful FindMyAccessory)
      * after a successful fetch. Targeted UPDATE so we don't risk clobbering other
      * columns if the in-memory copy is stale.
+     *
+     * <p><b>Never onto a removed tag.</b> A fetch or a Bluetooth sighting that was already running
+     * when the user removed the tag lands afterwards, and without {@code is_removed = 0} it wrote
+     * the keys {@link #removeAndForgetKeys} had just deleted straight back onto the hidden row.
      */
-    @Query("UPDATE OwnedBeacons SET accessory_json = :accessoryJson WHERE id = :beaconId")
+    @Query("UPDATE OwnedBeacons SET accessory_json = :accessoryJson"
+            + " WHERE id = :beaconId AND is_removed = 0")
     void updateAccessoryJson(String beaconId, String accessoryJson);
+
+    /**
+     * Which of these tags still have a row, removed or not.
+     *
+     * <p>For a fetch landing after a tag was erased: its reports have nothing to belong to, and
+     * {@code LocationReport}'s foreign key would fail the whole insert, every other tag's reports
+     * included.
+     */
+    @Query("SELECT id FROM OwnedBeacons WHERE id IN (:beaconIds)")
+    List<String> whichExist(List<String> beaconIds);
 
     @Delete
     void delete(OwnedBeacon ownedBeaconWithId);

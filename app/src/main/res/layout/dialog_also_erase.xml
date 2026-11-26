@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A confirmation dialog's "and erase this too" choice: under the message, unticked by default,
+    with its wording set by the caller. Used by Remove (the tag's location history) and Logout
+    (everything). Unticked because both actions already did something less destructive before
+    this existed, and erasing is the one that cannot be undone.
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="8dp"
+    android:paddingStart="?attr/dialogPreferredPadding"
+    android:paddingEnd="?attr/dialogPreferredPadding"
+    >
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/dialog_also_erase"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:checked="false"
+        android:fontFamily="@font/nunito_medium"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="14sp" />
+
+</FrameLayout>

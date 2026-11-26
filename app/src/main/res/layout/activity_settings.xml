@@ -25,6 +25,7 @@
         <variable name="onClickAppleDevicesHelpLink" type="Runnable" />
         <variable name="isSystemColorsSupported" type="boolean" />
         <variable name="isSystemColorsEnabled" type="boolean" />
+        <variable name="onClickEraseAllData" type="Runnable" />
     </data>
 
     <LinearLayout
@@ -486,6 +487,19 @@
                     android:text="@string/enable_debug_data"
                     android:textSize="16sp" />
             </LinearLayout>
+
+            <!--
+                Last on the page, as the one thing here that cannot be undone. Not inside the
+                account block beside Logout, because that block is only drawn while a session can
+                be read, and erasing has to stay reachable when it cannot.
+            -->
+            <include
+                android:id="@+id/settings_erase_all_data"
+                layout="@layout/settings_item_clickable"
+                app:icon="@{@drawable/delete_24px}"
+                app:onClick="@{onClickEraseAllData}"
+                app:sectionSubtitle="@{@string/erase_all_data_subtitle}"
+                app:title="@{@string/erase_all_data_title}" />
 
         </LinearLayout>
 

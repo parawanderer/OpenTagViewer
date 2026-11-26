@@ -21,6 +21,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
@@ -1412,20 +1413,28 @@ public class DeviceInfoActivity extends AppCompatActivity
             return;
         }
 
+        // The tag's keys are deleted either way; see BeaconRepository#removeBeacon. Its history
+        // only when this is ticked, because keeping it is what lets a tag removed by mistake come
+        // back whole when it is imported again.
+        final View alsoErase = this.getLayoutInflater().inflate(R.layout.dialog_also_erase, null);
+        final CheckBox eraseHistory = alsoErase.findViewById(R.id.dialog_also_erase);
+        eraseHistory.setText(R.string.remove_tag_also_erase_history);
+
         var dialog = new MaterialAlertDialogBuilder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog_Centered)
                 .setTitle(R.string.remove_device)
                 .setIcon(R.drawable.delete_24px)
                 .setMessage(R.string.are_you_sure_you_want_to_remove_this_device_once_removed_it_will_need_to_be_reimported_to_get_it_back)
+                .setView(alsoErase)
                 .setPositiveButton(R.string.confirm, (dialog1, which) -> {
-                    Log.d(TAG, "Clicked to confirm device deletion. Now proceeding to delete (actually hide) device...");
-                    this.handleDeviceRemoval();
+                    Log.d(TAG, "Clicked to confirm device removal");
+                    this.handleDeviceRemoval(eraseHistory.isChecked());
                 }).setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    private void handleDeviceRemoval() {
+    private void handleDeviceRemoval(final boolean alsoErasingHistory) {
         final String beaconId = this.beaconId;
-        var async = this.beaconRepo.markBeaconAsRemoved(beaconId)
+        var async = this.beaconRepo.removeBeacon(beaconId, alsoErasingHistory)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
                     Intent data = new Intent();

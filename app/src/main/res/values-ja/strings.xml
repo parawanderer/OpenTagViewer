@@ -465,4 +465,13 @@ Appleが要求を拒否しただけなら、少し待ってからもう一度お
     <string name="settings_section_tags">タグ</string>
     <string name="settings_section_app">アプリ</string>
     <string name="anisette_coreadi_card_title">Apple からファイルをダウンロードできませんでした</string>
+    <string name="remove_tag_also_erase_history">位置情報の履歴も削除する。タグを再度インポートしても元に戻りません。</string>
+    <string name="remove_tags_also_erase_history">位置情報の履歴も削除する。タグを再度インポートしても元に戻りません。</string>
+    <string name="logout_also_erase_data">このスマートフォン上のすべてのタグ（キーと位置情報の履歴を含む）と iCloud 連携も消去する</string>
+    <string name="erase_all_data_title">すべてのデータを消去</string>
+    <string name="erase_all_data_subtitle">このスマートフォンからすべてのタグ、キー、位置情報の履歴を削除してログアウトします</string>
+    <string name="erase_all_data_confirm_title">すべてのデータを消去しますか？</string>
+    <string name="erase_all_data_confirm_message">このスマートフォン上のすべてのタグが、キーと位置情報の履歴、インポート元のデータ、iCloud 連携とともに削除されます。Apple アカウントからログアウトします。設定はそのまま残ります。\n\nこの操作は取り消せません。ファイルからインポートしたタグは、そのファイルを再度インポートしない限り戻りません。\n\nこれによって Apple アカウントからこのアプリが削除されるわけではありません。削除は Apple デバイスで行う必要があります。</string>
+    <string name="erase_all_data_confirm_button">消去</string>
+    <string name="error_erasing_data">このスマートフォン上のすべてを消去できなかったため、ログインしたままです。タグは残っていますが、iCloud 連携はすでに削除されている可能性があります。もう一度お試しください。</string>
 </resources>
