@@ -4,23 +4,50 @@ env:
   main_project_module: app
   # The name of the App
   app_name: OpenTagViewer
-  KEYSTORE_FILE: release-keystore.jks
   ALIAS: upload
 
 on:
   release:
     types: published
 
+# Every job states what it needs below; nothing gets more than that by default.
+permissions: {}
+
+# **The release key never shares a job with the build.**
+#
+# Building runs a great deal of code nobody here wrote or reviewed: Gradle plugins and every Maven
+# artifact they pull, pip's dependency tree for the bridge tests, Chaquopy's own pip install of
+# FindMy.py's dependencies, and the actions themselves. Any one of those, compromised, could read a
+# keystore sitting on the same disk, or leave something behind in ~/.gradle to catch the passwords
+# when a later step handed them over. And this app is sideloaded, with no Play App Signing behind
+# it: a stolen key signs updates that install over every existing install without a warning.
+#
+# So the work is split three ways:
+#
+# - `build` builds and tests, and produces the release APK *unsigned*. It never sees the key or its
+#   passwords. app/build.gradle.kts leaves a release unsigned when no keystore is present.
+# - `sign` is the only job that does. It checks nothing out and runs nothing from the repository,
+#   only the Android SDK's own apksigner and zipalign from the runner image, on the APK `build`
+#   uploaded. It writes the keystore to the runner's temp directory and deletes it straight after,
+#   and it checks the result is signed by the key every earlier release was signed by.
+# - `publish` attaches the signed APK to the release, with this run's own token.
+#
+# Do not fold them back into one job to save an artifact round-trip. That is the arrangement this
+# replaced.
 jobs:
   build:
     environment: 'Android Build Release'
     runs-on: ubuntu-latest
 
-    # The repository default is read-only, which is what turns a token that never arrives into
-    # a 403 at the very last step. Granting it here means the upload still works if the PAT is
-    # ever unset or expires - the action treats an empty token as unset and falls back to this.
+    # Read-only: this job publishes nothing. Its environment is only for MAPS_API_KEY, which ends up
+    # inside the APK anyway. GitHub hands a job the secrets that job references and no others, so the
+    # signing secrets in the same environment do not reach this runner.
     permissions:
-      contents: write
+      contents: read
+
+    outputs:
+      app_version: ${{ steps.extract_version.outputs.APP_VERSION }}
+      release_artifact: ${{ steps.names.outputs.release_artifact }}
 
     # Only run this for 'android-app-v<whatever>' tags!
     if: |
@@ -56,6 +83,12 @@ jobs:
       - name: Set repository name as env variable
         run: echo "repository_name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
 
+      # The signed APK is uploaded by `sign`, under the same name this job always used. Worked out
+      # here so the date in it is the one the build started on, as it always was.
+      - name: Name the release artifact
+        id: names
+        run: echo "release_artifact=$date_today - $app_name - $repository_name - APK(s) release generated" >> "$GITHUB_OUTPUT"
+
       - name: Set Up JDK
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -74,10 +107,6 @@ jobs:
       - name: Inject secrets.properties
         run: |
           echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > secrets.properties
-
-      - name: Recreate release keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > ${{ env.main_project_module }}/${{ env.KEYSTORE_FILE }}
 
       # No stub wheel to validate any more: it is generated from app/stubs/unicorn/ by
       # generateUnicornStubWheel during the build, rather than being checked in.
@@ -104,30 +133,22 @@ jobs:
 
       - name: Build gradle project
         run: ./gradlew build -x lint
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ env.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK Debug
         run: |
           ./gradlew assembleDebug
           # rename debug build
           mv ${{ env.main_project_module }}/build/outputs/apk/debug/app-debug.apk ${{ env.main_project_module }}/build/outputs/apk/debug/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}-debug.apk
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ env.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Build APK Release
+      # Unsigned, because there is no keystore here to sign it with. AGP names that output
+      # app-release-unsigned.apk, so if a keystore ever did turn up in this job the `mv` would fail
+      # rather than quietly shipping whatever it had signed.
+      - name: Build APK Release (unsigned)
         run: |
           ./gradlew assembleRelease
-          # rename release build
-          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release.apk ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
+          mv "$main_project_module/build/outputs/apk/release/app-release-unsigned.apk" "$RUNNER_TEMP/$app_name-$APP_VERSION-unsigned.apk"
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ env.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          APP_VERSION: ${{ steps.extract_version.outputs.APP_VERSION }}
 
       # Create Bundle AAB Release
       # Noted for main module build [main_project_module]:bundleRelease
@@ -142,27 +163,157 @@ jobs:
           name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) debug generated
           path: ${{ env.main_project_module }}/build/outputs/apk/debug/
 
-      # Noted For Output [main_project_module]/build/outputs/apk/release/
+      # Only for `sign` to pick up. The signed APK goes out under the usual artifact name from there.
+      - name: Upload the unsigned release APK for signing
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-release-apk
+          path: ${{ runner.temp }}/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
+
+      # Noted For Output [main_project_module]/build/outputs/bundle/release/
+      # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
+      #   uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      #   with:
+      #     name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - App bundle(s) AAB release generated
+      #     path: ${{ env.main_project_module }}/build/outputs/bundle/release/
+
+  # The only job that ever holds the release key. Keep it that way: no checkout, no setup actions,
+  # no Gradle, no pip. What runs here is the runner image's own Android SDK and two GitHub-owned
+  # artifact actions, and nothing the repository or a dependency could have changed.
+  sign:
+    needs: build
+    environment: 'Android Build Release'
+    runs-on: ubuntu-latest
+
+    # Nothing. Artifacts from this run need no token permission, and this job writes nowhere else.
+    permissions: {}
+
+    env:
+      APP_VERSION: ${{ needs.build.outputs.app_version }}
+
+      # The certificate every release so far has been signed with (1.2.0 and before). Checked after
+      # signing, because an APK signed by any other key will not install over an existing one, and
+      # the person who finds that out is a user being told to uninstall, which destroys their
+      # imported tags and history. Only change this if the release key is deliberately rotated.
+      EXPECTED_SIGNER_SHA256: e85e6f91cb4b58102ef7476e7193e7fae25cfb46c9f0425d8aced117a12ecf92
+
+    steps:
+      - name: Download the unsigned release APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-release-apk
+          path: ${{ runner.temp }}/unsigned
+
+      # Build-tools comes with the runner image, not from anything this workflow fetched. The newest
+      # installed one is used; -P (16 KB page alignment) needs 35.0.0 or later.
+      - name: Find the Android build-tools
+        run: |
+          set -euo pipefail
+          version=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)
+          test -n "$version"
+          echo "Using build-tools $version"
+          echo "BUILD_TOOLS=$ANDROID_HOME/build-tools/$version" >> "$GITHUB_ENV"
+
+      # AGP aligns the APK when it packages it, including 16 KB page alignment for the native
+      # libraries it stores uncompressed. apksigner keeps the alignment it is given, and a v2 signature
+      # is a block outside the zip entries, so checking it here and again afterwards is enough.
+      - name: Check the unsigned APK is aligned
+        run: |
+          "$BUILD_TOOLS/zipalign" -c -P 16 4 "$RUNNER_TEMP/unsigned/$app_name-$APP_VERSION-unsigned.apk"
+
+      # The keystore exists only for the length of this step, outside the workspace, readable only
+      # by the runner user. The passwords are handed to apksigner through the environment, never on
+      # its command line.
+      #
+      # v2 only, which is what AGP signed every earlier release with for minSdk 24: v1 is only
+      # needed below API 24, and v3 adds nothing without a key rotation. Matching it keeps the
+      # APK the same shape as before rather than changing two things at once.
+      - name: Sign the release APK
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/release-keystore.jks"
+          trap 'rm -f "$keystore"' EXIT
+          (umask 077 && printf '%s' "$SIGNING_KEY" | base64 --decode > "$keystore")
+          mkdir -p "$RUNNER_TEMP/signed"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$keystore" \
+            --ks-key-alias "$ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --v4-signing-enabled false \
+            --out "$RUNNER_TEMP/signed/$app_name-$APP_VERSION.apk" \
+            "$RUNNER_TEMP/unsigned/$app_name-$APP_VERSION-unsigned.apk"
+
+      - name: Verify the signature, the signer and the alignment
+        run: |
+          set -euo pipefail
+          apk="$RUNNER_TEMP/signed/$app_name-$APP_VERSION.apk"
+          report=$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$apk")
+          echo "$report" | grep -v '^WARNING'
+          echo "$report" | grep -qx 'Verified using v2 scheme (APK Signature Scheme v2): true'
+          echo "$report" | grep -qx 'Number of signers: 1'
+          # Every certificate digest the report names, whatever it calls the signer: build-tools 35
+          # and 36 say "Signer #1 certificate SHA-256 digest:", 37 says "V2 Signer: certificate
+          # SHA-256 digest:". Exactly one, and it must be the release certificate.
+          signers=$(echo "$report" | sed -n 's/^.*[Ss]igner.*certificate SHA-256 digest: \([0-9a-f]\{64\}\)$/\1/p' | sort -u)
+          if [ "$signers" != "$EXPECTED_SIGNER_SHA256" ]; then
+            echo "::error::The APK is signed by ${signers:-nothing recognisable}, not the release certificate ($EXPECTED_SIGNER_SHA256). It would not install over an existing release, so it is not being published."
+            exit 1
+          fi
+          "$BUILD_TOOLS/zipalign" -c -P 16 4 "$apk"
+          {
+            echo "### Signed $app_name $APP_VERSION"
+            echo
+            echo '```'
+            (cd "$RUNNER_TEMP/signed" && sha256sum "$app_name-$APP_VERSION.apk")
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload APK Release
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - APK(s) release generated
-          path: ${{ env.main_project_module }}/build/outputs/apk/release/
+          name: ${{ needs.build.outputs.release_artifact }}
+          path: ${{ runner.temp }}/signed/
+          if-no-files-found: error
 
-      # The token goes in `with:`, not `env:`. This action's `token` input defaults to
-      # ${{ github.token }}, and its own docs say "a non-empty explicit token overrides
-      # GITHUB_TOKEN" - so the default is always non-empty and an env var is ignored entirely.
-      # It then authenticates as the built-in token, whose contents permission is read-only
-      # here, and fails with 403 "Resource not accessible by integration" after the APK has
-      # already been built and signed. That is exactly how the 1.0.5 exporter release went out
-      # with no assets attached; this workflow had the same wiring and was never re-run.
+  # Attaches the signed APK to the release. No environment and no key; it needs only this run's own
+  # token with write access to releases, which is what `permissions` grants below.
+  publish:
+    needs: [build, sign]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      APP_VERSION: ${{ needs.build.outputs.app_version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the signed release APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.release_artifact }}
+          path: signed
+
       # The APK carries libmacadi.so, which links Unicorn (GPL-2.0). GPL-2.0 section 3 asks for the
       # corresponding source to be offered from the same place as the binary, and FetchContent
       # downloads Unicorn's at build time rather than it being in this repository's tag. So the
       # exact tarball the build used goes on the release beside the APK, checked against the hash
       # MacAdi.cmake pins, and the APK's assets/licences/unicorn/NOTICE.txt says where it is.
       - name: Fetch Unicorn's source, as the APK was built from it
-        if: github.event_name == 'release'
         run: |
           url=$(sed -n 's/^ *URL \(https:[^ ]*unicorn[^ ]*\.tar\.gz\)$/\1/p' app/src/main/cpp/macadi/MacAdi.cmake)
           sha=$(sed -n 's/^ *URL_HASH SHA256=\([0-9a-f]*\).*/\1/p' app/src/main/cpp/macadi/MacAdi.cmake)
@@ -171,19 +322,16 @@ jobs:
           echo "$sha  unicorn-$(basename "$url")" | sha256sum -c -
           echo "UNICORN_SOURCE=unicorn-$(basename "$url")" >> "$GITHUB_ENV"
 
+      # `gh` is on the runner image, so this needs no third-party action and no personal access
+      # token: the job's own token, granted contents: write above, is enough to upload assets and
+      # set the title. --clobber replaces an asset of the same name, so re-running a failed release
+      # works. The title is the one releases have always ended up with, without the `v`.
       - name: Upload APK Release Asset to GitHub Release
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
-        if: github.event_name == 'release'
-        with:
-          files: |
-            ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ steps.extract_version.outputs.APP_VERSION }}.apk
-            ${{ env.UNICORN_SOURCE }}
-          name: ${{ env.app_name }} Android App ${{ steps.extract_version.outputs.APP_VERSION }}
-          token: ${{ secrets.ANDROID_BUILD_RELEASE_GITHUB_TOKEN }}
-
-      # Noted For Output [main_project_module]/build/outputs/bundle/release/
-      # - name: Upload AAB (App Bundle) Release - ${{ env.repository_name }}
-      #   uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-      #   with:
-      #     name: ${{ env.date_today }} - ${{ env.app_name }} - ${{ env.repository_name }} - App bundle(s) AAB release generated
-      #     path: ${{ env.main_project_module }}/build/outputs/bundle/release/
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" "signed/$app_name-$APP_VERSION.apk" "$UNICORN_SOURCE" \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$TAG" --title "$app_name Android App $APP_VERSION" --repo "$GITHUB_REPOSITORY"
