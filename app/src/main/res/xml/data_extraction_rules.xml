@@ -1,19 +1,55 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nothing this app stores leaves the phone, by backup or by device-to-device transfer.
+    Used on Android 12 (API 31) and newer; backup_rules.xml says the same for older versions.
+
+    android:allowBackup="false" turns off cloud backup, but on Android 12+ it does NOT turn off
+    device-to-device transfer (the phone-to-phone copy when setting up a new phone). Without a
+    <device-transfer> section everything was eligible. So both sections exclude every domain:
+
+    - The database holds every imported tag's private keys and its whole location history,
+      unencrypted.
+    - The Apple session, the iCloud link and the extra sources' passwords are encrypted with
+      Android Keystore keys, and Keystore keys never leave the phone. On a new phone those would
+      arrive as data nothing can decrypt.
+    - The Anisette identity (files/anisette, the anisette-identity preferences) is one machine
+      for the life of an install (AGENTS.md rules 11 and 21). A copy would put the same machine
+      on two phones.
+    - Moving some of it and not the rest (settings and "onboarding done", say, without tags or
+      a session) is a state no install is ever in otherwise.
+
+    So a new phone starts as a fresh install: sign in again and import the export again. Export
+    Tags and Export History move tags and history on purpose. Settings are not carried over
+    either; they are few and quick to set again, and splitting them out would need this file to
+    track every file the app writes.
+
+    The cloud-backup section is never used while allowBackup is false. It is filled in anyway,
+    so that flipping allowBackup on later does not quietly start uploading the above.
+
+    The cache, code_cache and no_backup directories are never backed up or transferred, so they
+    have no domain here. KeepingAppDataOnThisPhoneTest pins all of this.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

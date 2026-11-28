@@ -61,7 +61,8 @@ user's imported beacons and location history.
 
 - Add a `Migration` and register it in `addMigrations(...)`
 - **Never** use `fallbackToDestructiveMigration()` — recovery means redoing the macOS
-  export, and `allowBackup` is false so there is no backup
+  export, and `allowBackup` is false so there is no backup (and `data_extraction_rules.xml`
+  keeps the database off device-to-device transfer too, so a new phone has no copy either)
 - Add a migration test, including the direct path from the oldest version (users skip
   releases)
 - Schemas are exported to `app/schemas/` and committed; include the new JSON in your change
