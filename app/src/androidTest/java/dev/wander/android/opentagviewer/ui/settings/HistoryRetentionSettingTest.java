@@ -26,6 +26,8 @@ import org.junit.runner.RunWith;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import dev.wander.android.opentagviewer.DeviceStateGuard;
 import dev.wander.android.opentagviewer.Eventually;
@@ -37,6 +39,8 @@ import dev.wander.android.opentagviewer.db.repo.HistoryPruner;
 import dev.wander.android.opentagviewer.db.repo.UserSettingsRepository;
 import dev.wander.android.opentagviewer.db.repo.model.UserSettings;
 import dev.wander.android.opentagviewer.python.AppDependencies;
+import dev.wander.android.opentagviewer.ui.TestHostActivity;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
 
 /**
@@ -181,12 +185,55 @@ public class HistoryRetentionSettingTest {
         this.seeSubtitle(R.string.history_retention_1_month);
     }
 
+    /**
+     * A save that fails deletes nothing, and the screen goes back to the period still stored.
+     * Hosted on its own so the save can be made to fail without a seam in SettingsActivity.
+     */
+    @Test
+    public void aFailedSaveDeletesNothingAndPutsThePeriodBack() {
+        final UserSettings settings = this.repository().getUserSettings();
+        final SavesNothing repository = new SavesNothing();
+        final AtomicReference<String> subtitle = new AtomicReference<>();
+        final String forever = this.context.getString(R.string.history_retention_forever);
+
+        try (ActivityScenario<TestHostActivity> host =
+                     ActivityScenario.launch(TestHostActivity.class)) {
+            host.onActivity(activity -> {
+                final HistoryRetentionRow row =
+                        new HistoryRetentionRow(activity, settings, repository, subtitle::set);
+                row.refresh();
+                row.onClick();
+            });
+            this.pick(R.string.history_retention_1_month);
+            Eventually.check(() -> onView(withText(R.string.history_retention_confirm_button))
+                    .inRoot(isDialog()).check(matches(isDisplayed())));
+            onView(withText(R.string.history_retention_confirm_button))
+                    .inRoot(isDialog()).perform(click());
+
+            Eventually.check(() -> {
+                assertEquals(1, repository.attempts.get());
+                assertEquals(forever, subtitle.get());
+            });
+            assertEquals(UserSettings.HISTORY_RETENTION_FOREVER,
+                    settings.resolveHistoryRetentionDays());
+            assertEquals("the delete was called although the save failed",
+                    List.of(), this.pruner.storedWhenAsked);
+            assertEquals(List.of(), this.pruner.asked);
+            assertEquals(UserSettings.HISTORY_RETENTION_FOREVER, this.storedPeriod());
+        }
+    }
+
     private void open() {
         this.scenario = ActivityScenario.launch(SettingsActivity.class);
     }
 
     private void choose(final int label) {
         onView(withId(R.id.settings_history_retention)).perform(scrollTo(), click());
+        this.pick(label);
+    }
+
+    /** Picks {@code label} in the open list of periods and accepts it. */
+    private void pick(final int label) {
         Eventually.check(() -> onView(withText(label)).inRoot(isDialog())
                 .check(matches(isDisplayed())));
         onView(withText(label)).inRoot(isDialog()).perform(click());
@@ -214,16 +261,36 @@ public class HistoryRetentionSettingTest {
         this.repository().storeUserSettings(settings).blockingAwait();
     }
 
+    /** A settings repository whose every save fails, and which counts the attempts. */
+    private final class SavesNothing extends UserSettingsRepository {
+        final AtomicInteger attempts = new AtomicInteger();
+
+        SavesNothing() {
+            super(UserSettingsDataStore.getInstance(HistoryRetentionSettingTest.this.context));
+        }
+
+        @Override
+        public Completable storeUserSettings(final UserSettings userSettings) {
+            this.attempts.incrementAndGet();
+            return Completable.error(new IllegalStateException("a save that fails, on purpose"));
+        }
+    }
+
     /** Records each call, and the period stored at that moment. */
     private final class RecordingPruner implements HistoryPruner {
         final List<Integer> asked = new CopyOnWriteArrayList<>();
         final List<Integer> storedWhenAsked = new CopyOnWriteArrayList<>();
         volatile boolean fail = false;
 
+        /**
+         * Records when called, not when subscribed. The real pruner does nothing until
+         * subscribed, so recording inside the callable could not tell {@code save.andThen(prune)}
+         * from {@code RxFlows.onlyAfter}: both subscribe once the save is done.
+         */
         @Override
         public Single<Integer> prune(final int retentionDays) {
+            this.storedWhenAsked.add(storedPeriod());
             return Single.fromCallable(() -> {
-                this.storedWhenAsked.add(storedPeriod());
                 this.asked.add(retentionDays);
                 if (this.fail) {
                     throw new IllegalStateException("a delete that fails, on purpose");

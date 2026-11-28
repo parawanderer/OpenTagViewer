@@ -2,8 +2,6 @@ package dev.wander.android.opentagviewer.db.repo;
 
 import android.util.Log;
 
-import androidx.sqlite.db.SupportSQLiteDatabase;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -1095,7 +1093,7 @@ public class BeaconRepository {
                 }
             });
 
-            this.compactBestEffort();
+            DatabaseCompaction.now(db, "removing a tag");
         }).subscribeOn(Schedulers.io());
     }
 
@@ -1108,25 +1106,6 @@ public class BeaconRepository {
      */
     public Completable eraseEverything() {
         return Completable.fromRunnable(db::clearAllTables).subscribeOn(Schedulers.io());
-    }
-
-    /**
-     * Rewrite the database file without the free pages a delete leaves behind, then fold the
-     * write-ahead log back in and truncate it.
-     *
-     * <p>Best effort: if another connection is busy it fails, and the data is still deleted as far
-     * as the app is concerned - only a forensic reading of the file could find it until the next
-     * compaction. Not worth failing the user's removal over.
-     */
-    private void compactBestEffort() {
-        try {
-            final SupportSQLiteDatabase sqlite = db.getOpenHelper().getWritableDatabase();
-            sqlite.execSQL("VACUUM");
-            sqlite.query("PRAGMA wal_checkpoint(TRUNCATE)").close();
-        } catch (RuntimeException e) {
-            Log.w(TAG, "Could not compact the database after removing a tag; the rows are gone"
-                    + " but their bytes stay in the file until the next compaction", e);
-        }
     }
 
     public Observable<Optional<DailyHistoryFetchRecord>> getInsertionHistoryItem(final String beaconId, final long startOfDayTimestampMS) {
