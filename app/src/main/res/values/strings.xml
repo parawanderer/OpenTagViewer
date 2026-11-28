@@ -381,6 +381,18 @@ You can set this up now, or any time later from Settings.</string>
     <string name="left_behind_seconds_explainer">How long a tag has to go unheard before the app decides you have left it behind. It listens at full power from halfway through that time, so a shorter wait warns you sooner and costs more battery.</string>
     <string name="left_behind_sound">Alarm sound</string>
     <string name="left_behind_sound_default">Default alarm sound</string>
+    <string name="history_retention_title">Keep location history</string>
+    <string name="history_retention_forever">Forever</string>
+    <string name="history_retention_1_year">1 year</string>
+    <string name="history_retention_6_months">6 months</string>
+    <string name="history_retention_3_months">3 months</string>
+    <string name="history_retention_1_month">1 month</string>
+    <string name="history_retention_confirm_title">Delete older history?</string>
+    <string name="history_retention_confirm_message">Positions older than the period you chose are deleted now, and again each time the app starts. That includes history you imported. Each tag keeps its last known position.
+
+This cannot be undone. Export History first if you want a copy.</string>
+    <string name="history_retention_confirm_button">Delete</string>
+    <string name="history_retention_delete_failed">Could not delete the older history. The app will try again the next time it starts.</string>
     <string name="icloud_membership_unreadable_title">Reconnect your Apple account</string>
     <string name="icloud_membership_unreadable_message">This app has a connection to your Apple account saved, but can no longer read it. The keys it needs are kept in this device\'s secure storage, and they cannot be recovered — so the connection has to be made again.
 

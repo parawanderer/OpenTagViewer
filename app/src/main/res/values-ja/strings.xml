@@ -347,6 +347,18 @@
     <string name="left_behind_seconds_explainer">タグの信号が途絶えてから、置き忘れと判断するまでの時間です。その半分を過ぎると全力で探すため、短いほど早く知らせますが電池を多く使います。</string>
     <string name="left_behind_sound">アラーム音</string>
     <string name="left_behind_sound_default">既定のアラーム音</string>
+    <string name="history_retention_title">位置情報履歴の保存期間</string>
+    <string name="history_retention_forever">無期限</string>
+    <string name="history_retention_1_year">1 年</string>
+    <string name="history_retention_6_months">6 か月</string>
+    <string name="history_retention_3_months">3 か月</string>
+    <string name="history_retention_1_month">1 か月</string>
+    <string name="history_retention_confirm_title">古い履歴を削除しますか？</string>
+    <string name="history_retention_confirm_message">選択した期間より古い位置情報は、今すぐ削除され、以後はアプリを起動するたびに削除されます。インポートした履歴も対象です。各タグの最後の既知の位置は残ります。
+
+この操作は元に戻せません。コピーが必要な場合は、先に履歴をエクスポートしてください。</string>
+    <string name="history_retention_confirm_button">削除</string>
+    <string name="history_retention_delete_failed">古い履歴を削除できませんでした。次回アプリを起動したときに再試行します。</string>
     <string name="icloud_membership_unreadable_title">Apple アカウントを接続し直してください</string>
     <string name="icloud_membership_unreadable_message">このアプリには Apple アカウントとの接続が保存されていますが、読み取れなくなりました。必要な鍵はこの端末の安全な保管領域にあり、復元できません。そのため接続をやり直す必要があります。
 

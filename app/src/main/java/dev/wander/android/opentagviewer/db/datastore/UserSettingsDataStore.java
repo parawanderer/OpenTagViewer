@@ -42,6 +42,13 @@ public final class UserSettingsDataStore {
     public static final Preferences.Key<String> LEFT_BEHIND_SOUND_URI =
             PreferencesKeys.stringKey("left_behind_sound_uri");
 
+    /**
+     * How many days of location history to keep. Absent or zero means keep everything, which is
+     * what every install did before this existed.
+     */
+    public static final Preferences.Key<Integer> HISTORY_RETENTION_DAYS =
+            PreferencesKeys.intKey("history_retention_days");
+
     public static RxDataStore<Preferences> getInstance(Context context) {
         if (PREFERENCES_DATA_STORE == null) {
             PREFERENCES_DATA_STORE = new RxPreferenceDataStoreBuilder(context, SETTINGS_FILE_NAME)

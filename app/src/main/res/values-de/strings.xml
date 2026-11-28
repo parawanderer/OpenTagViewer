@@ -347,6 +347,18 @@ Du kannst das jetzt einrichten oder jederzeit später in den Einstellungen.</str
     <string name="left_behind_seconds_explainer">Wie lange ein Tag nicht zu hören sein darf, bevor die App entscheidet, dass du ihn zurückgelassen hast. Ab der Hälfte dieser Zeit sucht sie mit voller Leistung, ein kürzerer Wert warnt also früher und kostet mehr Akku.</string>
     <string name="left_behind_sound">Alarmton</string>
     <string name="left_behind_sound_default">Standard-Alarmton</string>
+    <string name="history_retention_title">Standortverlauf behalten</string>
+    <string name="history_retention_forever">Für immer</string>
+    <string name="history_retention_1_year">1 Jahr</string>
+    <string name="history_retention_6_months">6 Monate</string>
+    <string name="history_retention_3_months">3 Monate</string>
+    <string name="history_retention_1_month">1 Monat</string>
+    <string name="history_retention_confirm_title">Älteren Verlauf löschen?</string>
+    <string name="history_retention_confirm_message">Positionen, die älter als der gewählte Zeitraum sind, werden jetzt gelöscht und danach bei jedem Start der App. Das gilt auch für importierten Verlauf. Jeder Tag behält seine letzte bekannte Position.
+
+Das kann nicht rückgängig gemacht werden. Exportiere vorher den Verlauf, wenn du eine Kopie möchtest.</string>
+    <string name="history_retention_confirm_button">Löschen</string>
+    <string name="history_retention_delete_failed">Der ältere Verlauf konnte nicht gelöscht werden. Die App versucht es beim nächsten Start erneut.</string>
     <string name="icloud_membership_unreadable_title">Apple-Konto erneut verbinden</string>
     <string name="icloud_membership_unreadable_message">Diese App hat eine Verbindung zu deinem Apple-Konto gespeichert, kann sie aber nicht mehr lesen. Die dafür nötigen Schlüssel liegen im sicheren Speicher dieses Geräts und lassen sich nicht wiederherstellen – die Verbindung muss also neu hergestellt werden.
 

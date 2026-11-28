@@ -347,6 +347,18 @@ Je kunt dit nu instellen, of later altijd nog via Instellingen.</string>
     <string name="left_behind_seconds_explainer">Hoe lang een tag onhoorbaar moet blijven voordat de app besluit dat je hem hebt laten liggen. Vanaf de helft van die tijd luistert hij op vol vermogen, dus korter waarschuwt eerder en kost meer batterij.</string>
     <string name="left_behind_sound">Alarmgeluid</string>
     <string name="left_behind_sound_default">Standaard alarmgeluid</string>
+    <string name="history_retention_title">Locatiegeschiedenis bewaren</string>
+    <string name="history_retention_forever">Voor altijd</string>
+    <string name="history_retention_1_year">1 jaar</string>
+    <string name="history_retention_6_months">6 maanden</string>
+    <string name="history_retention_3_months">3 maanden</string>
+    <string name="history_retention_1_month">1 maand</string>
+    <string name="history_retention_confirm_title">Oudere geschiedenis verwijderen?</string>
+    <string name="history_retention_confirm_message">Posities die ouder zijn dan de gekozen periode worden nu verwijderd, en daarna elke keer dat de app start. Dat geldt ook voor geïmporteerde geschiedenis. Elke tag houdt zijn laatst bekende positie.
+
+Dit kan niet ongedaan worden gemaakt. Exporteer eerst de geschiedenis als je een kopie wilt.</string>
+    <string name="history_retention_confirm_button">Verwijderen</string>
+    <string name="history_retention_delete_failed">De oudere geschiedenis kon niet worden verwijderd. De app probeert het opnieuw bij de volgende start.</string>
     <string name="icloud_membership_unreadable_title">Verbind je Apple-account opnieuw</string>
     <string name="icloud_membership_unreadable_message">Deze app heeft een verbinding met je Apple-account opgeslagen, maar kan die niet meer lezen. De benodigde sleutels staan in de beveiligde opslag van dit apparaat en zijn niet te herstellen — de verbinding moet dus opnieuw worden gemaakt.
 

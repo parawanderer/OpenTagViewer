@@ -91,6 +91,7 @@ import dev.wander.android.opentagviewer.service.web.GithubRawUtilityFilesService
 import dev.wander.android.opentagviewer.service.web.sidestore.AnisetteServerSuggestion;
 import dev.wander.android.opentagviewer.ui.compat.WindowPaddingUtil;
 import dev.wander.android.opentagviewer.ui.settings.AmapApiKeyDialog;
+import dev.wander.android.opentagviewer.ui.settings.HistoryRetentionRow;
 import dev.wander.android.opentagviewer.ui.settings.SharedMainSettingsManager;
 import dev.wander.android.opentagviewer.ui.extensions.AppAutoCompleteTextView;
 import dev.wander.android.opentagviewer.update.UpdateSettingsRow;
@@ -278,6 +279,11 @@ public class SettingsActivity extends AppCompatActivity {
         systemColors.setOnCheckedChangeListener(this::onUseSystemColorsChange);
 
         this.setupLeftBehindSettings();
+
+        this.historyRetentionRow = new HistoryRetentionRow(this, this.currentSettings,
+                this.settingsRepository, this.binding::setHistoryRetentionSubtitle);
+        this.binding.setOnClickHistoryRetention(this.historyRetentionRow::onClick);
+        this.historyRetentionRow.refresh();
 
         this.setupUserInfo();
 
@@ -487,6 +493,9 @@ public class SettingsActivity extends AppCompatActivity {
 
     /** Settings -> App updates. */
     private UpdateSettingsRow appUpdatesRow;
+
+    /** Settings -> Keep location history. */
+    private HistoryRetentionRow historyRetentionRow;
 
     /**
      * Say whether this app has already joined the account's keychain.

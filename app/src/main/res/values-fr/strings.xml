@@ -348,6 +348,18 @@ Vous pouvez configurer cela maintenant, ou à tout moment depuis les réglages.<
     <string name="left_behind_seconds_explainer">Combien de temps un tag doit rester inaudible avant que l\'application décide que vous l\'avez oublié. Elle écoute à pleine puissance à partir de la moitié de ce délai, donc un délai plus court avertit plus tôt et consomme plus de batterie.</string>
     <string name="left_behind_sound">Son de l\'alarme</string>
     <string name="left_behind_sound_default">Son d\'alarme par défaut</string>
+    <string name="history_retention_title">Conserver l’historique de localisation</string>
+    <string name="history_retention_forever">Indéfiniment</string>
+    <string name="history_retention_1_year">1 an</string>
+    <string name="history_retention_6_months">6 mois</string>
+    <string name="history_retention_3_months">3 mois</string>
+    <string name="history_retention_1_month">1 mois</string>
+    <string name="history_retention_confirm_title">Supprimer l’historique plus ancien ?</string>
+    <string name="history_retention_confirm_message">Les positions plus anciennes que la durée choisie sont supprimées maintenant, puis à chaque démarrage de l’application. Cela inclut l’historique que vous avez importé. Chaque balise garde sa dernière position connue.
+
+Cette action est irréversible. Exportez d’abord l’historique si vous voulez en garder une copie.</string>
+    <string name="history_retention_confirm_button">Supprimer</string>
+    <string name="history_retention_delete_failed">Impossible de supprimer l’historique plus ancien. L’application réessaiera au prochain démarrage.</string>
     <string name="icloud_membership_unreadable_title">Reconnectez votre compte Apple</string>
     <string name="icloud_membership_unreadable_message">Cette application a une connexion à votre compte Apple enregistrée, mais ne parvient plus à la lire. Les clés nécessaires sont conservées dans le stockage sécurisé de cet appareil et ne peuvent pas être récupérées : la connexion doit donc être refaite.
 
