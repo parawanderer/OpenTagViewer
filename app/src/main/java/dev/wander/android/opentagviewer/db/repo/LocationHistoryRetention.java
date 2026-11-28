@@ -15,8 +15,10 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 /**
  * Deletes location reports older than the period chosen in Settings, keeping each tag's newest.
  *
- * <p>Runs when the app starts and when a shorter period is chosen. Nothing else deletes history
- * on a timer, because the app has no background work outside the optional scan.
+ * <p>Runs when the app starts and when a shorter period is chosen, and compacts the file
+ * afterwards so the deleted reports are not left in it (see {@link DatabaseCompaction}). Nothing
+ * else deletes history on a timer, because the app has no background work outside the optional
+ * scan.
  *
  * <p><b>Keeping everything opens nothing.</b> With the default, {@link #prune} returns without
  * touching the database, so an install that never chose a period behaves exactly as it did
@@ -52,15 +54,43 @@ public final class LocationHistoryRetention implements HistoryPruner {
                 System::currentTimeMillis);
     }
 
+    /**
+     * For a period just chosen in Settings: deletes, then compacts the file if anything went, so
+     * what was deleted is not still readable in it. See {@link DatabaseCompaction#now}.
+     */
     @Override
     public Single<Integer> prune(final int retentionDays) {
         return Single.fromCallable(() -> {
-            final long cutoff = cutoffFor(retentionDays, this.clock.getAsLong());
-            if (cutoff == NO_CUTOFF) {
-                return 0;
+            final int deleted = this.delete(retentionDays);
+            if (deleted > 0) {
+                DatabaseCompaction.now(this.db, "deleting older location history");
             }
-            return this.db.locationReportDao().deleteOlderThanExceptNewest(cutoff);
+            return deleted;
         }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * For the delete at app start, which runs every time the app does and removes little each
+     * time. So it checkpoints rather than rewriting the whole file: that is what clears the
+     * deleted rows out of the files, and it costs only the pages that changed. See
+     * {@link DatabaseCompaction#checkpoint}.
+     */
+    public Single<Integer> pruneAtStart(final int retentionDays) {
+        return Single.fromCallable(() -> {
+            final int deleted = this.delete(retentionDays);
+            if (deleted > 0) {
+                DatabaseCompaction.checkpoint(this.db, "deleting older location history");
+            }
+            return deleted;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    private int delete(final int retentionDays) {
+        final long cutoff = cutoffFor(retentionDays, this.clock.getAsLong());
+        if (cutoff == NO_CUTOFF) {
+            return 0;
+        }
+        return this.db.locationReportDao().deleteOlderThanExceptNewest(cutoff);
     }
 
     /**

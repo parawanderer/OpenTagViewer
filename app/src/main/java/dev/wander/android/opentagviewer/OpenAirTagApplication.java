@@ -140,7 +140,7 @@ public class OpenAirTagApplication extends Application {
                     return;
                 }
 
-                final int deleted = LocationHistoryRetention.of(this).prune(days).blockingGet();
+                final int deleted = LocationHistoryRetention.of(this).pruneAtStart(days).blockingGet();
                 Log.i(TAG, "Kept " + days + " days of location history; deleted "
                         + deleted + " older reports");
             } catch (final Exception e) {

@@ -865,6 +865,24 @@ the chain is built before anything subscribes. When the order matters, test the 
 because the success path cannot tell the two apart. `RxFlowsTest` shows how, with a stand-in that
 writes when called.
 
+### 24. A deleted row is still in the file until a checkpoint, and a PRAGMA cursor runs only when read
+
+Android's SQLite has `secure_delete` and `auto_vacuum` on, so a delete zeroes the row and frees its
+pages. **But the database is in WAL mode, and all of that happens in the log.** Until a checkpoint,
+the main file still holds the pages from before the delete, and the `-wal` file still holds the
+frames that inserted the rows. Anyone reading the files finds what the user removed. Measured on the
+managed device: after a delete, the rows are readable in both files; after a checkpoint, in neither.
+
+**`sqlite.query("PRAGMA wal_checkpoint(TRUNCATE)").close()` runs nothing.** An Android cursor
+executes when it is first read, so a query that is closed unread never reaches SQLite. #315 shipped
+that line after `VACUUM`, and its tag removal left every row in the WAL with no error anywhere. Read
+the row (`moveToFirst()`), and do the same for any `PRAGMA` run for its effect.
+
+`DatabaseCompaction` is the one place this is done: `checkpoint` after an ordinary delete, `now`
+(`VACUUM` too) after one the user asked for. `freelist_count` is no help in deciding when: with
+`auto_vacuum` on it is always 0. `CompactingAfterDeletingHistoryTest` reads the files byte for byte
+for text only the deleted rows carried, and both of its tests fail with the cursor left unread.
+
 ---
 
 ## Building and testing
