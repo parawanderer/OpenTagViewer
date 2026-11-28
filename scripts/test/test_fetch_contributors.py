@@ -7,7 +7,8 @@ that cache, so the run triggered by the merge gets either a 202 it has to wait o
 200 from before the merge. The second is indistinguishable from success - nothing changes, no
 pull request opens, and the workflow is green having credited nobody.
 
-`--expect-contributor` is what makes that visible, and this is the predicate behind it.
+`--expect-contributor` is what makes that visible, as a warning naming the cause, and these are
+the predicates behind it.
 """
 
 from __future__ import annotations
@@ -174,3 +175,70 @@ def test_giving_up_raises_rather_than_returning_nothing(monkeypatch):
 
     with pytest.raises(RuntimeError):
         fc.fetch_stats()
+
+
+def test_unlinked_commits_are_named_as_the_cause():
+    """The case that actually happened: every commit from an address not on the account."""
+    message = fc.why_missing("someone", 0)
+    assert "linked to their GitHub account" in message
+    assert "Settings > Emails" in message
+    assert "cached" not in message
+
+
+def test_linked_commits_point_at_a_stale_cache():
+    message = fc.why_missing("someone", 4)
+    assert "cached from before the merge" in message
+    assert "Settings > Emails" not in message
+
+
+def test_not_being_able_to_ask_names_both_causes():
+    message = fc.why_missing("someone", None)
+    assert "email" in message and "cached" in message
+
+
+def test_merge_commits_do_not_count_as_linked(monkeypatch):
+    """
+    A merge through the web interface is linked, but `/stats/contributors` ignores merges, so it
+    must not make an unlinked contributor read as a stale cache.
+    """
+    class Response:
+        def read(self):
+            return (b'[{"sha": "a", "parents": [{"sha": "p"}, {"sha": "q"}]},'
+                    b' {"sha": "b", "parents": [{"sha": "p"}]}]')
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(fc, "_request", lambda *_args, **_kwargs: Response())
+    assert fc.linked_commits("someone") == 1
+
+
+def test_a_lookup_that_fails_says_so_rather_than_raising(monkeypatch):
+    def refuse(*_args, **_kwargs):
+        raise OSError("no network")
+
+    monkeypatch.setattr(fc, "_request", refuse)
+    assert fc.linked_commits("someone") is None
+
+
+def test_a_missing_contributor_warns_and_does_not_fail(monkeypatch, tmp_path, capsys):
+    """
+    The run that failed over this was red three times for one contributor whose commits GitHub
+    never links. It warns now, with the cause, and exits 0 so the pull request step still runs.
+    """
+    monkeypatch.setattr(fc, "fetch_stats", lambda: [
+        {"author": {"login": "parawanderer", "type": "User"}, "total": 9, "weeks": []}])
+    monkeypatch.setattr(fc, "download_avatar", lambda *_args: None)
+    monkeypatch.setattr(fc, "linked_commits", lambda _login: 0)
+    monkeypatch.setattr(fc, "ASSETS", tmp_path)
+    monkeypatch.setattr(fc, "MANIFEST", tmp_path / "contributors.json")
+    monkeypatch.setattr(fc, "AVATAR_DIR", tmp_path / "contributors")
+    monkeypatch.setattr(fc, "REPO_ROOT", tmp_path)
+
+    assert fc.main(["--expect-contributor", "someone"]) == 0
+    out = capsys.readouterr().out
+    assert "::warning title=Not credited::someone" in out
+    assert "linked to their GitHub account" in out
