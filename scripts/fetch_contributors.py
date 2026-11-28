@@ -43,6 +43,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -203,18 +204,61 @@ def missing_from(contributors: list[dict], expected: str | None) -> bool:
     cached 200 from before the merge, and the second is indistinguishable from success. Nothing
     changes, no pull request opens, and the run is green.
 
-    So the merge-triggered run says who it expected to find. Absent means the weekly schedule is
-    what will actually credit them, and that is worth a failed run on the Actions tab rather than
-    a green one that did nothing.
+    So the merge-triggered run says who it expected to find, and an absence is reported as a
+    warning on the run rather than passing unremarked. See why_missing() for what it says.
 
     An excluded login is not missing - it was never going to be there. Without this, merging a
-    pull request authored by one of the tool accounts in EXCLUDED_LOGINS would fail every time,
+    pull request authored by one of the tool accounts in EXCLUDED_LOGINS would warn every time,
     correctly by the letter and uselessly in practice.
     """
     if not expected or expected.lower() in EXCLUDED_LOGINS:
         return False
 
     return not any(c["login"].lower() == expected.lower() for c in contributors)
+
+
+def linked_commits(login: str) -> int | None:
+    """
+    How many of this person's commits on the default branch GitHub links to their account,
+    leaving out merge commits, or None if GitHub could not be asked.
+
+    Merges are left out because `/stats/contributors` leaves them out. Somebody who merged a pull
+    request through the web interface has a linked merge commit, and that is enough for GitHub's
+    own contributor sidebar, but not for this list.
+    """
+    url = (f"https://api.github.com/repos/{REPO}/commits"
+           f"?author={urllib.parse.quote(login)}&per_page=100")
+    try:
+        with _request(url) as response:
+            commits = json.loads(response.read())
+    except Exception:  # noqa: BLE001 - only used to word a warning
+        return None
+    return sum(1 for commit in commits if len(commit.get("parents", [])) == 1)
+
+
+def why_missing(login: str, linked: int | None) -> str:
+    """
+    One line saying why `login` is absent, for the run's warning.
+
+    <b>Usually it is the commit email, not the cache.</b> `/stats/contributors` credits a commit
+    to an account only when its author email is on that account. A contributor committing from
+    an address they never added to GitHub is absent from every run, the weekly one included, so
+    a rerun cannot fix it and failing the run over it only produced a red run per merge. That
+    happened for every pull request one contributor merged, over three days.
+    """
+    if linked == 0:
+        return (f"{login} is not in the contributor list: none of their commits on the default "
+                "branch are linked to their GitHub account, which usually means the commit email "
+                "is not on it. Adding that address under GitHub Settings > Emails links the "
+                "existing commits too, and the next run credits them.")
+    if linked is None:
+        return (f"{login} is not in the contributor list, and GitHub could not be asked whether "
+                "their commits are linked to their account. Either the commit email is not on "
+                "their GitHub account, or the stats were cached from before the merge and the "
+                "weekly run will add them.")
+    return (f"{login} is not in the contributor list although {linked} of their commits are "
+            "linked to their account, so GitHub's contributor stats were probably cached from "
+            "before the merge. The weekly run will add them.")
 
 
 def _keep_what_we_have(error: Exception) -> int:
@@ -245,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--expect-contributor",
         metavar="LOGIN",
-        help="fail if this login is absent from the generated list - see missing_from()")
+        help="warn if this login is absent from the generated list - see missing_from()")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
     print(f"Fetching contributors for {REPO} ...")
@@ -302,14 +346,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nWrote {len(contributors)} contributor(s) to "
           f"{MANIFEST.relative_to(REPO_ROOT)}")
 
+    # A warning, not a failure: neither cause is fixed by rerunning this job, and a failed run
+    # also skipped opening the pull request for whatever else this run found.
     if missing_from(contributors, args.expect_contributor):
-        print(f"\n{args.expect_contributor} is not in the list this run generated.",
-              file=sys.stderr)
-        print("GitHub's contributor stats are computed asynchronously and cached, so a run "
-              "fired by a merge can be answered from before it. The weekly schedule will pick "
-              "them up; this is a failed run rather than a green one that credited nobody.",
-              file=sys.stderr)
-        return 1
+        login = args.expect_contributor
+        print(f"::warning title=Not credited::{why_missing(login, linked_commits(login))}")
 
     return 0
 

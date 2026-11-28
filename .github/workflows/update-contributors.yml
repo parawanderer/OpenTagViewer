@@ -75,11 +75,12 @@ jobs:
       # GitHub computes `/stats/contributors` asynchronously and caches it. Merging invalidates
       # that cache, so this run gets either a 202 it waits out or a cached 200 from before the
       # merge - and the second looks exactly like success: no diff, no pull request, green tick.
-      # Naming who this run was fired for turns that into a failed run somebody can see.
+      # Naming who this run was fired for turns that into a warning on the run somebody can see.
       #
-      # It is not a gate on anything, and a red run here means only "the weekly schedule will
-      # credit them instead". Failing loudly is the point; it is the difference between knowing
-      # this trigger works and assuming it does.
+      # A warning and not a failure, because neither cause is fixed by a rerun. The usual one is a
+      # contributor whose commit email is not on their GitHub account: GitHub links none of their
+      # commits, so they are absent from every run, and failing turned each of their merges into a
+      # red run while also skipping the pull request below. The warning says which cause it was.
       # **The login goes through `env:`, never interpolated into the command line.** It is a
       # value an outside person chooses, this job runs with a write token, and `${{ }}` inside
       # `run:` is textual substitution into the shell - which is the standard injection route
